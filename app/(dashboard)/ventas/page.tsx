@@ -1,0 +1,373 @@
+import Link from "next/link";
+import {
+  ArrowRight,
+  Boxes,
+  Hammer,
+  PackageOpen,
+  Scissors,
+  TruckIcon,
+} from "lucide-react";
+import { createChofer, createCliente, createProveedor } from "@/app/actions";
+import { ContextActionPanel } from "@/components/context-action-panel";
+import { voidFormAction } from "@/lib/void-form-action";
+import { ClienteFormFields } from "@/components/sales/cliente-form-fields";
+import { Button } from "@/components/ui/button";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
+import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
+import { getCurrentUserRole } from "@/lib/current-user-role";
+import {
+  getChoferesRows,
+  getClientesRows,
+  getCobrosVencidos,
+  getMueblesCatalogoRows,
+  getOrdenesProduccionRows,
+  getProveedoresRows,
+  getServiciosAserraderoRows,
+  getVentasMuebleTerminadoRows,
+} from "@/lib/data";
+import { canMutateVentas } from "@/lib/permissions";
+import { formatDate, formatPen } from "@/lib/utils";
+
+type Tarjeta = {
+  href: string;
+  titulo: string;
+  descripcion: string;
+  icono: typeof Hammer;
+  badge?: string;
+};
+
+const tarjetas: Tarjeta[] = [
+  {
+    href: "/ventas/muebles-terminados",
+    titulo: "Muebles terminados",
+    descripcion: "Catálogo, venta directa, regateo y entrega con chofer asignado.",
+    icono: Boxes,
+    badge: "Catálogo",
+  },
+  {
+    href: "/ventas/muebles-personalizados",
+    titulo: "Muebles personalizados",
+    descripcion: "Cotizador inteligente, aprobación a orden de producción y seguimiento.",
+    icono: Hammer,
+    badge: "Cotizador",
+  },
+  {
+    href: "/ventas/madera-cortada",
+    titulo: "Madera cortada",
+    descripcion: "Venta por pie tablar con calculadora PT y control de stock.",
+    icono: PackageOpen,
+    badge: "PT",
+  },
+  {
+    href: "/ventas/alquiler-mixer",
+    titulo: "Alquiler Bomba Mixer",
+    descripcion: "Contrato extendido, depósito 30% automático y penalidades por cierre.",
+    icono: TruckIcon,
+    badge: "Contrato",
+  },
+  {
+    href: "/ventas/aserradero-servicios",
+    titulo: "Servicio Aserradero",
+    descripcion: "Cubicaje rápido, cepillado, machembrado y otros procesos especiales.",
+    icono: Scissors,
+    badge: "Cubicaje",
+  },
+];
+
+type VentasPageProps = {
+  searchParams?: Promise<{ quick?: string | string[] }>;
+};
+
+function normalizeQuickParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
+}
+
+export default async function VentasHubPage({ searchParams }: VentasPageProps) {
+  const quick = normalizeQuickParam((await searchParams)?.quick);
+  const [
+    clientes,
+    proveedores,
+    choferes,
+    muebles,
+    ventasMuebles,
+    ordenes,
+    serviciosAserradero,
+    cobrosVencidos,
+  ] = await Promise.all([
+    getClientesRows(),
+    getProveedoresRows(),
+    getChoferesRows(),
+    getMueblesCatalogoRows(),
+    getVentasMuebleTerminadoRows(),
+    getOrdenesProduccionRows(),
+    getServiciosAserraderoRows(),
+    getCobrosVencidos(),
+  ]);
+  const totalCobrosVencidos = cobrosVencidos.reduce((acc, c) => acc + c.monto, 0);
+  const role = await getCurrentUserRole();
+  const canMutate = canMutateVentas(role);
+  const clientesById = new Map(clientes.map((c) => [c.id, c.nombre]));
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold">Módulo de venta</h2>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Cinco sub-flujos del taller: muebles terminados, personalizados, madera cortada, alquiler de Bomba Mixer y servicio de aserradero.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/ventas/dashboard">
+            <Button variant="secondary">Dashboard del mes</Button>
+          </Link>
+          <Link href="/ventas/proveedores-comparador">
+            <Button variant="secondary">Comparador de proveedores</Button>
+          </Link>
+          <Link href="/ventas/zonas-entrega">
+            <Button variant="secondary">Zonas de entrega</Button>
+          </Link>
+        </div>
+      </div>
+
+      {cobrosVencidos.length > 0 ? (
+        <Card className="border-[var(--color-danger)] bg-red-50">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-[var(--color-danger)]">
+                ⚠ {cobrosVencidos.length} cobro{cobrosVencidos.length === 1 ? "" : "s"} a crédito vencido{cobrosVencidos.length === 1 ? "" : "s"}
+              </CardTitle>
+              <CardDescription>
+                Total adeudado:{" "}
+                <span className="font-bold text-[var(--color-danger)]">
+                  {formatPen(totalCobrosVencidos)}
+                </span>
+                . Contacta al cliente para regularizar.
+              </CardDescription>
+            </div>
+            <Link href="/reportes#cobros-vencidos" className="text-sm font-semibold text-[var(--color-danger)] underline">
+              Ver detalle
+            </Link>
+          </div>
+        </Card>
+      ) : null}
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {tarjetas.map((tarjeta) => {
+          const Icon = tarjeta.icono;
+          return (
+            <Link
+              key={tarjeta.href}
+              href={tarjeta.href}
+              className="group rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_var(--color-accent)]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-[var(--color-primary-soft)] text-[var(--color-text-primary)]">
+                  <Icon className="size-6" />
+                </div>
+                {tarjeta.badge ? (
+                  <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    {tarjeta.badge}
+                  </span>
+                ) : null}
+              </div>
+              <h3 className="mt-4 text-base font-semibold text-[var(--color-text-primary)]">
+                {tarjeta.titulo}
+              </h3>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{tarjeta.descripcion}</p>
+              <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-accent)] group-hover:gap-2">
+                Abrir <ArrowRight className="size-3.5" />
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <CardTitle>Acciones rápidas</CardTitle>
+          <CardDescription>
+            Crea cliente, proveedor o chofer sin entrar a un sub-flujo.
+          </CardDescription>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {!canMutate ? (
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              Tu rol es de solo lectura en ventas.
+            </p>
+          ) : (
+            <>
+              <ContextActionPanel
+                key={`quick-cliente-${quick}`}
+                triggerLabel="Registrar cliente"
+                title="Nuevo cliente"
+                description="Datos completos: persona o empresa, RUC/DNI y dirección."
+                openByDefault={quick === "cliente"}
+              >
+                <form action={createCliente} className="space-y-3">
+                  <ClienteFormFields />
+                  <input type="hidden" name="return_to" value="/ventas" />
+                  <div>
+                    <Button>Guardar cliente</Button>
+                  </div>
+                </form>
+              </ContextActionPanel>
+
+              <ContextActionPanel
+                key={`quick-proveedor-${quick}`}
+                triggerLabel="Registrar proveedor"
+                title="Nuevo proveedor"
+                description="Datos básicos del proveedor de madera o insumos."
+                openByDefault={quick === "proveedor"}
+              >
+                <form action={createProveedor} className="grid gap-3 md:grid-cols-2">
+                  <Field name="nombre" label="Proveedor" required />
+                  <Field name="documento" label="RUC o DNI" />
+                  <Field name="telefono" label="Celular" />
+                  <input type="hidden" name="return_to" value="/ventas" />
+                  <div className="md:col-span-2">
+                    <Button>Guardar proveedor</Button>
+                  </div>
+                </form>
+              </ContextActionPanel>
+
+              <ContextActionPanel
+                key={`quick-chofer-${quick}`}
+                triggerLabel="Registrar chofer"
+                title="Nuevo chofer"
+                description="Para asignar entregas a obras y clientes."
+                openByDefault={quick === "chofer"}
+              >
+                <form action={voidFormAction(createChofer)} className="grid gap-3 md:grid-cols-2">
+                  <Field name="nombre" label="Nombre del chofer" required />
+                  <Field name="telefono" label="Teléfono" inputMode="tel" />
+                  <Field
+                    name="placa"
+                    label="Placa de vehículo"
+                    placeholder="ABC-123"
+                    className="md:col-span-2"
+                  />
+                  <input type="hidden" name="return_to" value="/ventas" />
+                  <div className="md:col-span-2">
+                    <Button>Guardar chofer</Button>
+                  </div>
+                </form>
+              </ContextActionPanel>
+            </>
+          )}
+        </div>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardTitle>Últimas ventas de muebles terminados</CardTitle>
+          <CardDescription>
+            {ventasMuebles.length} ventas registradas en total.
+          </CardDescription>
+          <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
+            <Table>
+              <THead>
+                <TRow>
+                  <TH>Fecha</TH>
+                  <TH>Cliente</TH>
+                  <TH>Mueble</TH>
+                  <TH className="text-right">Total</TH>
+                </TRow>
+              </THead>
+              <tbody>
+                {ventasMuebles.slice(0, 5).map((venta) => {
+                  const mueble = muebles.find((m) => m.id === venta.mueble_catalogo_id);
+                  return (
+                    <TRow key={venta.id}>
+                      <TD>{formatDate(venta.fecha)}</TD>
+                      <TD>{clientesById.get(venta.cliente_id) ?? "—"}</TD>
+                      <TD>{mueble?.nombre ?? "—"}</TD>
+                      <TD className="text-right font-semibold">
+                        {formatPen(Number(venta.total))}
+                      </TD>
+                    </TRow>
+                  );
+                })}
+                {ventasMuebles.length === 0 ? (
+                  <TRow>
+                    <TD colSpan={4} className="text-center text-[var(--color-text-secondary)]">
+                      Aún no hay ventas registradas.
+                    </TD>
+                  </TRow>
+                ) : null}
+              </tbody>
+            </Table>
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitle>Órdenes de producción activas</CardTitle>
+          <CardDescription>
+            {ordenes.filter((o) => o.estado !== "entregado").length} órdenes en curso.
+          </CardDescription>
+          <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
+            <Table>
+              <THead>
+                <TRow>
+                  <TH>Cliente</TH>
+                  <TH>Estado</TH>
+                  <TH>Aprobada</TH>
+                </TRow>
+              </THead>
+              <tbody>
+                {ordenes.slice(0, 5).map((orden) => (
+                  <TRow key={orden.id}>
+                    <TD>{clientesById.get(orden.cliente_id) ?? "—"}</TD>
+                    <TD className="capitalize">{orden.estado.replace(/_/g, " ")}</TD>
+                    <TD>
+                      {orden.fecha_aprobacion ? formatDate(orden.fecha_aprobacion) : "—"}
+                    </TD>
+                  </TRow>
+                ))}
+                {ordenes.length === 0 ? (
+                  <TRow>
+                    <TD colSpan={3} className="text-center text-[var(--color-text-secondary)]">
+                      Sin órdenes aún. Aprueba una cotización para crear una.
+                    </TD>
+                  </TRow>
+                ) : null}
+              </tbody>
+            </Table>
+          </div>
+        </Card>
+      </div>
+
+      <Card>
+        <CardTitle>Resumen de catálogos disponibles</CardTitle>
+        <CardDescription>
+          Datos maestros que alimentan los formularios de cada sub-flujo.
+        </CardDescription>
+        <div className="mt-3 grid gap-3 md:grid-cols-4">
+          <Resumen titulo="Clientes" valor={clientes.length} href="#" />
+          <Resumen titulo="Proveedores" valor={proveedores.length} href="#" />
+          <Resumen titulo="Choferes" valor={choferes.length} href="#" />
+          <Resumen titulo="Muebles en catálogo" valor={muebles.length} href="/ventas/muebles-terminados" />
+        </div>
+        {serviciosAserradero.length > 0 ? (
+          <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
+            {serviciosAserradero.length} servicios de aserradero en histórico.
+          </p>
+        ) : null}
+      </Card>
+    </div>
+  );
+}
+
+function Resumen({ titulo, valor, href }: { titulo: string; valor: number; href: string }) {
+  return (
+    <Link
+      href={href}
+      className="rounded-xl border border-[var(--color-border)] p-3 transition hover:bg-[var(--color-primary-soft)]/40"
+    >
+      <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">{titulo}</p>
+      <p className="text-2xl font-bold text-[var(--color-text-primary)]">{valor}</p>
+    </Link>
+  );
+}

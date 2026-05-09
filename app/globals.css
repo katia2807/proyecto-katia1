@@ -1,0 +1,258 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --scrollbar-thumb: #b8c2d9;
+  --color-bg: #eef3fb;
+  --color-surface: #ffffff;
+  --color-surface-2: #f8fbff;
+  --color-border: #d9e2f0;
+  --color-border-strong: #c3d0e3;
+  --color-text-primary: #101828;
+  --color-text-secondary: #667085;
+  --color-primary: #111827;
+  --color-primary-soft: #eef2ff;
+  --color-accent: #17b6ad;
+  --color-accent-soft: #dcf9f6;
+  --color-on-accent: #ffffff;
+  --color-success: #12a978;
+  --color-warning: #ca8a04;
+  --color-danger: #dc3545;
+  --color-warning-soft: #fff4df;
+  --color-warning-border: #d4a652;
+  --color-warning-strong: #6f4a0e;
+  --color-highlight-bg: #ffe7ba;
+  --color-highlight-ring: #d29b37;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --shadow-soft: 0 10px 24px -18px rgba(19, 37, 62, 0.22);
+  --shadow-card: 0 20px 50px -34px rgba(16, 24, 40, 0.3);
+  --shadow-focus: 0 0 0 3px color-mix(in srgb, var(--color-accent) 26%, transparent);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  /* Neutro zinc (sin café); dorado brillante para acentos (no ocre/marrón) */
+  --scrollbar-thumb: #52525b;
+  --color-bg: #0f0f10;
+  --color-surface: #18181b;
+  --color-surface-2: #222226;
+  --color-border: #2e2e33;
+  --color-border-strong: #3f3f46;
+  --color-text-primary: #fafafa;
+  --color-text-secondary: #a1a1aa;
+  --color-primary: #27272a;
+  --color-primary-soft: #27272a;
+  --color-accent: #f5cc4a;
+  --color-accent-soft: #26262c;
+  --color-on-accent: #171717;
+  --color-success: #4ade80;
+  --color-warning: #fcd34d;
+  --color-danger: #fb7185;
+  --color-warning-soft: #3c2d14;
+  --color-warning-border: #eab308;
+  --color-warning-strong: #fde68a;
+  --color-highlight-bg: #422006;
+  --color-highlight-ring: #f5cc4a;
+  --shadow-soft: 0 14px 28px -18px rgba(0, 0, 0, 0.55);
+  --shadow-card: 0 24px 54px -30px rgba(0, 0, 0, 0.68);
+  --shadow-focus: 0 0 0 3px color-mix(in srgb, var(--color-accent) 32%, transparent);
+}
+
+@theme inline {
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text-primary);
+  --font-sans: var(--font-geist-sans), "Inter", ui-sans-serif, system-ui;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+body {
+  background:
+    radial-gradient(circle at 10% 10%, #f9fbff 0%, transparent 42%),
+    radial-gradient(circle at 94% 0%, #edf4ff 0%, transparent 32%),
+    radial-gradient(circle at 72% 18%, color-mix(in srgb, var(--color-accent) 14%, transparent) 0%, transparent 24%),
+    var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans), sans-serif;
+}
+
+[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at 10% 10%, #1a1a1c 0%, transparent 42%),
+    radial-gradient(circle at 90% 0%, #18181b 0%, transparent 34%),
+    radial-gradient(circle at 75% 14%, color-mix(in srgb, var(--color-accent) 10%, transparent) 0%, transparent 26%),
+    var(--color-bg);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.header-chrome {
+  box-shadow:
+    inset 0 -1px 0 color-mix(in srgb, var(--color-accent) 16%, var(--color-border)),
+    inset 0 1px 0 color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.profile-chip {
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--color-primary-soft) 90%, var(--color-surface)) 0%,
+    color-mix(in srgb, var(--color-accent-soft) 24%, var(--color-surface)) 100%
+  );
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 24%, transparent),
+    0 14px 28px -24px color-mix(in srgb, var(--color-accent) 65%, transparent);
+  transition: box-shadow 220ms ease, transform 220ms ease;
+}
+
+.profile-chip:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 36%, transparent),
+    0 18px 34px -22px color-mix(in srgb, var(--color-accent) 78%, transparent);
+}
+
+.profile-avatar,
+.menu-orb {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 20%, transparent),
+    0 10px 20px -18px color-mix(in srgb, var(--color-accent) 60%, transparent);
+}
+
+[data-theme="dark"] .profile-chip {
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--color-primary-soft) 82%, var(--color-surface)) 0%,
+    color-mix(in srgb, var(--color-accent-soft) 26%, var(--color-surface)) 100%
+  );
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.dashboard-content h1,
+.dashboard-content h2,
+.dashboard-content h3 {
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+.dashboard-content h2 {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.dashboard-content h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.dashboard-content :where(input, select, textarea) {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-surface) 92%, var(--color-accent-soft)),
+    var(--color-surface)
+  );
+  color: var(--color-text-primary);
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.dashboard-content :where(input, select, textarea):focus-visible {
+  border-color: color-mix(in srgb, var(--color-accent) 68%, var(--color-border));
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+
+.dashboard-content :where(input, select, textarea)::placeholder {
+  color: color-mix(in srgb, var(--color-text-secondary) 82%, transparent);
+}
+
+/* Oscuro: campos sin mezcla café (accent-soft); borde/foco siguen dorados */
+[data-theme="dark"] .dashboard-content :where(input, select, textarea) {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-surface) 88%, var(--color-surface-2)),
+    var(--color-surface)
+  );
+}
+
+/* <select> nativos: lista y opciones legibles; evita popover claro y azul de sistema */
+[data-theme="dark"] select {
+  color-scheme: dark;
+  accent-color: var(--color-accent);
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] select option,
+[data-theme="dark"] select optgroup {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] select option:checked {
+  background-color: color-mix(in srgb, var(--color-accent) 28%, var(--color-surface-2));
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] select option:hover {
+  background-color: color-mix(in srgb, var(--color-accent) 18%, var(--color-surface-2));
+}
+
+.dashboard-content table {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-surface) 94%, var(--color-surface-2));
+}
+
+.dashboard-content thead {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-primary-soft) 86%, var(--color-surface)),
+    color-mix(in srgb, var(--color-primary-soft) 62%, var(--color-surface))
+  );
+}
+
+.glass-panel {
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 16%, var(--color-border));
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--color-surface) 90%, var(--color-accent-soft) 10%),
+    color-mix(in srgb, var(--color-surface-2) 92%, var(--color-surface))
+  );
+  box-shadow: var(--shadow-card);
+}
+
+@keyframes content-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-content > * {
+  animation: content-rise 260ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

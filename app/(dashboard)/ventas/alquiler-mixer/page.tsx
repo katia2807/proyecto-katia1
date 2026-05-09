@@ -1,0 +1,153 @@
+import Link from "next/link";
+import { cerrarContratoAlquiler, createContratoAlquiler } from "@/app/actions";
+import { voidFormAction } from "@/lib/void-form-action";
+import { ContextActionPanel } from "@/components/context-action-panel";
+import { CierreContratoForm } from "@/components/sales/cierre-contrato-form";
+import { ContratoAlquilerForm } from "@/components/sales/contrato-alquiler-form";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
+import { getCurrentUserRole } from "@/lib/current-user-role";
+import { getAlquilerRows, getClientesRows } from "@/lib/data";
+import { canMutateVentas } from "@/lib/permissions";
+import { formatDate, formatPen } from "@/lib/utils";
+
+export default async function AlquilerMixerPage() {
+  const [clientes, contratos] = await Promise.all([getClientesRows(), getAlquilerRows()]);
+  const role = await getCurrentUserRole();
+  const canMutate = canMutateVentas(role);
+
+  const clientesById = new Map(clientes.map((c) => [c.id, c.nombre]));
+  const abiertos = contratos.filter((c) => c.estado === "abierto");
+  const totalDepositos = abiertos.reduce(
+    (acc, c) => acc + (c.deposito_30 ?? 0),
+    0,
+  );
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold">Alquiler Bomba Mixer</h2>
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          Contrato extendido con depósito 30% automático y cierre con penalidades configurables.
+        </p>
+      </div>
+
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <CardTitle>Acciones rápidas</CardTitle>
+          <CardDescription>
+            Crear contrato (calcula depósito y registra ingreso) o cerrarlo aplicando penalidades.
+          </CardDescription>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {canMutate ? (
+            <>
+              <ContextActionPanel
+                triggerLabel="Nuevo contrato"
+                title="Contrato de alquiler"
+                description="Calcula monto total y depósito 30% en vivo. El depósito entra como ingreso al confirmar."
+              >
+                <ContratoAlquilerForm action={voidFormAction(createContratoAlquiler)} clientes={clientes} />
+              </ContextActionPanel>
+
+              <ContextActionPanel
+                triggerLabel="Cerrar contrato"
+                title="Cierre de contrato"
+                description="Aplica penalidades por retraso, devolución tardía o daños."
+              >
+                <CierreContratoForm action={voidFormAction(cerrarContratoAlquiler)} contratos={abiertos} />
+              </ContextActionPanel>
+            </>
+          ) : (
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              Tu rol es de solo lectura.
+            </p>
+          )}
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Resumen</CardTitle>
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl border border-[var(--color-border)] p-3">
+            <p className="text-xs uppercase text-[var(--color-text-secondary)]">Contratos abiertos</p>
+            <p className="text-2xl font-bold">{abiertos.length}</p>
+          </div>
+          <div className="rounded-xl border border-[var(--color-border)] p-3">
+            <p className="text-xs uppercase text-[var(--color-text-secondary)]">Depósitos retenidos</p>
+            <p className="text-2xl font-bold">{formatPen(totalDepositos)}</p>
+          </div>
+          <div className="rounded-xl border border-[var(--color-border)] p-3">
+            <p className="text-xs uppercase text-[var(--color-text-secondary)]">Penalidades activas</p>
+            <p className="text-2xl font-bold">
+              {formatPen(contratos.reduce((acc, c) => acc + Number(c.penalidad ?? 0), 0))}
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Contratos</CardTitle>
+        <CardDescription>{contratos.length} contratos en total.</CardDescription>
+        <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
+          <Table>
+            <THead>
+              <TRow>
+                <TH>Código</TH>
+                <TH>Inicio</TH>
+                <TH>Cliente</TH>
+                <TH>Equipo</TH>
+                <TH>Estado</TH>
+                <TH className="text-right">Monto</TH>
+                <TH className="text-right">Depósito</TH>
+                <TH className="text-right">Penalidad</TH>
+                <TH className="text-right">PDF</TH>
+              </TRow>
+            </THead>
+            <tbody>
+              {contratos.map((c) => (
+                <TRow key={c.id}>
+                  <TD className="font-mono text-xs">{c.codigo ?? `—`}</TD>
+                  <TD>{formatDate(c.fecha_inicio)}</TD>
+                  <TD>{clientesById.get(c.cliente_id) ?? "—"}</TD>
+                  <TD>{c.activo}</TD>
+                  <TD>
+                    <Badge variant={c.estado === "abierto" ? "warning" : "success"}>
+                      {c.estado}
+                    </Badge>
+                  </TD>
+                  <TD className="text-right">
+                    {c.monto_total != null ? formatPen(c.monto_total) : "—"}
+                  </TD>
+                  <TD className="text-right">
+                    {c.deposito_30 != null ? formatPen(c.deposito_30) : "—"}
+                  </TD>
+                  <TD className="text-right font-semibold">
+                    {formatPen(Number(c.penalidad ?? 0))}
+                  </TD>
+                  <TD className="text-right">
+                    <Link
+                      href={`/ventas/alquiler-mixer/${c.id}/pdf`}
+                      target="_blank"
+                      className="text-xs font-semibold text-[var(--color-accent)] underline"
+                    >
+                      Imprimir
+                    </Link>
+                  </TD>
+                </TRow>
+              ))}
+              {contratos.length === 0 ? (
+                <TRow>
+                  <TD colSpan={9} className="text-center text-[var(--color-text-secondary)]">
+                    Aún no hay contratos. Crea uno con “Nuevo contrato”.
+                  </TD>
+                </TRow>
+              ) : null}
+            </tbody>
+          </Table>
+        </div>
+      </Card>
+    </div>
+  );
+}

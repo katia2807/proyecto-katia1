@@ -1,0 +1,61 @@
+"use server";
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { LEGACY_LOCAL_AUTH_COOKIE, getSupabaseAuthServerClient } from "@/lib/auth";
+
+export type LoginFormState = {
+  error?: string;
+};
+
+const loginSchema = z.object({
+  email: z.string().min(3),
+  password: z.string().min(6),
+});
+
+export async function loginWithPassword(_prevState: LoginFormState, formData: FormData): Promise<LoginFormState> {
+  const parsed = loginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) {
+    return { error: "Credenciales inválidas. Revisa correo y contraseña." };
+  }
+
+  const authClient = await getSupabaseAuthServerClient();
+  if (!authClient) {
+    return {
+      error:
+        "Supabase no está configurado. Define NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY en el servidor.",
+    };
+  }
+
+  const email = parsed.data.email.trim();
+  if (!email.includes("@")) {
+    return { error: "Usa un correo electrónico válido para iniciar sesión." };
+  }
+
+  const { error } = await authClient.auth.signInWithPassword({
+    email,
+    password: parsed.data.password,
+  });
+
+  if (error) {
+    return { error: "No se pudo iniciar sesión. Verifica tus credenciales." };
+  }
+
+  redirect("/");
+}
+
+export async function logout() {
+  const cookieStore = await cookies();
+  cookieStore.delete(LEGACY_LOCAL_AUTH_COOKIE);
+
+  const authClient = await getSupabaseAuthServerClient();
+  if (authClient) {
+    await authClient.auth.signOut();
+  }
+
+  redirect("/login");
+}
