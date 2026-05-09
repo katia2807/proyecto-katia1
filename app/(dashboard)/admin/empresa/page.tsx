@@ -1,3 +1,4 @@
+import { EmpresaLogoUpload } from "@/components/admin/empresa-logo-upload";
 import { EmpresaSettingsForm } from "@/components/admin/empresa-settings-form";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { requireAuthContext } from "@/lib/auth";
@@ -16,6 +17,17 @@ export default async function EmpresaPage() {
           consistente.
         </p>
       </div>
+
+      <Card>
+        <CardTitle>Logo en PDFs</CardTitle>
+        <CardDescription>
+          Solo <strong>owner_admin</strong> puede subir o quitar el logo. Visible en cotizaciones y documentos
+          de ventas.
+        </CardDescription>
+        <div className="mt-4">
+          <EmpresaLogoUpload empresa={empresa} />
+        </div>
+      </Card>
 
       <Card>
         <CardTitle>Configuracion de emisor</CardTitle>

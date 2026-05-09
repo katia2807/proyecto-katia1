@@ -8,6 +8,8 @@ export type EmpresaConfig = {
   telefono: string;
   direccion: string;
   firmante: string;
+  /** URL pública en Supabase Storage (`empresa-logos`). */
+  logo_url: string | null;
 };
 
 export const DEFAULT_EMPRESA_CONFIG: EmpresaConfig = {
@@ -16,6 +18,7 @@ export const DEFAULT_EMPRESA_CONFIG: EmpresaConfig = {
   telefono: "987 654 321",
   direccion: "Lima, Peru",
   firmante: "Katia Lizzet Meneses Taype",
+  logo_url: null,
 };
 
 export async function getEmpresaConfig(): Promise<EmpresaConfig> {
@@ -26,7 +29,7 @@ export async function getEmpresaConfig(): Promise<EmpresaConfig> {
   const supabase = getSupabaseServerClient();
   const { data } = await supabase
     .from("configuracion_empresa")
-    .select("nombre,ruc,telefono,direccion,firmante")
+    .select("nombre,ruc,telefono,direccion,firmante,logo_url")
     .eq("organization_id", DEFAULT_ORG_ID)
     .maybeSingle();
 
@@ -40,5 +43,6 @@ export async function getEmpresaConfig(): Promise<EmpresaConfig> {
     telefono: String(data.telefono ?? DEFAULT_EMPRESA_CONFIG.telefono),
     direccion: String(data.direccion ?? DEFAULT_EMPRESA_CONFIG.direccion),
     firmante: String(data.firmante ?? DEFAULT_EMPRESA_CONFIG.firmante),
+    logo_url: typeof data.logo_url === "string" && data.logo_url.trim() !== "" ? data.logo_url.trim() : null,
   };
 }

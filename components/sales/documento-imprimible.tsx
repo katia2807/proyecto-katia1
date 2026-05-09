@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { EmpresaLogoMark } from "@/components/sales/empresa-logo-mark";
 import type { EmpresaConfig } from "@/lib/company-config";
 
 type DocumentoImprimibleProps = {
@@ -63,16 +64,28 @@ type DocumentoHeaderProps = {
 
 export function DocumentoHeader({ empresa }: DocumentoHeaderProps) {
   return (
-    <header style={{ borderBottom: "2px solid #111", paddingBottom: 12, marginBottom: 16 }}>
-      <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>
-        {empresa.nombre}
-      </h1>
-      <p style={{ fontSize: 12, margin: "4px 0", color: "#444" }}>
-        Carpinteria &amp; Aserradero · RUC {empresa.ruc}
-      </p>
-      <p style={{ fontSize: 11, margin: 0, color: "#666" }}>
-        {empresa.direccion} · Tel. {empresa.telefono}
-      </p>
+    <header
+      style={{
+        display: "flex",
+        gap: 16,
+        alignItems: "flex-start",
+        borderBottom: "2px solid #111",
+        paddingBottom: 12,
+        marginBottom: 16,
+      }}
+    >
+      <EmpresaLogoMark empresa={empresa} print />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>
+          {empresa.nombre}
+        </h1>
+        <p style={{ fontSize: 12, margin: "4px 0", color: "#444" }}>
+          Carpinteria &amp; Aserradero · RUC {empresa.ruc}
+        </p>
+        <p style={{ fontSize: 11, margin: 0, color: "#666" }}>
+          {empresa.direccion} · Tel. {empresa.telefono}
+        </p>
+      </div>
     </header>
   );
 }

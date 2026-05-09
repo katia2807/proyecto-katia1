@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   ChartColumn,
-  CheckCircle2,
   Database,
   Download,
   HandCoins,
@@ -39,7 +38,6 @@ const icons = {
   "/personal": Users,
   "/reportes": ChartColumn,
   "/reportes/antifraude": ShieldAlert,
-  "/checklist": CheckCircle2,
   "/seguridad": ShieldCheck,
   "/cuenta": UserCog,
   "/admin/empresa": UserCog,

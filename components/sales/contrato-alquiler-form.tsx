@@ -1,5 +1,6 @@
 "use client";
 
+import { createContratoAlquiler } from "@/app/actions";
 import { useMemo, useState } from "react";
 import { PagoFormFields } from "@/components/sales/pago-form-fields";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,6 @@ import { formatPen } from "@/lib/utils";
 type Cliente = { id: string; nombre: string; ruc?: string | null };
 
 type ContratoAlquilerFormProps = {
-  action: (formData: FormData) => Promise<void>;
   clientes: Cliente[];
 };
 
@@ -19,7 +19,7 @@ const tarifas = [
   { value: "dia", label: "Por día" },
 ] as const;
 
-export function ContratoAlquilerForm({ action, clientes }: ContratoAlquilerFormProps) {
+export function ContratoAlquilerForm({ clientes }: ContratoAlquilerFormProps) {
   const hoy = new Date().toISOString().slice(0, 10);
   const [tarifa, setTarifa] = useState(0);
   const [dias, setDias] = useState(1);
@@ -35,7 +35,7 @@ export function ContratoAlquilerForm({ action, clientes }: ContratoAlquilerFormP
   const deposito30 = useMemo(() => Number((montoTotal * 0.3).toFixed(2)), [montoTotal]);
 
   return (
-    <form action={action} className="space-y-4">
+    <form action={createContratoAlquiler} className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
         <SelectField name="cliente_id" label="Cliente" defaultValue="" required>
           <option value="" disabled>

@@ -1,19 +1,10 @@
 import Link from "next/link";
-import {
-  aprobarCotizacionAOrden,
-  cambiarEstadoOrden,
-  createCotizacion,
-} from "@/app/actions";
-import { voidFormAction } from "@/lib/void-form-action";
-import { ContextActionPanel } from "@/components/context-action-panel";
+import { MueblesPersonalizadosContextPanels } from "@/components/ventas/muebles-personalizados-context-panels";
 import { CotizadorInteligente } from "@/components/cotizador-inteligente";
 import { KanbanOrdenes } from "@/components/sales/kanban-ordenes";
-import { NotasSelector } from "@/components/sales/notas-selector";
 import { WhatsAppButton } from "@/components/sales/whatsapp-button";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Field, SelectField } from "@/components/ui/field";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import {
@@ -45,6 +36,10 @@ export default async function MueblesPersonalizadosPage() {
     (c) => c.tipo === "mueble_personalizado",
   );
   const aprobables = cotizacionesPersonalizadas.filter((c) => c.estado === "confirmada");
+  const opcionesAprobacion = aprobables.map((c) => ({
+    id: c.id,
+    label: `${c.correlativo ?? formatDate(c.fecha)} · ${clientesById.get(c.cliente_id) ?? "Cliente"} · ${formatPen(Number(c.precio_acordado))}`,
+  }));
 
   return (
     <div className="space-y-6">
@@ -64,111 +59,10 @@ export default async function MueblesPersonalizadosPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {canMutate ? (
-            <>
-              <ContextActionPanel
-                triggerLabel="Nueva cotización"
-                title="Cotización personalizada"
-                description="Cliente, especie, precio calculado y precio acordado."
-              >
-                <form action={createCotizacion} className="grid gap-3 md:grid-cols-2">
-                  <SelectField name="cliente_id" label="Cliente" defaultValue="" required>
-                    <option value="" disabled>
-                      Selecciona cliente
-                    </option>
-                    {clientes.map((cliente) => (
-                      <option key={cliente.id} value={cliente.id}>
-                        {cliente.nombre}
-                      </option>
-                    ))}
-                  </SelectField>
-                  <Field name="fecha" type="date" label="Fecha" required />
-                  <input type="hidden" name="tipo" value="mueble_personalizado" />
-                  <Field
-                    name="especie_madera"
-                    label="Especie de madera"
-                    placeholder="Tornillo / Pino / Cedro"
-                    required
-                  />
-                  <SelectField name="unidad_medida" label="Unidad base" defaultValue="cm">
-                    <option value="cm">Centímetros</option>
-                    <option value="in">Pulgadas</option>
-                    <option value="otro">Otra</option>
-                  </SelectField>
-                  <Field
-                    name="precio_calculado"
-                    label="Precio calculado (S/)"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                  />
-                  <Field
-                    name="precio_acordado"
-                    label="Precio acordado (S/)"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                  />
-                  <SelectField name="estado" label="Estado" defaultValue="confirmada">
-                    <option value="borrador">Borrador</option>
-                    <option value="confirmada">Confirmada</option>
-                  </SelectField>
-                  <div className="md:col-span-2">
-                    <NotasSelector name="motivo_ajuste" label="Notas para incluir en la cotización" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Button>Guardar cotización</Button>
-                  </div>
-                </form>
-              </ContextActionPanel>
-
-              <ContextActionPanel
-                triggerLabel="Aceptar (orden + adelanto)"
-                title="Aceptar cotización confirmada"
-                description="En un solo paso: crea la orden de producción y registra el adelanto en caja."
-              >
-                <form action={voidFormAction(aprobarCotizacionAOrden)} className="grid gap-3">
-                  <SelectField name="cotizacion_id" label="Cotización" defaultValue="" required>
-                    <option value="" disabled>
-                      Selecciona cotización
-                    </option>
-                    {aprobables.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {`${c.correlativo ?? formatDate(c.fecha)} · ${clientesById.get(c.cliente_id) ?? "Cliente"} · ${formatPen(Number(c.precio_acordado))}`}
-                      </option>
-                    ))}
-                  </SelectField>
-                  <Field
-                    name="notas"
-                    label="Notas para el taller"
-                    placeholder="Acabado, materiales, fechas estimadas…"
-                  />
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Field
-                      name="adelanto"
-                      label="Adelanto cobrado (S/) — opcional"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      defaultValue="0"
-                    />
-                    <SelectField name="metodo_adelanto" label="Medio del adelanto" defaultValue="efectivo">
-                      <option value="efectivo">Efectivo</option>
-                      <option value="yape">Yape</option>
-                      <option value="banco">Banco</option>
-                      <option value="otro">Otro</option>
-                    </SelectField>
-                  </div>
-                  <p className="text-xs text-[var(--color-text-secondary)]">
-                    Si dejas el adelanto en 0, solo se crea la orden. Si pones un monto &gt; 0, se
-                    asienta como ingreso en caja con la categoría
-                    <strong> adelanto_mueble_personalizado</strong>.
-                  </p>
-                  <Button>Aceptar cotización</Button>
-                </form>
-              </ContextActionPanel>
-            </>
+            <MueblesPersonalizadosContextPanels
+              clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre }))}
+              opcionesAprobacion={opcionesAprobacion}
+            />
           ) : (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
               Tu rol es de solo lectura.
@@ -252,7 +146,6 @@ export default async function MueblesPersonalizadosPage() {
         <div className="mt-4">
           <KanbanOrdenes
             canMutate={canMutate}
-            action={voidFormAction(cambiarEstadoOrden)}
             ordenes={ordenes.map((orden) => {
               const cot = orden.cotizacion_id
                 ? cotizacionesById.get(orden.cotizacion_id) ?? null

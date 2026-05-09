@@ -1,29 +1,7 @@
+import { EmpresaLogoMark } from "@/components/sales/empresa-logo-mark";
 import { cn, formatDate, formatPen } from "@/lib/utils";
 import type { LineaFormal } from "@/lib/cotizacion-unificada-lineas";
 import type { EmpresaConfig } from "@/lib/company-config";
-
-function LogoKatia() {
-  return (
-    <div
-      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-amber-900/40 bg-gradient-to-br from-amber-100 to-amber-200"
-      aria-hidden
-    >
-      <svg viewBox="0 0 48 48" className="h-10 w-10 text-amber-900/90">
-        <path
-          fill="currentColor"
-          d="M24 4l18 10v20L24 44 6 34V14L24 4zm0 4.5L10.5 15.5v17L24 39.5l13.5-7v-17L24 8.5z"
-          opacity="0.85"
-        />
-        <path
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.2"
-          d="M14 22c3-4 7-6 10-6s7 2 10 6M16 28c2.5 3 5 4.5 8 4.5s5.5-1.5 8-4.5"
-        />
-      </svg>
-    </div>
-  );
-}
 
 export type CotizacionResumenFormalProps = {
   correlativoLabel: string;
@@ -99,7 +77,7 @@ export function CotizacionResumenFormal({
       `}</style>
 
       <header className={cn("mb-6 flex flex-wrap items-start gap-4 pb-4", embedded ? "border-b border-[var(--color-border)]" : "border-b-2 border-[#111]")}>
-        <LogoKatia />
+        <EmpresaLogoMark empresa={empresa} embedded={embedded} />
         <div className="min-w-0 flex-1 text-center sm:text-left">
           <p className="text-lg font-extrabold leading-tight tracking-tight">{empresa.nombre}</p>
           <p className={cn("mt-1 text-xs", embedded ? "text-[var(--color-text-secondary)]" : "text-[#444]")}>

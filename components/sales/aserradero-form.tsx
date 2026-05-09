@@ -1,5 +1,6 @@
 "use client";
 
+import { createServicioAserradero } from "@/app/actions";
 import { useMemo, useState } from "react";
 import { CubicajeInput } from "@/components/sales/cubicaje-input";
 import { MargenIndicator } from "@/components/sales/margen-indicator";
@@ -16,7 +17,6 @@ type ServicioEspecial = {
 };
 
 type AserraderoFormProps = {
-  action: (formData: FormData) => Promise<void>;
   clientes: Cliente[];
   serviciosEspeciales: ServicioEspecial[];
   /** Costo en S/ por pie cúbico para cubicaje base. */
@@ -26,7 +26,6 @@ type AserraderoFormProps = {
 const PIE_TABLAR_A_PIE_CUBICO = 1 / 12;
 
 export function AserraderoForm({
-  action,
   clientes,
   serviciosEspeciales,
   defaultCostoPorPieCubico = 0.5,
@@ -89,7 +88,7 @@ export function AserraderoForm({
 
   return (
     <form
-      action={action}
+      action={createServicioAserradero}
       className="space-y-4"
       onChange={(e) => {
         const target = e.target as unknown as HTMLInputElement;

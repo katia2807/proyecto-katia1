@@ -17,7 +17,6 @@ export const navItems = [
   { href: "/personal", label: "Equipo" },
   { href: "/reportes", label: "Reportes" },
   { href: "/reportes/antifraude", label: "Control socios" },
-  { href: "/checklist", label: "Checklist" },
   { href: "/seguridad", label: "Seguridad" },
   { href: "/cuenta", label: "Cuenta admin" },
   { href: "/admin/empresa", label: "Empresa" },

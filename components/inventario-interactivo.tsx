@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  deleteInventarioMovimiento,
+  registrarConteoInventario,
+  toggleInventarioProductoActivo,
+  updateInventarioProducto,
+} from "@/app/actions";
 import { useMemo, useRef, useState } from "react";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
@@ -75,23 +81,14 @@ type InventarioData = {
   };
 };
 
-type ActionFn = (formData: FormData) => Promise<void>;
-
 type Props = {
   data: InventarioData;
   canMutate: boolean;
-  actions: {
-    updateInventarioProducto: ActionFn;
-    toggleInventarioProductoActivo: ActionFn;
-    deleteInventarioMovimiento: ActionFn;
-    registrarConteoInventario: ActionFn;
-  };
-}
+};
 
 export function InventarioInteractivo({
   data,
   canMutate,
-  actions,
 }: Props) {
   const {
     productos,
@@ -305,7 +302,7 @@ export function InventarioInteractivo({
                 highlightedId === row.id && "bg-[var(--color-highlight-bg)] ring-2 ring-[var(--color-highlight-ring)]",
               )}
             >
-              <form action={actions.updateInventarioProducto} className="grid gap-2 md:grid-cols-7">
+              <form action={updateInventarioProducto} className="grid gap-2 md:grid-cols-7">
                 <input type="hidden" name="id" value={row.id} />
                 <Field name="codigo" label="Código" defaultValue={row.codigo} required />
                 <Field name="nombre" label="Nombre" defaultValue={row.nombre} required />
@@ -321,7 +318,7 @@ export function InventarioInteractivo({
                 </div>
               </form>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <form action={actions.toggleInventarioProductoActivo}>
+                <form action={toggleInventarioProductoActivo}>
                   <input type="hidden" name="id" value={row.id} />
                   <input type="hidden" name="activo" value={row.activo ? "false" : "true"} />
                   <Button type="submit" variant="danger" disabled={!canMutate}>
@@ -387,7 +384,7 @@ export function InventarioInteractivo({
                   {canMutate ? (
                     <TD>
                       <form
-                        action={actions.deleteInventarioMovimiento}
+                        action={deleteInventarioMovimiento}
                         onSubmit={(event) => {
                           const ok = window.confirm(
                             "¿Eliminar este movimiento? Esta acción afecta el stock y no se puede deshacer.",
@@ -452,7 +449,7 @@ export function InventarioInteractivo({
         <Card className="xl:col-span-2">
           <CardTitle>Conteo físico y ajuste automático</CardTitle>
           <CardDescription>Registra stock contado; el sistema crea ajuste con trazabilidad.</CardDescription>
-          <form action={actions.registrarConteoInventario} className="mt-4 grid gap-3 md:grid-cols-4">
+          <form action={registrarConteoInventario} className="mt-4 grid gap-3 md:grid-cols-4">
             <SelectField name="producto_id" label="Producto" defaultValue="" required>
               <option value="" disabled>Seleccionar</option>
               {productos.filter((p) => p.activo !== false).map((p) => (

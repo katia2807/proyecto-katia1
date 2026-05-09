@@ -7,13 +7,9 @@ import {
   Scissors,
   TruckIcon,
 } from "lucide-react";
-import { createChofer, createCliente, createProveedor } from "@/app/actions";
-import { ContextActionPanel } from "@/components/context-action-panel";
-import { voidFormAction } from "@/lib/void-form-action";
-import { ClienteFormFields } from "@/components/sales/cliente-form-fields";
+import { VentasHubContextPanels } from "@/components/ventas/ventas-hub-context-panels";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Field } from "@/components/ui/field";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import {
@@ -198,64 +194,7 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
               Tu rol es de solo lectura en ventas.
             </p>
           ) : (
-            <>
-              <ContextActionPanel
-                key={`quick-cliente-${quick}`}
-                triggerLabel="Registrar cliente"
-                title="Nuevo cliente"
-                description="Datos completos: persona o empresa, RUC/DNI y dirección."
-                openByDefault={quick === "cliente"}
-              >
-                <form action={createCliente} className="space-y-3">
-                  <ClienteFormFields />
-                  <input type="hidden" name="return_to" value="/ventas" />
-                  <div>
-                    <Button>Guardar cliente</Button>
-                  </div>
-                </form>
-              </ContextActionPanel>
-
-              <ContextActionPanel
-                key={`quick-proveedor-${quick}`}
-                triggerLabel="Registrar proveedor"
-                title="Nuevo proveedor"
-                description="Datos básicos del proveedor de madera o insumos."
-                openByDefault={quick === "proveedor"}
-              >
-                <form action={createProveedor} className="grid gap-3 md:grid-cols-2">
-                  <Field name="nombre" label="Proveedor" required />
-                  <Field name="documento" label="RUC o DNI" />
-                  <Field name="telefono" label="Celular" />
-                  <input type="hidden" name="return_to" value="/ventas" />
-                  <div className="md:col-span-2">
-                    <Button>Guardar proveedor</Button>
-                  </div>
-                </form>
-              </ContextActionPanel>
-
-              <ContextActionPanel
-                key={`quick-chofer-${quick}`}
-                triggerLabel="Registrar chofer"
-                title="Nuevo chofer"
-                description="Para asignar entregas a obras y clientes."
-                openByDefault={quick === "chofer"}
-              >
-                <form action={voidFormAction(createChofer)} className="grid gap-3 md:grid-cols-2">
-                  <Field name="nombre" label="Nombre del chofer" required />
-                  <Field name="telefono" label="Teléfono" inputMode="tel" />
-                  <Field
-                    name="placa"
-                    label="Placa de vehículo"
-                    placeholder="ABC-123"
-                    className="md:col-span-2"
-                  />
-                  <input type="hidden" name="return_to" value="/ventas" />
-                  <div className="md:col-span-2">
-                    <Button>Guardar chofer</Button>
-                  </div>
-                </form>
-              </ContextActionPanel>
-            </>
+            <VentasHubContextPanels quick={quick} />
           )}
         </div>
       </Card>

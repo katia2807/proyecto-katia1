@@ -1,5 +1,6 @@
 "use client";
 
+import { cambiarEstadoOrden } from "@/app/actions";
 import { useOptimistic, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatPen } from "@/lib/utils";
@@ -19,7 +20,6 @@ type OrdenCard = {
 
 type KanbanOrdenesProps = {
   ordenes: OrdenCard[];
-  action: (formData: FormData) => Promise<void>;
   canMutate: boolean;
 };
 
@@ -29,7 +29,7 @@ const columnas: { value: Estado; label: string; color: string }[] = [
   { value: "entregado", label: "Entregado", color: "success" },
 ];
 
-export function KanbanOrdenes({ ordenes, action, canMutate }: KanbanOrdenesProps) {
+export function KanbanOrdenes({ ordenes, canMutate }: KanbanOrdenesProps) {
   const [optimistic, setOptimistic] = useOptimistic(
     ordenes,
     (state, { id, nuevoEstado }: { id: string; nuevoEstado: Estado }) =>
@@ -45,7 +45,7 @@ export function KanbanOrdenes({ ordenes, action, canMutate }: KanbanOrdenesProps
       const formData = new FormData();
       formData.append("orden_id", id);
       formData.append("nuevo_estado", nuevoEstado);
-      await action(formData);
+      await cambiarEstadoOrden(formData);
     });
   }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { createVentaMaderaCortada } from "@/app/actions";
 import { useMemo, useState } from "react";
 import { EntregaFormFields } from "@/components/sales/entrega-form-fields";
 import { PagoFormFields } from "@/components/sales/pago-form-fields";
@@ -19,7 +20,6 @@ type Producto = {
 };
 
 type MaderaCortadaFormProps = {
-  action: (formData: FormData) => Promise<void>;
   clientes: Cliente[];
   choferes: Chofer[];
   productos: Producto[];
@@ -37,7 +37,7 @@ function calcularPT(cantidad: number, espesor: number, ancho: number, largo: num
   return (cantidad * espesor * ancho * largo) / 12;
 }
 
-export function MaderaCortadaForm({ action, clientes, choferes, productos, zonas = [] }: MaderaCortadaFormProps) {
+export function MaderaCortadaForm({ clientes, choferes, productos, zonas = [] }: MaderaCortadaFormProps) {
   const hoy = new Date().toISOString().slice(0, 10);
   const [cantidad, setCantidad] = useState(1);
   const [espesor, setEspesor] = useState(2);
@@ -53,7 +53,7 @@ export function MaderaCortadaForm({ action, clientes, choferes, productos, zonas
     productoSeleccionado && Number(productoSeleccionado.stock_actual) <= 0;
 
   return (
-    <form action={action} className="space-y-4">
+    <form action={createVentaMaderaCortada} className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
         <SelectField name="cliente_id" label="Cliente" defaultValue="" required>
           <option value="" disabled>

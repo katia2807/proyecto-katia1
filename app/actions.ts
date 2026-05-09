@@ -39,9 +39,7 @@ import {
   demoCreateVentaMuebleTerminado,
   demoCreateZonaEntrega,
   demoMarcarEntregaMueble,
-  demoSaveGoLiveEvidence,
   demoRegistrarConteoInventario,
-  demoToggleGoLiveItem,
   demoToggleInventarioProductoActivo,
   demoToggleSecurityControl,
   demoUpdateInventarioProducto,
@@ -1991,31 +1989,6 @@ export async function cerrarMes(formData: FormData) {
 
   revalidatePath("/reportes");
   revalidatePath("/");
-}
-
-export async function toggleGoLiveItem(formData: FormData) {
-  await requireMutationAccess(liderazgoRoles);
-  const id = String(formData.get("id") ?? "");
-  if (!id) throw new Error("Item inválido.");
-  if (!hasSupabaseEnv()) {
-    demoToggleGoLiveItem(id);
-    revalidatePath("/checklist");
-    return;
-  }
-  revalidatePath("/checklist");
-}
-
-export async function saveGoLiveEvidence(formData: FormData) {
-  await requireMutationAccess(liderazgoRoles);
-  const id = String(formData.get("id") ?? "");
-  const evidence = String(formData.get("evidence") ?? "");
-  if (!id) throw new Error("Item inválido.");
-  if (!hasSupabaseEnv()) {
-    demoSaveGoLiveEvidence(id, evidence);
-    revalidatePath("/checklist");
-    return;
-  }
-  revalidatePath("/checklist");
 }
 
 export async function toggleSecurityControl(formData: FormData) {

@@ -1,19 +1,9 @@
 import Image from "next/image";
-import {
-  createMuebleCatalogo,
-  createVentaMuebleTerminado,
-  marcarEntregaMueble,
-} from "@/app/actions";
-import { voidFormAction } from "@/lib/void-form-action";
-import { ContextActionPanel } from "@/components/context-action-panel";
-import { EntregaFormFields } from "@/components/sales/entrega-form-fields";
-import { FotoUpload } from "@/components/sales/foto-upload";
-import { PagoFormFields } from "@/components/sales/pago-form-fields";
+import { marcarEntregaMueble } from "@/app/actions";
+import { MueblesTerminadosContextPanels } from "@/components/ventas/muebles-terminados-context-panels";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Field, SelectField } from "@/components/ui/field";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import {
@@ -58,131 +48,29 @@ export default async function MueblesTerminadosPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {canMutate ? (
-            <>
-              <ContextActionPanel
-                triggerLabel="Agregar mueble"
-                title="Nuevo mueble en catálogo"
-                description="Foto opcional, precio de lista y stock disponible."
-              >
-                <form action={voidFormAction(createMuebleCatalogo)} className="grid gap-3 md:grid-cols-2">
-                  <Field name="codigo" label="Código" placeholder="MT-001" required />
-                  <Field name="nombre" label="Nombre del mueble" required />
-                  <Field
-                    className="md:col-span-2"
-                    name="descripcion"
-                    label="Descripción"
-                    placeholder="Material, dimensiones, acabado…"
-                  />
-                  <Field
-                    name="precio_lista"
-                    label="Precio de lista (S/)"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                  />
-                  <Field
-                    name="stock_disponible"
-                    label="Stock disponible"
-                    type="number"
-                    min="0"
-                    step="1"
-                    defaultValue="0"
-                  />
-                  <div className="md:col-span-2">
-                    <FotoUpload
-                      bucket="muebles"
-                      name="foto_url"
-                      label="Foto del mueble (PNG/JPG/WEBP, máx. 5 MB)"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <PendingSubmitButton idleText="Guardar mueble" />
-                  </div>
-                </form>
-              </ContextActionPanel>
-
-              <ContextActionPanel
-                triggerLabel="Vender mueble"
-                title="Nueva venta de mueble"
-                description="Cliente, mueble del catálogo, regateo, chofer y pago."
-              >
-                <form action={voidFormAction(createVentaMuebleTerminado)} className="space-y-4">
-                  <SelectField
-                    name="cliente_id"
-                    label="Cliente"
-                    defaultValue=""
-                    required
-                  >
-                    <option value="" disabled>
-                      Selecciona cliente
-                    </option>
-                    {clientes.map((cliente) => (
-                      <option key={cliente.id} value={cliente.id}>
-                        {cliente.nombre}
-                      </option>
-                    ))}
-                  </SelectField>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <SelectField
-                      name="mueble_catalogo_id"
-                      label="Mueble del catálogo"
-                      defaultValue=""
-                      required
-                    >
-                      <option value="" disabled>
-                        Selecciona mueble
-                      </option>
-                      {muebles.map((mueble) => (
-                        <option key={mueble.id} value={mueble.id}>
-                          {mueble.codigo} — {mueble.nombre} · {formatPen(mueble.precio_lista)}
-                          {mueble.stock_disponible <= 0 ? " (sin stock)" : ""}
-                        </option>
-                      ))}
-                    </SelectField>
-                    <Field name="fecha" label="Fecha" type="date" defaultValue={hoy} required />
-                    <Field
-                      name="cantidad"
-                      label="Cantidad"
-                      type="number"
-                      min="1"
-                      step="1"
-                      defaultValue="1"
-                      required
-                    />
-                    <Field
-                      name="precio_unitario"
-                      label="Precio unitario regateado (S/)"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      required
-                    />
-                  </div>
-
-                  <div className="rounded-xl border border-[var(--color-border)] p-3">
-                    <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-                      Datos de entrega
-                    </p>
-                    <div className="mt-2">
-                      <EntregaFormFields choferes={choferes} zonas={zonas} />
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-[var(--color-border)] p-3">
-                    <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-                      Datos de pago
-                    </p>
-                    <div className="mt-2">
-                      <PagoFormFields />
-                    </div>
-                  </div>
-
-                  <PendingSubmitButton idleText="Confirmar venta" />
-                </form>
-              </ContextActionPanel>
-            </>
+            <MueblesTerminadosContextPanels
+              clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre }))}
+              muebles={muebles.map((m) => ({
+                id: m.id,
+                codigo: m.codigo,
+                nombre: m.nombre,
+                precio_lista: m.precio_lista,
+                stock_disponible: m.stock_disponible,
+              }))}
+              choferes={choferes.map((c) => ({
+                id: c.id,
+                nombre: c.nombre,
+                telefono: c.telefono,
+                placa: c.placa,
+              }))}
+              zonas={zonas.map((z) => ({
+                id: z.id,
+                nombre: z.nombre,
+                tarifa: z.tarifa,
+                distancia_km: z.distancia_km,
+              }))}
+              fechaDefault={hoy}
+            />
           ) : (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
               Tu rol es de solo lectura.
@@ -292,7 +180,7 @@ export default async function MueblesTerminadosPage() {
                     </TD>
                     <TD className="text-right">
                       {canMutate && venta.estado_entrega !== "entregado" ? (
-                        <form action={voidFormAction(marcarEntregaMueble)} className="inline-flex">
+                        <form action={marcarEntregaMueble} className="inline-flex">
                           <input type="hidden" name="id" value={venta.id} />
                           <input
                             type="hidden"

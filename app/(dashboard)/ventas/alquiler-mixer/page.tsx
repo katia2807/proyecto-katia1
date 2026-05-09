@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { cerrarContratoAlquiler, createContratoAlquiler } from "@/app/actions";
-import { voidFormAction } from "@/lib/void-form-action";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { CierreContratoForm } from "@/components/sales/cierre-contrato-form";
 import { ContratoAlquilerForm } from "@/components/sales/contrato-alquiler-form";
@@ -48,7 +46,7 @@ export default async function AlquilerMixerPage() {
                 title="Contrato de alquiler"
                 description="Calcula monto total y depósito 30% en vivo. El depósito entra como ingreso al confirmar."
               >
-                <ContratoAlquilerForm action={voidFormAction(createContratoAlquiler)} clientes={clientes} />
+                <ContratoAlquilerForm clientes={clientes} />
               </ContextActionPanel>
 
               <ContextActionPanel
@@ -56,7 +54,7 @@ export default async function AlquilerMixerPage() {
                 title="Cierre de contrato"
                 description="Aplica penalidades por retraso, devolución tardía o daños."
               >
-                <CierreContratoForm action={voidFormAction(cerrarContratoAlquiler)} contratos={abiertos} />
+                <CierreContratoForm contratos={abiertos} />
               </ContextActionPanel>
             </>
           ) : (

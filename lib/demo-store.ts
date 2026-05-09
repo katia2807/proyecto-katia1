@@ -376,15 +376,6 @@ type CierreRow = {
   reopen_reason: string | null;
 };
 
-export type GoLiveItem = {
-  id: string;
-  title: string;
-  completed: boolean;
-  owner: string;
-  evidence: string;
-  updated_at: string;
-};
-
 export type SecurityControlItem = {
   id: string;
   title: string;
@@ -444,7 +435,6 @@ type DemoStore = {
   inventarioMovimientos: InventarioMovimientoRow[];
   alertas: AlertaRow[];
   cierres: CierreRow[];
-  goLiveChecklist: GoLiveItem[];
   securityControls: SecurityControlItem[];
   choferes: ChoferRow[];
   mueblesCatalogo: MuebleCatalogoRow[];
@@ -1091,72 +1081,6 @@ function createDefaultDemoStore(): DemoStore {
     },
   ],
   cierres: [] as CierreRow[],
-  goLiveChecklist: [
-    {
-      id: "go-1",
-      title: "Contrato del MVP y alcance comercial firmado.",
-      completed: true,
-      owner: "Katia",
-      evidence: "Contrato base revisado con socios.",
-      updated_at: nowIso(),
-    },
-    {
-      id: "go-2",
-      title: "RLS y roles validados en producción para datos privados.",
-      completed: false,
-      owner: "Equipo técnico",
-      evidence: "",
-      updated_at: nowIso(),
-    },
-    {
-      id: "go-3",
-      title: "MFA habilitado para owner_admin y gerencia.",
-      completed: false,
-      owner: "Katia",
-      evidence: "",
-      updated_at: nowIso(),
-    },
-    {
-      id: "go-4",
-      title: "Backups diarios activos con prueba de restauración.",
-      completed: false,
-      owner: "Equipo técnico",
-      evidence: "",
-      updated_at: nowIso(),
-    },
-    {
-      id: "go-5",
-      title: "Flujos de caja, ventas, alquiler, personal y reportes ejecutados en uso real.",
-      completed: true,
-      owner: "Katia",
-      evidence: "Flujo validado en demo operativa.",
-      updated_at: nowIso(),
-    },
-    {
-      id: "go-6",
-      title: "Cierre mensual con token de confirmación y hash inmutable validado.",
-      completed: true,
-      owner: "Equipo técnico",
-      evidence: "Cierre ejecutado y hash visible en reportes.",
-      updated_at: nowIso(),
-    },
-    {
-      id: "go-7",
-      title: "Manual operativo de Katia y reporte de socios entregados.",
-      completed: false,
-      owner: "Katia",
-      evidence: "",
-      updated_at: nowIso(),
-    },
-    {
-      id: "go-8",
-      title: "Canal de soporte y SLA definidos para la primera ventana de operación.",
-      completed: false,
-      owner: "Equipo técnico",
-      evidence: "",
-      updated_at: nowIso(),
-    },
-  ],
   securityControls: [
     {
       id: "sec-1",
@@ -1521,7 +1445,6 @@ function isValidDemoStore(data: unknown): data is DemoStore {
     "inventarioMovimientos",
     "alertas",
     "cierres",
-    "goLiveChecklist",
     "securityControls",
     "choferes",
     "mueblesCatalogo",
@@ -1701,7 +1624,6 @@ function migrateDemoStore(raw: Record<string, unknown>): DemoStore {
     inventarioMovimientos: pick("inventarioMovimientos", defaults.inventarioMovimientos),
     alertas: pick("alertas", defaults.alertas),
     cierres: pick("cierres", defaults.cierres),
-    goLiveChecklist: pick("goLiveChecklist", defaults.goLiveChecklist),
     securityControls: pick("securityControls", defaults.securityControls),
     choferes: seed("choferes", defaults.choferes),
     mueblesCatalogo: seed("mueblesCatalogo", defaults.mueblesCatalogo),
@@ -1801,7 +1723,6 @@ export function demoResetStore(): { eliminados: number } {
     snapshot.inventarioProductos.length +
     snapshot.inventarioMovimientos.length +
     snapshot.registrosGenerales.length +
-    snapshot.goLiveChecklist.length +
     snapshot.securityControls.length +
     snapshot.choferes.length +
     snapshot.mueblesCatalogo.length +
@@ -1835,7 +1756,6 @@ const DELETABLE_COLLECTIONS = [
   "inventarioMovimientos",
   "alertas",
   "cierres",
-  "goLiveChecklist",
   "securityControls",
   "choferes",
   "mueblesCatalogo",
@@ -1994,10 +1914,6 @@ export function demoUtilidadRows() {
 }
 export function demoCierresRows() {
   return [...store.cierres].sort((a, b) => `${b.anio}${b.mes}`.localeCompare(`${a.anio}${a.mes}`));
-}
-
-export function demoGoLiveChecklistRows() {
-  return [...store.goLiveChecklist];
 }
 
 export function demoSecurityControlRows() {
@@ -2426,22 +2342,6 @@ export function demoCerrarMes(organizationId: string, anio: number, mes: number)
     const [y, m] = row.fecha.split("-").map(Number);
     if (y === anio && m === mes) row.periodo_cerrado = true;
   }
-  persistStore();
-}
-
-export function demoToggleGoLiveItem(id: string) {
-  const row = store.goLiveChecklist.find((item) => item.id === id);
-  if (!row) return;
-  row.completed = !row.completed;
-  row.updated_at = nowIso();
-  persistStore();
-}
-
-export function demoSaveGoLiveEvidence(id: string, evidence: string) {
-  const row = store.goLiveChecklist.find((item) => item.id === id);
-  if (!row) return;
-  row.evidence = evidence;
-  row.updated_at = nowIso();
   persistStore();
 }
 

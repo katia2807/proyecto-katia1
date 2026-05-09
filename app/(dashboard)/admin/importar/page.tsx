@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { importarArchivo } from "@/app/actions";
-import { voidFormAction } from "@/lib/void-form-action";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { SelectField } from "@/components/ui/field";
@@ -53,7 +52,7 @@ BOSCO Madera SAC,20111111111,955555555`}
           Acepta .xlsx (primer hoja) y .csv. Las columnas deben respetar el formato sugerido. Las
           filas duplicadas se procesan tal cual; deduplica primero si es necesario.
         </CardDescription>
-        <form action={voidFormAction(importarArchivo)} className="mt-3 grid gap-3 md:grid-cols-2">
+        <form action={importarArchivo} className="mt-3 grid gap-3 md:grid-cols-2">
           <SelectField name="tipo" label="Tipo de carga" required defaultValue="gastos">
             <option value="gastos">Gastos (caja)</option>
             <option value="clientes">Clientes</option>

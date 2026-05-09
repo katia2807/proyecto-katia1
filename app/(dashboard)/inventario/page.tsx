@@ -1,17 +1,7 @@
-import {
-  createInventarioMovimiento,
-  createInventarioProducto,
-  deleteInventarioMovimiento,
-  registrarConteoInventario,
-  toggleInventarioProductoActivo,
-  updateInventarioProducto,
-} from "@/app/actions";
-import { ContextActionPanel } from "@/components/context-action-panel";
 import { InventarioAccionesRapidas } from "@/components/inventario-acciones-rapidas";
+import { InventarioContextPanels } from "@/components/inventario/inventario-context-panels";
 import { InventarioInteractivo } from "@/components/inventario-interactivo";
 import { MetricCard } from "@/components/metric-card";
-import { Button } from "@/components/ui/button";
-import { Field, SelectField } from "@/components/ui/field";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import { getInventarioRobustoData } from "@/lib/data";
 import { canMutateInventario } from "@/lib/permissions";
@@ -67,81 +57,15 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
           </p>
         }
       >
-          <ContextActionPanel
-            key={`quick-producto-${quick}`}
-            triggerLabel="Agregar producto"
-            title="Nuevo producto"
-            description="Completa solo lo necesario para registrarlo."
-            openByDefault={quick === "producto"}
-            replacePathOnClose="/inventario"
-          >
-            <form action={createInventarioProducto} className="grid gap-3 md:grid-cols-2">
-              <Field name="codigo" label="Código" placeholder="MAD-TOR-01" required />
-              <Field name="nombre" label="Nombre" placeholder="Tabla Tornillo 2x10x240" required />
-              <Field name="categoria" label="Categoría" placeholder="Madera" required />
-              <Field name="unidad" label="Unidad" placeholder="unidad / caja / lata" required />
-              <Field
-                name="stock_minimo"
-                label="Stock mínimo"
-                type="number"
-                min="0"
-                step="1"
-                required
-                className="md:col-span-2"
-              />
-              <input type="hidden" name="return_to" value="/inventario" />
-              <input type="hidden" name="next_quick" value="movimiento" />
-              <div className="md:col-span-2">
-                <Button>Guardar producto</Button>
-              </div>
-            </form>
-          </ContextActionPanel>
-
-          <ContextActionPanel
-            key={`quick-movimiento-${quick}`}
-            triggerLabel="Registrar movimiento"
-            title="Movimiento de inventario"
-            description="Entrada, salida o ajuste en un panel puntual."
-            openByDefault={quick === "movimiento"}
-            replacePathOnClose="/inventario"
-          >
-            <form action={createInventarioMovimiento} className="grid gap-3 md:grid-cols-2">
-              <SelectField name="producto_id" label="Producto" required defaultValue="">
-                <option value="" disabled>
-                  Selecciona producto
-                </option>
-                {productos.map((producto) => (
-                  <option key={producto.id} value={producto.id}>
-                    {producto.nombre}
-                  </option>
-                ))}
-              </SelectField>
-              <Field name="fecha" type="date" label="Fecha" required />
-              <SelectField name="tipo" label="Tipo" defaultValue="entrada_compra" required>
-                <option value="entrada_compra">Entrada por compra</option>
-                <option value="salida_venta">Salida por venta</option>
-                <option value="ajuste">Ajuste</option>
-              </SelectField>
-              <Field name="cantidad" label="Cantidad" type="number" min="0.01" step="0.01" required />
-              <Field name="costo_unitario" label="Costo unitario (opcional)" type="number" min="0" step="0.01" />
-              <Field name="referencia" label="Referencia" placeholder="Factura, pedido, ajuste..." />
-              <input type="hidden" name="return_to" value="/inventario" />
-              <div className="md:col-span-2">
-                <Button>Guardar movimiento</Button>
-              </div>
-            </form>
-          </ContextActionPanel>
+        <InventarioContextPanels
+          quick={quick}
+          productos={productos.map((p) => ({ id: p.id, nombre: p.nombre }))}
+        />
       </InventarioAccionesRapidas>
 
       <InventarioInteractivo
         data={inventario}
         canMutate={canMutate}
-        actions={{
-          updateInventarioProducto,
-          toggleInventarioProductoActivo,
-          deleteInventarioMovimiento,
-          registrarConteoInventario,
-        }}
       />
     </div>
   );

@@ -1,12 +1,9 @@
 import Link from "next/link";
-import { cerrarMes } from "@/app/actions";
-import { ContextActionPanel } from "@/components/context-action-panel";
+import { ReportesCerrarMesPanel } from "@/components/reportes/reportes-cerrar-mes-panel";
 import { MetricCard } from "@/components/metric-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Field } from "@/components/ui/field";
-import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { WhatsAppButton } from "@/components/sales/whatsapp-button";
 import { getCurrentUserRole } from "@/lib/current-user-role";
@@ -179,26 +176,7 @@ export default async function ReportesPage() {
           <CardDescription>Cierre mensual en panel separado para evitar confusión.</CardDescription>
         </div>
         {canDoCloseMonth ? (
-          <ContextActionPanel
-            triggerLabel="Cerrar mes"
-            title="Cierre mensual irreversible"
-            description="Doble confirmación anti-error. Luego del cierre no se puede editar ese período."
-          >
-            <form action={cerrarMes} className="grid gap-3 md:grid-cols-2">
-              <Field name="anio" label="Año" type="number" defaultValue={String(anio)} required />
-              <Field name="mes" label="Mes" type="number" min="1" max="12" defaultValue={String(mes)} required />
-              <Field
-                name="confirmacion"
-                label={`Confirmación (escribe: ${token})`}
-                placeholder={token}
-                required
-                className="md:col-span-2"
-              />
-              <div className="md:col-span-2">
-                <PendingSubmitButton idleText="Cerrar mes" />
-              </div>
-            </form>
-          </ContextActionPanel>
+          <ReportesCerrarMesPanel anio={anio} mes={mes} token={token} />
         ) : (
           <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
             Solo owner_admin y gerencia pueden ejecutar cierre mensual.

@@ -11,6 +11,8 @@ import type { AppRole } from "@/lib/supabase/types";
 
 /** Cookie antigua del login local; se borra en logout por si quedó en el navegador. */
 export const LEGACY_LOCAL_AUTH_COOKIE = "katia_local_auth";
+const DEV_LOGIN_COOKIE_VALUE = "dev-local-owner-admin";
+const DEV_LOGIN_EMAIL = "test@test.com";
 
 export type AuthContext = {
   userId: string;
@@ -55,6 +57,21 @@ export async function getSupabaseAuthServerClient() {
 }
 
 export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
+  if (process.env.NODE_ENV === "development") {
+    const cookieStore = await cookies();
+    const localAuthCookie = cookieStore.get(LEGACY_LOCAL_AUTH_COOKIE)?.value;
+    if (localAuthCookie === DEV_LOGIN_COOKIE_VALUE) {
+      return {
+        userId: "dev-local-user",
+        organizationId: DEFAULT_ORG_ID,
+        role: "owner_admin",
+        uiRole: "owner_admin",
+        fullName: "Usuario de prueba (local)",
+        email: DEV_LOGIN_EMAIL,
+      };
+    }
+  }
+
   const authClient = await getSupabaseAuthServerClient();
   if (!authClient) {
     return null;

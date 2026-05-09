@@ -1,5 +1,6 @@
 "use client";
 
+import { cerrarContratoAlquiler } from "@/app/actions";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -15,11 +16,10 @@ type ContratoLite = {
 };
 
 type CierreContratoFormProps = {
-  action: (formData: FormData) => Promise<void>;
   contratos: ContratoLite[];
 };
 
-export function CierreContratoForm({ action, contratos }: CierreContratoFormProps) {
+export function CierreContratoForm({ contratos }: CierreContratoFormProps) {
   const hoy = new Date().toISOString().slice(0, 10);
   const [contratoId, setContratoId] = useState(contratos[0]?.id ?? "");
   const [retraso, setRetraso] = useState(false);
@@ -37,7 +37,7 @@ export function CierreContratoForm({ action, contratos }: CierreContratoFormProp
   }, [contrato, retraso, devolucion, danios]);
 
   return (
-    <form action={action} className="space-y-3">
+    <form action={cerrarContratoAlquiler} className="space-y-3">
       <label className="flex flex-col gap-1.5 text-sm font-medium">
         Contrato a cerrar
         <select

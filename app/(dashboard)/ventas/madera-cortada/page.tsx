@@ -1,5 +1,3 @@
-import { createVentaMaderaCortada } from "@/app/actions";
-import { voidFormAction } from "@/lib/void-form-action";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { MaderaCortadaForm } from "@/components/sales/madera-cortada-form";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +53,6 @@ export default async function MaderaCortadaPage() {
             description="Cliente, tipo de corte, calculadora PT, entrega y pago."
           >
             <MaderaCortadaForm
-              action={voidFormAction(createVentaMaderaCortada)}
               clientes={clientes}
               choferes={choferes}
               productos={productosMadera}

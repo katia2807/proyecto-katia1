@@ -1,5 +1,3 @@
-import { createServicioAserradero } from "@/app/actions";
-import { voidFormAction } from "@/lib/void-form-action";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { AserraderoForm } from "@/components/sales/aserradero-form";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -49,7 +47,6 @@ export default async function AserraderoServiciosPage() {
             description="Cubicaje + servicios especiales con cálculo en vivo de utilidad."
           >
             <AserraderoForm
-              action={voidFormAction(createServicioAserradero)}
               clientes={clientes}
               serviciosEspeciales={tarifas}
             />

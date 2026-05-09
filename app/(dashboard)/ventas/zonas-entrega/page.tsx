@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { createZonaEntrega } from "@/app/actions";
-import { voidFormAction } from "@/lib/void-form-action";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
@@ -36,7 +35,7 @@ export default async function ZonasEntregaPage() {
           <CardDescription>
             La tarifa se sugiere al elegir la zona en el formulario de venta.
           </CardDescription>
-          <form action={voidFormAction(createZonaEntrega)} className="mt-3 grid gap-3 md:grid-cols-3">
+          <form action={createZonaEntrega} className="mt-3 grid gap-3 md:grid-cols-3">
             <Field name="nombre" label="Nombre de la zona" required placeholder="Ej. Cono norte" />
             <Field name="distancia_km" label="Distancia (km)" type="number" min="0" step="0.5" defaultValue="0" />
             <Field name="tarifa" label="Tarifa (S/.)" type="number" min="0" step="0.5" required />

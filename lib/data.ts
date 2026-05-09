@@ -10,7 +10,6 @@ import {
   demoCotizacionesRows,
   demoCotizacionesUnificadasRows,
   demoGetCotizacionUnificada,
-  demoGoLiveChecklistRows,
   demoInventarioMovimientosRows,
   demoInventarioProductosRows,
   demoInventarioResumen,
@@ -28,7 +27,6 @@ import {
   demoVentasMuebleTerminadoRows,
   demoVentasRows,
   demoZonasEntregaRows,
-  type GoLiveItem,
   type SecurityControlItem,
 } from "@/lib/demo-store";
 import { hasSupabaseEnv } from "@/lib/runtime";
@@ -457,13 +455,6 @@ export async function getCierresRows() {
     .order("mes", { ascending: false })
     .limit(24);
   return data ?? fallback.cierres;
-}
-
-export async function getGoLiveChecklistRows(): Promise<GoLiveItem[]> {
-  if (!hasSupabaseEnv()) {
-    return demoGoLiveChecklistRows();
-  }
-  return [];
 }
 
 export async function getSecurityControlRows(): Promise<SecurityControlItem[]> {
