@@ -42,7 +42,11 @@ export function FotoUpload({ bucket, name, label, defaultUrl = "" }: FotoUploadP
       setMensaje("Archivo guardado.");
     } catch (err) {
       setEstado("error");
-      setMensaje(err instanceof Error ? err.message : "Error al subir.");
+      setMensaje(
+        err instanceof Error && err.message
+          ? "No se pudo subir el archivo. Intenta de nuevo."
+          : "Ocurrio un problema, intenta de nuevo.",
+      );
     }
   }
 

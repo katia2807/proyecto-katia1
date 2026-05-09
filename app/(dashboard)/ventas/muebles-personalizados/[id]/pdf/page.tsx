@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { DocumentoHeader, DocumentoImprimible } from "@/components/sales/documento-imprimible";
+import { getEmpresaConfig } from "@/lib/company-config";
 import { getClientesRows, getCortesRows, getCotizacionesRows } from "@/lib/data";
 import { formatDate, formatPen } from "@/lib/utils";
 
@@ -7,10 +8,11 @@ type PageProps = { params: Promise<{ id: string }> };
 
 export default async function CotizacionPdfPage({ params }: PageProps) {
   const { id } = await params;
-  const [cotizaciones, clientes, cortes] = await Promise.all([
+  const [cotizaciones, clientes, cortes, empresa] = await Promise.all([
     getCotizacionesRows(),
     getClientesRows(),
     getCortesRows(id),
+    getEmpresaConfig(),
   ]);
 
   const cotizacion = cotizaciones.find((c) => c.id === id);
@@ -20,7 +22,7 @@ export default async function CotizacionPdfPage({ params }: PageProps) {
 
   return (
     <DocumentoImprimible>
-      <DocumentoHeader />
+      <DocumentoHeader empresa={empresa} />
 
       <h2 style={{ fontSize: 16, marginBottom: 4 }}>
         Cotización {cotizacion.correlativo ?? id.slice(0, 8)}

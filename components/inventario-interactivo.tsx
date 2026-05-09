@@ -386,7 +386,17 @@ export function InventarioInteractivo({
                   <TD>{row.referencia ?? "—"}</TD>
                   {canMutate ? (
                     <TD>
-                      <form action={actions.deleteInventarioMovimiento}>
+                      <form
+                        action={actions.deleteInventarioMovimiento}
+                        onSubmit={(event) => {
+                          const ok = window.confirm(
+                            "¿Eliminar este movimiento? Esta acción afecta el stock y no se puede deshacer.",
+                          );
+                          if (!ok) {
+                            event.preventDefault();
+                          }
+                        }}
+                      >
                         <input type="hidden" name="id" value={row.id} />
                         <Button type="submit" variant="danger">Eliminar</Button>
                       </form>

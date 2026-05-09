@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { CotizacionResumenFormal } from "@/components/sales/cotizacion-resumen-formal";
 import { DocumentoImprimible } from "@/components/sales/documento-imprimible";
+import { getEmpresaConfig } from "@/lib/company-config";
 import { totalGeneralDetalle } from "@/lib/cotizacion-calculos";
 import { buildLineasResumen } from "@/lib/cotizacion-unificada-lineas";
 import { parseCotizacionDetalle } from "@/lib/cotizacion-unificada-payload";
@@ -10,7 +11,11 @@ type PdfPageProps = { params: Promise<{ id: string }> };
 
 export default async function CotizacionUnificadaPdfPage({ params }: PdfPageProps) {
   const { id } = await params;
-  const [cot, clientes] = await Promise.all([getCotizacionUnificadaById(id), getClientesRows()]);
+  const [cot, clientes, empresa] = await Promise.all([
+    getCotizacionUnificadaById(id),
+    getClientesRows(),
+    getEmpresaConfig(),
+  ]);
   if (!cot) {
     notFound();
   }
@@ -31,6 +36,7 @@ export default async function CotizacionUnificadaPdfPage({ params }: PdfPageProp
         lineas={lineas}
         notasGenerales={detalle.notas_generales}
         total={total}
+        empresa={empresa}
       />
     </DocumentoImprimible>
   );

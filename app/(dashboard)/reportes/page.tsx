@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { WhatsAppButton } from "@/components/sales/whatsapp-button";
 import { getCurrentUserRole } from "@/lib/current-user-role";
@@ -194,7 +195,7 @@ export default async function ReportesPage() {
                 className="md:col-span-2"
               />
               <div className="md:col-span-2">
-                <Button>Cerrar mes</Button>
+                <PendingSubmitButton idleText="Cerrar mes" />
               </div>
             </form>
           </ContextActionPanel>

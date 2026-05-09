@@ -49,11 +49,13 @@ export function buildNavHrefAllowlist(role: AppRole, uiRole: string | null): Set
     hide("/admin/respaldo");
     hide("/cuenta");
     hide("/admin/usuarios");
+    hide("/admin/empresa");
   }
 
   if (!isOwnerAdminUi) {
     hide("/cuenta");
     hide("/admin/usuarios");
+    hide("/admin/empresa");
   }
 
   return allowed;

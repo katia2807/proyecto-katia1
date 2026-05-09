@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Field, SelectField } from "@/components/ui/field";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import {
@@ -96,7 +97,7 @@ export default async function MueblesTerminadosPage() {
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <Button>Guardar mueble</Button>
+                    <PendingSubmitButton idleText="Guardar mueble" />
                   </div>
                 </form>
               </ContextActionPanel>
@@ -178,7 +179,7 @@ export default async function MueblesTerminadosPage() {
                     </div>
                   </div>
 
-                  <Button>Confirmar venta</Button>
+                  <PendingSubmitButton idleText="Confirmar venta" />
                 </form>
               </ContextActionPanel>
             </>
@@ -300,11 +301,15 @@ export default async function MueblesTerminadosPage() {
                               venta.estado_entrega === "pendiente" ? "en_proceso" : "entregado"
                             }
                           />
-                          <Button variant="secondary" className="h-8 px-3 text-xs">
-                            {venta.estado_entrega === "pendiente"
-                              ? "Marcar en proceso"
-                              : "Marcar entregado"}
-                          </Button>
+                          <PendingSubmitButton
+                            variant="secondary"
+                            className="h-8 px-3 text-xs"
+                            idleText={
+                              venta.estado_entrega === "pendiente"
+                                ? "Marcar en proceso"
+                                : "Marcar entregado"
+                            }
+                          />
                         </form>
                       ) : null}
                     </TD>

@@ -20,6 +20,7 @@ export const navItems = [
   { href: "/checklist", label: "Checklist" },
   { href: "/seguridad", label: "Seguridad" },
   { href: "/cuenta", label: "Cuenta admin" },
+  { href: "/admin/empresa", label: "Empresa" },
   { href: "/admin/importar", label: "Importar" },
   { href: "/admin/respaldo", label: "Respaldo" },
   { href: "/admin/usuarios", label: "Usuarios" },

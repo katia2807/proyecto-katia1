@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import type { EmpresaConfig } from "@/lib/company-config";
 
 type DocumentoImprimibleProps = {
   /** Si es true, dispara window.print() automáticamente al cargar. */
@@ -56,17 +57,21 @@ export function DocumentoImprimible({ autoPrint = false, children }: DocumentoIm
   );
 }
 
-export function DocumentoHeader() {
+type DocumentoHeaderProps = {
+  empresa: EmpresaConfig;
+};
+
+export function DocumentoHeader({ empresa }: DocumentoHeaderProps) {
   return (
     <header style={{ borderBottom: "2px solid #111", paddingBottom: 12, marginBottom: 16 }}>
       <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>
-        KATIA LIZZET MENESES TAYPE
+        {empresa.nombre}
       </h1>
       <p style={{ fontSize: 12, margin: "4px 0", color: "#444" }}>
-        Carpintería &amp; Aserradero · RUC 10739957520
+        Carpinteria &amp; Aserradero · RUC {empresa.ruc}
       </p>
       <p style={{ fontSize: 11, margin: 0, color: "#666" }}>
-        Lima, Perú · Tel. 987 654 321
+        {empresa.direccion} · Tel. {empresa.telefono}
       </p>
     </header>
   );

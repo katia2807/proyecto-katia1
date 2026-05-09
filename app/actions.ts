@@ -1002,7 +1002,7 @@ export async function createClienteCotizacionRapida(input: {
     revalidatePath("/ventas");
     return { ok: true, id: data.id };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Error desconocido" };
+    return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
   }
 }
 
@@ -1082,7 +1082,7 @@ export async function ensureClientesGenericosCotizacion(): Promise<
     revalidatePath("/ventas");
     return { ok: true, created, reused };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Error desconocido" };
+    return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
   }
 }
 
@@ -1193,7 +1193,7 @@ export async function saveCotizacionUnificada(input: {
     revalidatePath("/cotizacion");
     return { ok: true, id: data.id };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Error desconocido" };
+    return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
   }
 }
 
@@ -1231,7 +1231,7 @@ export async function deleteCotizacionUnificada(
     revalidatePath("/cotizacion");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Error desconocido" };
+    return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
   }
 }
 
@@ -1276,7 +1276,7 @@ export async function marcarListaProduccionCotizacion(
     revalidatePath("/cotizacion");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Error desconocido" };
+    return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
   }
 }
 
@@ -1400,7 +1400,7 @@ export async function pasarCotizacionAProduccion(
     revalidatePath("/ventas/muebles-personalizados");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Error desconocido" };
+    return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
   }
 }
 
@@ -1503,7 +1503,7 @@ export async function registrarCobroCotizacionUnificada(
     revalidatePath("/caja");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Error desconocido" };
+    return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
   }
 }
 

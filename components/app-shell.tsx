@@ -42,6 +42,7 @@ const icons = {
   "/checklist": CheckCircle2,
   "/seguridad": ShieldCheck,
   "/cuenta": UserCog,
+  "/admin/empresa": UserCog,
   "/admin/importar": Download,
   "/admin/respaldo": Database,
   "/admin/usuarios": Users,

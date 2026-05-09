@@ -26,6 +26,7 @@ import {
 } from "@/lib/cotizacion-unificada-payload";
 import { CotizacionResumenFormal } from "@/components/sales/cotizacion-resumen-formal";
 import { buildLineasResumen } from "@/lib/cotizacion-unificada-lineas";
+import type { EmpresaConfig } from "@/lib/company-config";
 import { formatPen } from "@/lib/utils";
 import type { Database } from "@/lib/supabase/types";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -41,6 +42,7 @@ type CotizacionUnificadaWizardProps = {
   productos: InventarioProductoRow[];
   clientes: ClienteRow[];
   cotizacionesGuardadas: CotizacionUnificadaRow[];
+  empresa: EmpresaConfig;
 };
 
 const inputClass =
@@ -255,6 +257,7 @@ export function CotizacionUnificadaWizard({
   productos,
   clientes,
   cotizacionesGuardadas,
+  empresa,
 }: CotizacionUnificadaWizardProps) {
   const router = useRouter();
   const [tipoCliente, setTipoCliente] = useState<"natural" | "empresa">("natural");
@@ -2366,6 +2369,7 @@ export function CotizacionUnificadaWizard({
               lineas={lineasFormalSafe}
               notasGenerales={detalle.notas_generales}
               total={totalGral}
+              empresa={empresa}
               embedded
             />
           </div>
@@ -2648,7 +2652,7 @@ export function CotizacionUnificadaWizard({
                             return;
                           }
                           const r = await registrarCobroCotizacionUnificada(c.id);
-                          if (!r.ok) alert(r.error);
+                          if (!r.ok) setError(r.error);
                           else window.location.reload();
                         }}
                       >
@@ -2662,7 +2666,7 @@ export function CotizacionUnificadaWizard({
                         onClick={async () => {
                           if (!confirm("¿Eliminar esta cotización pendiente?")) return;
                           const r = await deleteCotizacionUnificada(c.id);
-                          if (!r.ok) alert(r.error);
+                          if (!r.ok) setError(r.error);
                           else window.location.reload();
                         }}
                       >

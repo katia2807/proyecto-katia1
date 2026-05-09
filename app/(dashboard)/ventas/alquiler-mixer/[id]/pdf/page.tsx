@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { DocumentoHeader, DocumentoImprimible } from "@/components/sales/documento-imprimible";
+import { getEmpresaConfig } from "@/lib/company-config";
 import { getAlquilerRows, getClientesRows } from "@/lib/data";
 import { formatDate, formatPen } from "@/lib/utils";
 
@@ -7,7 +8,11 @@ type PageProps = { params: Promise<{ id: string }> };
 
 export default async function ContratoPdfPage({ params }: PageProps) {
   const { id } = await params;
-  const [contratos, clientes] = await Promise.all([getAlquilerRows(), getClientesRows()]);
+  const [contratos, clientes, empresa] = await Promise.all([
+    getAlquilerRows(),
+    getClientesRows(),
+    getEmpresaConfig(),
+  ]);
 
   const contrato = contratos.find((c) => c.id === id);
   if (!contrato) notFound();
@@ -15,7 +20,7 @@ export default async function ContratoPdfPage({ params }: PageProps) {
 
   return (
     <DocumentoImprimible>
-      <DocumentoHeader />
+      <DocumentoHeader empresa={empresa} />
 
       <h2 style={{ fontSize: 16, marginBottom: 4 }}>
         Contrato de alquiler {contrato.codigo ?? id.slice(0, 8)}
@@ -100,7 +105,7 @@ export default async function ContratoPdfPage({ params }: PageProps) {
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 50 }}>
           <div style={{ borderTop: "1px solid #333", paddingTop: 4, width: 220 }}>Cliente</div>
           <div style={{ borderTop: "1px solid #333", paddingTop: 4, width: 220 }}>
-            Katia Lizzet Meneses Taype
+            {empresa.firmante}
           </div>
         </div>
       </footer>

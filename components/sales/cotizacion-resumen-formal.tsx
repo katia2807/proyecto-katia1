@@ -1,12 +1,6 @@
 import { cn, formatDate, formatPen } from "@/lib/utils";
 import type { LineaFormal } from "@/lib/cotizacion-unificada-lineas";
-
-const EMPRESA = {
-  nombre: "KATIA LIZZET MENESES TAYPE",
-  ruc: "10739957520",
-  subtitulo: "Carpintería & Aserradero",
-  telefono: "987 654 321",
-};
+import type { EmpresaConfig } from "@/lib/company-config";
 
 function LogoKatia() {
   return (
@@ -40,6 +34,7 @@ export type CotizacionResumenFormalProps = {
   lineas: LineaFormal[];
   notasGenerales: string;
   total: number;
+  empresa: EmpresaConfig;
   /** Vista compacta dentro del asistente (sin sombra extra). */
   embedded?: boolean;
 };
@@ -53,6 +48,7 @@ export function CotizacionResumenFormal({
   lineas,
   notasGenerales,
   total,
+  empresa,
   embedded = false,
 }: CotizacionResumenFormalProps) {
   const docLabel = tipoCliente === "empresa" ? "RUC" : "DNI";
@@ -105,11 +101,13 @@ export function CotizacionResumenFormal({
       <header className={cn("mb-6 flex flex-wrap items-start gap-4 pb-4", embedded ? "border-b border-[var(--color-border)]" : "border-b-2 border-[#111]")}>
         <LogoKatia />
         <div className="min-w-0 flex-1 text-center sm:text-left">
-          <p className="text-lg font-extrabold leading-tight tracking-tight">{EMPRESA.nombre}</p>
+          <p className="text-lg font-extrabold leading-tight tracking-tight">{empresa.nombre}</p>
           <p className={cn("mt-1 text-xs", embedded ? "text-[var(--color-text-secondary)]" : "text-[#444]")}>
-            {EMPRESA.subtitulo} · RUC {EMPRESA.ruc}
+            Carpinteria & Aserradero · RUC {empresa.ruc}
           </p>
-          <p className={cn("mt-0.5 text-[11px]", embedded ? "text-[var(--color-text-secondary)]" : "text-[#666]")}>Lima, Perú · Tel. {EMPRESA.telefono}</p>
+          <p className={cn("mt-0.5 text-[11px]", embedded ? "text-[var(--color-text-secondary)]" : "text-[#666]")}>
+            {empresa.direccion} · Tel. {empresa.telefono}
+          </p>
         </div>
       </header>
 

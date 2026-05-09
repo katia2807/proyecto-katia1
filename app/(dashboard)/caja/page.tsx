@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Field, SelectField } from "@/components/ui/field";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import { getCajaRows } from "@/lib/data";
@@ -108,7 +109,7 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
                 </span>
               </label>
               <div className="md:col-span-2">
-                <Button>Registrar movimiento</Button>
+                <PendingSubmitButton idleText="Registrar movimiento" />
               </div>
             </form>
           </ContextActionPanel>
@@ -128,7 +129,7 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
                   <input type="checkbox" name="incluir_personal" value="on" />
                   <span>Incluir también gastos personales de la jefa</span>
                 </label>
-                <Button>Generar copias del mes anterior</Button>
+                <PendingSubmitButton idleText="Generar copias del mes anterior" />
               </form>
             </ContextActionPanel>
           </div>
