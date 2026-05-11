@@ -12,7 +12,10 @@ export async function requestAntifraudeAccess(formData: FormData) {
     redirectTo: null,
   });
   const code = String(formData.get("access_code") ?? "").trim();
-  const expected = process.env.ANTIFRAUD_ACCESS_CODE || "KATIA-ANTIFRAUDE";
+  const expected = process.env.ANTIFRAUD_ACCESS_CODE?.trim();
+  if (!expected) {
+    throw new Error("ANTIFRAUD_ACCESS_CODE no está configurado en el servidor.");
+  }
 
   if (!code || code !== expected) {
     throw new Error("Permiso denegado: código de acceso inválido.");

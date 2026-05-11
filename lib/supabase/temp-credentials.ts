@@ -49,10 +49,14 @@ export function getServerSupabaseCredentials() {
   const envService = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (envUrl && envAnon) {
+    const isProd = process.env.NODE_ENV === "production";
+    if (isProd && !envService) {
+      return { url: envUrl, anonKey: envAnon, serviceRoleKey: undefined };
+    }
     return {
       url: envUrl,
       anonKey: envAnon,
-      serviceRoleKey: envService ?? envAnon,
+      serviceRoleKey: envService ?? (!isProd ? envAnon : undefined),
     };
   }
 
@@ -64,6 +68,6 @@ export function getServerSupabaseCredentials() {
   return {
     url: tempUrl,
     anonKey: tempAnon,
-    serviceRoleKey: tempService ?? tempAnon,
+    serviceRoleKey: tempService ?? (process.env.NODE_ENV !== "production" ? tempAnon : undefined),
   };
 }

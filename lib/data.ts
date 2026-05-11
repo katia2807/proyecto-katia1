@@ -21,6 +21,7 @@ import {
   demoRegistrosGeneralesRows,
   demoSecurityControlRows,
   demoServiciosAserraderoRows,
+  demoServiciosEspecialesTarifaRows,
   demoSnapshot,
   type ServicioEspecialTarifaRow,
   demoUtilidadRows,
@@ -461,7 +462,21 @@ export async function getSecurityControlRows(): Promise<SecurityControlItem[]> {
   if (!hasSupabaseEnv()) {
     return demoSecurityControlRows();
   }
-  return [];
+  const supabase = getSupabaseServerClient();
+  return safeQuery(async () => {
+    const { data } = await supabase
+      .from("security_control_items")
+      .select("id,title,owner,completed,updated_at")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .order("sort_order", { ascending: true });
+    return (data ?? []).map((r) => ({
+      id: r.id,
+      title: r.title,
+      owner: r.owner,
+      completed: r.completed,
+      updated_at: r.updated_at,
+    }));
+  }, []);
 }
 
 export async function getInventarioProductosRows(includeInactive = false) {
@@ -742,9 +757,20 @@ export async function getServiciosAserraderoRows() {
   }, fallback.serviciosAserradero);
 }
 
-/** Tarifas de procesos especiales: sin tabla en BD; lista vacía hasta implementar. */
 export async function getServiciosEspecialesTarifaRows(): Promise<ServicioEspecialTarifaRow[]> {
-  return [];
+  if (!hasSupabaseEnv()) {
+    return demoServiciosEspecialesTarifaRows();
+  }
+  const supabase = getSupabaseServerClient();
+  return safeQuery(async () => {
+    const { data } = await supabase
+      .from("servicios_especiales_tarifa")
+      .select("*")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .eq("activo", true)
+      .order("nombre", { ascending: true });
+    return (data ?? []) as ServicioEspecialTarifaRow[];
+  }, []);
 }
 
 export async function getZonasEntregaRows() {

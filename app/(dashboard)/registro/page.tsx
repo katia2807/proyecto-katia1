@@ -41,6 +41,7 @@ export default async function RegistroPage({ searchParams }: RegistroPageProps) 
           <CardDescription>Empieza con un dato y evita repetir capturas en distintos módulos.</CardDescription>
         </div>
         <RegistroNuevoContextPanel
+          key={categoriaId || "all"}
           categorias={categorias.map((c) => ({ id: c.id, nombre: c.nombre }))}
           defaultCategoriaId={categoriaId || ""}
           openByDefault={quick === "nuevo-registro"}

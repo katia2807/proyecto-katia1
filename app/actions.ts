@@ -2000,6 +2000,27 @@ export async function toggleSecurityControl(formData: FormData) {
     revalidatePath("/seguridad");
     return;
   }
+  const supabase = getSupabaseServerClient();
+  const { data: row, error: readErr } = await supabase
+    .from("security_control_items")
+    .select("id,completed")
+    .eq("id", id)
+    .eq("organization_id", DEFAULT_ORG_ID)
+    .maybeSingle();
+  if (readErr || !row) {
+    throw new Error(readErr?.message ?? "Control no encontrado.");
+  }
+  const { error: upErr } = await supabase
+    .from("security_control_items")
+    .update({
+      completed: !row.completed,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("organization_id", DEFAULT_ORG_ID);
+  if (upErr) {
+    throw new Error(upErr.message);
+  }
   revalidatePath("/seguridad");
 }
 

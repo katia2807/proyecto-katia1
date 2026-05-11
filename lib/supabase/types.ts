@@ -164,6 +164,59 @@ export type Database = {
           correlativo?: string | null;
         };
       };
+      security_control_items: {
+        Row: {
+          id: string;
+          organization_id: string;
+          sort_order: number;
+          title: string;
+          owner: string;
+          completed: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          sort_order?: number;
+          title: string;
+          owner?: string;
+          completed?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          sort_order?: number;
+          title?: string;
+          owner?: string;
+          completed?: boolean;
+          updated_at?: string;
+        };
+      };
+      servicios_especiales_tarifa: {
+        Row: {
+          id: string;
+          organization_id: string;
+          codigo: string;
+          nombre: string;
+          tarifa_por_pieza: number;
+          activo: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          codigo: string;
+          nombre: string;
+          tarifa_por_pieza: number;
+          activo?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          codigo?: string;
+          nombre?: string;
+          tarifa_por_pieza?: number;
+          activo?: boolean;
+        };
+      };
       registro_categorias: {
         Row: {
           id: string;

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/Combobox";
 import { Field } from "@/components/ui/field";
 import { MOCK_CATEGORIAS_REGISTRO } from "@/lib/combobox-mocks";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type CategoriaOpt = { id: string; nombre: string };
 
@@ -24,10 +24,6 @@ export function RegistroNuevoContextPanel({
   mockData = false,
 }: RegistroNuevoContextPanelProps) {
   const [categoriaId, setCategoriaId] = useState(defaultCategoriaId || "");
-
-  useEffect(() => {
-    setCategoriaId(defaultCategoriaId || "");
-  }, [defaultCategoriaId]);
 
   const categoriaOptions = useMemo(() => {
     const src = mockData ? MOCK_CATEGORIAS_REGISTRO : categorias;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type ComboboxOption = { value: string; label: string; sublabel?: string };
@@ -32,8 +32,7 @@ export function Combobox({
   hiddenInputName,
 }: ComboboxProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const listId = useRef(`cb-list-${Math.random().toString(36).slice(2, 9)}`);
+  const listId = useId();
 
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
@@ -51,15 +50,7 @@ export function Combobox({
     );
   }, [options, inputValue]);
 
-  useEffect(() => {
-    setHighlight(0);
-  }, [filtered.length, inputValue]);
-
-  useEffect(() => {
-    if (!open) {
-      setInputValue(selected?.label ?? "");
-    }
-  }, [value, selected?.label, open]);
+  const clampedHighlight = filtered.length === 0 ? 0 : Math.min(highlight, filtered.length - 1);
 
   const commitValue = useCallback(
     (next: string) => {
@@ -71,6 +62,12 @@ export function Combobox({
     },
     [onChange, options],
   );
+
+  const closeAndRevertInput = useCallback(() => {
+    setOpen(false);
+    const sel = options.find((o) => o.value === value);
+    setInputValue(sel?.label ?? "");
+  }, [options, value]);
 
   useEffect(() => {
     if (!open) return;
@@ -87,9 +84,7 @@ export function Combobox({
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
       e.preventDefault();
-      setOpen(false);
-      const sel = options.find((o) => o.value === value);
-      setInputValue(sel?.label ?? "");
+      closeAndRevertInput();
       return;
     }
     if (e.key === "ArrowDown") {
@@ -107,34 +102,35 @@ export function Combobox({
     if (e.key === "Enter") {
       if (open && filtered.length > 0) {
         e.preventDefault();
-        const pick = filtered[Math.min(highlight, filtered.length - 1)];
+        const pick = filtered[clampedHighlight];
         if (pick) commitValue(pick.value);
       }
       return;
     }
   };
 
+  const selectedLabel = selected?.label ?? "";
+
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       {hiddenInputName ? <input type="hidden" name={hiddenInputName} value={value} /> : null}
       <input
-        ref={inputRef}
         type="text"
+        role="combobox"
         disabled={disabled}
         autoComplete="off"
         aria-label={inputAriaLabel}
         aria-expanded={open}
-        aria-controls={open ? listId.current : undefined}
+        aria-controls={open ? listId : undefined}
         aria-activedescendant={
-          open && filtered[highlight]
-            ? `${listId.current}-opt-${filtered[highlight].value}`
-            : undefined
+          open && filtered[clampedHighlight] ? `${listId}-opt-${filtered[clampedHighlight].value}` : undefined
         }
         placeholder={placeholder}
         className={controlClass}
-        value={open ? inputValue : selected?.label ?? inputValue}
+        value={open ? inputValue : selectedLabel}
         onChange={(e) => {
           setInputValue(e.target.value);
+          setHighlight(0);
           setOpen(true);
           if (value) {
             onChange("");
@@ -149,19 +145,19 @@ export function Combobox({
 
       {open && filtered.length > 0 ? (
         <ul
-          id={listId.current}
+          id={listId}
           role="listbox"
           className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-lg"
         >
           {filtered.map((opt, idx) => (
             <li
               key={opt.value}
-              id={`${listId.current}-opt-${opt.value}`}
+              id={`${listId}-opt-${opt.value}`}
               role="option"
-              aria-selected={idx === highlight}
+              aria-selected={idx === clampedHighlight}
               className={cn(
                 "cursor-pointer px-3 py-2 text-sm",
-                idx === highlight
+                idx === clampedHighlight
                   ? "bg-[var(--color-primary-soft)] text-[var(--color-text-primary)]"
                   : "text-[var(--color-text-primary)] hover:bg-[var(--color-primary-soft)]/60",
               )}

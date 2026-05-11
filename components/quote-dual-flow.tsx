@@ -580,8 +580,8 @@ export function QuoteDualFlow({ canSave = true, mode = "simple", mockData }: Quo
   }
 
   function saveQuoteToDB(payload: unknown) {
-    // Replace this with your API/backend integration.
-    console.log("saveQuoteToDB", payload);
+    // Componente legacy: no está enlazado al flujo unificado de cotización. No persistir hasta cablear una acción servidor.
+    void payload;
   }
 
   function handleSave() {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   createClienteCotizacionRapida,
   deleteCotizacionUnificada,
@@ -78,6 +78,38 @@ const navBtnClass =
   "h-10 min-w-28 rounded-full bg-[var(--color-accent)] px-5 text-sm font-semibold text-[var(--color-on-accent)] transition hover:brightness-110";
 const MUEBLE_TEMPLATES_KEY = "cotizacion_muebles_templates_v1";
 const COTIZACION_DRAFT_KEY = "cotizacion_unificada_draft_v1";
+const WIZARD_TEMPLATES_EVENT = "katia:cotizacion-templates-changed";
+const WIZARD_DRAFT_EVENT = "katia:cotizacion-draft-changed";
+
+function subscribeWizardTemplates(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const handler = () => onStoreChange();
+  window.addEventListener("storage", handler);
+  window.addEventListener(WIZARD_TEMPLATES_EVENT, handler);
+  return () => {
+    window.removeEventListener("storage", handler);
+    window.removeEventListener(WIZARD_TEMPLATES_EVENT, handler);
+  };
+}
+
+function emitWizardTemplatesChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(WIZARD_TEMPLATES_EVENT));
+}
+
+function subscribeWizardDraft(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const handler = () => onStoreChange();
+  window.addEventListener("storage", handler);
+  window.addEventListener(WIZARD_DRAFT_EVENT, handler);
+  return () => {
+    window.removeEventListener("storage", handler);
+    window.removeEventListener(WIZARD_DRAFT_EVENT, handler);
+  };
+}
+
+function emitWizardDraftChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(WIZARD_DRAFT_EVENT));
+}
 
 type MuebleTemplate = {
   id: string;
@@ -339,17 +371,22 @@ export function CotizacionUnificadaWizard({
   >("todos");
   const [filterFechaDesde, setFilterFechaDesde] = useState("");
   const [filterFechaHasta, setFilterFechaHasta] = useState("");
-  const [muebleTemplates, setMuebleTemplates] = useState<MuebleTemplate[]>(() => [getDefaultGerenciaTemplate()]);
+  const muebleTemplates = useSyncExternalStore(
+    subscribeWizardTemplates,
+    () => loadMuebleTemplatesFromStorage(),
+    () => [getDefaultGerenciaTemplate()],
+  );
+  const draftSavedAt = useSyncExternalStore(
+    subscribeWizardDraft,
+    () => (typeof window === "undefined" ? null : (loadDraftFromStorage()?.savedAt ?? null)),
+    () => null,
+  );
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const [selectedMuebleTemplateId, setSelectedMuebleTemplateId] = useState("");
-  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-    setMuebleTemplates(loadMuebleTemplatesFromStorage());
-    const draft = loadDraftFromStorage();
-    setDraftSavedAt(draft?.savedAt ?? null);
-  }, []);
 
   const docLabel = tipoCliente === "empresa" ? "RUC" : "DNI";
   const docErrorLive = useMemo(() => {
@@ -696,15 +733,16 @@ export function CotizacionUnificadaWizard({
       plazoDiasUI,
       plazoUnidadUI,
     };
-    setMuebleTemplates((current) => {
-      const merged = [...current.filter((t) => t.name.toLowerCase() !== next.name.toLowerCase()), next];
-      try {
-        localStorage.setItem(MUEBLE_TEMPLATES_KEY, JSON.stringify(merged));
-      } catch {
-        // ignore local storage errors
-      }
-      return merged;
-    });
+    const merged = [
+      ...loadMuebleTemplatesFromStorage().filter((t) => t.name.toLowerCase() !== next.name.toLowerCase()),
+      next,
+    ];
+    try {
+      localStorage.setItem(MUEBLE_TEMPLATES_KEY, JSON.stringify(merged));
+    } catch {
+      // ignore local storage errors
+    }
+    emitWizardTemplatesChanged();
     setSelectedMuebleTemplateId(next.id);
   }, [
     acabadoOtroUI,
@@ -754,7 +792,7 @@ export function CotizacionUnificadaWizard({
     };
     try {
       localStorage.setItem(COTIZACION_DRAFT_KEY, JSON.stringify(draft));
-      setDraftSavedAt(draft.savedAt);
+      emitWizardDraftChanged();
     } catch {
       // Ignore localStorage errors.
     }
@@ -790,7 +828,7 @@ export function CotizacionUnificadaWizard({
     } catch {
       // ignore
     }
-    setDraftSavedAt(null);
+    emitWizardDraftChanged();
   }, []);
 
   const restoreDraft = useCallback(() => {
@@ -824,7 +862,6 @@ export function CotizacionUnificadaWizard({
     setPlazoDiasUI(draft.plazoDiasUI);
     setPlazoUnidadUI(draft.plazoUnidadUI);
     setError("Borrador recuperado.");
-    setDraftSavedAt(draft.savedAt);
   }, [applyCotizacionPreset]);
 
   const resetWizardFast = useCallback(() => {
@@ -1246,7 +1283,7 @@ export function CotizacionUnificadaWizard({
               type="button"
               className="h-9 rounded-lg border border-[var(--color-border)] px-3 text-xs font-semibold disabled:opacity-50"
               onClick={restoreDraft}
-              disabled={!isMounted || !draftSavedAt}
+              disabled={!isClient || !draftSavedAt}
             >
               Recuperar borrador
             </button>
@@ -1260,7 +1297,7 @@ export function CotizacionUnificadaWizard({
           </div>
         </div>
         <p className="mt-2 text-[11px] text-[var(--color-text-secondary)]">
-          {isMounted && draftSavedAt
+          {isClient && draftSavedAt
             ? `Último borrador: ${new Date(draftSavedAt).toLocaleString("es-PE")}`
             : "Aún no hay borrador guardado."}{" "}
           En PC: `Ctrl/Cmd + S` guarda, `Alt + R` recupera, `Alt + N` nueva.
