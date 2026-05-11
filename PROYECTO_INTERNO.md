@@ -51,7 +51,7 @@ La **lógica de negocio** y lecturas agregadas suelen vivir en `lib/data.ts`, `a
 
 ## Módulos “ocultos” o fuera del alcance comercial V1
 
-**Flags de producto:** `lib/features.ts` exporta `FEATURES` (objeto `as const`) y el tipo `FeatureKey`. Cada clave es `true`/`false` para incluir o excluir capacidades de la **versión contratada**. El menú lateral solo incluye enlaces cuyo `href` pasa `isNavHrefAllowedByProductFeatures`, según el mapa `NAV_MENU_FEATURE` en el mismo archivo (por ejemplo `mueblesPersonalizados` controla `/ventas/muebles-personalizados`, `importarDatos` a `/admin/importar`, `antifraude` a `/reportes/antifraude`). La entrada **Ventas** (`/ventas`) se muestra si **alguna** de las features de ese hub está activa (`clientes`, `maderaCortada`, `aserradero`, `alquilerMixer`, `mueblesTerminados`, `mueblesPersonalizados`). Rutas sin regla explícita (Inicio, Registro, Seguridad, Cuenta admin, Empresa, Usuarios) siguen visibles en producto y solo las limita el rol.
+**Flags de producto:** `lib/features.ts` exporta `FEATURES` (objeto `as const`) y el tipo `FeatureKey`. Cada clave es `true`/`false` para incluir o excluir capacidades de la **versión contratada**. El menú lateral solo incluye enlaces cuyo `href` pasa `isNavHrefAllowedByProductFeatures`, según el mapa `NAV_MENU_FEATURE` (por ejemplo `inicio` → `/`, `ventas` → `/ventas`, `equipoPersonal` → `/personal`, `controlSocios` → `/reportes/antifraude`, `seguridad` → `/seguridad`, `importar` → `/admin/importar`). Algunas entradas usan regla compuesta (`every`): p. ej. `/ventas/alquiler-mixer` requiere `ventas` y `alquilerMixer` en `true`. Lo no incluido en V1 comercial sigue en código y puede mostrarse al activar flags y desplegar.
 
 **Importante:** ocultar del menú **no** borra rutas: `/ventas/muebles-personalizados`, importar, respaldo, etc. siguen resolviendo si se abre la URL directamente (middleware y permisos de página siguen aplicando). Para bloquear acceso directo habría que añadir comprobaciones en layout o en cada página (no implementado aquí).
 
@@ -67,6 +67,33 @@ La **lógica de negocio** y lecturas agregadas suelen vivir en `lib/data.ts`, `a
 | Cierre de mes + antifraude | 200 |
 | Nómina completa | 200 |
 | Importación + respaldo | 150 |
+
+---
+
+## Decisiones V1 — por qué se simplificó cada módulo
+
+| Módulo | Decisión | Razón técnica | Precio para activar |
+|--------|----------|---------------|--------------------:|
+| Muebles personalizados | Simplificado | Se quitó vista Kanban, queda formulario básico | — |
+| Registro | Simplificado | Solo agregar hechos, sin categorías complejas | — |
+| Alquiler Mixer | Simplificado | Sin contratos complejos, solo registro | — |
+| Reportes | Simplificado | Sin cierre de mes, solo utilidades y export | — |
+| Personal / Equipo | Oculto V2 | Sin nómina no aporta valor a taller pequeño | 200 |
+| Control socios | Oculto V2 | Antifraude no urgente para arrancar | 200 |
+| Seguridad avanzada | Oculto V2 | Auth básico cubre las necesidades actuales | 150 |
+| Importar datos | Oculto V2 | Solo uso técnico del desarrollador | 150 |
+| Cierre de mes | Oculto V2 | Requiere más pruebas antes de producción | 200 |
+
+*(Precios en soles PEN; guión “—” = incluido en V1 sin cargo extra por activación.)*
+
+---
+
+## Notas para el equipo de desarrollo
+
+- **Empresa** se mantiene en V1 porque controla logo y datos legales en PDFs de cotización.  
+- **Respaldo** se mantiene en V1 para dar confianza al cliente.  
+- Ningún archivo fue eliminado; todo lo marcado como V2 en producto se activa cambiando `false` a `true` en `lib/features.ts` (`FEATURES` + mapa `NAV_MENU_FEATURE`).  
+- Para activar un módulo V2 en menú: poner su flag en `true` en `lib/features.ts`, verificar permisos por rol en `lib/permissions.ts` si aplica, y hacer **deploy** (build + despliegue del entorno acordado).  
 
 ---
 
@@ -94,7 +121,7 @@ y se pasa como `mockData` a los paneles o formularios. Con eso se activa el modo
 
 1. **Conectar Supabase** de forma consistente (reemplazar o reducir dependencia de mocks / demo store donde corresponda).
 2. **Corregir hydration mismatch** en cotización unificada (`components/cotizacion-unificada-wizard.tsx` y datos que difieren servidor vs cliente).
-3. **Extender `FEATURES`** (o env) para enlazar `cierreMes`, `quoteDualFlow` y `zonasEntrega` a UI concreta si se desea ocultar más allá del menú.
+3. **Extender `FEATURES` / `NAV_MENU_FEATURE`** (o env) para enlazar `cierreMes`, `quoteDualFlow` y `zonasEntrega` a entradas de menú o paneles si se desea ocultar más allá del sidebar.
 4. **Tests E2E** de flujos críticos (`npm run e2e`; ej. `tests/e2e/critical-flow.spec.ts` y ampliar cobertura).
 
 ---

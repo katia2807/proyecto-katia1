@@ -2,62 +2,50 @@
 
 ## Qué es este sistema (en una línea)
 
-**ERP Proyecto Katia** es un sistema en línea para llevar el día a día del negocio: ventas, inventario, caja, personal básico y reportes, todo desde un mismo lugar y con acceso seguro por usuario.
+**ERP Proyecto Katia** es un sistema en línea para llevar el día a día del negocio: caja, inventario, ventas, cotizaciones, reportes y administración básica, con acceso seguro por usuario.
 
 ---
 
 ## Módulos incluidos en V1
 
-En esta primera versión el cliente puede usar lo siguiente:
+En esta primera versión el cliente puede usar lo siguiente (además del **ingreso con usuario y contraseña**):
 
-1. **Login y acceso seguro**  
-   Entrada con usuario y contraseña, y menús según el perfil (quién puede ver o editar qué).
-
-2. **Dashboard / resumen del negocio**  
-   Vista de inicio con indicadores y accesos rápidos para ver de un vistazo cómo va el negocio.
-
-3. **Caja (ingresos y egresos)**  
-   Registro de movimientos de dinero que entra y sale, para controlar la caja del día.
-
-4. **Clientes**  
-   Ficha y listado de clientes para cotizar, vender y hacer seguimiento sin perder datos de contacto.
-
-5. **Inventario**  
-   Control de productos y existencias para saber qué hay en almacén y apoyar las ventas.
-
-6. **Madera cortada**  
-   Venta de madera por medidas y pie tablar, con apoyo en cálculos y formularios de venta.
-
-7. **Aserradero**  
-   Registro de servicios del aserradero (por ejemplo cubicaje y trabajos asociados) con su documentación.
-
-8. **Alquiler Mixer**  
-   Contratos de alquiler de bomba mixer, con montos y condiciones claras para el cliente.
-
-9. **Cotización unificada**  
-   Armado de cotizaciones en un solo flujo, para presentar precios y líneas al cliente de forma ordenada.
-
-10. **Muebles terminados**  
-    Venta desde catálogo de muebles listos, con datos de entrega cuando aplica.
-
-11. **Reportes básicos**  
-    Consultas y exportes simples para revisar ventas, inventario y operación sin ser contador.
-
-12. **Personal (registro básico, sin cierre de nómina)**  
-    Datos del equipo y registros útiles para operación; **no** incluye nómina completa ni cálculo de planillas cerradas.
+1. **Inicio / Dashboard:** resumen visual del negocio  
+2. **Caja:** registro de ingresos y egresos diarios  
+3. **Inventario:** control de productos y stock  
+4. **Ventas:** madera cortada, aserradero y muebles terminados  
+5. **Muebles personalizados:** registro de pedidos a medida (versión simplificada)  
+6. **Cotización unificada:** presupuestos profesionales con PDF  
+7. **Registro:** anotaciones y hechos del negocio (versión simplificada)  
+8. **Alquiler Mixer:** registro de contratos de alquiler (versión simplificada)  
+9. **Reportes:** utilidades y exportaciones básicas  
+10. **Cuenta admin:** gestión de contraseña y perfil  
+11. **Empresa:** datos legales, logo y configuración de PDFs  
+12. **Respaldo:** descarga de seguridad de datos  
+13. **Usuarios:** gestión del dueño y empleado de confianza  
 
 ---
 
-## Módulos no incluidos en V1
+## No incluido en V1
 
-Los siguientes ítems **no** forman parte del paquete V1. Cada uno está **disponible como módulo adicional** (contrato aparte):
+Lo siguiente **no** forma parte del paquete base de la V1. Se puede contratar aparte según acuerdo:
 
-- Muebles personalizados (Kanban)
-- Cierre de mes
-- Antifraude / auditoría
-- Importación de datos
-- Respaldo admin
-- Nómina completa
+- Módulo de Personal y Nómina completa (+200 soles)  
+- Control de socios y antifraude (+200 soles)  
+- Seguridad avanzada (+150 soles)  
+- Importación masiva de datos (+150 soles)  
+- Cierre de mes inmutable (+200 soles)  
+- Módulos adicionales según necesidad del negocio  
+
+---
+
+## ¿Por qué esta versión se ajusta a su negocio?
+
+- Sistema diseñado para taller de 1 a 3 personas  
+- Cubre el 100% de las operaciones diarias  
+- Sin funciones innecesarias que compliquen el uso  
+- Los módulos adicionales se activan cuando el negocio los necesite  
+- Capacitación incluida para dueño y un empleado  
 
 ---
 
