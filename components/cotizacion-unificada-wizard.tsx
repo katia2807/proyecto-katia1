@@ -343,6 +343,11 @@ export function CotizacionUnificadaWizard({
   const [selectedMuebleTemplateId, setSelectedMuebleTemplateId] = useState("");
   const [hasDraftAvailable, setHasDraftAvailable] = useState(() => Boolean(loadDraftFromStorage()));
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(() => loadDraftFromStorage()?.savedAt ?? null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const docLabel = tipoCliente === "empresa" ? "RUC" : "DNI";
   const docErrorLive = useMemo(() => {
@@ -1242,7 +1247,7 @@ export function CotizacionUnificadaWizard({
               type="button"
               className="h-9 rounded-lg border border-[var(--color-border)] px-3 text-xs font-semibold disabled:opacity-50"
               onClick={restoreDraft}
-              disabled={!hasDraftAvailable}
+              disabled={isMounted ? !hasDraftAvailable : true}
             >
               Recuperar borrador
             </button>
@@ -1256,7 +1261,7 @@ export function CotizacionUnificadaWizard({
           </div>
         </div>
         <p className="mt-2 text-[11px] text-[var(--color-text-secondary)]">
-          {draftSavedAt
+          {isMounted && draftSavedAt
             ? `Último borrador: ${new Date(draftSavedAt).toLocaleString("es-PE")}`
             : "Aún no hay borrador guardado."}{" "}
           En PC: `Ctrl/Cmd + S` guarda, `Alt + R` recupera, `Alt + N` nueva.
