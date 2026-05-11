@@ -8,6 +8,8 @@ import { canMutateVentas } from "@/lib/permissions";
 export default async function CotizacionPage() {
   const role = await getCurrentUserRole();
   const canSave = canMutateVentas(role);
+  const comboMock =
+    process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const [productos, clientes, cotizacionesGuardadas, empresa] = await Promise.all([
     getInventarioProductosRows(),
     getClientesRows(),
@@ -32,6 +34,7 @@ export default async function CotizacionPage() {
         clientes={clientes}
         cotizacionesGuardadas={cotizacionesGuardadas}
         empresa={empresa}
+        mockData={comboMock}
       />
     </div>
   );

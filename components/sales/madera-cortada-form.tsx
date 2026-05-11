@@ -5,7 +5,10 @@ import { useMemo, useState } from "react";
 import { EntregaFormFields } from "@/components/sales/entrega-form-fields";
 import { PagoFormFields } from "@/components/sales/pago-form-fields";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/Combobox";
+import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field, SelectField } from "@/components/ui/field";
+import { liteClientesToCompleto, MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
 import { formatPen } from "@/lib/utils";
 import type { ZonaEntregaRow } from "@/lib/demo-store";
 
@@ -24,6 +27,7 @@ type MaderaCortadaFormProps = {
   choferes: Chofer[];
   productos: Producto[];
   zonas?: Pick<ZonaEntregaRow, "id" | "nombre" | "tarifa" | "distancia_km">[];
+  mockData?: boolean;
 };
 
 const tiposCorte = [
@@ -37,8 +41,15 @@ function calcularPT(cantidad: number, espesor: number, ancho: number, largo: num
   return (cantidad * espesor * ancho * largo) / 12;
 }
 
-export function MaderaCortadaForm({ clientes, choferes, productos, zonas = [] }: MaderaCortadaFormProps) {
+export function MaderaCortadaForm({
+  clientes,
+  choferes,
+  productos,
+  zonas = [],
+  mockData = false,
+}: MaderaCortadaFormProps) {
   const hoy = new Date().toISOString().slice(0, 10);
+  const [clienteId, setClienteId] = useState("");
   const [cantidad, setCantidad] = useState(1);
   const [espesor, setEspesor] = useState(2);
   const [ancho, setAncho] = useState(6);
@@ -48,23 +59,49 @@ export function MaderaCortadaForm({ clientes, choferes, productos, zonas = [] }:
 
   const totalPt = useMemo(() => calcularPT(cantidad, espesor, ancho, largo), [cantidad, espesor, ancho, largo]);
   const totalSoles = useMemo(() => totalPt * precioPorPt, [totalPt, precioPorPt]);
-  const productoSeleccionado = productos.find((p) => p.id === productoId);
+
+  const effectiveProductos = useMemo((): Producto[] => {
+    if (!mockData) return productos;
+    return MOCK_INVENTARIO_PRODUCTOS.map((p) => ({
+      id: p.id,
+      nombre: p.nombre,
+      unidad: p.unidad,
+      stock_actual: p.stock_actual,
+      categoria: p.categoria,
+    }));
+  }, [mockData, productos]);
+
+  const clientesCombo = useMemo(() => liteClientesToCompleto(clientes), [clientes]);
+
+  const productoComboOptions = useMemo(
+    () => [
+      { value: "", label: "Sin descontar inventario", sublabel: undefined as string | undefined },
+      ...effectiveProductos.map((p) => ({
+        value: p.id,
+        label: p.nombre,
+        sublabel: `stock ${Number(p.stock_actual).toFixed(2)} ${p.unidad}`,
+      })),
+    ],
+    [effectiveProductos],
+  );
+
+  const productoSeleccionado = effectiveProductos.find((p) => p.id === productoId);
   const sinStock =
     productoSeleccionado && Number(productoSeleccionado.stock_actual) <= 0;
 
   return (
     <form action={createVentaMaderaCortada} className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
-        <SelectField name="cliente_id" label="Cliente" defaultValue="" required>
-          <option value="" disabled>
-            Selecciona cliente
-          </option>
-          {clientes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
-          ))}
-        </SelectField>
+        <ClienteCombobox
+          mockData={mockData}
+          clientes={clientesCombo}
+          value={clienteId}
+          onChange={setClienteId}
+          hiddenInputName="cliente_id"
+          label="Cliente"
+          placeholder="Buscar cliente…"
+          inputAriaLabel="Cliente para venta de madera cortada"
+        />
         <Field name="fecha" type="date" label="Fecha" defaultValue={hoy} required />
         <SelectField name="tipo_corte" label="Tipo de corte" defaultValue="tabla">
           {tiposCorte.map((t) => (
@@ -73,19 +110,17 @@ export function MaderaCortadaForm({ clientes, choferes, productos, zonas = [] }:
             </option>
           ))}
         </SelectField>
-        <SelectField
-          name="inventario_producto_id"
-          label="Producto en inventario (opcional)"
-          value={productoId}
-          onChange={(e) => setProductoId(e.target.value)}
-        >
-          <option value="">Sin descontar inventario</option>
-          {productos.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nombre} · stock {Number(p.stock_actual).toFixed(2)} {p.unidad}
-            </option>
-          ))}
-        </SelectField>
+        <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+          <span>Producto en inventario (opcional)</span>
+          <Combobox
+            options={productoComboOptions}
+            value={productoId}
+            onChange={setProductoId}
+            hiddenInputName="inventario_producto_id"
+            placeholder="Buscar producto o dejar sin inventario…"
+            inputAriaLabel="Producto de inventario para descontar stock"
+          />
+        </label>
       </div>
 
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-3">
@@ -162,7 +197,7 @@ export function MaderaCortadaForm({ clientes, choferes, productos, zonas = [] }:
           Datos de entrega
         </p>
         <div className="mt-2">
-          <EntregaFormFields choferes={choferes} zonas={zonas} />
+          <EntregaFormFields mockData={mockData} choferes={choferes} zonas={zonas} />
         </div>
       </div>
 

@@ -18,6 +18,8 @@ import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 
 export default async function MueblesPersonalizadosPage() {
+  const comboMock =
+    process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const [clientes, cotizaciones, ordenes, cotizacionesUnificadas] = await Promise.all([
     getClientesRows(),
     getCotizacionesRows(),
@@ -62,6 +64,7 @@ export default async function MueblesPersonalizadosPage() {
             <MueblesPersonalizadosContextPanels
               clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre }))}
               opcionesAprobacion={opcionesAprobacion}
+              mockData={comboMock}
             />
           ) : (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">

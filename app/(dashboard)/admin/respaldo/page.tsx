@@ -1,15 +1,14 @@
 import Link from "next/link";
-import {
-  eliminarDatoIndividual,
-  eliminarDatosPorCategoria,
-  eliminarDatosSistema,
-  restaurarRespaldoJSON,
-} from "@/app/actions";
+import { eliminarDatosSistema, restaurarRespaldoJSON } from "@/app/actions";
+import { RespaldoPeligroCategoriaForms } from "@/components/admin/respaldo-peligro-categoria-forms";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Field, SelectField } from "@/components/ui/field";
+import { Field } from "@/components/ui/field";
 
 export default function RespaldoPage() {
+  const comboMock =
+    process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -93,88 +92,7 @@ export default function RespaldoPage() {
         </form>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="border-[var(--color-danger)]">
-          <CardTitle className="text-[var(--color-danger)]">Eliminar por categoría</CardTitle>
-          <CardDescription>
-            Borra todos los registros de una categoría puntual. Usa esta opción para limpiar un módulo
-            completo sin tocar el resto.
-          </CardDescription>
-          <form action={eliminarDatosPorCategoria} className="mt-3 space-y-3">
-            <SelectField name="categoria" label="Categoría" defaultValue="cotizacionesUnificadas" required>
-              <option value="caja">Caja</option>
-              <option value="clientes">Clientes</option>
-              <option value="proveedores">Proveedores</option>
-              <option value="ventas">Ventas</option>
-              <option value="cotizaciones">Cotizaciones</option>
-              <option value="cotizacionesUnificadas">Cotizaciones unificadas</option>
-              <option value="comprasMadera">Compras de madera</option>
-              <option value="inventarioProductos">Inventario productos</option>
-              <option value="inventarioMovimientos">Inventario movimientos</option>
-              <option value="alquileres">Alquileres</option>
-              <option value="empleados">Empleados</option>
-              <option value="adelantos">Adelantos</option>
-              <option value="sueldos">Sueldos</option>
-              <option value="ordenesProduccion">Órdenes de producción</option>
-              <option value="mueblesCatalogo">Catálogo de muebles</option>
-              <option value="ventasMuebleTerminado">Ventas de muebles terminados</option>
-              <option value="serviciosAserradero">Servicios de aserradero</option>
-              <option value="registrosGenerales">Registros generales</option>
-              <option value="zonasEntrega">Zonas de entrega</option>
-            </SelectField>
-            <Field
-              name="confirmacion_categoria"
-              label='Confirmación (escribe: ELIMINAR CATEGORIA)'
-              placeholder="ELIMINAR CATEGORIA"
-              required
-            />
-            <Button variant="danger">Eliminar categoría completa</Button>
-          </form>
-        </Card>
-
-        <Card className="border-[var(--color-danger)]">
-          <CardTitle className="text-[var(--color-danger)]">Eliminar registro individual</CardTitle>
-          <CardDescription>
-            Elimina un solo registro por su ID exacto dentro de una categoría.
-          </CardDescription>
-          <form action={eliminarDatoIndividual} className="mt-3 space-y-3">
-            <SelectField name="categoria" label="Categoría" defaultValue="cotizacionesUnificadas" required>
-              <option value="caja">Caja</option>
-              <option value="clientes">Clientes</option>
-              <option value="proveedores">Proveedores</option>
-              <option value="ventas">Ventas</option>
-              <option value="cotizaciones">Cotizaciones</option>
-              <option value="cotizacionesUnificadas">Cotizaciones unificadas</option>
-              <option value="comprasMadera">Compras de madera</option>
-              <option value="inventarioProductos">Inventario productos</option>
-              <option value="inventarioMovimientos">Inventario movimientos</option>
-              <option value="alquileres">Alquileres</option>
-              <option value="empleados">Empleados</option>
-              <option value="adelantos">Adelantos</option>
-              <option value="sueldos">Sueldos</option>
-              <option value="ordenesProduccion">Órdenes de producción</option>
-              <option value="mueblesCatalogo">Catálogo de muebles</option>
-              <option value="ventasMuebleTerminado">Ventas de muebles terminados</option>
-              <option value="serviciosAserradero">Servicios de aserradero</option>
-              <option value="registrosGenerales">Registros generales</option>
-              <option value="zonasEntrega">Zonas de entrega</option>
-            </SelectField>
-            <Field
-              name="id_registro"
-              label="ID del registro a eliminar"
-              placeholder="Pega el UUID o ID exacto"
-              required
-            />
-            <Field
-              name="confirmacion_item"
-              label='Confirmación (escribe: ELIMINAR REGISTRO)'
-              placeholder="ELIMINAR REGISTRO"
-              required
-            />
-            <Button variant="danger">Eliminar solo este registro</Button>
-          </form>
-        </Card>
-      </div>
+      <RespaldoPeligroCategoriaForms comboMock={comboMock} />
     </div>
   );
 }

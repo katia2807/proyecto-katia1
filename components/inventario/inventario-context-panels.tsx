@@ -3,16 +3,36 @@
 import { createInventarioMovimiento, createInventarioProducto } from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/Combobox";
 import { Field, SelectField } from "@/components/ui/field";
+import { MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
+import { useMemo, useState } from "react";
 
 type ProductoOpt = { id: string; nombre: string };
 
 type InventarioContextPanelsProps = {
   quick: string;
   productos: ProductoOpt[];
+  mockData?: boolean;
 };
 
-export function InventarioContextPanels({ quick, productos }: InventarioContextPanelsProps) {
+export function InventarioContextPanels({ quick, productos, mockData = false }: InventarioContextPanelsProps) {
+  const [productoMovId, setProductoMovId] = useState("");
+
+  const effectiveProductos = useMemo((): ProductoOpt[] => {
+    if (!mockData) return productos;
+    return MOCK_INVENTARIO_PRODUCTOS.map((p) => ({ id: p.id, nombre: p.nombre }));
+  }, [mockData, productos]);
+
+  const productoOptions = useMemo(
+    () =>
+      effectiveProductos.map((p) => ({
+        value: p.id,
+        label: p.nombre,
+      })),
+    [effectiveProductos],
+  );
+
   return (
     <>
       <ContextActionPanel
@@ -54,16 +74,17 @@ export function InventarioContextPanels({ quick, productos }: InventarioContextP
         replacePathOnClose="/inventario"
       >
         <form action={createInventarioMovimiento} className="grid gap-3 md:grid-cols-2">
-          <SelectField name="producto_id" label="Producto" required defaultValue="">
-            <option value="" disabled>
-              Selecciona producto
-            </option>
-            {productos.map((producto) => (
-              <option key={producto.id} value={producto.id}>
-                {producto.nombre}
-              </option>
-            ))}
-          </SelectField>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+            <span>Producto</span>
+            <Combobox
+              options={productoOptions}
+              value={productoMovId}
+              onChange={setProductoMovId}
+              hiddenInputName="producto_id"
+              placeholder="Buscar producto…"
+              inputAriaLabel="Producto para movimiento de inventario"
+            />
+          </label>
           <Field name="fecha" type="date" label="Fecha" required />
           <SelectField name="tipo" label="Tipo" defaultValue="entrada_compra" required>
             <option value="entrada_compra">Entrada por compra</option>

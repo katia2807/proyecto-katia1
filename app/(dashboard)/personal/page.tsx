@@ -8,6 +8,8 @@ import { canMutateRRHH } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 
 export default async function PersonalPage() {
+  const comboMock =
+    process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const { empleados, adelantos, sueldos } = await getPersonalRows();
   const role = await getCurrentUserRole();
   const canMutate = canMutateRRHH(role);
@@ -33,7 +35,10 @@ export default async function PersonalPage() {
             </p>
           ) : null}
           {canMutate ? (
-            <PersonalContextPanels empleados={empleados.map((e) => ({ id: e.id, nombre: e.nombre }))} />
+            <PersonalContextPanels
+              empleados={empleados.map((e) => ({ id: e.id, nombre: e.nombre }))}
+              mockData={comboMock}
+            />
           ) : null}
         </div>
       </Card>

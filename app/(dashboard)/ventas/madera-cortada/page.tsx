@@ -15,6 +15,8 @@ import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 
 export default async function MaderaCortadaPage() {
+  const comboMock =
+    process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const [clientes, choferes, productos, ventas, zonas] = await Promise.all([
     getClientesRows(),
     getChoferesRows(),
@@ -57,6 +59,7 @@ export default async function MaderaCortadaPage() {
               choferes={choferes}
               productos={productosMadera}
               zonas={zonas}
+              mockData={comboMock}
             />
           </ContextActionPanel>
         ) : (

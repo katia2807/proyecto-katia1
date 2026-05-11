@@ -4,7 +4,11 @@ import { aprobarCotizacionAOrden, createCotizacion } from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { NotasSelector } from "@/components/sales/notas-selector";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/Combobox";
+import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field, SelectField } from "@/components/ui/field";
+import { liteClientesToCompleto, MOCK_COTIZACIONES_APROBACION } from "@/lib/combobox-mocks";
+import { useMemo, useState } from "react";
 
 type ClienteOpt = { id: string; nombre: string };
 type AprobableOpt = { id: string; label: string };
@@ -12,12 +16,27 @@ type AprobableOpt = { id: string; label: string };
 type MueblesPersonalizadosContextPanelsProps = {
   clientes: ClienteOpt[];
   opcionesAprobacion: AprobableOpt[];
+  mockData?: boolean;
 };
 
 export function MueblesPersonalizadosContextPanels({
   clientes,
   opcionesAprobacion,
+  mockData = false,
 }: MueblesPersonalizadosContextPanelsProps) {
+  const [clienteCotId, setClienteCotId] = useState("");
+  const [cotizacionAprId, setCotizacionAprId] = useState("");
+
+  const clientesCombo = useMemo(() => liteClientesToCompleto(clientes), [clientes]);
+
+  const cotizacionAprOptions = useMemo(() => {
+    const src = mockData ? MOCK_COTIZACIONES_APROBACION : opcionesAprobacion;
+    return src.map((o) => ({
+      value: o.id,
+      label: o.label,
+    }));
+  }, [mockData, opcionesAprobacion]);
+
   return (
     <>
       <ContextActionPanel
@@ -26,16 +45,16 @@ export function MueblesPersonalizadosContextPanels({
         description="Cliente, especie, precio calculado y precio acordado."
       >
         <form action={createCotizacion} className="grid gap-3 md:grid-cols-2">
-          <SelectField name="cliente_id" label="Cliente" defaultValue="" required>
-            <option value="" disabled>
-              Selecciona cliente
-            </option>
-            {clientes.map((cliente) => (
-              <option key={cliente.id} value={cliente.id}>
-                {cliente.nombre}
-              </option>
-            ))}
-          </SelectField>
+          <ClienteCombobox
+            mockData={mockData}
+            clientes={clientesCombo}
+            value={clienteCotId}
+            onChange={setClienteCotId}
+            hiddenInputName="cliente_id"
+            label="Cliente"
+            placeholder="Buscar cliente…"
+            inputAriaLabel="Cliente para cotización personalizada"
+          />
           <Field name="fecha" type="date" label="Fecha" required />
           <input type="hidden" name="tipo" value="mueble_personalizado" />
           <Field
@@ -84,16 +103,17 @@ export function MueblesPersonalizadosContextPanels({
         description="En un solo paso: crea la orden de producción y registra el adelanto en caja."
       >
         <form action={aprobarCotizacionAOrden} className="grid gap-3">
-          <SelectField name="cotizacion_id" label="Cotización" defaultValue="" required>
-            <option value="" disabled>
-              Selecciona cotización
-            </option>
-            {opcionesAprobacion.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </SelectField>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+            <span>Cotización</span>
+            <Combobox
+              options={cotizacionAprOptions}
+              value={cotizacionAprId}
+              onChange={setCotizacionAprId}
+              hiddenInputName="cotizacion_id"
+              placeholder="Buscar cotización confirmada…"
+              inputAriaLabel="Cotización para pasar a orden"
+            />
+          </label>
           <Field
             name="notas"
             label="Notas para el taller"

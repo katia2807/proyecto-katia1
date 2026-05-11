@@ -4,13 +4,16 @@ import { createContratoAlquiler } from "@/app/actions";
 import { useMemo, useState } from "react";
 import { PagoFormFields } from "@/components/sales/pago-form-fields";
 import { Button } from "@/components/ui/button";
+import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field, SelectField } from "@/components/ui/field";
+import { contratoClientesToCompleto } from "@/lib/combobox-mocks";
 import { formatPen } from "@/lib/utils";
 
 type Cliente = { id: string; nombre: string; ruc?: string | null };
 
 type ContratoAlquilerFormProps = {
   clientes: Cliente[];
+  mockData?: boolean;
 };
 
 const tarifas = [
@@ -19,8 +22,9 @@ const tarifas = [
   { value: "dia", label: "Por día" },
 ] as const;
 
-export function ContratoAlquilerForm({ clientes }: ContratoAlquilerFormProps) {
+export function ContratoAlquilerForm({ clientes, mockData = false }: ContratoAlquilerFormProps) {
   const hoy = new Date().toISOString().slice(0, 10);
+  const [clienteId, setClienteId] = useState("");
   const [tarifa, setTarifa] = useState(0);
   const [dias, setDias] = useState(1);
   const [tarifaUnidad, setTarifaUnidad] = useState<(typeof tarifas)[number]["value"]>(
@@ -34,20 +38,21 @@ export function ContratoAlquilerForm({ clientes }: ContratoAlquilerFormProps) {
 
   const deposito30 = useMemo(() => Number((montoTotal * 0.3).toFixed(2)), [montoTotal]);
 
+  const clientesCombo = useMemo(() => contratoClientesToCompleto(clientes), [clientes]);
+
   return (
     <form action={createContratoAlquiler} className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
-        <SelectField name="cliente_id" label="Cliente" defaultValue="" required>
-          <option value="" disabled>
-            Selecciona cliente
-          </option>
-          {clientes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-              {c.ruc ? ` · RUC ${c.ruc}` : ""}
-            </option>
-          ))}
-        </SelectField>
+        <ClienteCombobox
+          mockData={mockData}
+          clientes={clientesCombo}
+          value={clienteId}
+          onChange={setClienteId}
+          hiddenInputName="cliente_id"
+          label="Cliente"
+          placeholder="Buscar cliente…"
+          inputAriaLabel="Cliente para contrato de alquiler"
+        />
         <Field name="codigo" label="Código de contrato" placeholder="CT-2026-0001" />
         <Field name="activo" label="Activo / equipo" placeholder="Bomba Mixer" required />
         <Field

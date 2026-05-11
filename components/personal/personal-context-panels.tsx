@@ -2,16 +2,31 @@
 
 import { createAdelanto, createEmpleado, createSueldo } from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
-import { Field, SelectField } from "@/components/ui/field";
+import { Combobox } from "@/components/ui/Combobox";
+import { Field } from "@/components/ui/field";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
+import { MOCK_EMPLEADOS } from "@/lib/combobox-mocks";
+import { useMemo, useState } from "react";
 
 type EmpleadoOpt = { id: string; nombre: string };
 
 type PersonalContextPanelsProps = {
   empleados: EmpleadoOpt[];
+  mockData?: boolean;
 };
 
-export function PersonalContextPanels({ empleados }: PersonalContextPanelsProps) {
+export function PersonalContextPanels({ empleados, mockData = false }: PersonalContextPanelsProps) {
+  const [empleadoAdelantoId, setEmpleadoAdelantoId] = useState("");
+  const [empleadoSueldoId, setEmpleadoSueldoId] = useState("");
+
+  const empleadoOptions = useMemo(() => {
+    const src = mockData ? MOCK_EMPLEADOS : empleados;
+    return src.map((e) => ({
+      value: e.id,
+      label: e.nombre,
+    }));
+  }, [mockData, empleados]);
+
   return (
     <>
       <ContextActionPanel
@@ -33,16 +48,17 @@ export function PersonalContextPanels({ empleados }: PersonalContextPanelsProps)
         description="Registra monto y fecha para el empleado seleccionado."
       >
         <form action={createAdelanto} className="space-y-3">
-          <SelectField name="empleado_id" label="Empleado" defaultValue="" required>
-            <option value="" disabled>
-              Selecciona empleado
-            </option>
-            {empleados.map((empleado) => (
-              <option key={empleado.id} value={empleado.id}>
-                {empleado.nombre}
-              </option>
-            ))}
-          </SelectField>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+            <span>Empleado</span>
+            <Combobox
+              options={empleadoOptions}
+              value={empleadoAdelantoId}
+              onChange={setEmpleadoAdelantoId}
+              hiddenInputName="empleado_id"
+              placeholder="Buscar empleado…"
+              inputAriaLabel="Empleado para adelanto"
+            />
+          </label>
           <Field name="fecha" label="Fecha" type="date" required />
           <Field name="monto" label="Monto (S/)" type="number" step="0.01" min="0" required />
           <PendingSubmitButton idleText="Registrar adelanto" />
@@ -55,16 +71,17 @@ export function PersonalContextPanels({ empleados }: PersonalContextPanelsProps)
         description="Neto = bruto - descuentos, sin doble conteo en reportes."
       >
         <form action={createSueldo} className="space-y-3">
-          <SelectField name="empleado_id" label="Empleado" defaultValue="" required>
-            <option value="" disabled>
-              Selecciona empleado
-            </option>
-            {empleados.map((empleado) => (
-              <option key={empleado.id} value={empleado.id}>
-                {empleado.nombre}
-              </option>
-            ))}
-          </SelectField>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+            <span>Empleado</span>
+            <Combobox
+              options={empleadoOptions}
+              value={empleadoSueldoId}
+              onChange={setEmpleadoSueldoId}
+              hiddenInputName="empleado_id"
+              placeholder="Buscar empleado…"
+              inputAriaLabel="Empleado para sueldo"
+            />
+          </label>
           <Field name="periodo" label="Periodo (YYYY-MM)" placeholder="2026-04" required />
           <Field name="monto_bruto" label="Bruto (S/)" type="number" step="0.01" min="0" required />
           <Field name="descuentos" label="Descuentos (S/)" type="number" step="0.01" min="0" defaultValue="0" />

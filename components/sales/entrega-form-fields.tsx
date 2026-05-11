@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Combobox } from "@/components/ui/Combobox";
 import { Field, SelectField } from "@/components/ui/field";
+import { MOCK_CHOFERES, MOCK_ZONAS_ENTREGA } from "@/lib/combobox-mocks";
 import type { EstadoEntrega, TipoEntrega, ZonaEntregaRow } from "@/lib/demo-store";
 import { formatPen } from "@/lib/utils";
 
@@ -23,6 +25,8 @@ type EntregaFormFieldsProps = {
   defaultZonaId?: string;
   /** URL del listado de choferes para crearlos cuando no haya. */
   choferesHref?: string;
+  /** Con `NEXT_PUBLIC_COMBOBOX_MOCK` el padre puede pasar `true` para listas demo. */
+  mockData?: boolean;
 };
 
 const tipos: { value: TipoEntrega; label: string }[] = [
@@ -51,31 +55,80 @@ export function EntregaFormFields({
   defaultEstadoEntrega = "pendiente",
   defaultZonaId = "",
   choferesHref = "/personal",
+  mockData = false,
 }: EntregaFormFieldsProps) {
   const [tipo, setTipo] = useState<TipoEntrega>(defaultTipoEntrega);
   const [zonaId, setZonaId] = useState(defaultZonaId);
+  const [choferId, setChoferId] = useState(defaultChoferId);
   const name = (n: string) => (prefix ? `${prefix}_${n}` : n);
   const requiereDireccion = tipo !== "entrega_local";
+
+  const effectiveChoferes = useMemo((): ChoferOption[] => {
+    if (!mockData) return choferes;
+    const injected: ChoferOption[] = MOCK_CHOFERES.map((c) => ({
+      id: c.id,
+      nombre: c.nombre,
+      telefono: c.telefono,
+      placa: c.placa,
+    }));
+    return [...injected, ...choferes];
+  }, [choferes, mockData]);
+
+  const effectiveZonas = useMemo(() => {
+    if (!mockData) return zonas;
+    const injected: Pick<ZonaEntregaRow, "id" | "nombre" | "tarifa" | "distancia_km">[] = MOCK_ZONAS_ENTREGA.map(
+      (z) => ({
+        id: z.id,
+        nombre: z.nombre,
+        tarifa: z.tarifa,
+        distancia_km: z.distancia_km,
+      }),
+    );
+    return [...injected, ...zonas];
+  }, [mockData, zonas]);
+
+  const choferComboboxOptions = useMemo(
+    () => [
+      { value: "", label: "Sin asignar" },
+      ...effectiveChoferes.map((c) => ({
+        value: c.id,
+        label: `${c.nombre}${c.placa ? ` · ${c.placa}` : ""}`,
+        sublabel: c.telefono ? String(c.telefono) : undefined,
+      })),
+    ],
+    [effectiveChoferes],
+  );
+
+  const zonaComboboxOptions = useMemo(
+    () => [
+      { value: "", label: "Sin zona" },
+      ...effectiveZonas.map((z) => ({
+        value: z.id,
+        label: `${z.nombre} · ${formatPen(z.tarifa)}`,
+        sublabel: z.distancia_km > 0 ? `${z.distancia_km} km` : undefined,
+      })),
+    ],
+    [effectiveZonas],
+  );
+
   const zonaSeleccionada = useMemo(
-    () => zonas.find((z) => z.id === zonaId) ?? null,
-    [zonas, zonaId],
+    () => effectiveZonas.find((z) => z.id === zonaId) ?? null,
+    [effectiveZonas, zonaId],
   );
 
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      <SelectField
-        name={name("chofer_id")}
-        label="Chofer asignado"
-        defaultValue={defaultChoferId}
-      >
-        <option value="">Sin asignar</option>
-        {choferes.map((chofer) => (
-          <option key={chofer.id} value={chofer.id}>
-            {chofer.nombre}
-            {chofer.placa ? ` · ${chofer.placa}` : ""}
-          </option>
-        ))}
-      </SelectField>
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+        Chofer asignado
+        <Combobox
+          options={choferComboboxOptions}
+          value={choferId}
+          onChange={setChoferId}
+          hiddenInputName={name("chofer_id")}
+          placeholder="Buscar chofer…"
+          inputAriaLabel="Chofer asignado"
+        />
+      </label>
 
       <SelectField
         name={name("tipo_entrega")}
@@ -103,21 +156,18 @@ export function EntregaFormFields({
         <input type="hidden" name={name("direccion_entrega")} value="" />
       )}
 
-      {requiereDireccion && zonas.length > 0 ? (
-        <SelectField
-          name={name("zona_entrega_id")}
-          label="Zona de entrega (tarifa)"
-          value={zonaId}
-          onChange={(event) => setZonaId(event.target.value)}
-        >
-          <option value="">Sin zona</option>
-          {zonas.map((z) => (
-            <option key={z.id} value={z.id}>
-              {z.nombre} · {formatPen(z.tarifa)}
-              {z.distancia_km > 0 ? ` · ${z.distancia_km} km` : ""}
-            </option>
-          ))}
-        </SelectField>
+      {requiereDireccion && effectiveZonas.length > 0 ? (
+        <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+          Zona de entrega (tarifa)
+          <Combobox
+            options={zonaComboboxOptions}
+            value={zonaId}
+            onChange={setZonaId}
+            hiddenInputName={name("zona_entrega_id")}
+            placeholder="Buscar zona…"
+            inputAriaLabel="Zona de entrega"
+          />
+        </label>
       ) : (
         <input type="hidden" name={name("zona_entrega_id")} value="" />
       )}
@@ -141,7 +191,7 @@ export function EntregaFormFields({
         </p>
       ) : null}
 
-      {choferes.length === 0 ? (
+      {effectiveChoferes.length === 0 ? (
         <p className="md:col-span-2 text-xs text-[var(--color-text-secondary)]">
           Aún no hay choferes registrados.{" "}
           <a className="text-[var(--color-accent)] underline" href={choferesHref}>

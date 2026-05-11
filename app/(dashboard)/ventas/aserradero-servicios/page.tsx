@@ -12,6 +12,8 @@ import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 
 export default async function AserraderoServiciosPage() {
+  const comboMock =
+    process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const [clientes, servicios, tarifas] = await Promise.all([
     getClientesRows(),
     getServiciosAserraderoRows(),
@@ -49,6 +51,7 @@ export default async function AserraderoServiciosPage() {
             <AserraderoForm
               clientes={clientes}
               serviciosEspeciales={tarifas}
+              mockData={comboMock}
             />
           </ContextActionPanel>
         ) : (

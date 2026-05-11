@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Combobox } from "@/components/ui/Combobox";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
+import { MOCK_QUOTE_TEMPLATES } from "@/lib/combobox-mocks";
 import { formatPen } from "@/lib/utils";
 
 type QuoteRow = {
@@ -207,6 +209,23 @@ export function QuoteDualFlow({ canSave = true, mode = "simple" }: QuoteDualFlow
   const quickEntryRef = useRef<HTMLInputElement | null>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const accessoryInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const comboboxMock =
+    typeof process !== "undefined" &&
+    (process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true");
+
+  const effectiveTemplates = useMemo((): QuoteTemplate[] => {
+    if (!comboboxMock) return templates;
+    return [...(MOCK_QUOTE_TEMPLATES as unknown as QuoteTemplate[]), ...templates];
+  }, [comboboxMock, templates]);
+
+  const templateComboboxOptions = useMemo(
+    () => [
+      { value: "", label: "Seleccionar plantilla..." },
+      ...effectiveTemplates.map((t) => ({ value: t.id, label: t.name })),
+    ],
+    [effectiveTemplates],
+  );
 
   useEffect(() => {
     try {
@@ -545,7 +564,7 @@ export function QuoteDualFlow({ canSave = true, mode = "simple" }: QuoteDualFlow
 
   function applyTemplate(templateId: string) {
     setSelectedTemplateId(templateId);
-    const template = templates.find((item) => item.id === templateId);
+    const template = effectiveTemplates.find((item) => item.id === templateId);
     if (!template) return;
     const mappedRows = template.rows.map((row) => ({
       id: crypto.randomUUID(),
@@ -638,18 +657,13 @@ export function QuoteDualFlow({ canSave = true, mode = "simple" }: QuoteDualFlow
         <div className="grid gap-3 md:grid-cols-3">
           <label className="space-y-1 md:col-span-2">
             <span className="text-xs font-medium text-[var(--color-text-secondary)]">Plantillas técnicas</span>
-            <select
+            <Combobox
+              options={templateComboboxOptions}
               value={selectedTemplateId}
-              onChange={(e) => applyTemplate(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Seleccionar plantilla...</option>
-              {templates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </select>
+              onChange={applyTemplate}
+              placeholder="Buscar plantilla…"
+              inputAriaLabel="Plantillas técnicas"
+            />
           </label>
           <div className="flex items-end">
             <Button type="button" variant="secondary" className="w-full" onClick={saveCurrentAsTemplate}>

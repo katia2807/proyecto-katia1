@@ -25,8 +25,18 @@ import {
   type MuebleLineaPieza,
 } from "@/lib/cotizacion-unificada-payload";
 import { CotizacionResumenFormal } from "@/components/sales/cotizacion-resumen-formal";
+import { ClienteCombobox } from "@/components/ui/cliente-combobox";
+import { Combobox } from "@/components/ui/Combobox";
 import { buildLineasResumen } from "@/lib/cotizacion-unificada-lineas";
+import type { ClienteCompleto } from "@/lib/combobox-mocks";
+import {
+  MOCK_INVENTARIO_PRODUCTOS,
+  MOCK_MUEBLES_CATALOGO_VENTA,
+  MOCK_WIZARD_MUEBLE_PLANTILLAS,
+  mockClientesAsRows,
+} from "@/lib/combobox-mocks";
 import type { EmpresaConfig } from "@/lib/company-config";
+import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { formatPen } from "@/lib/utils";
 import type { Database } from "@/lib/supabase/types";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -43,7 +53,20 @@ type CotizacionUnificadaWizardProps = {
   clientes: ClienteRow[];
   cotizacionesGuardadas: CotizacionUnificadaRow[];
   empresa: EmpresaConfig;
+  /** Usa datos mock locales para combobox / inventario (desarrollo sin Supabase). */
+  mockData?: boolean;
 };
+
+function clienteRowToCompleto(r: ClienteRow): ClienteCompleto {
+  return {
+    id: r.id,
+    nombre: r.nombre,
+    documento: r.documento,
+    telefono: r.telefono,
+    direccion: r.direccion,
+    ruc: r.ruc,
+  };
+}
 
 const inputClass =
   "h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]/60 focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]";
@@ -258,7 +281,16 @@ export function CotizacionUnificadaWizard({
   clientes,
   cotizacionesGuardadas,
   empresa,
+  mockData = false,
 }: CotizacionUnificadaWizardProps) {
+  const effectiveClientes = useMemo(
+    () => (mockData ? mockClientesAsRows(DEFAULT_ORG_ID) : clientes),
+    [mockData, clientes],
+  );
+  const effectiveProductos = useMemo(
+    () => (mockData ? MOCK_INVENTARIO_PRODUCTOS : productos),
+    [mockData, productos],
+  );
   const router = useRouter();
   const [tipoCliente, setTipoCliente] = useState<"natural" | "empresa">("natural");
   const [nombreCliente, setNombreCliente] = useState("");
@@ -420,7 +452,14 @@ export function CotizacionUnificadaWizard({
     return Math.min(Math.max(0, selectedPiezaIndexUI), piezasMuebleActual.length - 1);
   }, [piezasMuebleActual.length, selectedPiezaIndexUI]);
   const muebleOptions = useMemo(() => {
-    const activos = productos.filter((p) => p.activo !== false);
+    if (mockData) {
+      return MOCK_MUEBLES_CATALOGO_VENTA.map((m) => ({
+        id: m.id,
+        nombre: `${m.codigo} — ${m.nombre}`,
+        origen: "inventario" as const,
+      }));
+    }
+    const activos = effectiveProductos.filter((p) => p.activo !== false);
     const soloMueble = activos.filter((p) => isMuebleCategory(p.categoria));
     if (soloMueble.length > 0) {
       return soloMueble.map((p) => ({
@@ -434,17 +473,66 @@ export function CotizacionUnificadaWizard({
       { id: "ejemplo-escritorio", nombre: "Escritorio ejecutivo", origen: "ejemplo" as const },
       { id: "ejemplo-repostero", nombre: "Repostero de cocina", origen: "ejemplo" as const },
     ];
-  }, [productos]);
+  }, [mockData, effectiveProductos]);
+
+  const effectiveMuebleTemplates = useMemo((): MuebleTemplate[] => {
+    if (!mockData) return muebleTemplates;
+    const injected = MOCK_WIZARD_MUEBLE_PLANTILLAS as unknown as MuebleTemplate[];
+    return [...injected, ...muebleTemplates];
+  }, [mockData, muebleTemplates]);
+
+  const plantillaComboboxOptions = useMemo(
+    () => [
+      { value: "", label: "Seleccionar plantilla..." },
+      ...effectiveMuebleTemplates.map((t) => ({
+        value: t.id,
+        label: t.name,
+      })),
+    ],
+    [effectiveMuebleTemplates],
+  );
+
+  const maderaComboboxOptions = useMemo(() => {
+    const opts = effectiveProductos
+      .filter((p) => (p.stock_actual ?? 0) > 0 && isWoodCategory(p.categoria))
+      .map((p) => ({
+        value: p.id,
+        label: `[${p.categoria}] ${stripDimensionesMadera(p.nombre)}`,
+        sublabel: `Pies: ${formatoPiesDisponibles(p.stock_actual, p.unidad)} · Stock ${p.stock_actual} ${p.unidad}`,
+      }));
+    return [{ value: "", label: "Desplegable madera (según inventario)" }, ...opts];
+  }, [effectiveProductos]);
+
+  const alquilerProductoComboboxOptions = useMemo(
+    () => [
+      { value: "", label: "— Escribir manual —" },
+      ...effectiveProductos.map((p) => ({
+        value: p.id,
+        label: p.nombre,
+      })),
+    ],
+    [effectiveProductos],
+  );
+
+  const muebleTipoComboboxOptions = useMemo(
+    () => [{ value: "", label: "Desplegable de tipo" }, ...muebleOptions.map((p) => ({ value: p.id, label: p.nombre }))],
+    [muebleOptions],
+  );
   const selectedTipoMuebleLabel = useMemo(
     () => muebleOptions.find((x) => x.id === tipoMuebleVista)?.nombre ?? "Mueble",
     [muebleOptions, tipoMuebleVista],
   );
   const clientesFiltrados = useMemo(
     () =>
-      clientes.filter((c) =>
+      effectiveClientes.filter((c) =>
         tipoCliente === "empresa" ? isEmpresaClienteRow(c) : !isEmpresaClienteRow(c),
       ),
-    [clientes, tipoCliente],
+    [effectiveClientes, tipoCliente],
+  );
+
+  const clientesParaCombo = useMemo(
+    () => clientesFiltrados.map(clienteRowToCompleto),
+    [clientesFiltrados],
   );
 
   useEffect(() => {
@@ -465,7 +553,7 @@ export function CotizacionUnificadaWizard({
   useEffect(() => {
     if (!(tipoCotizacionPreset === "muebles" || tipoCotizacionPreset === "general")) return;
     const precioPt = Number(precioVentaPtUI) || 0;
-    const selectedMadera = productos.find((p) => p.id === tipoMaderaUI) ?? null;
+    const selectedMadera = effectiveProductos.find((p) => p.id === tipoMaderaUI) ?? null;
     const timer = window.setTimeout(() => {
       setDetalle((d) => {
         const lineas = d.muebles_lineas.length > 0 ? [...d.muebles_lineas] : [emptyLineaMadera()];
@@ -497,7 +585,7 @@ export function CotizacionUnificadaWizard({
     conversionMedidasUI.espIn,
     conversionMedidasUI.larFt,
     precioVentaPtUI,
-    productos,
+    effectiveProductos,
     selectedTipoMuebleLabel,
     selectedPiezaIndexSafe,
     tipoCotizacionPreset,
@@ -553,7 +641,8 @@ export function CotizacionUnificadaWizard({
   const applyMuebleTemplate = useCallback(
     (templateId: string) => {
       setSelectedMuebleTemplateId(templateId);
-      const selected = muebleTemplates.find((t) => t.id === templateId);
+      if (!templateId) return;
+      const selected = effectiveMuebleTemplates.find((t) => t.id === templateId);
       if (!selected) return;
       setTipoMuebleVista(selected.tipoMuebleVista);
       setUnidadEspesorUI(selected.unidadEspesorUI || "cm");
@@ -574,7 +663,7 @@ export function CotizacionUnificadaWizard({
       setPlazoUnidadUI(selected.plazoUnidadUI);
       setError("");
     },
-    [muebleTemplates],
+    [effectiveMuebleTemplates],
   );
 
   const saveCurrentMuebleTemplate = useCallback(() => {
@@ -874,9 +963,9 @@ export function CotizacionUnificadaWizard({
   );
   const clientesById = useMemo(() => {
     const map = new Map<string, ClienteRow>();
-    for (const c of clientes) map.set(c.id, c);
+    for (const c of effectiveClientes) map.set(c.id, c);
     return map;
-  }, [clientes]);
+  }, [effectiveClientes]);
   const cotizacionesFiltradas = useMemo(() => {
     const q = filterText.trim().toLowerCase();
     return cotizacionesGuardadas.filter((c) => {
@@ -1072,9 +1161,11 @@ export function CotizacionUnificadaWizard({
     setFecha(row.fecha);
     setDetalle(d);
     setClienteId(row.cliente_id);
-    const cl = clientes.find((c) => c.id === row.cliente_id);
+    const cl = effectiveClientes.find((c) => c.id === row.cliente_id);
     setNombreCliente(cl?.nombre ?? "");
-    setDocumento(cl?.documento ?? "");
+    setDocumento(
+      row.tipo_cliente === "empresa" ? (cl?.ruc ?? cl?.documento ?? "") : (cl?.documento ?? ""),
+    );
     setTelefono(cl?.telefono ?? "");
     setDireccion(cl?.direccion ?? "");
     if (d.rubros.muebles && d.rubros.aserradero && d.rubros.alquiler) setTipoCotizacionPreset("general");
@@ -1084,11 +1175,11 @@ export function CotizacionUnificadaWizard({
     setStepIndex(0);
     setMaxStep(30);
     setError("");
-  }, [clientes]);
+  }, [effectiveClientes]);
 
   const productoById = useCallback(
-    (id: string | null) => productos.find((p) => p.id === id) ?? null,
-    [productos],
+    (id: string | null) => effectiveProductos.find((p) => p.id === id) ?? null,
+    [effectiveProductos],
   );
 
   return (
@@ -1239,35 +1330,29 @@ export function CotizacionUnificadaWizard({
           </div>
           <CardTitle className="text-center text-2xl font-extrabold">Datos del cliente</CardTitle>
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-1">
-              <span className="text-xs font-medium text-[var(--color-text-secondary)]">Cliente existente</span>
-              <select
-                className={inputClass}
-                value={clienteId ?? ""}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (!v) {
-                    setClienteId(null);
-                    return;
-                  }
-                  setClienteId(v);
-                  const c = clientes.find((x) => x.id === v);
-                  if (c) {
-                    setNombreCliente(c.nombre);
-                    setDocumento(c.documento ?? "");
-                    setTelefono(c.telefono ?? "");
-                    setDireccion(c.direccion ?? "");
-                  }
-                }}
-              >
-                <option value="">— Nuevo cliente —</option>
-                {clientesFiltrados.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <ClienteCombobox
+              className="[&>span]:text-xs [&>span]:font-medium [&>span]:text-[var(--color-text-secondary)]"
+              label="Cliente existente"
+              clientes={clientesParaCombo}
+              value={clienteId ?? ""}
+              onChange={(id) => {
+                if (!id) {
+                  setClienteId(null);
+                  return;
+                }
+                setClienteId(id);
+              }}
+              onSelectFull={(c) => {
+                setNombreCliente(c.nombre);
+                setDocumento(
+                  tipoCliente === "empresa" ? (c.ruc ?? c.documento ?? "") : (c.documento ?? ""),
+                );
+                setTelefono(c.telefono ?? "");
+                setDireccion(c.direccion ?? "");
+              }}
+              placeholder="Buscar o elegir cliente…"
+              inputAriaLabel="Cliente existente — buscar en lista"
+            />
             <label className="space-y-1">
               <span className="text-xs font-medium text-[var(--color-text-secondary)]">Fecha</span>
               <input type="date" className={inputClass} value={fecha} onChange={(e) => setFecha(e.target.value)} />
@@ -1353,18 +1438,13 @@ export function CotizacionUnificadaWizard({
                 <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
                   Plantilla de mueble personalizado
                 </span>
-                <select
-                  className={inputClass}
+                <Combobox
+                  options={plantillaComboboxOptions}
                   value={selectedMuebleTemplateId}
-                  onChange={(e) => applyMuebleTemplate(e.target.value)}
-                >
-                  <option value="">Seleccionar plantilla...</option>
-                  {muebleTemplates.map((tpl) => (
-                    <option key={tpl.id} value={tpl.id}>
-                      {tpl.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={applyMuebleTemplate}
+                  placeholder="Buscar plantilla…"
+                  inputAriaLabel="Plantilla de mueble personalizado"
+                />
               </label>
               <div className="flex items-end">
                 <button
@@ -1375,7 +1455,7 @@ export function CotizacionUnificadaWizard({
                       saveCurrentMuebleTemplate();
                       return;
                     }
-                    const fallbackId = selectedMuebleTemplateId || muebleTemplates[0]?.id;
+                    const fallbackId = selectedMuebleTemplateId || effectiveMuebleTemplates[0]?.id;
                     if (!fallbackId) {
                       setError("No hay plantillas guardadas para cargar.");
                       return;
@@ -1485,14 +1565,13 @@ export function CotizacionUnificadaWizard({
             {tipoCotizacionPreset === "muebles" || tipoCotizacionPreset === "general" ? (
             <div className="space-y-2">
               <span className="inline-flex rounded-md bg-[var(--color-primary-soft)] px-4 py-2 text-sm font-bold text-[var(--color-text-primary)]">Tipo de madera</span>
-              <select
-                className={`${inputClass} h-11`}
+              <Combobox
+                options={maderaComboboxOptions}
                 value={tipoMaderaUI}
-                onChange={(e) => {
-                  const selectedId = e.target.value;
+                onChange={(selectedId) => {
                   setTipoMaderaUI(selectedId);
                   if (!selectedId) return;
-                  const picked = productos.find((p) => p.id === selectedId);
+                  const picked = effectiveProductos.find((p) => p.id === selectedId);
                   if (!picked) return;
                   if (detalle.muebles_lineas.length === 0) return;
                   setDetalle((d) => {
@@ -1505,22 +1584,14 @@ export function CotizacionUnificadaWizard({
                     return { ...d, muebles_lineas: [nextFirst, ...d.muebles_lineas.slice(1)] };
                   });
                 }}
-              >
-                <option value="">Desplegable madera (según inventario)</option>
-                {productos
-                  .filter((p) => (p.stock_actual ?? 0) > 0 && isWoodCategory(p.categoria))
-                  .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    [{p.categoria}] {stripDimensionesMadera(p.nombre)} · Pies disponibles:{" "}
-                    {formatoPiesDisponibles(p.stock_actual, p.unidad)} · Stock: {p.stock_actual} {p.unidad}
-                  </option>
-                  ))}
-              </select>
+                placeholder="Buscar madera…"
+                inputAriaLabel="Tipo de madera desde inventario"
+              />
               {tipoMaderaUI ? (
                 <p className="text-xs text-[var(--color-text-secondary)]">
                   Selección tomada desde inventario para la cotización.
                 </p>
-              ) : productos.some((p) => (p.stock_actual ?? 0) > 0 && isWoodCategory(p.categoria)) ? (
+              ) : effectiveProductos.some((p) => (p.stock_actual ?? 0) > 0 && isWoodCategory(p.categoria)) ? (
                 <p className="text-xs text-[var(--color-text-secondary)]">Solo se listan materiales de categoría madera con stock.</p>
               ) : null}
             </div>
@@ -1846,18 +1917,13 @@ export function CotizacionUnificadaWizard({
             <div className="space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-4">
               <div className="grid grid-cols-[1fr_1.5fr] gap-2">
                 <span className={pillClass}>Tipo de mueble</span>
-                <select
-                  className={`${inputClass} h-10`}
+                <Combobox
+                  options={muebleTipoComboboxOptions}
                   value={tipoMuebleVista}
-                  onChange={(e) => setTipoMuebleVista(e.target.value)}
-                >
-                  <option value="">Desplegable de tipo</option>
-                  {muebleOptions.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombre}
-                      </option>
-                    ))}
-                </select>
+                  onChange={setTipoMuebleVista}
+                  placeholder="Buscar tipo de mueble…"
+                  inputAriaLabel="Tipo de mueble"
+                />
               </div>
               <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-[var(--color-text-primary)]">
                 <p className="mb-2 text-sm font-bold uppercase text-[var(--color-text-secondary)]">Detalle de cobro</p>
@@ -2162,11 +2228,11 @@ export function CotizacionUnificadaWizard({
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-1 md:col-span-2">
               <span className="text-xs font-medium">Equipo en inventario (opcional)</span>
-              <select
-                className={inputClass}
+              <Combobox
+                options={alquilerProductoComboboxOptions}
                 value={detalle.alquiler.inventario_producto_id ?? ""}
-                onChange={(e) => {
-                  const pid = e.target.value || null;
+                onChange={(pidStr) => {
+                  const pid = pidStr || null;
                   const p = productoById(pid);
                   setDetalle((d) =>
                     d.alquiler
@@ -2181,14 +2247,9 @@ export function CotizacionUnificadaWizard({
                       : d,
                   );
                 }}
-              >
-                <option value="">— Escribir manual —</option>
-                {productos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
+                placeholder="Buscar equipo…"
+                inputAriaLabel="Equipo en inventario para alquiler"
+              />
             </label>
             <label className="space-y-1 md:col-span-2">
               <span className="text-xs font-medium">Nombre maquinaria</span>

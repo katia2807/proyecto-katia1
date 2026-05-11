@@ -16,6 +16,8 @@ function normalizeQuickParam(value: string | string[] | undefined) {
 }
 
 export default async function InventarioPage({ searchParams }: InventarioPageProps) {
+  const comboMock =
+    process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const quick = normalizeQuickParam((await searchParams)?.quick);
   const inventario = await getInventarioRobustoData();
   const { productos } = inventario;
@@ -60,6 +62,7 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
         <InventarioContextPanels
           quick={quick}
           productos={productos.map((p) => ({ id: p.id, nombre: p.nombre }))}
+          mockData={comboMock}
         />
       </InventarioAccionesRapidas>
 

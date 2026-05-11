@@ -17,6 +17,8 @@ import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 
 export default async function MueblesTerminadosPage() {
+  const comboMock =
+    process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const [muebles, clientes, choferes, ventas, zonas] = await Promise.all([
     getMueblesCatalogoRows(),
     getClientesRows(),
@@ -70,6 +72,7 @@ export default async function MueblesTerminadosPage() {
                 distancia_km: z.distancia_km,
               }))}
               fechaDefault={hoy}
+              mockData={comboMock}
             />
           ) : (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">

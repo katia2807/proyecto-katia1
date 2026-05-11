@@ -5,7 +5,9 @@ import { useMemo, useState } from "react";
 import { CubicajeInput } from "@/components/sales/cubicaje-input";
 import { MargenIndicator } from "@/components/sales/margen-indicator";
 import { Button } from "@/components/ui/button";
-import { Field, SelectField } from "@/components/ui/field";
+import { ClienteCombobox } from "@/components/ui/cliente-combobox";
+import { Field } from "@/components/ui/field";
+import { liteClientesToCompleto } from "@/lib/combobox-mocks";
 import { formatPen } from "@/lib/utils";
 
 type Cliente = { id: string; nombre: string };
@@ -21,6 +23,8 @@ type AserraderoFormProps = {
   serviciosEspeciales: ServicioEspecial[];
   /** Costo en S/ por pie cúbico para cubicaje base. */
   defaultCostoPorPieCubico?: number;
+  /** Lista mock para ClienteCombobox sin Supabase. */
+  mockData?: boolean;
 };
 
 const PIE_TABLAR_A_PIE_CUBICO = 1 / 12;
@@ -29,8 +33,10 @@ export function AserraderoForm({
   clientes,
   serviciosEspeciales,
   defaultCostoPorPieCubico = 0.5,
+  mockData = false,
 }: AserraderoFormProps) {
   const hoy = new Date().toISOString().slice(0, 10);
+  const [clienteId, setClienteId] = useState("");
   const [costoPorPieCubico, setCostoPorPieCubico] = useState(defaultCostoPorPieCubico);
   const [piezasJson, setPiezasJson] = useState<string>("[]");
   const [seleccionados, setSeleccionados] = useState<Record<string, { activo: boolean; cantidad: number; tarifa: number }>>(
@@ -68,6 +74,8 @@ export function AserraderoForm({
   const precioCobrado = costoCubicaje + totalServiciosEspeciales;
   const utilidad = precioCobrado - costoCubicaje;
 
+  const clientesCombo = useMemo(() => liteClientesToCompleto(clientes), [clientes]);
+
   const lineasPayload = useMemo(
     () =>
       Object.entries(seleccionados)
@@ -98,16 +106,16 @@ export function AserraderoForm({
       }}
     >
       <div className="grid gap-3 md:grid-cols-2">
-        <SelectField name="cliente_id" label="Cliente" defaultValue="" required>
-          <option value="" disabled>
-            Selecciona cliente
-          </option>
-          {clientes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
-          ))}
-        </SelectField>
+        <ClienteCombobox
+          mockData={mockData}
+          clientes={clientesCombo}
+          value={clienteId}
+          onChange={setClienteId}
+          hiddenInputName="cliente_id"
+          label="Cliente"
+          placeholder="Buscar cliente…"
+          inputAriaLabel="Cliente para servicio de aserradero"
+        />
         <Field name="fecha" type="date" label="Fecha" defaultValue={hoy} required />
       </div>
 

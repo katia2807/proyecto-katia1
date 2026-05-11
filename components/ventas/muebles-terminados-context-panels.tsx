@@ -6,9 +6,13 @@ import { EntregaFormFields } from "@/components/sales/entrega-form-fields";
 import { FotoUpload } from "@/components/sales/foto-upload";
 import { PagoFormFields } from "@/components/sales/pago-form-fields";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
-import { Field, SelectField } from "@/components/ui/field";
+import { Combobox } from "@/components/ui/Combobox";
+import { ClienteCombobox } from "@/components/ui/cliente-combobox";
+import { Field } from "@/components/ui/field";
+import { liteClientesToCompleto, MOCK_MUEBLES_CATALOGO_VENTA } from "@/lib/combobox-mocks";
 import type { ZonaEntregaRow } from "@/lib/demo-store";
 import { formatPen } from "@/lib/utils";
+import { useMemo, useState } from "react";
 
 type ClienteOpt = { id: string; nombre: string };
 type ChoferOpt = { id: string; nombre: string; telefono?: string | null; placa?: string | null };
@@ -26,6 +30,7 @@ type MueblesTerminadosContextPanelsProps = {
   choferes: ChoferOpt[];
   zonas: Pick<ZonaEntregaRow, "id" | "nombre" | "tarifa" | "distancia_km">[];
   fechaDefault: string;
+  mockData?: boolean;
 };
 
 export function MueblesTerminadosContextPanels({
@@ -34,7 +39,32 @@ export function MueblesTerminadosContextPanels({
   choferes,
   zonas,
   fechaDefault,
+  mockData = false,
 }: MueblesTerminadosContextPanelsProps) {
+  const [clienteVentaId, setClienteVentaId] = useState("");
+  const [muebleCatalogoId, setMuebleCatalogoId] = useState("");
+
+  const clientesCombo = useMemo(() => liteClientesToCompleto(clientes), [clientes]);
+
+  const muebleOptions = useMemo(() => {
+    const src: MuebleOpt[] = mockData
+      ? [...MOCK_MUEBLES_CATALOGO_VENTA].map((m) => ({
+          id: m.id,
+          codigo: m.codigo,
+          nombre: m.nombre,
+          precio_lista: m.precio_lista,
+          stock_disponible: m.stock_disponible,
+        }))
+      : muebles;
+    return src.map((m) => ({
+      value: m.id,
+      label: `${m.codigo} — ${m.nombre}`,
+      sublabel: `${formatPen(Number(m.precio_lista))}${
+        Number(m.stock_disponible) <= 0 ? " · sin stock" : ""
+      }`,
+    }));
+  }, [mockData, muebles]);
+
   return (
     <>
       <ContextActionPanel
@@ -86,29 +116,29 @@ export function MueblesTerminadosContextPanels({
         description="Cliente, mueble del catálogo, regateo, chofer y pago."
       >
         <form action={createVentaMuebleTerminado} className="space-y-4">
-          <SelectField name="cliente_id" label="Cliente" defaultValue="" required>
-            <option value="" disabled>
-              Selecciona cliente
-            </option>
-            {clientes.map((cliente) => (
-              <option key={cliente.id} value={cliente.id}>
-                {cliente.nombre}
-              </option>
-            ))}
-          </SelectField>
+          <ClienteCombobox
+            mockData={mockData}
+            clientes={clientesCombo}
+            value={clienteVentaId}
+            onChange={setClienteVentaId}
+            hiddenInputName="cliente_id"
+            label="Cliente"
+            placeholder="Buscar cliente…"
+            inputAriaLabel="Cliente para venta de mueble terminado"
+          />
 
           <div className="grid gap-3 md:grid-cols-2">
-            <SelectField name="mueble_catalogo_id" label="Mueble del catálogo" defaultValue="" required>
-              <option value="" disabled>
-                Selecciona mueble
-              </option>
-              {muebles.map((mueble) => (
-                <option key={mueble.id} value={mueble.id}>
-                  {mueble.codigo} — {mueble.nombre} · {formatPen(Number(mueble.precio_lista))}
-                  {Number(mueble.stock_disponible) <= 0 ? " (sin stock)" : ""}
-                </option>
-              ))}
-            </SelectField>
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+              <span>Mueble del catálogo</span>
+              <Combobox
+                options={muebleOptions}
+                value={muebleCatalogoId}
+                onChange={setMuebleCatalogoId}
+                hiddenInputName="mueble_catalogo_id"
+                placeholder="Buscar en catálogo…"
+                inputAriaLabel="Mueble del catálogo"
+              />
+            </label>
             <Field name="fecha" label="Fecha" type="date" defaultValue={fechaDefault} required />
             <Field
               name="cantidad"
@@ -134,7 +164,7 @@ export function MueblesTerminadosContextPanels({
               Datos de entrega
             </p>
             <div className="mt-2">
-              <EntregaFormFields choferes={choferes} zonas={zonas} />
+              <EntregaFormFields mockData={mockData} choferes={choferes} zonas={zonas} />
             </div>
           </div>
 

@@ -16,6 +16,8 @@ function firstParam(value: string | string[] | undefined) {
 }
 
 export default async function RegistroPage({ searchParams }: RegistroPageProps) {
+  const comboMock =
+    process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const params = await searchParams;
   const quick = firstParam(params?.quick);
   const categoriaId = firstParam(params?.categoria);
@@ -42,6 +44,7 @@ export default async function RegistroPage({ searchParams }: RegistroPageProps) 
           categorias={categorias.map((c) => ({ id: c.id, nombre: c.nombre }))}
           defaultCategoriaId={categoriaId || ""}
           openByDefault={quick === "nuevo-registro"}
+          mockData={comboMock}
         />
       </Card>
 

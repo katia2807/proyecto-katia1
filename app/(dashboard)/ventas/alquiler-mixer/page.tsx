@@ -11,6 +11,8 @@ import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 
 export default async function AlquilerMixerPage() {
+  const comboMock =
+    process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const [clientes, contratos] = await Promise.all([getClientesRows(), getAlquilerRows()]);
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
@@ -46,7 +48,7 @@ export default async function AlquilerMixerPage() {
                 title="Contrato de alquiler"
                 description="Calcula monto total y depósito 30% en vivo. El depósito entra como ingreso al confirmar."
               >
-                <ContratoAlquilerForm clientes={clientes} />
+                <ContratoAlquilerForm clientes={clientes} mockData={comboMock} />
               </ContextActionPanel>
 
               <ContextActionPanel
