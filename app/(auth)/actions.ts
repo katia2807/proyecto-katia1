@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { LEGACY_LOCAL_AUTH_COOKIE, getSupabaseAuthServerClient } from "@/lib/auth";
+import { isDemoDatabaseMode } from "@/lib/demo-mode";
 
 export type LoginFormState = {
   error?: string;
@@ -31,7 +32,8 @@ export async function loginWithPassword(_prevState: LoginFormState, formData: Fo
     return { error: "Usa un correo electrónico válido para iniciar sesión." };
   }
 
-  if (process.env.NODE_ENV === "development") {
+  const allowLocalDemoLogin = process.env.NODE_ENV === "development" || isDemoDatabaseMode();
+  if (allowLocalDemoLogin) {
     const password = parsed.data.password;
     if (email.toLowerCase() === DEV_LOGIN_EMAIL && password === DEV_LOGIN_PASSWORD) {
       const cookieStore = await cookies();
@@ -46,6 +48,12 @@ export async function loginWithPassword(_prevState: LoginFormState, formData: Fo
 
   const authClient = await getSupabaseAuthServerClient();
   if (!authClient) {
+    if (isDemoDatabaseMode()) {
+      return {
+        error:
+          "Modo demo activo (KATIA_USE_DEMO_DB): inicia con test@test.com y la contraseña de prueba indicada en la pantalla de login.",
+      };
+    }
     return {
       error:
         "Supabase no está configurado. Define NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY en el servidor.",

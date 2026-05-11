@@ -2,6 +2,7 @@ import "server-only";
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { isDemoDatabaseMode } from "@/lib/demo-mode";
 
 type TempSupabaseCredentials = {
   url?: string;
@@ -39,6 +40,10 @@ function readTempCredentialsFile(): TempSupabaseCredentials | null {
 }
 
 export function getServerSupabaseCredentials() {
+  if (isDemoDatabaseMode()) {
+    return { url: undefined, anonKey: undefined, serviceRoleKey: undefined };
+  }
+
   const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const envAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const envService = process.env.SUPABASE_SERVICE_ROLE_KEY;

@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
+import { isDemoDatabaseMode } from "@/lib/demo-mode";
 import { getServerSupabaseCredentials } from "@/lib/supabase/temp-credentials";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole } from "@/lib/supabase/types";
@@ -57,7 +58,8 @@ export async function getSupabaseAuthServerClient() {
 }
 
 export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
-  if (process.env.NODE_ENV === "development") {
+  const allowDevLocalSession = process.env.NODE_ENV === "development" || isDemoDatabaseMode();
+  if (allowDevLocalSession) {
     const cookieStore = await cookies();
     const localAuthCookie = cookieStore.get(LEGACY_LOCAL_AUTH_COOKIE)?.value;
     if (localAuthCookie === DEV_LOGIN_COOKIE_VALUE) {
