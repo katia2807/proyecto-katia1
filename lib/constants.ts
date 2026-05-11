@@ -5,6 +5,7 @@ export const DEFAULT_ORG_ID =
 export const MODULO_PROXIMA_ACTUALIZACION_MSG =
   "Este módulo estará disponible en la próxima actualización.";
 
+/** Listado maestro del menú lateral. La visibilidad por producto (V1/V2) se aplica en `lib/features.ts` + `buildNavHrefAllowlist`. */
 export const navItems = [
   { href: "/", label: "Inicio" },
   { href: "/caja", label: "Caja" },

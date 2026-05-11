@@ -1,4 +1,5 @@
 import { navItems } from "@/lib/constants";
+import { isNavHrefAllowedByProductFeatures } from "@/lib/features";
 import type { AppRole } from "@/lib/supabase/types";
 
 const maderaEditableRoles = new Set<AppRole>(["owner_admin", "gerencia", "ventas"]);
@@ -25,7 +26,9 @@ export function mapUiRoleToDbRole(ui: UiRoleSlug): AppRole {
 
 /** Enlaces de navegación visibles según rol UI + rol legacy. */
 export function buildNavHrefAllowlist(role: AppRole, uiRole: string | null): Set<string> {
-  const allowed = new Set<string>(navItems.map((n) => n.href));
+  const allowed = new Set<string>(
+    navItems.filter((n) => isNavHrefAllowedByProductFeatures(n.href)).map((n) => n.href),
+  );
 
   const hide = (href: string) => {
     allowed.delete(href);

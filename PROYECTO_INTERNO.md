@@ -30,7 +30,7 @@ Scripts relevantes: `npm run dev`, `npm run build`, `npm run typecheck`, `npm ru
 
 ## Módulos activos en V1 y cómo están implementados
 
-La **navegación lateral** se arma desde `lib/constants.ts` (`navItems`) y se filtra por rol en `lib/permissions.ts` (`buildNavHrefAllowlist`). El layout del dashboard envuelve las páginas en `components/app-shell.tsx`.
+La **navegación lateral** se arma desde `lib/constants.ts` (`navItems`), se filtra por **producto** en `lib/features.ts` (`FEATURES`, `isNavHrefAllowedByProductFeatures`) y por **rol** en `lib/permissions.ts` (`buildNavHrefAllowlist`). El layout del dashboard envuelve las páginas en `components/app-shell.tsx`.
 
 | Módulo (negocio) | Rutas / piezas principales |
 |------------------|----------------------------|
@@ -51,9 +51,13 @@ La **lógica de negocio** y lecturas agregadas suelen vivir en `lib/data.ts`, `a
 
 ## Módulos “ocultos” o fuera del alcance comercial V1
 
-**Estado actual:** no existe aún `lib/features.ts`. La visibilidad es **por lista de `navItems` + allowlist por rol** (`buildNavHrefAllowlist`). Algunas pantallas (importar, respaldo, antifraude, Kanban) **ya existen en código** pero el documento comercial V1 puede tratarlas como **no incluidas**; para alinear menú y contrato habrá que introducir **flags de producto**.
+**Flags de producto:** `lib/features.ts` exporta `FEATURES` (objeto `as const`) y el tipo `FeatureKey`. Cada clave es `true`/`false` para incluir o excluir capacidades de la **versión contratada**. El menú lateral solo incluye enlaces cuyo `href` pasa `isNavHrefAllowedByProductFeatures`, según el mapa `NAV_MENU_FEATURE` en el mismo archivo (por ejemplo `mueblesPersonalizados` controla `/ventas/muebles-personalizados`, `importarDatos` a `/admin/importar`, `antifraude` a `/reportes/antifraude`). La entrada **Ventas** (`/ventas`) se muestra si **alguna** de las features de ese hub está activa (`clientes`, `maderaCortada`, `aserradero`, `alquilerMixer`, `mueblesTerminados`, `mueblesPersonalizados`). Rutas sin regla explícita (Inicio, Registro, Seguridad, Cuenta admin, Empresa, Usuarios) siguen visibles en producto y solo las limita el rol.
 
-**Plan recomendado:** crear `lib/features.ts` con constantes booleanas (o lectura de env) por módulo premium, y hacer que el menú y enlaces internos respeten esos flags además del rol.
+**Importante:** ocultar del menú **no** borra rutas: `/ventas/muebles-personalizados`, importar, respaldo, etc. siguen resolviendo si se abre la URL directamente (middleware y permisos de página siguen aplicando). Para bloquear acceso directo habría que añadir comprobaciones en layout o en cada página (no implementado aquí).
+
+**Features sin ítem de menú propio:** `cierreMes`, `nominaCompleta`, `quoteDualFlow` y `zonasEntrega` están en `FEATURES` para activación futura (p. ej. panel de cierre dentro de Reportes, enlaces en el hub de ventas, o cotización dual); hoy el filtro del sidebar no depende de ellas.
+
+**Siguiente mejora opcional:** leer flags desde variables de entorno en build/runtime para no recompilar al activar un módulo.
 
 **Precios orientativos de activación** (referencia comercial interna; ajustar según acuerdo):
 
@@ -90,7 +94,7 @@ y se pasa como `mockData` a los paneles o formularios. Con eso se activa el modo
 
 1. **Conectar Supabase** de forma consistente (reemplazar o reducir dependencia de mocks / demo store donde corresponda).
 2. **Corregir hydration mismatch** en cotización unificada (`components/cotizacion-unificada-wizard.tsx` y datos que difieren servidor vs cliente).
-3. **Crear `lib/features.ts`** para ocultar módulos no contratados en V1 y documentar variables de entorno asociadas.
+3. **Extender `FEATURES`** (o env) para enlazar `cierreMes`, `quoteDualFlow` y `zonasEntrega` a UI concreta si se desea ocultar más allá del menú.
 4. **Tests E2E** de flujos críticos (`npm run e2e`; ej. `tests/e2e/critical-flow.spec.ts` y ampliar cobertura).
 
 ---
