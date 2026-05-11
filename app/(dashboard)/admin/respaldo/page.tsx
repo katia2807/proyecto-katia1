@@ -6,7 +6,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 
 export default function RespaldoPage() {
-  const comboMock =
+  const mockData =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
 
   return (
@@ -92,7 +92,7 @@ export default function RespaldoPage() {
         </form>
       </Card>
 
-      <RespaldoPeligroCategoriaForms comboMock={comboMock} />
+      <RespaldoPeligroCategoriaForms mockData={mockData} />
     </div>
   );
 }

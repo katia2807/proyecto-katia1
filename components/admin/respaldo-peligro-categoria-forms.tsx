@@ -10,21 +10,21 @@ import { useMemo, useState } from "react";
 
 type RespaldoPeligroCategoriaFormsProps = {
   /** Con `NEXT_PUBLIC_COMBOBOX_MOCK=true` usa subconjunto corto para pruebas locales. */
-  comboMock?: boolean;
+  mockData?: boolean;
 };
 
 /** Formularios peligrosos con categoría en Combobox (lista estática ~17 ítems). */
-export function RespaldoPeligroCategoriaForms({ comboMock = false }: RespaldoPeligroCategoriaFormsProps) {
+export function RespaldoPeligroCategoriaForms({ mockData = false }: RespaldoPeligroCategoriaFormsProps) {
   const [categoriaMasiva, setCategoriaMasiva] = useState("cotizacionesUnificadas");
   const [categoriaIndividual, setCategoriaIndividual] = useState("cotizacionesUnificadas");
 
   const options = useMemo(() => {
-    const src = comboMock ? RESPALDO_CATEGORIA_OPTIONS.slice(0, 10) : RESPALDO_CATEGORIA_OPTIONS;
+    const src = mockData ? RESPALDO_CATEGORIA_OPTIONS.slice(0, 10) : RESPALDO_CATEGORIA_OPTIONS;
     return src.map((o) => ({
       value: o.value,
       label: o.label,
     }));
-  }, [comboMock]);
+  }, [mockData]);
 
   return (
     <div className="grid gap-4 md:grid-cols-2">

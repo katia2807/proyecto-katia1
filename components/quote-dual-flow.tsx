@@ -21,6 +21,7 @@ type QuoteRow = {
 type QuoteDualFlowProps = {
   canSave?: boolean;
   mode?: "tecnico" | "simple";
+  mockData?: boolean;
 };
 
 type AccessoryRow = {
@@ -180,7 +181,7 @@ function getRowPT(row: QuoteRow) {
   return Math.floor((espesor * ancho * largo * cantidad) / 12);
 }
 
-export function QuoteDualFlow({ canSave = true, mode = "simple" }: QuoteDualFlowProps) {
+export function QuoteDualFlow({ canSave = true, mode = "simple", mockData }: QuoteDualFlowProps) {
   const [rows, setRows] = useState<QuoteRow[]>([createEmptyRow()]);
   const [quickEntry, setQuickEntry] = useState("");
   const [selectedParametricTemplateId, setSelectedParametricTemplateId] = useState(PARAMETRIC_TEMPLATES[0].id);
@@ -210,9 +211,10 @@ export function QuoteDualFlow({ canSave = true, mode = "simple" }: QuoteDualFlow
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const accessoryInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const comboboxMock =
+  const comboboxMockFromEnv =
     typeof process !== "undefined" &&
     (process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true");
+  const comboboxMock = mockData ?? comboboxMockFromEnv;
 
   const effectiveTemplates = useMemo((): QuoteTemplate[] => {
     if (!comboboxMock) return templates;
