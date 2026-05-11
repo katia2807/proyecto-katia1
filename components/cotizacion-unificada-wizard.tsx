@@ -339,14 +339,16 @@ export function CotizacionUnificadaWizard({
   >("todos");
   const [filterFechaDesde, setFilterFechaDesde] = useState("");
   const [filterFechaHasta, setFilterFechaHasta] = useState("");
-  const [muebleTemplates, setMuebleTemplates] = useState<MuebleTemplate[]>(loadMuebleTemplatesFromStorage);
+  const [muebleTemplates, setMuebleTemplates] = useState<MuebleTemplate[]>(() => [getDefaultGerenciaTemplate()]);
   const [selectedMuebleTemplateId, setSelectedMuebleTemplateId] = useState("");
-  const [hasDraftAvailable, setHasDraftAvailable] = useState(() => Boolean(loadDraftFromStorage()));
-  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(() => loadDraftFromStorage()?.savedAt ?? null);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
+    setMuebleTemplates(loadMuebleTemplatesFromStorage());
+    const draft = loadDraftFromStorage();
+    setDraftSavedAt(draft?.savedAt ?? null);
   }, []);
 
   const docLabel = tipoCliente === "empresa" ? "RUC" : "DNI";
@@ -752,7 +754,6 @@ export function CotizacionUnificadaWizard({
     };
     try {
       localStorage.setItem(COTIZACION_DRAFT_KEY, JSON.stringify(draft));
-      setHasDraftAvailable(true);
       setDraftSavedAt(draft.savedAt);
     } catch {
       // Ignore localStorage errors.
@@ -789,7 +790,6 @@ export function CotizacionUnificadaWizard({
     } catch {
       // ignore
     }
-    setHasDraftAvailable(false);
     setDraftSavedAt(null);
   }, []);
 
@@ -824,7 +824,6 @@ export function CotizacionUnificadaWizard({
     setPlazoDiasUI(draft.plazoDiasUI);
     setPlazoUnidadUI(draft.plazoUnidadUI);
     setError("Borrador recuperado.");
-    setHasDraftAvailable(true);
     setDraftSavedAt(draft.savedAt);
   }, [applyCotizacionPreset]);
 
@@ -1247,7 +1246,7 @@ export function CotizacionUnificadaWizard({
               type="button"
               className="h-9 rounded-lg border border-[var(--color-border)] px-3 text-xs font-semibold disabled:opacity-50"
               onClick={restoreDraft}
-              disabled={isMounted ? !hasDraftAvailable : true}
+              disabled={!isMounted || !draftSavedAt}
             >
               Recuperar borrador
             </button>
