@@ -39,6 +39,7 @@ export function PhraseConfirmDialog({
   const [mounted, setMounted] = useState(false);
   const [phrase, setPhrase] = useState("");
   const [busy, setBusy] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const titleId = useId();
   const descId = useId();
 
@@ -47,7 +48,10 @@ export function PhraseConfirmDialog({
   }, []);
 
   useEffect(() => {
-    if (!open) setPhrase("");
+    if (!open) {
+      setPhrase("");
+      setSubmitError(null);
+    }
   }, [open]);
 
   useEffect(() => {
@@ -73,11 +77,14 @@ export function PhraseConfirmDialog({
   async function handleConfirm() {
     if (!match) return;
     setBusy(true);
+    setSubmitError(null);
     try {
       const result = await onConfirm();
       if (result !== false) {
         onOpenChange(false);
       }
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : "Ocurrió un error al confirmar.");
     } finally {
       setBusy(false);
     }
@@ -126,6 +133,11 @@ export function PhraseConfirmDialog({
                 autoComplete="off"
                 spellCheck={false}
               />
+              {submitError ? (
+                <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200" role="alert">
+                  {submitError}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>

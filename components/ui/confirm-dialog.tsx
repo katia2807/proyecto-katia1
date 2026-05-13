@@ -42,12 +42,17 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [mounted, setMounted] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const titleId = useId();
   const descId = useId();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!open) setSubmitError(null);
+  }, [open]);
 
   useEffect(() => {
     if (!open || typeof document === "undefined") return;
@@ -69,11 +74,14 @@ export function ConfirmDialog({
 
   async function handleConfirm() {
     setBusy(true);
+    setSubmitError(null);
     try {
       const result = await onConfirm();
       if (result !== false) {
         onOpenChange(false);
       }
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : "Ocurrió un error al confirmar.");
     } finally {
       setBusy(false);
     }
@@ -126,6 +134,11 @@ export function ConfirmDialog({
             </h2>
             <div id={descId} className="mt-2 space-y-2 text-sm leading-relaxed text-[var(--text-secondary)]">
               {children}
+              {submitError ? (
+                <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200" role="alert">
+                  {submitError}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>

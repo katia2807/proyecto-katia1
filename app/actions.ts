@@ -2383,29 +2383,36 @@ export async function deleteInventarioProducto(formData: FormData) {
     if (!res.ok) throw new Error(res.error);
   } else {
     const supabase = getSupabaseServerClient();
-    const { count, error: countErr } = await supabase
+    const { data: movBlock, error: movErr } = await supabase
       .from("inventario_movimientos")
-      .select("*", { count: "exact", head: true })
+      .select("id")
       .eq("producto_id", parsed.data.id)
-      .eq("organization_id", DEFAULT_ORG_ID);
-    if (countErr) throw new Error(countErr.message);
-    if (count !== null && count > 0) {
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .limit(1);
+    if (movErr) throw new Error(`No se pudo verificar el kardex: ${movErr.message}`);
+    if (movBlock && movBlock.length > 0) {
       throw new Error(
-        "No se puede eliminar: este producto tiene movimientos en el kardex. Eliminá primero esos movimientos o desactivá el producto.",
+        "No se puede eliminar: este producto tiene al menos un movimiento en el kardex. Eliminá primero esos movimientos en la pestaña Kardex o desactivá el producto.",
       );
     }
-    const { error } = await supabase
+    const { data: deletedRows, error: delErr } = await supabase
       .from("inventario_productos")
       .delete()
       .eq("id", parsed.data.id)
-      .eq("organization_id", DEFAULT_ORG_ID);
-    if (error) {
-      if (/foreign key|violates|restrict/i.test(error.message)) {
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .select("id");
+    if (delErr) {
+      if (/foreign key|violates|restrict|23503/i.test(delErr.message)) {
         throw new Error(
-          "No se puede eliminar: el producto sigue referenciado en el sistema. Revisá ventas o movimientos vinculados.",
+          "No se puede eliminar: el producto sigue referenciado en el sistema (p. ej. ventas o tablas vinculadas).",
         );
       }
-      throw new Error(error.message);
+      throw new Error(delErr.message);
+    }
+    if (!deletedRows?.length) {
+      throw new Error(
+        "No se eliminó ningún registro. Verificá que el producto exista y que la variable de entorno ERP_ORG_ID coincida con organization_id en Supabase.",
+      );
     }
   }
   revalidatePath("/inventario");

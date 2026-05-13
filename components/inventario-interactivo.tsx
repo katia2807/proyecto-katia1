@@ -17,6 +17,7 @@ import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Field, SelectField } from "@/components/ui/field";
+import { useToast } from "@/components/ui/toast";
 
 type ProductoEnriched = {
   id: string;
@@ -128,6 +129,7 @@ export function InventarioInteractivo({
     indicadores,
   } = data;
   const router = useRouter();
+  const { showToast } = useToast();
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"resumen" | "productos" | "kardex" | "alertas" | "reportes">("resumen");
   const [filterText, setFilterText] = useState("");
@@ -671,6 +673,7 @@ export function InventarioInteractivo({
           await toggleInventarioProductoActivo(fd);
           router.refresh();
           setToggleTarget(null);
+          showToast({ variant: "success", message: "Estado del producto actualizado." });
         }}
       >
         <p>
@@ -721,6 +724,7 @@ export function InventarioInteractivo({
           await deleteInventarioProducto(fd);
           setEditModalProductId((id) => (id === deleteProductTarget.id ? null : id));
           setDeleteProductTarget(null);
+          showToast({ variant: "success", message: "Producto eliminado del catálogo." });
           router.refresh();
         }}
       >
@@ -764,6 +768,7 @@ export function InventarioInteractivo({
           fd.set("id", kardexDeleteMovId);
           await deleteInventarioMovimiento(fd);
           setKardexDeleteMovId(null);
+          showToast({ variant: "success", message: "Movimiento eliminado del kardex." });
           router.refresh();
         }}
       >
