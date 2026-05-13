@@ -320,6 +320,8 @@ const inventarioToggleActivoSchema = z.object({
 
 const inventarioDeleteProductoSchema = z.object({
   id: z.string().uuid(),
+  /** Si es true, elimina todos los movimientos del kardex del producto y luego el producto. */
+  forzarConMovimientos: z.boolean().optional().default(false),
 });
 
 const muebleCatalogoUpdateSchema = z.object({
@@ -2375,25 +2377,39 @@ export async function deleteInventarioProducto(formData: FormData) {
   await requireMutationAccess(writerRoles);
   const parsed = inventarioDeleteProductoSchema.safeParse({
     id: formData.get("id"),
+    forzarConMovimientos: formData.get("forzarConMovimientos") === "true",
   });
   if (!parsed.success) throw new Error("Solicitud inválida.");
 
+  const forzar = parsed.data.forzarConMovimientos === true;
+
   if (!hasSupabaseEnv()) {
-    const res = demoDeleteInventarioProducto(parsed.data.id);
+    const res = demoDeleteInventarioProducto(parsed.data.id, { forzarConMovimientos: forzar });
     if (!res.ok) throw new Error(res.error);
   } else {
     const supabase = getSupabaseServerClient();
-    const { data: movBlock, error: movErr } = await supabase
-      .from("inventario_movimientos")
-      .select("id")
-      .eq("producto_id", parsed.data.id)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .limit(1);
-    if (movErr) throw new Error(`No se pudo verificar el kardex: ${movErr.message}`);
-    if (movBlock && movBlock.length > 0) {
-      throw new Error(
-        "No se puede eliminar: este producto tiene al menos un movimiento en el kardex. Eliminá primero esos movimientos en la pestaña Kardex o desactivá el producto.",
-      );
+    if (!forzar) {
+      const { data: movBlock, error: movErr } = await supabase
+        .from("inventario_movimientos")
+        .select("id")
+        .eq("producto_id", parsed.data.id)
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .limit(1);
+      if (movErr) throw new Error(`No se pudo verificar el kardex: ${movErr.message}`);
+      if (movBlock && movBlock.length > 0) {
+        throw new Error(
+          "No se puede eliminar: este producto tiene al menos un movimiento en el kardex. Eliminá primero esos movimientos en la pestaña Kardex o desactivá el producto.",
+        );
+      }
+    } else {
+      const { error: delMovErr } = await supabase
+        .from("inventario_movimientos")
+        .delete()
+        .eq("producto_id", parsed.data.id)
+        .eq("organization_id", DEFAULT_ORG_ID);
+      if (delMovErr) {
+        throw new Error(`No se pudieron eliminar los movimientos del kardex: ${delMovErr.message}`);
+      }
     }
     const { data: deletedRows, error: delErr } = await supabase
       .from("inventario_productos")

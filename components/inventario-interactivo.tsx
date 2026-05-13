@@ -7,7 +7,7 @@ import {
   toggleInventarioProductoActivo,
 } from "@/app/actions";
 import { InventarioProductoEditModal } from "@/components/inventario/inventario-producto-edit-modal";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -91,6 +91,15 @@ type Props = {
   canMutate: boolean;
 };
 
+function isInventarioProductoKardexBlockError(e: unknown): boolean {
+  const msg = typeof e === "string" ? e : e instanceof Error ? e.message : "";
+  return (
+    /movimiento.*kardex|kardex.*movimiento/i.test(msg) ||
+    /tiene al menos un movimiento/i.test(msg) ||
+    /tiene movimientos en el kardex/i.test(msg)
+  );
+}
+
 function ProductoIrAEdicion({
   nombre,
   productoId,
@@ -118,6 +127,7 @@ export function InventarioInteractivo({
 }: Props) {
   const {
     productos,
+    movimientos,
     categorias,
     stockBajo,
     sinMovimiento,
@@ -143,6 +153,8 @@ export function InventarioInteractivo({
   const [deleteProductTarget, setDeleteProductTarget] = useState<{ id: string; nombre: string } | null>(null);
   const [deleteProductStep1Open, setDeleteProductStep1Open] = useState(false);
   const [deleteProductPhraseOpen, setDeleteProductPhraseOpen] = useState(false);
+  const [deleteProductCascadeOpen, setDeleteProductCascadeOpen] = useState(false);
+  const deleteProductOpeningCascadeRef = useRef(false);
   const [kardexDeleteMovId, setKardexDeleteMovId] = useState<string | null>(null);
   const [kardexDeleteStep1Open, setKardexDeleteStep1Open] = useState(false);
   const [kardexDeletePhraseOpen, setKardexDeletePhraseOpen] = useState(false);
@@ -202,6 +214,7 @@ export function InventarioInteractivo({
     if (!deleteProductTarget) {
       setDeleteProductStep1Open(false);
       setDeleteProductPhraseOpen(false);
+      setDeleteProductCascadeOpen(false);
     }
   }, [deleteProductTarget]);
 
@@ -703,27 +716,46 @@ export function InventarioInteractivo({
         }}
       >
         <p>
-          Vas a eliminar <strong>{deleteProductTarget?.nombre}</strong> del catálogo. Solo es posible si no tiene
-          movimientos en el kardex.
+          Vas a eliminar <strong>{deleteProductTarget?.nombre}</strong> del catálogo. El siguiente paso pedirá escribir
+          ELIMINAR. Si hay movimientos en el kardex, podrás elegir eliminar también todo ese historial.
         </p>
-        <p className="text-xs">El siguiente paso pedirá escribir ELIMINAR.</p>
+        <p className="text-xs text-[var(--color-text-secondary)]">El siguiente paso pedirá escribir ELIMINAR.</p>
       </ConfirmDialog>
 
       <PhraseConfirmDialog
         open={deleteProductPhraseOpen && Boolean(deleteProductTarget)}
         onOpenChange={(o) => {
-          if (!o) setDeleteProductTarget(null);
+          if (!o) {
+            setDeleteProductPhraseOpen(false);
+            if (deleteProductOpeningCascadeRef.current) {
+              deleteProductOpeningCascadeRef.current = false;
+            } else {
+              setDeleteProductTarget(null);
+            }
+          }
         }}
         title="Confirmación estricta"
         expectedPhrase="ELIMINAR"
         confirmLabel="Eliminar definitivamente"
         onConfirm={async () => {
           if (!deleteProductTarget) return;
+          const id = deleteProductTarget.id;
+          const tieneMovsEnCliente = movimientos.some((m) => m.producto_id === id);
+          if (tieneMovsEnCliente) {
+            deleteProductOpeningCascadeRef.current = true;
+            setDeleteProductCascadeOpen(true);
+            return;
+          }
           const fd = new FormData();
-          fd.set("id", deleteProductTarget.id);
+          fd.set("id", id);
           try {
             await deleteInventarioProducto(fd);
           } catch (e) {
+            if (isInventarioProductoKardexBlockError(e)) {
+              deleteProductOpeningCascadeRef.current = true;
+              setDeleteProductCascadeOpen(true);
+              return;
+            }
             const message =
               typeof e === "string" && e.trim()
                 ? e
@@ -733,7 +765,7 @@ export function InventarioInteractivo({
             showToast({ variant: "error", message });
             return false;
           }
-          setEditModalProductId((id) => (id === deleteProductTarget.id ? null : id));
+          setEditModalProductId((prev) => (prev === id ? null : prev));
           setDeleteProductTarget(null);
           showToast({ variant: "success", message: "Producto eliminado del catálogo." });
           router.refresh();
@@ -743,6 +775,55 @@ export function InventarioInteractivo({
           Eliminación definitiva de <strong>{deleteProductTarget?.nombre}</strong>. Esta acción no se puede deshacer.
         </p>
       </PhraseConfirmDialog>
+
+      <ConfirmDialog
+        open={deleteProductCascadeOpen && Boolean(deleteProductTarget)}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDeleteProductCascadeOpen(false);
+            setDeleteProductTarget(null);
+          }
+        }}
+        title="Producto con movimientos en el kardex"
+        confirmLabel="Sí, eliminar todo"
+        cancelLabel="Cancelar"
+        confirmVariant="danger"
+        onConfirm={async () => {
+          if (!deleteProductTarget) return false;
+          const fd = new FormData();
+          fd.set("id", deleteProductTarget.id);
+          fd.set("forzarConMovimientos", "true");
+          try {
+            await deleteInventarioProducto(fd);
+          } catch (e) {
+            const message =
+              typeof e === "string" && e.trim()
+                ? e
+                : e instanceof Error && e.message
+                  ? e.message
+                  : "No se pudo eliminar el producto ni sus movimientos.";
+            showToast({ variant: "error", message });
+            return false;
+          }
+          const deletedId = deleteProductTarget.id;
+          setEditModalProductId((prev) => (prev === deletedId ? null : prev));
+          setDeleteProductCascadeOpen(false);
+          setDeleteProductTarget(null);
+          showToast({
+            variant: "success",
+            message: "Producto y sus movimientos eliminados correctamente.",
+          });
+          router.refresh();
+        }}
+      >
+        <p>
+          Este producto tiene movimientos en el kardex. ¿Deseas eliminar también todos sus movimientos?
+        </p>
+        <p className="text-xs text-[var(--color-text-secondary)]">
+          Se borrarán primero todas las filas del kardex vinculadas a <strong>{deleteProductTarget?.nombre}</strong> y
+          después el producto. Esta acción no se puede deshacer.
+        </p>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={kardexDeleteStep1Open && Boolean(kardexDeleteMovId)}

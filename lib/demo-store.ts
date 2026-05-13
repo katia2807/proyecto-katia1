@@ -2277,14 +2277,21 @@ export function demoToggleInventarioProductoActivo(id: string, activo: boolean) 
   return demoUpdateInventarioProducto(id, { activo });
 }
 
-export function demoDeleteInventarioProducto(id: string): { ok: true } | { ok: false; error: string } {
+export function demoDeleteInventarioProducto(
+  id: string,
+  opts?: { forzarConMovimientos?: boolean },
+): { ok: true } | { ok: false; error: string } {
   const movs = store.inventarioMovimientos.filter((m) => m.producto_id === id);
-  if (movs.length > 0) {
+  if (movs.length > 0 && !opts?.forzarConMovimientos) {
     return {
       ok: false,
       error:
         "No se puede eliminar: este producto tiene movimientos en el kardex. Eliminá primero esos movimientos o desactivá el producto.",
     };
+  }
+  if (opts?.forzarConMovimientos && movs.length > 0) {
+    store.inventarioMovimientos = store.inventarioMovimientos.filter((m) => m.producto_id !== id);
+    persistStore();
   }
   const idx = store.inventarioProductos.findIndex((p) => p.id === id);
   if (idx < 0) return { ok: false, error: "Producto no encontrado." };
