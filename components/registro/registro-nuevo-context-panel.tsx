@@ -24,6 +24,7 @@ export function RegistroNuevoContextPanel({
   mockData = false,
 }: RegistroNuevoContextPanelProps) {
   const [categoriaId, setCategoriaId] = useState(defaultCategoriaId || "");
+  const [categoriaError, setCategoriaError] = useState<string | null>(null);
 
   const categoriaOptions = useMemo(() => {
     const src = mockData ? MOCK_CATEGORIAS_REGISTRO : categorias;
@@ -40,17 +41,36 @@ export function RegistroNuevoContextPanel({
       description="Define la categoría y guarda el hecho con fecha, detalle y monto opcional."
       openByDefault={openByDefault}
     >
-      <form action={createRegistroGeneral} className="grid gap-3 md:grid-cols-2">
+      <form
+        action={createRegistroGeneral}
+        className="grid gap-3 md:grid-cols-2"
+        onSubmit={(e) => {
+          if (!categoriaId.trim()) {
+            e.preventDefault();
+            setCategoriaError("Debes seleccionar una categoría");
+            return;
+          }
+          setCategoriaError(null);
+        }}
+      >
         <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
           <span>Categoría</span>
           <Combobox
             options={categoriaOptions}
             value={categoriaId}
-            onChange={setCategoriaId}
+            onChange={(v) => {
+              setCategoriaId(v);
+              if (v.trim()) setCategoriaError(null);
+            }}
             hiddenInputName="categoria_id"
             placeholder="Buscar categoría…"
             inputAriaLabel="Categoría del registro"
           />
+          {categoriaError ? (
+            <span role="alert" className="text-sm font-medium text-[var(--color-danger)]">
+              {categoriaError}
+            </span>
+          ) : null}
         </label>
         <Field name="fecha" type="date" label="Fecha" required />
         <Field name="titulo" label="Título" placeholder="Ingreso por corte, compra de troza..." required />

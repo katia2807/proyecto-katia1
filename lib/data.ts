@@ -403,13 +403,18 @@ export async function getCotizacionesUnificadasRows(): Promise<CotizacionUnifica
     return demoCotizacionesUnificadasRows() as CotizacionUnificadaRow[];
   }
   const supabase = getSupabaseServerClient();
-  const { data } = await supabase
-    .from("cotizaciones_unificadas")
-    .select("*")
-    .eq("organization_id", DEFAULT_ORG_ID)
-    .order("fecha", { ascending: false })
-    .limit(100);
-  return data ?? fallback.cotizacionesUnificadas;
+  return safeQuery(async () => {
+    const { data, error } = await supabase
+      .from("cotizaciones_unificadas")
+      .select("*")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .order("fecha", { ascending: false })
+      .limit(100);
+    if (error) {
+      throw new Error(error.message);
+    }
+    return data ?? [];
+  }, fallback.cotizacionesUnificadas);
 }
 
 export async function getCotizacionUnificadaById(id: string): Promise<CotizacionUnificadaRow | null> {

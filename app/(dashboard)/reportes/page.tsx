@@ -14,8 +14,9 @@ import {
   getCobrosVencidos,
   getUtilidadRows,
 } from "@/lib/data";
-import { canCloseMonth } from "@/lib/permissions";
+import { canCloseMonth, canExportReportesExcel } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
+import { ReportesExcelExport } from "@/components/reportes/reportes-excel-export";
 
 export default async function ReportesPage() {
   const [utilidad, cierres, caja, cobrosVencidos, clientes] = await Promise.all([
@@ -28,6 +29,7 @@ export default async function ReportesPage() {
   const clientesById = new Map(clientes.map((c) => [c.id, c]));
   const role = await getCurrentUserRole();
   const canDoCloseMonth = canCloseMonth(role);
+  const canExcel = canExportReportesExcel(role);
 
   const today = new Date();
   const anio = today.getFullYear();
@@ -64,9 +66,6 @@ export default async function ReportesPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <a href="/api/export/reportes-excel">
-          <Button type="button">Reporte general Excel</Button>
-        </a>
         <Link href="/reportes/antifraude">
           <Button type="button" variant="secondary">
             Antifraude (con permisos)
@@ -140,9 +139,7 @@ export default async function ReportesPage() {
               Exportar CSV
             </Button>
           </Link>
-          <a href="/api/export/reportes-excel">
-            <Button type="button">Descargar Excel multi-hoja</Button>
-          </a>
+          <ReportesExcelExport canExport={canExcel} />
         </div>
         <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
           <Table>

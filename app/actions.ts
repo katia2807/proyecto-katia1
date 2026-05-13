@@ -1770,6 +1770,7 @@ export async function createCotizacion(formData: FormData) {
   }
 
   revalidatePath("/ventas/muebles-corte");
+  revalidatePath("/ventas/muebles-personalizados");
   revalidatePath("/");
 }
 

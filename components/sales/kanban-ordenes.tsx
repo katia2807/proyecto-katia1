@@ -1,7 +1,7 @@
 "use client";
 
 import { cambiarEstadoOrden } from "@/app/actions";
-import { useOptimistic, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatPen } from "@/lib/utils";
 
@@ -38,19 +38,35 @@ export function KanbanOrdenes({ ordenes, canMutate }: KanbanOrdenesProps) {
   const [, startTransition] = useTransition();
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [overEstado, setOverEstado] = useState<Estado | null>(null);
+  const [kanbanToast, setKanbanToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!kanbanToast) return;
+    const t = window.setTimeout(() => setKanbanToast(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [kanbanToast]);
 
   function moverOrden(id: string, nuevoEstado: Estado) {
+    const estadoAnterior = optimistic.find((o) => o.id === id)?.estado;
+    if (!estadoAnterior || estadoAnterior === nuevoEstado) return;
+
     startTransition(async () => {
       setOptimistic({ id, nuevoEstado });
       const formData = new FormData();
       formData.append("orden_id", id);
       formData.append("nuevo_estado", nuevoEstado);
-      await cambiarEstadoOrden(formData);
+      try {
+        await cambiarEstadoOrden(formData);
+        setKanbanToast(null);
+      } catch (e) {
+        setOptimistic({ id, nuevoEstado: estadoAnterior });
+        setKanbanToast(e instanceof Error ? e.message : "No se pudo actualizar el estado de la orden.");
+      }
     });
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className="relative grid gap-3 md:grid-cols-3">
       {columnas.map((col) => {
         const items = optimistic.filter((o) => o.estado === col.value);
         const activa = overEstado === col.value;
@@ -128,6 +144,14 @@ export function KanbanOrdenes({ ordenes, canMutate }: KanbanOrdenesProps) {
           </div>
         );
       })}
+      {kanbanToast ? (
+        <div
+          role="alert"
+          className="fixed bottom-4 right-4 z-[100] max-w-sm rounded-xl border border-[var(--color-danger)]/40 bg-[var(--color-surface)] px-4 py-3 text-sm font-medium text-[var(--color-danger)] shadow-lg"
+        >
+          {kanbanToast}
+        </div>
+      ) : null}
     </div>
   );
 }

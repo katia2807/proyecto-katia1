@@ -135,3 +135,8 @@ export function canAccessAntifraude(role: AppRole | null | undefined, uiRole?: s
 export function canAccessSeguridad(role: AppRole | null | undefined, uiRole?: string | null) {
   return canAccessAntifraude(role, uiRole);
 }
+
+/** Misma regla que `GET /api/export/reportes-excel` (owner_admin, gerencia). */
+export function canExportReportesExcel(role: AppRole | null | undefined) {
+  return role === "owner_admin" || role === "gerencia";
+}
