@@ -43,11 +43,11 @@ export function Combobox({
   const filtered = useMemo(() => {
     const q = inputValue.trim().toLowerCase();
     if (!q) return options;
-    return options.filter(
-      (o) =>
-        o.label.toLowerCase().includes(q) ||
-        (o.sublabel?.toLowerCase().includes(q) ?? false),
-    );
+    return options.filter((o) => {
+      const label = (o.label ?? "").toLowerCase();
+      const sub = (o.sublabel ?? "").toLowerCase();
+      return label.includes(q) || sub.includes(q);
+    });
   }, [options, inputValue]);
 
   const clampedHighlight = filtered.length === 0 ? 0 : Math.min(highlight, filtered.length - 1);
@@ -138,7 +138,7 @@ export function Combobox({
         }}
         onFocus={() => {
           setOpen(true);
-          setInputValue((prev) => (selected ? selected.label : prev));
+          setInputValue((prev) => (selected ? (selected.label ?? "") : prev));
         }}
         onKeyDown={onKeyDown}
       />

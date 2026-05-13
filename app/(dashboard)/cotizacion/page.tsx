@@ -10,6 +10,9 @@ import { getCurrentUserRole } from "@/lib/current-user-role";
 import { previewCorrelativo } from "@/lib/numeracion";
 import { canMutateVentas } from "@/lib/permissions";
 
+/** Evita prerender estático con sesión vacía; la página depende de rol y datos en vivo. */
+export const dynamic = "force-dynamic";
+
 export default async function CotizacionPage() {
   const role = await getCurrentUserRole();
   const canSave = canMutateVentas(role);

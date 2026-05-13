@@ -550,7 +550,7 @@ export function CotizacionUnificadaWizard({
       { value: "", label: "Seleccionar plantilla..." },
       ...effectiveMuebleTemplates.map((t) => ({
         value: t.id,
-        label: t.name,
+        label: (t.name ?? "").trim() || "Plantilla sin nombre",
       })),
     ],
     [effectiveMuebleTemplates],
