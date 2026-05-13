@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { eliminarDatosSistema, restaurarRespaldoJSON } from "@/app/actions";
 import { RespaldoPeligroCategoriaForms } from "@/components/admin/respaldo-peligro-categoria-forms";
+import { RespaldoProduccionResumen } from "@/components/admin/respaldo-produccion-resumen";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
+import { fetchRespaldoSupabaseResumen } from "@/lib/respaldo-supabase-resumen";
 import { hasSupabaseEnv } from "@/lib/runtime";
+
+export const dynamic = "force-dynamic";
 
 export default async function RespaldoPage() {
   const prodDb = hasSupabaseEnv();
@@ -12,13 +16,16 @@ export default async function RespaldoPage() {
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
 
   if (prodDb) {
+    const resumen = await fetchRespaldoSupabaseResumen();
+
     return (
       <div className="space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold">Respaldo del sistema</h2>
             <p className="text-sm text-[var(--color-text-secondary)]">
-              Los datos en producción viven en Supabase Postgres; no se usa el archivo JSON local del modo demo.
+              En producción los datos están en Postgres (Supabase). Abajo ves un resumen de lectura; los respaldos los
+              configuras en el panel de Supabase.
             </p>
           </div>
           <Link href="/" className="text-sm font-semibold underline">
@@ -26,19 +33,26 @@ export default async function RespaldoPage() {
           </Link>
         </div>
 
+        <RespaldoProduccionResumen resumen={resumen} />
+
         <Card>
-          <CardTitle>Respaldo en producción</CardTitle>
+          <CardTitle>Panel de Supabase</CardTitle>
           <CardDescription className="leading-relaxed">
-            El respaldo en producción se gestiona desde el dashboard de Supabase. Ve a{" "}
-            <a href="https://supabase.com" className="font-semibold text-[var(--color-accent)] underline">
-              supabase.com
-            </a>{" "}
-            → tu proyecto → <strong>Database</strong> → <strong>Backups</strong> (y políticas de retención según tu
-            plan).
+            Abre{" "}
+            <a
+              href="https://supabase.com/dashboard"
+              className="font-semibold text-[var(--color-accent)] underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Supabase Dashboard
+            </a>
+            , elige el proyecto de este host y entra a <strong>Database</strong> → <strong>Backups</strong> para
+            retención y copias automáticas según tu plan.
           </CardDescription>
           <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-            La exportación JSON y restauración desde esta pantalla solo aplican al almacén demo local cuando la app no
-            está conectada a Supabase con las tres credenciales (URL, anon y service role).
+            La descarga JSON y la restauración desde esta app solo aplican al almacén demo local cuando no hay las tres
+            credenciales (URL, anon y service role).
           </p>
         </Card>
       </div>
