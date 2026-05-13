@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createClienteCotizacionRapida,
   deleteCotizacionUnificada,
@@ -378,21 +378,26 @@ export function CotizacionUnificadaWizard({
   >("todos");
   const [filterFechaDesde, setFilterFechaDesde] = useState("");
   const [filterFechaHasta, setFilterFechaHasta] = useState("");
-  const muebleTemplates = useSyncExternalStore(
-    subscribeWizardTemplates,
-    () => loadMuebleTemplatesFromStorage(),
-    () => [getDefaultGerenciaTemplate()],
-  );
-  const draftSavedAt = useSyncExternalStore(
-    subscribeWizardDraft,
-    () => (typeof window === "undefined" ? null : (loadDraftFromStorage()?.savedAt ?? null)),
-    () => null,
-  );
-  const isClient = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
+  /** Misma lista en servidor y primer paint cliente; luego se sincroniza con localStorage en useEffect. */
+  const [muebleTemplates, setMuebleTemplates] = useState<MuebleTemplate[]>(() => [getDefaultGerenciaTemplate()]);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    setMuebleTemplates(loadMuebleTemplatesFromStorage());
+    setDraftSavedAt(loadDraftFromStorage()?.savedAt ?? null);
+    const unsubTemplates = subscribeWizardTemplates(() => {
+      setMuebleTemplates(loadMuebleTemplatesFromStorage());
+    });
+    const unsubDraft = subscribeWizardDraft(() => {
+      setDraftSavedAt(loadDraftFromStorage()?.savedAt ?? null);
+    });
+    return () => {
+      unsubTemplates();
+      unsubDraft();
+    };
+  }, []);
   const [selectedMuebleTemplateId, setSelectedMuebleTemplateId] = useState("");
 
   const docLabel = tipoCliente === "empresa" ? "RUC" : "DNI";
