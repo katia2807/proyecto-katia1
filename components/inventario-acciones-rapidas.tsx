@@ -19,7 +19,7 @@ export function InventarioAccionesRapidas({
         <CardTitle>Operaciones</CardTitle>
         <CardDescription>Registrar compra, producto o movimiento de stock.</CardDescription>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-3">
         {!canMutate ? noPermisoHint : null}
         {canMutate ? children : null}
       </div>

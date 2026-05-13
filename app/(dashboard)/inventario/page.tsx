@@ -1,6 +1,6 @@
+import { Suspense } from "react";
 import { InventarioAccionesRapidas } from "@/components/inventario-acciones-rapidas";
 import { InventarioContextPanels } from "@/components/inventario/inventario-context-panels";
-import { MueblesCatalogoSection } from "@/components/inventario/muebles-catalogo-section";
 import { InventarioInteractivo } from "@/components/inventario-interactivo";
 import { MetricCard } from "@/components/metric-card";
 import { getCurrentUserRole } from "@/lib/current-user-role";
@@ -62,28 +62,34 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
         />
       </div>
 
-      <InventarioAccionesRapidas
-        canMutate={canMutate}
-        noPermisoHint={
-          <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            Tu rol no tiene permisos de escritura en inventario.
-          </p>
+      <Suspense
+        fallback={
+          <div
+            className="h-24 animate-pulse rounded-2xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]"
+            aria-hidden
+          />
         }
       >
-        <InventarioContextPanels
-          quick={quick}
-          productos={productos.map((p) => ({ id: p.id, nombre: p.nombre }))}
-          mockData={comboMock}
-        />
-      </InventarioAccionesRapidas>
+        <InventarioAccionesRapidas
+          canMutate={canMutate}
+          noPermisoHint={
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              Tu rol no tiene permisos de escritura en inventario.
+            </p>
+          }
+        >
+          <InventarioContextPanels
+            quick={quick}
+            productos={productos.map((p) => ({ id: p.id, nombre: p.nombre }))}
+            mockData={comboMock}
+          />
+        </InventarioAccionesRapidas>
+      </Suspense>
 
       <InventarioInteractivo
         data={inventarioData}
         canMutate={canMutate}
-      />
-
-      <MueblesCatalogoSection
-        muebles={mueblesCatalogo.map((m) => ({
+        mueblesCatalogo={mueblesCatalogo.map((m) => ({
           id: m.id,
           codigo: m.codigo,
           nombre: m.nombre,
@@ -92,7 +98,6 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
           foto_url: m.foto_url,
           activo: m.activo,
         }))}
-        canMutate={canMutate}
       />
     </div>
   );

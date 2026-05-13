@@ -1,9 +1,9 @@
 "use client";
 
 import { updateInventarioProducto } from "@/app/actions";
+import { ContextActionPanel } from "@/components/context-action-panel";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
-import { SurfaceModal } from "@/components/ui/surface-modal";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useId, useRef } from "react";
 
@@ -56,43 +56,29 @@ export function InventarioProductoEditModal({
     }
   }, [state.ok, product, onOpenChange, router]);
 
-  const show = Boolean(open && product);
+  const desc =
+    product != null
+      ? `Stock ${product.stock_actual} · Valorización S/ ${product.valor_stock.toFixed(2)} · Último mov. ${
+          product.ultimo_movimiento ? formatDate(product.ultimo_movimiento) : "—"
+        } · ${product.activo ? "Activo" : "Inactivo"}.`
+      : "Seleccioná un producto en la lista.";
 
   return (
-    <SurfaceModal
-      open={show}
+    <ContextActionPanel
+      omitTrigger
+      presentation="drawer"
+      open={open && Boolean(product)}
       onOpenChange={onOpenChange}
       title="Editar producto"
-      description={
-        product ? (
-          <>
-            <span className="font-semibold text-[var(--color-text-primary)]">{product.nombre}</span>
-            <span className="block mt-1 text-xs">
-              Stock actual: {product.stock_actual} · Valorización: S/ {product.valor_stock.toFixed(2)} · Último mov.:{" "}
-              {product.ultimo_movimiento ? formatDate(product.ultimo_movimiento) : "—"} · Estado:{" "}
-              {product.activo ? "Activo" : "Inactivo"}
-            </span>
-            <span className="mt-2 block text-xs text-[var(--color-text-secondary)]">
-              Revisá código y stock mínimo antes de guardar; los cambios aplican al catálogo en vivo.
-            </span>
-          </>
-        ) : (
-          " "
-        )
-      }
-      footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button type="submit" form={formId} variant="secondary" disabled={!canMutate || pending || !product}>
-            {pending ? "Guardando…" : "Guardar cambios"}
-          </Button>
-        </div>
-      }
+      description={desc}
+      triggerLabel="Editar producto"
     >
       {product ? (
         <>
+          <p className="mb-3 text-sm font-semibold text-[var(--color-text-primary)]">{product.nombre}</p>
+          <p className="mb-4 text-xs text-[var(--color-text-secondary)]">
+            Revisá código y stock mínimo antes de guardar; los cambios aplican al catálogo en vivo.
+          </p>
           <form key={product.id} ref={formRef} id={formId} action={formAction} className="grid gap-3 sm:grid-cols-2">
             <input type="hidden" name="id" value={product.id} />
             <Field name="codigo" label="Código" defaultValue={product.codigo} required disabled={!canMutate} />
@@ -120,8 +106,16 @@ export function InventarioProductoEditModal({
           {!canMutate ? (
             <p className="mt-3 text-xs text-[var(--color-text-secondary)]">Tu rol no puede guardar cambios en inventario.</p>
           ) : null}
+          <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-[var(--color-border)] pt-4">
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" form={formId} variant="secondary" disabled={!canMutate || pending || !product}>
+              {pending ? "Guardando…" : "Guardar cambios"}
+            </Button>
+          </div>
         </>
       ) : null}
-    </SurfaceModal>
+    </ContextActionPanel>
   );
 }

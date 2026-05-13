@@ -8,6 +8,7 @@ import {
   toggleInventarioProductoActivo,
 } from "@/app/actions";
 import { InventarioProductoEditModal } from "@/components/inventario/inventario-producto-edit-modal";
+import { MueblesCatalogoSection } from "@/components/inventario/muebles-catalogo-section";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -87,9 +88,20 @@ type InventarioData = {
   };
 };
 
+type MuebleCatalogoInventarioRow = {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  precio_lista: number | string;
+  foto_url: string | null;
+  activo: boolean;
+};
+
 type Props = {
   data: InventarioData;
   canMutate: boolean;
+  mueblesCatalogo: MuebleCatalogoInventarioRow[];
 };
 
 function isInventarioProductoKardexBlockError(e: unknown): boolean {
@@ -114,7 +126,7 @@ function ProductoIrAEdicion({
   return (
     <button
       type="button"
-      title="Ir a la pestaña Productos y abrir el editor"
+      title="Ir a la pestaña Productos y abrir el editor en panel lateral"
       className="-m-1 max-w-full rounded-md px-1 py-0.5 text-left text-[var(--color-text-primary)] underline-offset-2 hover:bg-[var(--color-primary-soft)] hover:underline focus-visible:outline focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
       onClick={() => onGo(productoId)}
     >
@@ -126,6 +138,7 @@ function ProductoIrAEdicion({
 export function InventarioInteractivo({
   data,
   canMutate,
+  mueblesCatalogo,
 }: Props) {
   const {
     productos,
@@ -170,12 +183,11 @@ export function InventarioInteractivo({
     setEditSession((s) => s + 1);
     setActiveTab("productos");
     setEditModalProductId(productoId);
-    try {
-      window.history.replaceState(null, "", `#producto-${productoId}`);
-    } catch {
-      /* ignore */
-    }
   }, []);
+
+  const openCompraReponer = useCallback((productoId: string) => {
+    router.push(`/inventario?quick=compra&producto_id=${encodeURIComponent(productoId)}`);
+  }, [router]);
 
   const openProductoModal = useCallback((productoId: string) => {
     setEditSession((s) => s + 1);
@@ -202,15 +214,6 @@ export function InventarioInteractivo({
       window.setTimeout(() => setHighlightedId(null), 3200);
     });
   }, []);
-
-  useEffect(() => {
-    if (!editModalProductId || activeTab !== "productos") return;
-    setHighlightedId(editModalProductId);
-    const el = document.getElementById(`producto-${editModalProductId}`);
-    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    const t = window.setTimeout(() => setHighlightedId(null), 2400);
-    return () => window.clearTimeout(t);
-  }, [editModalProductId, activeTab]);
 
   useEffect(() => {
     if (!deleteProductTarget) {
@@ -298,6 +301,40 @@ export function InventarioInteractivo({
         </div>
       ) : null}
 
+      {activeTab === "resumen" && stockBajo.length > 0 ? (
+        <Card>
+          <CardTitle>Alertas activas</CardTitle>
+          <CardDescription className="mt-1">
+            Productos con stock por debajo del mínimo. Usá Reponer para abrir el registro de compra con el producto ya
+            elegido.
+          </CardDescription>
+          <ul className="mt-4 divide-y divide-[var(--color-border)] rounded-xl border border-[var(--color-border)]">
+            {stockBajo.map((item) => (
+              <li
+                key={item.id}
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm text-[var(--color-text-primary)]"
+              >
+                <div className="min-w-0">
+                  <span className="font-semibold">{item.nombre}</span>
+                  <span className="block text-xs text-[var(--color-text-secondary)]">
+                    Stock {item.stock_actual} / mín. {item.stock_minimo}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="shrink-0 border border-emerald-500/45 bg-emerald-500/15 text-emerald-50 hover:bg-emerald-500/25"
+                  disabled={!canMutate}
+                  onClick={() => openCompraReponer(item.id)}
+                >
+                  Reponer
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       {activeTab === "resumen" ? (
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
@@ -380,8 +417,8 @@ export function InventarioInteractivo({
       <Card id="stock-productos">
         <CardTitle>Productos y mantenimiento</CardTitle>
         <CardDescription>
-          Editá cada producto en una ventana del sistema. Desactivar y eliminar piden confirmación; eliminar exige
-          escribir ELIMINAR.
+          Editá cada producto desde el panel lateral (botón Editar). Desactivar y eliminar piden confirmación; eliminar
+          exige escribir ELIMINAR.
         </CardDescription>
         <div className="mt-4 grid gap-3 md:grid-cols-4">
           <Field label="Buscar" value={filterText} onChange={(e) => setFilterText(e.target.value)} placeholder="Código, nombre..." />
@@ -461,6 +498,9 @@ export function InventarioInteractivo({
             </div>
           ))}
         </div>
+        <div className="mt-10 border-t border-[var(--color-border)] pt-8">
+          <MueblesCatalogoSection muebles={mueblesCatalogo} canMutate={canMutate} />
+        </div>
       </Card>
       ) : null}
 
@@ -538,81 +578,95 @@ export function InventarioInteractivo({
       ) : null}
 
       {activeTab === "alertas" ? (
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card id="alertas-stock">
-          <CardTitle>Alertas de stock bajo</CardTitle>
-          <CardDescription>Toca una alerta para ir al producto.</CardDescription>
-          {stockBajo.length > 0 ? (
+      <div className="space-y-8">
+        <div className="grid gap-4 xl:grid-cols-2">
+          <Card id="alertas-stock">
+            <CardTitle>Alertas de stock bajo</CardTitle>
+            <CardDescription>Toca una alerta para ir al producto.</CardDescription>
+            {stockBajo.length > 0 ? (
+              <div className="mt-4 space-y-2">
+                {stockBajo.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      goToProductoEditor(item.id);
+                    }}
+                    className="w-full rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-soft)] px-4 py-3 text-left text-sm text-[var(--color-warning-strong)] transition hover:brightness-95"
+                  >
+                    <span className="font-semibold">{item.nombre}</span> ({item.stock_actual}/{item.stock_minimo})
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
+                Todo bien por ahora. No hay productos en riesgo de agotarse.
+              </p>
+            )}
+          </Card>
+          <Card>
+            <CardTitle>Sin movimiento (+30 días)</CardTitle>
+            <CardDescription>Clic en un producto para abrir su ficha en la pestaña Productos.</CardDescription>
             <div className="mt-4 space-y-2">
-              {stockBajo.map((item) => (
+              {sinMovimiento.slice(0, 20).map((p) => (
                 <button
-                  key={item.id}
+                  key={p.id}
                   type="button"
-                  onClick={() => {
-                    goToProductoEditor(item.id);
-                  }}
-                  className="w-full rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-soft)] px-4 py-3 text-left text-sm text-[var(--color-warning-strong)] transition hover:brightness-95"
+                  onClick={() => goToProductoEditor(p.id)}
+                  className="w-full rounded-xl border border-[var(--color-border)] px-3 py-2 text-left text-sm transition hover:bg-[var(--color-primary-soft)]"
                 >
-                  <span className="font-semibold">{item.nombre}</span> ({item.stock_actual}/{item.stock_minimo})
+                  <strong className="text-[var(--color-text-primary)]">{p.nombre}</strong>
+                  <span className="text-[var(--color-text-secondary)]"> · {p.dias_sin_movimiento} días sin movimiento</span>
                 </button>
               ))}
+              {sinMovimiento.length === 0 ? <p className="text-sm text-[var(--color-text-secondary)]">Sin alertas de inactividad.</p> : null}
             </div>
-          ) : (
-            <p className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-text-secondary)]">
-              Todo bien por ahora. No hay productos en riesgo de agotarse.
-            </p>
-          )}
-        </Card>
-        <Card>
-          <CardTitle>Sin movimiento (+30 días)</CardTitle>
-          <CardDescription>Clic en un producto para abrir su ficha en la pestaña Productos.</CardDescription>
-          <div className="mt-4 space-y-2">
-            {sinMovimiento.slice(0, 20).map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => goToProductoEditor(p.id)}
-                className="w-full rounded-xl border border-[var(--color-border)] px-3 py-2 text-left text-sm transition hover:bg-[var(--color-primary-soft)]"
-              >
-                <strong className="text-[var(--color-text-primary)]">{p.nombre}</strong>
-                <span className="text-[var(--color-text-secondary)]"> · {p.dias_sin_movimiento} días sin movimiento</span>
-              </button>
-            ))}
-            {sinMovimiento.length === 0 ? <p className="text-sm text-[var(--color-text-secondary)]">Sin alertas de inactividad.</p> : null}
-          </div>
-        </Card>
-        <Card className="xl:col-span-2">
-          <CardTitle>Conteo físico y ajuste automático</CardTitle>
-          <CardDescription>Registra stock contado; el sistema crea ajuste con trazabilidad.</CardDescription>
-          <form
-            action={registrarConteoInventario}
-            className="mt-4 grid gap-3 md:grid-cols-4"
-            onSubmit={(e) => {
-              if (
-                !window.confirm(
-                  "¿Aplicar el conteo físico? Se generará un ajuste en el kardex con la diferencia respecto al stock del sistema.",
-                )
-              ) {
-                e.preventDefault();
-              }
-            }}
+          </Card>
+        </div>
+
+        <section className="space-y-3" aria-labelledby="inventario-ajuste-stock-heading">
+          <h3
+            id="inventario-ajuste-stock-heading"
+            className="text-base font-semibold tracking-tight text-[var(--color-text-primary)]"
           >
-            <SelectField name="producto_id" label="Producto" defaultValue="" required>
-              <option value="" disabled>Seleccionar</option>
-              {productos.filter((p) => p.activo !== false).map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.codigo} - {p.nombre}
-                </option>
-              ))}
-            </SelectField>
-            <Field name="fecha" type="date" label="Fecha" required />
-            <Field name="stock_contado" type="number" step="0.01" min="0" label="Stock contado" required />
-            <Field name="referencia" label="Motivo / referencia" placeholder="Conteo físico almacén mayo" required />
-            <div className="md:col-span-4">
-              <Button type="submit" disabled={!canMutate}>Aplicar conteo</Button>
-            </div>
-          </form>
-        </Card>
+            Ajuste de stock
+          </h3>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Conteo físico y diferencias respecto al sistema. Separado de las alertas de reposición.
+          </p>
+          <Card>
+            <CardTitle>Conteo físico y ajuste automático</CardTitle>
+            <CardDescription>Registra stock contado; el sistema crea ajuste con trazabilidad.</CardDescription>
+            <form
+              action={registrarConteoInventario}
+              className="mt-4 grid gap-3 md:grid-cols-4"
+              onSubmit={(e) => {
+                if (
+                  !window.confirm(
+                    "¿Aplicar el conteo físico? Se generará un ajuste en el kardex con la diferencia respecto al stock del sistema.",
+                  )
+                ) {
+                  e.preventDefault();
+                }
+              }}
+            >
+              <SelectField name="producto_id" label="Producto" defaultValue="" required>
+                <option value="" disabled>Seleccionar</option>
+                {productos.filter((p) => p.activo !== false).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.codigo} - {p.nombre}
+                  </option>
+                ))}
+              </SelectField>
+              <Field name="fecha" type="date" label="Fecha" required />
+              <Field name="stock_contado" type="number" step="0.01" min="0" label="Stock contado" required />
+              <Field name="referencia" label="Motivo / referencia" placeholder="Conteo físico almacén mayo" required />
+              <div className="md:col-span-4">
+                <Button type="submit" disabled={!canMutate}>Aplicar conteo</Button>
+              </div>
+            </form>
+          </Card>
+        </section>
       </div>
       ) : null}
 

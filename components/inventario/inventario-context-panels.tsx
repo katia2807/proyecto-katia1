@@ -12,7 +12,9 @@ import { useToast } from "@/components/ui/toast";
 import { Field, SelectField } from "@/components/ui/field";
 import { MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
+import { IconArrowsLeftRight, IconCirclePlus, IconShoppingCart } from "@tabler/icons-react";
 import { useActionState, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 type ProductoOpt = { id: string; nombre: string };
 
@@ -23,6 +25,7 @@ type InventarioContextPanelsProps = {
 };
 
 export function InventarioContextPanels({ quick, productos, mockData = false }: InventarioContextPanelsProps) {
+  const searchParams = useSearchParams();
   const [productoMovId, setProductoMovId] = useState("");
   const [productoCompraId, setProductoCompraId] = useState("");
   const [openCompra, setOpenCompra] = useState(quick === "compra");
@@ -49,6 +52,17 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
   }, [quick]);
 
   useEffect(() => {
+    const q = searchParams.get("quick");
+    const pid = searchParams.get("producto_id")?.trim();
+    if (q === "compra") {
+      setOpenCompra(true);
+      if (pid && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pid)) {
+        setProductoCompraId(pid);
+      }
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (compraState.success && compraState.message) {
       showToast({ variant: "success", message: compraState.message });
       setOpenCompra(false);
@@ -63,9 +77,12 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
     <>
       <ContextActionPanel
         triggerLabel="Registrar compra"
+        triggerIcon={<IconShoppingCart aria-hidden />}
+        triggerClassName="border border-emerald-500/45 bg-emerald-500/15 text-emerald-50 hover:bg-emerald-500/25 hover:brightness-105"
         title="Registrar compra"
         description="Registra mercadería entrante y, si corresponde, egreso de caja por la compra."
         open={openCompra}
+        replacePathOnClose="/inventario"
         onOpenChange={(next) => {
           setOpenCompra(next);
           if (!next) {
@@ -106,6 +123,8 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
       <ContextActionPanel
         key={`quick-producto-${quick}`}
         triggerLabel="Agregar producto"
+        triggerIcon={<IconCirclePlus aria-hidden />}
+        triggerClassName="border border-violet-500/45 bg-violet-500/15 text-violet-50 hover:bg-violet-500/25 hover:brightness-105"
         title="Nuevo producto"
         description="Completa solo lo necesario para registrarlo."
         openByDefault={quick === "producto"}
@@ -136,6 +155,8 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
       <ContextActionPanel
         key={`quick-movimiento-${quick}`}
         triggerLabel="Registrar movimiento"
+        triggerIcon={<IconArrowsLeftRight aria-hidden />}
+        triggerClassName="border border-sky-500/45 bg-sky-500/15 text-sky-50 hover:bg-sky-500/25 hover:brightness-105"
         title="Movimiento de inventario"
         description="Entrada, salida o ajuste en un panel puntual."
         openByDefault={quick === "movimiento"}

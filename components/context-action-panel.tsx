@@ -16,6 +16,10 @@ type ContextActionPanelProps = {
   title: string;
   description: string;
   children: React.ReactNode;
+  /** No renderiza el botón disparador (solo modo controlado con `open` / `onOpenChange`). */
+  omitTrigger?: boolean;
+  triggerIcon?: React.ReactNode;
+  triggerClassName?: string;
   openByDefault?: boolean;
   /** Modo controlado: `open` + `onOpenChange` (p. ej. cerrar tras guardar con éxito). */
   open?: boolean;
@@ -36,6 +40,9 @@ export function ContextActionPanel({
   title,
   description,
   children,
+  omitTrigger = false,
+  triggerIcon,
+  triggerClassName,
   openByDefault = false,
   open: controlledOpen,
   onOpenChange,
@@ -171,9 +178,17 @@ export function ContextActionPanel({
 
   return (
     <>
-      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
-        {triggerLabel}
-      </Button>
+      {!omitTrigger ? (
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setOpen(true)}
+          className={cn("inline-flex gap-2 shadow-md", triggerClassName)}
+        >
+          {triggerIcon ? <span className="shrink-0 [&_svg]:size-[1.125rem]">{triggerIcon}</span> : null}
+          {triggerLabel}
+        </Button>
+      ) : null}
 
       {portalReady && typeof document !== "undefined"
         ? createPortal(

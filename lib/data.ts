@@ -587,7 +587,11 @@ async function loadInventarioProductosRows(includeInactive: boolean): Promise<{
     const rows = (data ?? []) as InventarioProductoRow[];
     return { rows, usedFallback: false };
   } catch (e) {
-    console.error("[loadInventarioProductosRows]", e instanceof Error ? e.message : e);
+    console.log(
+      "[TEMP inventario] loadInventarioProductosRows fallo:",
+      e instanceof Error ? e.message : String(e),
+      e instanceof Error ? e.stack : e,
+    );
     let rows = fallback.inventarioProductos;
     if (!includeInactive) {
       rows = rows.filter((row) => row.activo !== false);
@@ -636,7 +640,11 @@ async function loadInventarioMovimientosRows(): Promise<{
     const totalRowCount = typeof countRes.count === "number" ? countRes.count : null;
     return { rows, usedFallback: false, totalRowCount };
   } catch (e) {
-    console.error("[loadInventarioMovimientosRows]", e instanceof Error ? e.message : e);
+    console.log(
+      "[TEMP inventario] loadInventarioMovimientosRows fallo:",
+      e instanceof Error ? e.message : String(e),
+      e instanceof Error ? e.stack : e,
+    );
     return { rows: fallback.inventarioMovimientos, usedFallback: true, totalRowCount: null };
   }
 }
