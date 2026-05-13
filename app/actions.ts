@@ -23,6 +23,7 @@ import {
   demoCreateInventarioMovimiento,
   demoCreateInventarioProducto,
   demoDeleteInventarioMovimiento,
+  demoDeleteInventarioProducto,
   demoCreateMuebleCatalogo,
   demoToggleMuebleCatalogoActivo,
   demoUpdateMuebleCatalogo,
@@ -315,6 +316,10 @@ const inventarioProductoUpdateSchema = z.object({
 const inventarioToggleActivoSchema = z.object({
   id: z.string().uuid(),
   activo: z.preprocess((v) => v === "true" || v === true || v === "on", z.boolean()),
+});
+
+const inventarioDeleteProductoSchema = z.object({
+  id: z.string().uuid(),
 });
 
 const muebleCatalogoUpdateSchema = z.object({
@@ -2362,6 +2367,46 @@ export async function toggleInventarioProductoActivo(formData: FormData) {
       .eq("id", parsed.data.id)
       .eq("organization_id", DEFAULT_ORG_ID);
     if (error) throw new Error(error.message);
+  }
+  revalidatePath("/inventario");
+}
+
+export async function deleteInventarioProducto(formData: FormData) {
+  await requireMutationAccess(writerRoles);
+  const parsed = inventarioDeleteProductoSchema.safeParse({
+    id: formData.get("id"),
+  });
+  if (!parsed.success) throw new Error("Solicitud inválida.");
+
+  if (!hasSupabaseEnv()) {
+    const res = demoDeleteInventarioProducto(parsed.data.id);
+    if (!res.ok) throw new Error(res.error);
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { count, error: countErr } = await supabase
+      .from("inventario_movimientos")
+      .select("*", { count: "exact", head: true })
+      .eq("producto_id", parsed.data.id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+    if (countErr) throw new Error(countErr.message);
+    if (count !== null && count > 0) {
+      throw new Error(
+        "No se puede eliminar: este producto tiene movimientos en el kardex. Eliminá primero esos movimientos o desactivá el producto.",
+      );
+    }
+    const { error } = await supabase
+      .from("inventario_productos")
+      .delete()
+      .eq("id", parsed.data.id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+    if (error) {
+      if (/foreign key|violates|restrict/i.test(error.message)) {
+        throw new Error(
+          "No se puede eliminar: el producto sigue referenciado en el sistema. Revisá ventas o movimientos vinculados.",
+        );
+      }
+      throw new Error(error.message);
+    }
   }
   revalidatePath("/inventario");
 }

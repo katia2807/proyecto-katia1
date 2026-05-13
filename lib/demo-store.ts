@@ -2277,6 +2277,22 @@ export function demoToggleInventarioProductoActivo(id: string, activo: boolean) 
   return demoUpdateInventarioProducto(id, { activo });
 }
 
+export function demoDeleteInventarioProducto(id: string): { ok: true } | { ok: false; error: string } {
+  const movs = store.inventarioMovimientos.filter((m) => m.producto_id === id);
+  if (movs.length > 0) {
+    return {
+      ok: false,
+      error:
+        "No se puede eliminar: este producto tiene movimientos en el kardex. Eliminá primero esos movimientos o desactivá el producto.",
+    };
+  }
+  const idx = store.inventarioProductos.findIndex((p) => p.id === id);
+  if (idx < 0) return { ok: false, error: "Producto no encontrado." };
+  store.inventarioProductos.splice(idx, 1);
+  persistStore();
+  return { ok: true };
+}
+
 export function demoCreateInventarioMovimiento(
   input: Omit<InventarioMovimientoRow, "id" | "created_at">,
 ) {

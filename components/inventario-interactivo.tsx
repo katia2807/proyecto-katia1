@@ -2,12 +2,16 @@
 
 import {
   deleteInventarioMovimiento,
+  deleteInventarioProducto,
   registrarConteoInventario,
   toggleInventarioProductoActivo,
-  updateInventarioProducto,
 } from "@/app/actions";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { InventarioProductoEditModal } from "@/components/inventario/inventario-producto-edit-modal";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PhraseConfirmDialog } from "@/components/ui/phrase-confirm-dialog";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -123,6 +127,7 @@ export function InventarioInteractivo({
     kardex,
     indicadores,
   } = data;
+  const router = useRouter();
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"resumen" | "productos" | "kardex" | "alertas" | "reportes">("resumen");
   const [filterText, setFilterText] = useState("");
@@ -130,36 +135,36 @@ export function InventarioInteractivo({
   const [filterEstado, setFilterEstado] = useState<"todos" | "activos" | "inactivos" | "stock_bajo">("todos");
   const [kardexTipo, setKardexTipo] = useState<"todos" | "entrada_compra" | "salida_venta" | "ajuste">("todos");
   const [kardexProducto, setKardexProducto] = useState("todos");
-  const [pendingFocusProductoId, setPendingFocusProductoId] = useState<string | null>(null);
-  const clearTimerRef = useRef<number | null>(null);
+  const [editModalProductId, setEditModalProductId] = useState<string | null>(null);
+  const [editSession, setEditSession] = useState(0);
+  const [toggleTarget, setToggleTarget] = useState<{ id: string; nextActivo: boolean; nombre: string } | null>(null);
+  const [deleteProductTarget, setDeleteProductTarget] = useState<{ id: string; nombre: string } | null>(null);
+  const [deleteProductStep1Open, setDeleteProductStep1Open] = useState(false);
+  const [deleteProductPhraseOpen, setDeleteProductPhraseOpen] = useState(false);
+  const [kardexDeleteMovId, setKardexDeleteMovId] = useState<string | null>(null);
+  const [kardexDeleteStep1Open, setKardexDeleteStep1Open] = useState(false);
+  const [kardexDeletePhraseOpen, setKardexDeletePhraseOpen] = useState(false);
 
-  const focusProducto = useCallback((productoId: string) => {
-    const row = document.getElementById(`producto-${productoId}`);
-    if (!row) return;
+  const editingProduct = useMemo(
+    () => (editModalProductId ? productos.find((p) => p.id === editModalProductId) ?? null : null),
+    [editModalProductId, productos],
+  );
 
-    row.scrollIntoView({ behavior: "smooth", block: "center" });
-    setHighlightedId(productoId);
-
-    if (clearTimerRef.current) {
-      window.clearTimeout(clearTimerRef.current);
+  const goToProductoEditor = useCallback((productoId: string) => {
+    setEditSession((s) => s + 1);
+    setActiveTab("productos");
+    setEditModalProductId(productoId);
+    try {
+      window.history.replaceState(null, "", `#producto-${productoId}`);
+    } catch {
+      /* ignore */
     }
-    clearTimerRef.current = window.setTimeout(() => {
-      setHighlightedId(null);
-    }, 3500);
   }, []);
 
-  const goToProductoEditor = useCallback(
-    (productoId: string) => {
-      setActiveTab("productos");
-      setPendingFocusProductoId(productoId);
-      try {
-        window.history.replaceState(null, "", `#producto-${productoId}`);
-      } catch {
-        /* ignore */
-      }
-    },
-    [],
-  );
+  const openProductoModal = useCallback((productoId: string) => {
+    setEditSession((s) => s + 1);
+    setEditModalProductId(productoId);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -167,19 +172,33 @@ export function InventarioInteractivo({
     const m = /^producto-(.+)$/.exec(raw);
     if (m?.[1]) {
       setActiveTab("productos");
-      setPendingFocusProductoId(m[1]);
+      setEditSession((s) => s + 1);
+      setEditModalProductId(m[1]);
     }
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "productos" || !pendingFocusProductoId) return;
-    const id = pendingFocusProductoId;
-    const frame = window.requestAnimationFrame(() => {
-      focusProducto(id);
-      setPendingFocusProductoId(null);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [activeTab, pendingFocusProductoId, focusProducto]);
+    if (!editModalProductId || activeTab !== "productos") return;
+    setHighlightedId(editModalProductId);
+    const el = document.getElementById(`producto-${editModalProductId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const t = window.setTimeout(() => setHighlightedId(null), 2400);
+    return () => window.clearTimeout(t);
+  }, [editModalProductId, activeTab]);
+
+  useEffect(() => {
+    if (!deleteProductTarget) {
+      setDeleteProductStep1Open(false);
+      setDeleteProductPhraseOpen(false);
+    }
+  }, [deleteProductTarget]);
+
+  useEffect(() => {
+    if (!kardexDeleteMovId) {
+      setKardexDeleteStep1Open(false);
+      setKardexDeletePhraseOpen(false);
+    }
+  }, [kardexDeleteMovId]);
 
   const productosFiltrados = useMemo(() => {
     const q = filterText.trim().toLowerCase();
@@ -333,7 +352,10 @@ export function InventarioInteractivo({
       {activeTab === "productos" ? (
       <Card id="stock-productos">
         <CardTitle>Productos y mantenimiento</CardTitle>
-        <CardDescription>Edita catálogo, estado activo y stock mínimo.</CardDescription>
+        <CardDescription>
+          Editá cada producto en una ventana del sistema. Desactivar y eliminar piden confirmación; eliminar exige
+          escribir ELIMINAR.
+        </CardDescription>
         <div className="mt-4 grid gap-3 md:grid-cols-4">
           <Field label="Buscar" value={filterText} onChange={(e) => setFilterText(e.target.value)} placeholder="Código, nombre..." />
           <SelectField label="Categoría" value={filterCategoria} onChange={(e) => setFilterCategoria(e.target.value)}>
@@ -362,60 +384,52 @@ export function InventarioInteractivo({
               key={row.id}
               id={`producto-${row.id}`}
               className={cn(
-                "rounded-xl border border-[var(--color-border)] p-3",
+                "rounded-xl border border-[var(--color-border)] p-4",
                 highlightedId === row.id && "bg-[var(--color-highlight-bg)] ring-2 ring-[var(--color-highlight-ring)]",
               )}
             >
-              <form
-                action={updateInventarioProducto}
-                className="grid gap-2 md:grid-cols-7"
-                onSubmit={(e) => {
-                  if (
-                    !window.confirm(
-                      "¿Guardar los cambios de este producto? Revisá código, nombre, categoría y stock mínimo antes de continuar.",
-                    )
-                  ) {
-                    e.preventDefault();
-                  }
-                }}
-              >
-                <input type="hidden" name="id" value={row.id} />
-                <Field name="codigo" label="Código" defaultValue={row.codigo} required />
-                <Field name="nombre" label="Nombre" defaultValue={row.nombre} required />
-                <Field name="categoria" label="Categoría" defaultValue={row.categoria} required />
-                <Field name="unidad" label="Unidad" defaultValue={row.unidad} required />
-                <Field name="stock_minimo" label="Stock mínimo" type="number" min="0" step="0.01" defaultValue={String(row.stock_minimo)} required />
-                <div className="rounded-xl border border-[var(--color-border)] px-3 py-2 text-xs">
-                  <p className="font-semibold">Stock: {row.stock_actual}</p>
-                  <p className="text-[var(--color-text-secondary)]">Valor: S/ {row.valor_stock.toFixed(2)}</p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">{row.nombre}</p>
+                  <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
+                    {row.codigo} · {row.categoria} · {row.unidad} · Mín. {row.stock_minimo} · Stock {row.stock_actual} · S/{" "}
+                    {row.valor_stock.toFixed(2)}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                    Estado: {row.activo ? "Activo" : "Inactivo"} · Último mov.:{" "}
+                    {row.ultimo_movimiento ? formatDate(row.ultimo_movimiento) : "Sin movimientos"}
+                  </p>
                 </div>
-                <div className="flex items-end gap-2">
-                  <Button type="submit" variant="secondary" disabled={!canMutate}>Guardar</Button>
-                </div>
-              </form>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <form
-                  action={toggleInventarioProductoActivo}
-                  onSubmit={(e) => {
-                    if (
-                      !window.confirm(
-                        "¿Cambiar el estado activo o inactivo de este producto en el catálogo?",
-                      )
-                    ) {
-                      e.preventDefault();
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="secondary" onClick={() => openProductoModal(row.id)} disabled={!canMutate}>
+                    Editar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={row.activo ? "danger" : "secondary"}
+                    onClick={() =>
+                      setToggleTarget({
+                        id: row.id,
+                        nextActivo: !row.activo,
+                        nombre: row.nombre,
+                      })
                     }
-                  }}
-                >
-                  <input type="hidden" name="id" value={row.id} />
-                  <input type="hidden" name="activo" value={row.activo ? "false" : "true"} />
-                  <Button type="submit" variant="danger" disabled={!canMutate}>
+                    disabled={!canMutate}
+                  >
                     {row.activo ? "Desactivar" : "Activar"}
                   </Button>
-                </form>
-                <span className="text-xs text-[var(--color-text-secondary)]">
-                  Estado: {row.activo ? "Activo" : "Inactivo"} · Último mov.:{" "}
-                  {row.ultimo_movimiento ? formatDate(row.ultimo_movimiento) : "Sin movimientos"}
-                </span>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    onClick={() => {
+                      setDeleteProductTarget({ id: row.id, nombre: row.nombre });
+                      setDeleteProductStep1Open(true);
+                    }}
+                    disabled={!canMutate}
+                  >
+                    Eliminar
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
@@ -476,29 +490,16 @@ export function InventarioInteractivo({
                   <TD>{row.referencia ?? "—"}</TD>
                   {canMutate ? (
                     <TD>
-                      <form
-                        action={deleteInventarioMovimiento}
-                        onSubmit={(event) => {
-                          if (
-                            !window.confirm(
-                              "Primera confirmación: vas a eliminar un movimiento del kardex. Esto altera el historial y puede dejar inconsistencias si no coordinás con contabilidad.\n\n¿Seguís adelante?",
-                            )
-                          ) {
-                            event.preventDefault();
-                            return;
-                          }
-                          const typed = window.prompt(
-                            "Confirmación estricta: escribí ELIMINAR en mayúsculas para borrar este movimiento de forma definitiva.",
-                            "",
-                          );
-                          if (typed !== "ELIMINAR") {
-                            event.preventDefault();
-                          }
+                      <Button
+                        type="button"
+                        variant="danger"
+                        onClick={() => {
+                          setKardexDeleteMovId(row.id);
+                          setKardexDeleteStep1Open(true);
                         }}
                       >
-                        <input type="hidden" name="id" value={row.id} />
-                        <Button type="submit" variant="danger">Eliminar</Button>
-                      </form>
+                        Eliminar
+                      </Button>
                     </TD>
                   ) : null}
                 </TRow>
@@ -631,6 +632,133 @@ export function InventarioInteractivo({
         </Card>
       </div>
       ) : null}
+
+      <InventarioProductoEditModal
+        key={`${editModalProductId ?? "closed"}-${editSession}`}
+        product={editingProduct}
+        open={Boolean(editModalProductId)}
+        onOpenChange={(next) => {
+          if (!next) setEditModalProductId(null);
+        }}
+        canMutate={canMutate}
+        formatDate={formatDate}
+      />
+
+      <ConfirmDialog
+        open={Boolean(toggleTarget)}
+        onOpenChange={(o) => {
+          if (!o) setToggleTarget(null);
+        }}
+        title={toggleTarget?.nextActivo ? "¿Activar producto?" : "¿Desactivar producto?"}
+        confirmLabel={toggleTarget?.nextActivo ? "Sí, activar" : "Sí, desactivar"}
+        confirmVariant="primary"
+        tone="neutral"
+        onConfirm={async () => {
+          if (!toggleTarget) return;
+          const fd = new FormData();
+          fd.set("id", toggleTarget.id);
+          fd.set("activo", String(toggleTarget.nextActivo));
+          await toggleInventarioProductoActivo(fd);
+          router.refresh();
+          setToggleTarget(null);
+        }}
+      >
+        <p>
+          Producto: <strong>{toggleTarget?.nombre}</strong>
+        </p>
+        <p className="text-xs">
+          {toggleTarget?.nextActivo
+            ? "Volverá a mostrarse en listas y combos donde aplique."
+            : "Dejará de mostrarse en listas activas; el historial de movimientos se conserva."}
+        </p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={deleteProductStep1Open && Boolean(deleteProductTarget)}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDeleteProductStep1Open(false);
+            setDeleteProductTarget(null);
+          }
+        }}
+        title="¿Eliminar este producto?"
+        confirmLabel="Continuar"
+        cancelLabel="Cancelar"
+        onConfirm={() => {
+          setDeleteProductStep1Open(false);
+          setDeleteProductPhraseOpen(true);
+        }}
+      >
+        <p>
+          Vas a eliminar <strong>{deleteProductTarget?.nombre}</strong> del catálogo. Solo es posible si no tiene
+          movimientos en el kardex.
+        </p>
+        <p className="text-xs">El siguiente paso pedirá escribir ELIMINAR.</p>
+      </ConfirmDialog>
+
+      <PhraseConfirmDialog
+        open={deleteProductPhraseOpen && Boolean(deleteProductTarget)}
+        onOpenChange={(o) => {
+          if (!o) setDeleteProductTarget(null);
+        }}
+        title="Confirmación estricta"
+        expectedPhrase="ELIMINAR"
+        confirmLabel="Eliminar definitivamente"
+        onConfirm={async () => {
+          if (!deleteProductTarget) return;
+          const fd = new FormData();
+          fd.set("id", deleteProductTarget.id);
+          await deleteInventarioProducto(fd);
+          setEditModalProductId((id) => (id === deleteProductTarget.id ? null : id));
+          setDeleteProductTarget(null);
+          router.refresh();
+        }}
+      >
+        <p>
+          Eliminación definitiva de <strong>{deleteProductTarget?.nombre}</strong>. Esta acción no se puede deshacer.
+        </p>
+      </PhraseConfirmDialog>
+
+      <ConfirmDialog
+        open={kardexDeleteStep1Open && Boolean(kardexDeleteMovId)}
+        onOpenChange={(o) => {
+          if (!o) {
+            setKardexDeleteStep1Open(false);
+            setKardexDeleteMovId(null);
+          }
+        }}
+        title="¿Eliminar movimiento del kardex?"
+        confirmLabel="Continuar"
+        onConfirm={() => {
+          setKardexDeleteStep1Open(false);
+          setKardexDeletePhraseOpen(true);
+        }}
+      >
+        <p>
+          Se borrará el registro y se recalculará el stock del producto. Coordiná con contabilidad si hay dudas.
+        </p>
+        <p className="text-xs">El siguiente paso pedirá escribir ELIMINAR.</p>
+      </ConfirmDialog>
+
+      <PhraseConfirmDialog
+        open={kardexDeletePhraseOpen && Boolean(kardexDeleteMovId)}
+        onOpenChange={(o) => {
+          if (!o) setKardexDeleteMovId(null);
+        }}
+        title="Eliminar movimiento"
+        expectedPhrase="ELIMINAR"
+        confirmLabel="Eliminar movimiento"
+        onConfirm={async () => {
+          if (!kardexDeleteMovId) return;
+          const fd = new FormData();
+          fd.set("id", kardexDeleteMovId);
+          await deleteInventarioMovimiento(fd);
+          setKardexDeleteMovId(null);
+          router.refresh();
+        }}
+      >
+        <p>Confirmá la baja del movimiento seleccionado. El stock se actualizará en consecuencia.</p>
+      </PhraseConfirmDialog>
 
       {!canMutate ? (
         <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-800">
