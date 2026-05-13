@@ -54,8 +54,9 @@ export function buildLineasResumen(detalle: CotizacionDetalleV1): LineaFormal[] 
     const a = detalle.aserradero;
     const tot = totRubros.aserradero;
     const bullets: string[] = [];
-    if (a.descripcion.trim()) {
-      bullets.push(a.descripcion.trim());
+    const desc = (a.descripcion ?? "").trim();
+    if (desc) {
+      bullets.push(desc);
     }
     if (a.modo === "hora") {
       bullets.push(`S/ ${a.precioHora.toFixed(2)} × ${a.horas} h`);
@@ -79,8 +80,9 @@ export function buildLineasResumen(detalle: CotizacionDetalleV1): LineaFormal[] 
     const bullets: string[] = [
       `Cobro por ${al.tarifaUnidad === "hora" ? "hora" : "día"}: ${formatPen(al.tarifa)} × ${al.unidades_tiempo} ${al.tarifaUnidad === "hora" ? "h" : "día(s)"}`,
     ];
-    if (al.notas.trim()) {
-      bullets.push(al.notas.trim());
+    const notasAlq = (al.notas ?? "").trim();
+    if (notasAlq) {
+      bullets.push(notasAlq);
     }
     lineas.push({
       cantidad: cant,

@@ -239,7 +239,7 @@ function isEmpresaClienteRow(cliente: ClienteRow) {
   const doc = (cliente.documento ?? "").replace(/\D/g, "");
   if (doc.length === 11) return true; // RUC usual
   if (doc.length === 8) return false; // DNI usual
-  const name = cliente.nombre.toLowerCase();
+  const name = (cliente.nombre ?? "").toLowerCase();
   return (
     name.includes("sac") ||
     name.includes("s.a.c") ||
@@ -1030,19 +1030,27 @@ export function CotizacionUnificadaWizard({
           filterEstado === "produccion" ? "en_produccion" : filterEstado;
         if (c.estado_flujo !== esperado) return false;
       }
-      if (filterFechaDesde && c.fecha < filterFechaDesde) return false;
-      if (filterFechaHasta && c.fecha > filterFechaHasta) return false;
+      if (filterFechaDesde) {
+        const fecha = String(c.fecha ?? "");
+        if (!fecha || fecha < filterFechaDesde) return false;
+      }
+      if (filterFechaHasta) {
+        const fecha = String(c.fecha ?? "");
+        if (!fecha || fecha > filterFechaHasta) return false;
+      }
       if (!q) return true;
       const cliente = clientesById.get(c.cliente_id);
       const clienteNombre = (cliente?.nombre ?? "").toLowerCase();
       const correlativo = (c.correlativo ?? "").toLowerCase();
-      const estado = c.estado_flujo.toLowerCase();
+      const estado = String(c.estado_flujo ?? "").toLowerCase();
+      const fechaStr = String(c.fecha ?? "");
+      const idStr = String(c.id ?? "");
       return (
         correlativo.includes(q) ||
-        c.fecha.includes(q) ||
+        fechaStr.includes(q) ||
         estado.includes(q) ||
         clienteNombre.includes(q) ||
-        c.id.toLowerCase().includes(q)
+        idStr.toLowerCase().includes(q)
       );
     });
   }, [clientesById, cotizacionesGuardadas, filterEstado, filterFechaDesde, filterFechaHasta, filterText]);
