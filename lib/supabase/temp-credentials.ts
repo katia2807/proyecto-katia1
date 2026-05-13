@@ -44,9 +44,9 @@ export function getServerSupabaseCredentials() {
     return { url: undefined, anonKey: undefined, serviceRoleKey: undefined };
   }
 
-  const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const envAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const envService = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const envAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const envService = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
   if (envUrl && envAnon) {
     const isProd = process.env.NODE_ENV === "production";
