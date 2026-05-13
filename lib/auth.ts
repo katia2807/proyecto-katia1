@@ -87,7 +87,14 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
     return null;
   }
 
-  const adminClient = getSupabaseServerClient();
+  let adminClient;
+  try {
+    adminClient = getSupabaseServerClient();
+  } catch {
+    // Sin service role / URL (p. ej. Vercel mal configurado) no debe tumbar la página con 500.
+    return null;
+  }
+
   const { data: profile, error: profileError } = await adminClient
     .from("perfiles")
     .select("user_id,organization_id,role,full_name,ui_role,deactivated_at")
