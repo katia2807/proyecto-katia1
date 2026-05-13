@@ -16,6 +16,8 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     service: "erp-katia",
+    /** Si no ves 2, este deploy no incluye el health extendido del repo actual. */
+    healthVersion: 2,
     timestamp: new Date().toISOString(),
     /** true si el proceso ve URL+anon en process.env (antes de lógica demo). */
     processEnvPublicSupabase: Boolean(rawUrl && rawAnon),
