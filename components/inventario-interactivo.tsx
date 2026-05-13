@@ -766,9 +766,11 @@ export function InventarioInteractivo({
         title="¿Eliminar este producto?"
         confirmLabel="Continuar"
         cancelLabel="Cancelar"
-        onConfirm={() => {
+        onConfirm={async () => {
           setDeleteProductStep1Open(false);
           setDeleteProductPhraseOpen(true);
+          // Evitar que ConfirmDialog llame onOpenChange(false): borraría deleteProductTarget y el paso "ELIMINAR" nunca abriría.
+          return false;
         }}
       >
         <p>
@@ -897,9 +899,10 @@ export function InventarioInteractivo({
         }}
         title="¿Eliminar movimiento del kardex?"
         confirmLabel="Continuar"
-        onConfirm={() => {
+        onConfirm={async () => {
           setKardexDeleteStep1Open(false);
           setKardexDeletePhraseOpen(true);
+          return false;
         }}
       >
         <p>
