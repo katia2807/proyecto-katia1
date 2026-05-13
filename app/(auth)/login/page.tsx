@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/auth/login-form";
 import { getAuthContext } from "@/lib/auth";
+import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { isDemoDatabaseMode } from "@/lib/demo-mode";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { getServerSupabaseCredentials } from "@/lib/supabase/temp-credentials";
@@ -65,14 +66,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <div className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)] p-3 text-sm text-[var(--color-text-primary)]">
             <p className="font-semibold">No se abrió el panel</p>
             <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
-              La sesión de Supabase puede ser válida pero falta acceso al perfil. Revisa en Supabase: una fila en{" "}
-              <code className="rounded bg-[var(--color-surface)] px-1">perfiles</code> con tu{" "}
-              <code className="rounded bg-[var(--color-surface)] px-1">user_id</code> y la organización de la app (
-              <code className="rounded bg-[var(--color-surface)] px-1">ERP_ORG_ID</code> / valor por defecto del
-              código). Si acabas de aplicar migraciones, incluye la política{" "}
-              <code className="rounded bg-[var(--color-surface)] px-1">perfiles_select_self</code> (última migración
-              del repo). En Vercel, variables distintas por <strong>proyecto</strong> y por entorno: marca{" "}
-              <strong>Production</strong> y <strong>Preview</strong> si usas URLs de preview.
+              La sesión en Supabase Auth es válida, pero la app no encuentra tu fila en{" "}
+              <code className="rounded bg-[var(--color-surface)] px-1">public.perfiles</code> para esta organización:
+            </p>
+            <p className="mt-2 break-all font-mono text-xs text-[var(--color-text-primary)]">{DEFAULT_ORG_ID}</p>
+            <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
+              En Supabase → <strong>SQL</strong>, crea o corrige el perfil (sustituye el correo por el tuyo). Asegura la
+              migración <code className="rounded bg-[var(--color-surface)] px-1">perfiles_select_self</code> aplicada.
+              Si en Vercel definiste <code className="rounded bg-[var(--color-surface)] px-1">ERP_ORG_ID</code>, el{" "}
+              <code className="rounded bg-[var(--color-surface)] px-1">organization_id</code> del perfil debe coincidir.
             </p>
           </div>
         ) : null}
