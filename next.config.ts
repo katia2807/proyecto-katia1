@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
-/** Solo el build de la imagen Docker define `NEXT_STANDALONE=1`. Vercel y CI usan salida estándar de Next. */
-const useStandalone = process.env.NEXT_STANDALONE === "1";
+/** Solo la imagen Docker define `KATIA_DOCKER_BUILD=1` (evita colisión con vars en Vercel). */
+const useStandalone = process.env.KATIA_DOCKER_BUILD === "1";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
