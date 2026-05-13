@@ -1,9 +1,10 @@
 import { InventarioAccionesRapidas } from "@/components/inventario-acciones-rapidas";
 import { InventarioContextPanels } from "@/components/inventario/inventario-context-panels";
+import { MueblesCatalogoSection } from "@/components/inventario/muebles-catalogo-section";
 import { InventarioInteractivo } from "@/components/inventario-interactivo";
 import { MetricCard } from "@/components/metric-card";
 import { getCurrentUserRole } from "@/lib/current-user-role";
-import { getInventarioRobustoData } from "@/lib/data";
+import { getInventarioRobustoData, getMueblesCatalogoRows } from "@/lib/data";
 import { canMutateInventario } from "@/lib/permissions";
 
 type InventarioPageProps = {
@@ -19,7 +20,10 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const quick = normalizeQuickParam((await searchParams)?.quick);
-  const inventario = await getInventarioRobustoData();
+  const [inventario, mueblesCatalogo] = await Promise.all([
+    getInventarioRobustoData(),
+    getMueblesCatalogoRows(true),
+  ]);
   const { loadWarning, ...inventarioData } = inventario;
   const { productos } = inventarioData;
   const role = await getCurrentUserRole();
@@ -75,6 +79,19 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
 
       <InventarioInteractivo
         data={inventarioData}
+        canMutate={canMutate}
+      />
+
+      <MueblesCatalogoSection
+        muebles={mueblesCatalogo.map((m) => ({
+          id: m.id,
+          codigo: m.codigo,
+          nombre: m.nombre,
+          descripcion: m.descripcion,
+          precio_lista: m.precio_lista,
+          foto_url: m.foto_url,
+          activo: m.activo,
+        }))}
         canMutate={canMutate}
       />
     </div>

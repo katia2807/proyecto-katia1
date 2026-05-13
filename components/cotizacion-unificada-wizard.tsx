@@ -42,6 +42,7 @@ import type { Database } from "@/lib/supabase/types";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 
 type InventarioProductoRow = Database["public"]["Tables"]["inventario_productos"]["Row"];
+type MuebleCatalogoRow = Database["public"]["Tables"]["muebles_catalogo"]["Row"];
 type ClienteRow = Database["public"]["Tables"]["clientes"]["Row"];
 type CotizacionUnificadaRow = Database["public"]["Tables"]["cotizaciones_unificadas"]["Row"];
 
@@ -50,6 +51,7 @@ type CotizacionUnificadaWizardProps = {
   /** Siguiente N° de cotización (solo lectura; se calcula en el servidor). */
   correlativoPreview: string;
   productos: InventarioProductoRow[];
+  mueblesCatalogo: MuebleCatalogoRow[];
   clientes: ClienteRow[];
   cotizacionesGuardadas: CotizacionUnificadaRow[];
   empresa: EmpresaConfig;
@@ -310,6 +312,7 @@ export function CotizacionUnificadaWizard({
   canSave,
   correlativoPreview,
   productos,
+  mueblesCatalogo,
   clientes,
   cotizacionesGuardadas,
   empresa,
@@ -500,7 +503,15 @@ export function CotizacionUnificadaWizard({
       return MOCK_MUEBLES_CATALOGO_VENTA.map((m) => ({
         id: m.id,
         nombre: `${m.codigo} — ${m.nombre}`,
-        origen: "inventario" as const,
+        origen: "catalogo" as const,
+      }));
+    }
+    const catalogoActivo = mueblesCatalogo.filter((m) => m.activo !== false);
+    if (catalogoActivo.length > 0) {
+      return catalogoActivo.map((m) => ({
+        id: m.id,
+        nombre: `${m.codigo} — ${m.nombre}`,
+        origen: "catalogo" as const,
       }));
     }
     const activos = effectiveProductos.filter((p) => p.activo !== false);
@@ -517,7 +528,7 @@ export function CotizacionUnificadaWizard({
       { id: "ejemplo-escritorio", nombre: "Escritorio ejecutivo", origen: "ejemplo" as const },
       { id: "ejemplo-repostero", nombre: "Repostero de cocina", origen: "ejemplo" as const },
     ];
-  }, [mockData, effectiveProductos]);
+  }, [mockData, mueblesCatalogo, effectiveProductos]);
 
   const effectiveMuebleTemplates = useMemo((): MuebleTemplate[] => {
     if (!mockData) return muebleTemplates;

@@ -2395,6 +2395,27 @@ export function demoCreateMuebleCatalogo(
   persistStore();
 }
 
+export function demoUpdateMuebleCatalogo(
+  id: string,
+  patch: Pick<MuebleCatalogoRow, "precio_lista"> & Partial<Pick<MuebleCatalogoRow, "descripcion" | "foto_url">>,
+) {
+  const row = store.mueblesCatalogo.find((m) => m.id === id);
+  if (!row) return null;
+  row.precio_lista = patch.precio_lista;
+  row.descripcion = patch.descripcion ?? null;
+  row.foto_url = patch.foto_url ?? null;
+  persistStore();
+  return row;
+}
+
+export function demoToggleMuebleCatalogoActivo(id: string, activo: boolean) {
+  const row = store.mueblesCatalogo.find((m) => m.id === id);
+  if (!row) return null;
+  row.activo = activo;
+  persistStore();
+  return row;
+}
+
 export function demoVentasMuebleTerminadoRows() {
   return [...store.ventasMuebleTerminado].sort((a, b) => b.fecha.localeCompare(a.fecha));
 }

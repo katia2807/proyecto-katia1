@@ -24,6 +24,8 @@ import {
   demoCreateInventarioProducto,
   demoDeleteInventarioMovimiento,
   demoCreateMuebleCatalogo,
+  demoToggleMuebleCatalogoActivo,
+  demoUpdateMuebleCatalogo,
   demoCreateOrdenProduccion,
   demoDeleteCotizacionUnificada,
   demoGetCotizacionUnificada,
@@ -288,6 +290,18 @@ const inventarioMovimientoSchema = z.object({
   referencia: z.string().optional(),
 });
 
+const inventarioCompraRapidaSchema = z.object({
+  productoId: z.string().uuid(),
+  cantidad: z.coerce.number().positive(),
+  costoUnitario: z.preprocess(
+    (value) => (value === "" || value === null ? undefined : value),
+    z.coerce.number().nonnegative().optional(),
+  ),
+  proveedor: z.string().optional(),
+  fecha: z.string().min(1),
+  nota: z.string().optional(),
+});
+
 const inventarioProductoUpdateSchema = z.object({
   id: z.string().uuid(),
   codigo: z.string().min(2),
@@ -298,6 +312,18 @@ const inventarioProductoUpdateSchema = z.object({
 });
 
 const inventarioToggleActivoSchema = z.object({
+  id: z.string().uuid(),
+  activo: z.preprocess((v) => v === "true" || v === true || v === "on", z.boolean()),
+});
+
+const muebleCatalogoUpdateSchema = z.object({
+  id: z.string().uuid(),
+  descripcion: z.string().optional(),
+  precioLista: z.coerce.number().nonnegative(),
+  fotoUrl: z.string().optional(),
+});
+
+const muebleCatalogoToggleSchema = z.object({
   id: z.string().uuid(),
   activo: z.preprocess((v) => v === "true" || v === true || v === "on", z.boolean()),
 });
@@ -2118,6 +2144,99 @@ export async function createInventarioMovimiento(formData: FormData) {
   maybeRedirectToQuickStep(formData);
 }
 
+export async function createInventarioCompraRapida(formData: FormData) {
+  const actor = await requireMutationAccess(writerRoles);
+  const parsed = inventarioCompraRapidaSchema.safeParse({
+    productoId: formData.get("producto_id"),
+    cantidad: formData.get("cantidad"),
+    costoUnitario: formData.get("costo_unitario"),
+    proveedor: formData.get("proveedor"),
+    fecha: formData.get("fecha"),
+    nota: formData.get("nota"),
+  });
+  if (!parsed.success) {
+    throw new Error("Datos de compra inválidos.");
+  }
+
+  const referenciaPartes = [parsed.data.proveedor?.trim(), parsed.data.nota?.trim()].filter(Boolean);
+  const referencia = referenciaPartes.join(" · ") || null;
+  const costoUnitario = parsed.data.costoUnitario ?? null;
+  const montoCompra =
+    costoUnitario && costoUnitario > 0 ? Number((parsed.data.cantidad * costoUnitario).toFixed(2)) : 0;
+
+  if (!hasSupabaseEnv()) {
+    demoCreateInventarioMovimiento({
+      organization_id: DEFAULT_ORG_ID,
+      producto_id: parsed.data.productoId,
+      fecha: parsed.data.fecha,
+      tipo: "entrada_compra",
+      cantidad: parsed.data.cantidad,
+      costo_unitario: costoUnitario,
+      referencia,
+    });
+    if (montoCompra > 0) {
+      demoCreateCaja({
+        organization_id: DEFAULT_ORG_ID,
+        fecha: parsed.data.fecha,
+        tipo: "egreso",
+        medio: "efectivo",
+        categoria: "compra_inventario",
+        monto: montoCompra,
+        descripcion: referencia ? `Compra de inventario: ${referencia}` : "Compra de inventario",
+        modulo_origen: "inventario",
+      });
+    }
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { data: producto, error: productoErr } = await supabase
+      .from("inventario_productos")
+      .select("id, nombre")
+      .eq("id", parsed.data.productoId)
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .maybeSingle();
+    if (productoErr) throw new Error(productoErr.message);
+    if (!producto) throw new Error("Producto no encontrado.");
+
+    const { data: movimiento, error: movErr } = await supabase
+      .from("inventario_movimientos")
+      .insert({
+        organization_id: DEFAULT_ORG_ID,
+        producto_id: parsed.data.productoId,
+        fecha: parsed.data.fecha,
+        tipo: "entrada_compra",
+        cantidad: parsed.data.cantidad,
+        costo_unitario: costoUnitario,
+        referencia,
+      })
+      .select("id")
+      .single();
+    if (movErr || !movimiento) throw new Error(movErr?.message ?? "No se pudo registrar la entrada.");
+
+    if (montoCompra > 0) {
+      const { error: cajaErr } = await supabase.from("movimientos_caja").insert({
+        organization_id: DEFAULT_ORG_ID,
+        fecha: parsed.data.fecha,
+        tipo: "egreso",
+        medio: "efectivo",
+        categoria: "compra_inventario",
+        monto: montoCompra,
+        descripcion: `Compra de inventario: ${producto.nombre}`,
+        modulo_origen: "inventario",
+        referencia_id: movimiento.id,
+        created_by: actor.userId,
+        updated_by: actor.userId,
+      });
+      if (cajaErr) {
+        throw new Error(cajaErr.message);
+      }
+    }
+  }
+
+  revalidatePath("/inventario");
+  revalidatePath("/caja");
+  revalidatePath("/");
+}
+
 export async function updateInventarioProducto(formData: FormData) {
   await requireMutationAccess(writerRoles);
   const parsed = inventarioProductoUpdateSchema.safeParse({
@@ -2370,6 +2489,74 @@ export async function createMuebleCatalogo(formData: FormData) {
   }
   revalidatePath("/ventas");
   revalidatePath("/ventas/muebles-terminados");
+  revalidatePath("/inventario");
+  revalidatePath("/cotizacion");
+}
+
+export async function updateMuebleCatalogo(formData: FormData) {
+  await requireMutationAccess(ventasRoles);
+  const parsed = muebleCatalogoUpdateSchema.safeParse({
+    id: formData.get("id"),
+    descripcion: formData.get("descripcion"),
+    precioLista: formData.get("precio_lista"),
+    fotoUrl: formData.get("foto_url"),
+  });
+  if (!parsed.success) {
+    throw new Error("Datos de mueble inválidos.");
+  }
+
+  if (!hasSupabaseEnv()) {
+    const updated = demoUpdateMuebleCatalogo(parsed.data.id, {
+      descripcion: parsed.data.descripcion?.trim() || null,
+      precio_lista: parsed.data.precioLista,
+      foto_url: parsed.data.fotoUrl?.trim() || null,
+    });
+    if (!updated) throw new Error("Mueble no encontrado.");
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { error } = await supabase
+      .from("muebles_catalogo")
+      .update({
+        descripcion: parsed.data.descripcion?.trim() || null,
+        precio_lista: parsed.data.precioLista,
+        foto_url: parsed.data.fotoUrl?.trim() || null,
+      })
+      .eq("id", parsed.data.id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath("/inventario");
+  revalidatePath("/ventas");
+  revalidatePath("/ventas/muebles-terminados");
+  revalidatePath("/cotizacion");
+}
+
+export async function toggleMuebleCatalogoActivo(formData: FormData) {
+  await requireMutationAccess(ventasRoles);
+  const parsed = muebleCatalogoToggleSchema.safeParse({
+    id: formData.get("id"),
+    activo: formData.get("activo"),
+  });
+  if (!parsed.success) throw new Error("Solicitud inválida.");
+
+  if (!hasSupabaseEnv()) {
+    const updated = demoToggleMuebleCatalogoActivo(parsed.data.id, parsed.data.activo);
+    if (!updated) throw new Error("Mueble no encontrado.");
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { error } = await supabase
+      .from("muebles_catalogo")
+      .update({ activo: parsed.data.activo })
+      .eq("id", parsed.data.id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath("/inventario");
+  revalidatePath("/ventas");
+  revalidatePath("/ventas/muebles-terminados");
+  revalidatePath("/cotizacion");
 }
 
 export async function createVentaMuebleTerminado(formData: FormData) {
@@ -3337,6 +3524,87 @@ export async function submitRepetirGastosMesAnteriorForm(
     return {
       success: false,
       error: e instanceof Error ? e.message : "No se pudieron generar las copias.",
+      message: null,
+    };
+  }
+}
+
+export async function submitInventarioCompraRapidaForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createInventarioCompraRapida(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Compra registrada en inventario.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo registrar la compra.",
+      message: null,
+    };
+  }
+}
+
+export async function submitCreateMuebleCatalogoForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createMuebleCatalogo(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Mueble agregado al catálogo.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo guardar el mueble.",
+      message: null,
+    };
+  }
+}
+
+export async function submitUpdateMuebleCatalogoForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await updateMuebleCatalogo(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Catálogo actualizado.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo actualizar el mueble.",
+      message: null,
+    };
+  }
+}
+
+export async function submitToggleMuebleCatalogoForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await toggleMuebleCatalogoActivo(formData);
+    const activo = String(formData.get("activo") ?? "") === "true";
+    return {
+      success: true,
+      error: null,
+      message: activo ? "Mueble activado." : "Mueble desactivado.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo cambiar el estado del mueble.",
       message: null,
     };
   }

@@ -1,6 +1,11 @@
 import { CotizacionUnificadaWizard } from "@/components/cotizacion-unificada-wizard";
 import { getEmpresaConfig } from "@/lib/company-config";
-import { getClientesRows, getCotizacionesUnificadasRows, getInventarioProductosRows } from "@/lib/data";
+import {
+  getClientesRows,
+  getCotizacionesUnificadasRows,
+  getInventarioProductosRows,
+  getMueblesCatalogoRows,
+} from "@/lib/data";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import { previewCorrelativo } from "@/lib/numeracion";
 import { canMutateVentas } from "@/lib/permissions";
@@ -10,8 +15,9 @@ export default async function CotizacionPage() {
   const canSave = canMutateVentas(role);
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
-  const [productos, clientes, cotizacionesGuardadas, empresa] = await Promise.all([
+  const [productos, mueblesCatalogo, clientes, cotizacionesGuardadas, empresa] = await Promise.all([
     getInventarioProductosRows(),
+    getMueblesCatalogoRows(),
     getClientesRows(),
     getCotizacionesUnificadasRows(),
     getEmpresaConfig(),
@@ -31,6 +37,7 @@ export default async function CotizacionPage() {
         canSave={canSave}
         correlativoPreview={correlativoPreview}
         productos={productos}
+        mueblesCatalogo={mueblesCatalogo}
         clientes={clientes}
         cotizacionesGuardadas={cotizacionesGuardadas}
         empresa={empresa}

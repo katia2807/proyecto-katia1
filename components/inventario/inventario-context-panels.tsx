@@ -1,12 +1,18 @@
 "use client";
 
-import { createInventarioMovimiento, createInventarioProducto } from "@/app/actions";
+import {
+  createInventarioMovimiento,
+  createInventarioProducto,
+  submitInventarioCompraRapidaForm,
+} from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/Combobox";
+import { useToast } from "@/components/ui/toast";
 import { Field, SelectField } from "@/components/ui/field";
 import { MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
-import { useMemo, useState } from "react";
+import { mutationFormInitialState } from "@/lib/mutation-form-state";
+import { useActionState, useEffect, useMemo, useState } from "react";
 
 type ProductoOpt = { id: string; nombre: string };
 
@@ -18,6 +24,11 @@ type InventarioContextPanelsProps = {
 
 export function InventarioContextPanels({ quick, productos, mockData = false }: InventarioContextPanelsProps) {
   const [productoMovId, setProductoMovId] = useState("");
+  const [productoCompraId, setProductoCompraId] = useState("");
+  const [openCompra, setOpenCompra] = useState(quick === "compra");
+  const [compraFormKey, setCompraFormKey] = useState(0);
+  const { showToast } = useToast();
+  const [compraState, compraFormAction] = useActionState(submitInventarioCompraRapidaForm, mutationFormInitialState);
 
   const effectiveProductos = useMemo((): ProductoOpt[] => {
     if (!mockData) return productos;
@@ -33,8 +44,65 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
     [effectiveProductos],
   );
 
+  useEffect(() => {
+    if (quick === "compra") setOpenCompra(true);
+  }, [quick]);
+
+  useEffect(() => {
+    if (compraState.success && compraState.message) {
+      showToast({ variant: "success", message: compraState.message });
+      setOpenCompra(false);
+      setCompraFormKey((k) => k + 1);
+      setProductoCompraId("");
+    } else if (compraState.error) {
+      showToast({ variant: "error", message: compraState.error });
+    }
+  }, [compraState, showToast]);
+
   return (
     <>
+      <ContextActionPanel
+        triggerLabel="Registrar compra"
+        title="Entrada rápida de compras"
+        description="Registra mercadería entrante y, si corresponde, egreso de caja por la compra."
+        open={openCompra}
+        onOpenChange={(next) => {
+          setOpenCompra(next);
+          if (!next) {
+            setCompraFormKey((k) => k + 1);
+            setProductoCompraId("");
+          }
+        }}
+      >
+        <form key={compraFormKey} action={compraFormAction} className="grid gap-3 md:grid-cols-2">
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)] md:col-span-2">
+            <span>Producto</span>
+            <Combobox
+              options={productoOptions}
+              value={productoCompraId}
+              onChange={setProductoCompraId}
+              hiddenInputName="producto_id"
+              placeholder="Buscar producto…"
+              inputAriaLabel="Producto para registrar compra"
+            />
+          </label>
+          <Field name="cantidad" label="Cantidad recibida" type="number" min="0.01" step="0.01" required />
+          <Field
+            name="costo_unitario"
+            label="Costo unitario compra (opcional)"
+            type="number"
+            min="0"
+            step="0.01"
+          />
+          <Field name="proveedor" label="Proveedor (opcional)" placeholder="Texto libre" />
+          <Field name="fecha" type="date" label="Fecha" required />
+          <Field className="md:col-span-2" name="nota" label="Nota (opcional)" placeholder="Observación de la compra" />
+          <div className="md:col-span-2">
+            <Button>Guardar compra</Button>
+          </div>
+        </form>
+      </ContextActionPanel>
+
       <ContextActionPanel
         key={`quick-producto-${quick}`}
         triggerLabel="Agregar producto"

@@ -806,19 +806,23 @@ export async function getChoferesRows() {
   }, fallback.choferes);
 }
 
-export async function getMueblesCatalogoRows() {
+export async function getMueblesCatalogoRows(includeInactive = false) {
   if (!hasSupabaseEnv()) {
-    return demoMueblesCatalogoRows();
+    const rows = demoMueblesCatalogoRows();
+    return includeInactive ? rows : rows.filter((r) => r.activo !== false);
   }
   const supabase = getSupabaseServerClient();
   return safeQuery(async () => {
-    const { data } = await supabase
+    let query = supabase
       .from("muebles_catalogo")
       .select("*")
       .eq("organization_id", DEFAULT_ORG_ID)
-      .eq("activo", true)
       .order("nombre", { ascending: true })
       .limit(500);
+    if (!includeInactive) {
+      query = query.eq("activo", true);
+    }
+    const { data } = await query;
     return data ?? fallback.mueblesCatalogo;
   }, fallback.mueblesCatalogo);
 }
