@@ -6,7 +6,7 @@ export function Table({ className, ...props }: React.TableHTMLAttributes<HTMLTab
     <table
       className={cn(
         "w-full border-collapse text-sm",
-        "overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)]",
+        "overflow-hidden rounded-[var(--border-radius-card)] border border-[var(--border-color)]",
         className,
       )}
       {...props}
@@ -18,7 +18,7 @@ export function THead({ className, ...props }: React.HTMLAttributes<HTMLTableSec
   return (
     <thead
       className={cn(
-        "bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-primary-soft)_78%,var(--color-surface)),color-mix(in_srgb,var(--color-primary-soft)_58%,var(--color-surface)))]",
+        "bg-[rgba(255,255,255,0.03)]",
         className,
       )}
       {...props}
@@ -30,8 +30,8 @@ export function TRow({ className, ...props }: React.HTMLAttributes<HTMLTableRowE
   return (
     <tr
       className={cn(
-        "border-b border-[var(--color-border)] transition-colors",
-        "hover:bg-[color-mix(in_srgb,var(--color-primary-soft)_58%,transparent)]",
+        "border-b border-[var(--border-color)] transition-colors",
+        "hover:bg-[rgba(255,255,255,0.02)]",
         className,
       )}
       {...props}

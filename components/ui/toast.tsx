@@ -78,8 +78,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             role="status"
             className={`pointer-events-auto rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${
               t.variant === "success"
-                ? "border-emerald-500/40 bg-emerald-50 text-emerald-950 dark:bg-emerald-950/50 dark:text-emerald-50"
-                : "border-[var(--color-danger)]/40 bg-red-50 text-red-950 dark:bg-red-950/40 dark:text-red-50"
+                ? "border-emerald-500/50 bg-[#064e3b] text-white"
+                : "border-red-500/55 bg-[#450a0a] text-white"
             }`}
           >
             {t.message}

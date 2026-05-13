@@ -7,9 +7,8 @@ export function Card({ className, ...props }: CardProps) {
   return (
     <div
       className={cn(
-        "rounded-[var(--radius-lg)] border border-[color-mix(in_srgb,var(--color-border)_86%,var(--color-accent-soft))]",
-        "bg-[linear-gradient(170deg,color-mix(in_srgb,var(--color-surface)_94%,var(--color-accent-soft)_6%),color-mix(in_srgb,var(--color-surface-2)_90%,var(--color-surface)))]",
-        "p-5 shadow-[var(--shadow-card)] transition duration-200 hover:border-[var(--color-border-strong)]",
+        "rounded-[var(--border-radius-card)] border border-[var(--border-color)]",
+        "bg-[var(--bg-card)] p-5 shadow-[var(--shadow-card)] transition duration-200 hover:border-[var(--color-border-strong)]",
         className,
       )}
       {...props}

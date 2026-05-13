@@ -11,9 +11,9 @@ export function Field({ label, className, ...props }: FieldProps) {
       {label}
       <input
         className={cn(
-          "h-10 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface)_90%,var(--color-surface-2))] px-3 text-sm outline-none",
+          "h-10 rounded-[var(--radius-md)] border border-[rgba(255,255,255,0.1)] bg-[var(--bg-primary)] px-3 text-sm outline-none",
           "shadow-[var(--shadow-soft)]",
-          "focus-visible:border-[var(--color-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]",
+          "focus-visible:border-[var(--accent-primary)] focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/40",
           className,
         )}
         {...props}
@@ -32,9 +32,9 @@ export function SelectField({ label, className, children, ...props }: SelectFiel
       {label}
       <select
         className={cn(
-          "h-10 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface)_90%,var(--color-surface-2))] px-3 text-sm outline-none",
+          "h-10 rounded-[var(--radius-md)] border border-[rgba(255,255,255,0.1)] bg-[var(--bg-primary)] px-3 text-sm outline-none",
           "shadow-[var(--shadow-soft)]",
-          "focus-visible:border-[var(--color-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]",
+          "focus-visible:border-[var(--accent-primary)] focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/40",
           className,
         )}
         {...props}

@@ -34,85 +34,70 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     isDemoDatabaseMode() || (process.env.NODE_ENV === "development" && !hasSupabaseEnv());
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md items-center px-4">
-      <div className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm">
-        <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">ERP Katia</p>
-        <h1 className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">Ingreso privado</h1>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-          {showLocalDemoHint
-            ? "Modo prueba local: los datos vienen del almacén demo (no Supabase). No uses credenciales reales."
-            : "Acceso solo para usuarios autorizados. Usa el correo y la contraseña del usuario registrado en Supabase Auth."}
-        </p>
+    <main className="grid min-h-screen w-full grid-cols-1 md:grid-cols-2">
+      <section className="flex items-center justify-center bg-[var(--bg-primary)] px-6 py-10">
+        <div className="w-full max-w-md rounded-[var(--border-radius-card)] border border-[var(--border-color)] bg-[var(--bg-surface)] p-7 shadow-[var(--shadow-card)]">
+          <p className="text-xs uppercase tracking-[0.22em] text-[var(--text-secondary)]">ERP KATIA</p>
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--text-primary)]">Ingreso privado</h1>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            {showLocalDemoHint
+              ? "Modo prueba local: los datos vienen del almacén demo (no Supabase)."
+              : "Acceso seguro al panel de gestión del taller."}
+          </p>
 
-        {showLocalDemoHint ? (
-          <div className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)] p-3 text-sm text-[var(--color-text-primary)]">
-            <p className="font-semibold">Credenciales de prueba</p>
-            <p className="mt-1 font-mono text-xs">
-              Correo: test@test.com
-              <br />
-              Contraseña: test1234
-            </p>
-            {isDemoDatabaseMode() ? (
-              <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                Activo porque <code className="rounded bg-[var(--color-surface)] px-1">KATIA_USE_DEMO_DB=1</code> está
-                definido (revisa <code className="rounded bg-[var(--color-surface)] px-1">.env.local</code> o el
-                archivo de ejemplo en la raíz del repo).
+          {showLocalDemoHint ? (
+            <div className="mt-4 rounded-[var(--border-radius-input)] border border-[var(--border-color)] bg-[var(--bg-card)] p-3 text-sm text-[var(--text-primary)]">
+              <p className="font-semibold">Credenciales de prueba</p>
+              <p className="mt-1 font-mono text-xs">
+                Correo: test@test.com
+                <br />
+                Contraseña: test1234
               </p>
-            ) : null}
-          </div>
-        ) : null}
+              {isDemoDatabaseMode() ? (
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                  Activo por <code className="rounded bg-[var(--bg-primary)] px-1">KATIA_USE_DEMO_DB=1</code>.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
-        {avisoPanel ? (
-          <div className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)] p-3 text-sm text-[var(--color-text-primary)]">
-            <p className="font-semibold">No se abrió el panel</p>
-            <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
-              La sesión en Supabase Auth es válida, pero la app no encuentra tu fila en{" "}
-              <code className="rounded bg-[var(--color-surface)] px-1">public.perfiles</code> para esta organización:
-            </p>
-            <p className="mt-2 break-all font-mono text-xs text-[var(--color-text-primary)]">{DEFAULT_ORG_ID}</p>
-            <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
-              En Supabase → <strong>SQL</strong>, crea o corrige el perfil (sustituye el correo por el tuyo). Asegura la
-              migración <code className="rounded bg-[var(--color-surface)] px-1">perfiles_select_self</code> aplicada.
-              Si en Vercel definiste <code className="rounded bg-[var(--color-surface)] px-1">ERP_ORG_ID</code>, el{" "}
-              <code className="rounded bg-[var(--color-surface)] px-1">organization_id</code> del perfil debe coincidir.
-            </p>
-          </div>
-        ) : null}
+          {avisoPanel ? (
+            <div className="mt-4 rounded-[var(--border-radius-input)] border border-[var(--border-color)] bg-[var(--bg-card)] p-3 text-sm text-[var(--text-primary)]">
+              <p className="font-semibold">No se abrió el panel</p>
+              <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
+                Sesión válida, pero no existe tu fila en <code className="rounded bg-[var(--bg-primary)] px-1">public.perfiles</code> para:
+              </p>
+              <p className="mt-2 break-all font-mono text-xs text-[var(--text-primary)]">{DEFAULT_ORG_ID}</p>
+            </div>
+          ) : null}
 
-        {showSupabasePublicKeysMissing ? (
-          <div className="mt-4 rounded-xl border border-[var(--color-danger)] bg-[var(--color-primary-soft)] p-3 text-sm">
-            <p className="font-semibold text-[var(--color-danger)]">Supabase no está configurado en este servidor</p>
-            <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
-              Opción A:{" "}
-              <code className="rounded bg-[var(--color-surface)] px-1 text-[var(--color-text-primary)]">
-                NEXT_PUBLIC_SUPABASE_URL
-              </code>{" "}
-              y{" "}
-              <code className="rounded bg-[var(--color-surface)] px-1 text-[var(--color-text-primary)]">
-                NEXT_PUBLIC_SUPABASE_ANON_KEY
-              </code>
-              . Opción B (solo servidor, a veces más fiable en Vercel):{" "}
-              <code className="rounded bg-[var(--color-surface)] px-1">SUPABASE_URL</code> y{" "}
-              <code className="rounded bg-[var(--color-surface)] px-1">SUPABASE_ANON_KEY</code> (mismos valores que en
-              el panel de Supabase: Project URL y anon public). En <strong>Vercel</strong>: el{" "}
-              <strong>mismo proyecto</strong> que despliega esta URL → <strong>Settings</strong> →{" "}
-              <strong>Environment Variables</strong> → marca <strong>Production</strong> y{" "}
-              <strong>Preview</strong> → guarda → <strong>Redeploy</strong>. Comprueba{" "}
-              <code className="rounded bg-[var(--color-surface)] px-1">/api/health</code> en esta misma URL:{" "}
-              <code className="rounded bg-[var(--color-surface)] px-1">supabaseAuthReady</code> debe ser{" "}
-              <code className="rounded bg-[var(--color-surface)] px-1">true</code>.
-            </p>
-          </div>
-        ) : null}
+          {showSupabasePublicKeysMissing ? (
+            <div className="mt-4 rounded-[var(--border-radius-input)] border border-[var(--accent-danger)]/55 bg-[var(--bg-card)] p-3 text-sm">
+              <p className="font-semibold text-[var(--accent-danger)]">Supabase no configurado</p>
+              <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
+                Define credenciales públicas/servidor y redeploy.
+              </p>
+            </div>
+          ) : null}
 
-        <LoginForm />
+          <LoginForm />
+          <p className="mt-3 text-right text-xs text-[var(--text-secondary)]/90">Olvidé mi contraseña</p>
+          <p className="mt-4 text-xs text-[var(--text-secondary)]">
+            {showLocalDemoHint
+              ? "En producción desactiva modo demo y configura Supabase real."
+              : "El usuario debe tener perfil válido en la organización."}
+          </p>
+        </div>
+      </section>
 
-        <p className="mt-4 text-xs text-[var(--color-text-secondary)]">
-          {showLocalDemoHint
-            ? "En producción desactiva el modo demo y configura Supabase con usuarios y perfiles reales."
-            : "El usuario debe tener una fila en la tabla perfiles con rol adecuado para esta organización."}
-        </p>
-      </div>
+      <section className="relative hidden overflow-hidden bg-[var(--bg-sidebar)] md:block">
+        <div className="login-sphere left-[12%] top-[14%] h-44 w-44 bg-[var(--accent-primary)]/45" />
+        <div className="login-sphere right-[16%] top-[20%] h-64 w-64 bg-[var(--accent-secondary)]/35 [animation-delay:0.7s]" />
+        <div className="login-sphere bottom-[15%] left-[20%] h-56 w-56 bg-[var(--accent-primary)]/35 [animation-delay:1.4s]" />
+        <div className="login-sphere bottom-[8%] right-[10%] h-40 w-40 bg-[var(--accent-secondary)]/40 [animation-delay:2.1s]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(124,58,237,0.12),transparent_58%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(6,182,212,0.14),transparent_50%)]" />
+      </section>
     </main>
   );
 }
