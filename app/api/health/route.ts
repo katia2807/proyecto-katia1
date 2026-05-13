@@ -8,8 +8,10 @@ export const dynamic = "force-dynamic";
 
 /** Intencionalmente público (probe de disponibilidad); no expone datos operativos. */
 export async function GET() {
-  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const rawAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const rawUrl =
+    process.env["SUPABASE_URL"]?.trim() || process.env["NEXT_PUBLIC_SUPABASE_URL"]?.trim();
+  const rawAnon =
+    process.env["SUPABASE_ANON_KEY"]?.trim() || process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"]?.trim();
   const creds = getServerSupabaseCredentials();
   const demoMode = isDemoDatabaseMode();
 
@@ -19,8 +21,12 @@ export async function GET() {
     /** Si no ves 2, este deploy no incluye el health extendido del repo actual. */
     healthVersion: 2,
     timestamp: new Date().toISOString(),
-    /** true si el proceso ve URL+anon en process.env (antes de lógica demo). */
+    /** true si el proceso ve URL+anon (NEXT_PUBLIC_* o SUPABASE_URL / SUPABASE_ANON_KEY). */
     processEnvPublicSupabase: Boolean(rawUrl && rawAnon),
+    /** true solo si usa las variables sin prefijo NEXT_PUBLIC (recomendado en Vercel para el servidor). */
+    serverEnvSupabaseAuth: Boolean(
+      process.env["SUPABASE_URL"]?.trim() && process.env["SUPABASE_ANON_KEY"]?.trim(),
+    ),
     /** Si es true, la app ignora Supabase para credenciales y datos (KATIA_USE_DEMO_DB). */
     demoMode,
     /** URL + anon: login con Supabase Auth en Server Actions. */

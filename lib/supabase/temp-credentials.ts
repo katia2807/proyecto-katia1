@@ -21,8 +21,8 @@ function parseTxtCredentials(raw: string): TempSupabaseCredentials {
     const value = trimmed.slice(idx + 1).trim();
     if (!value) continue;
 
-    if (key === "NEXT_PUBLIC_SUPABASE_URL") result.url = value;
-    if (key === "NEXT_PUBLIC_SUPABASE_ANON_KEY") result.anonKey = value;
+    if (key === "SUPABASE_URL" || key === "NEXT_PUBLIC_SUPABASE_URL") result.url = value;
+    if (key === "SUPABASE_ANON_KEY" || key === "NEXT_PUBLIC_SUPABASE_ANON_KEY") result.anonKey = value;
     if (key === "SUPABASE_SERVICE_ROLE_KEY") result.serviceRoleKey = value;
   }
   return result;
@@ -44,9 +44,12 @@ export function getServerSupabaseCredentials() {
     return { url: undefined, anonKey: undefined, serviceRoleKey: undefined };
   }
 
-  const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const envAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-  const envService = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  /** Preferir nombres sin `NEXT_PUBLIC_` en servidor: en Vercel no dependen del inlining del build. */
+  const envUrl =
+    process.env["SUPABASE_URL"]?.trim() || process.env["NEXT_PUBLIC_SUPABASE_URL"]?.trim();
+  const envAnon =
+    process.env["SUPABASE_ANON_KEY"]?.trim() || process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"]?.trim();
+  const envService = process.env["SUPABASE_SERVICE_ROLE_KEY"]?.trim();
 
   if (envUrl && envAnon) {
     const isProd = process.env.NODE_ENV === "production";

@@ -56,10 +56,10 @@ export async function loginWithPassword(_prevState: LoginFormState, formData: Fo
     }
     const hint =
       process.env.VERCEL || process.env.NODE_ENV === "production"
-        ? " En Vercel: tu proyecto → Settings → Environment Variables (marca Production), guarda y haz Redeploy."
+        ? " En Vercel: Settings → Environment Variables (Production y Preview), guarda y Redeploy."
         : " En local: crea o edita `.env.local` en la raíz del repo.";
     return {
-      error: `[Katia] Supabase no está configurado. Define NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY.${hint}`,
+      error: `[Katia] Faltan credenciales Supabase (URL + anon). En Vercel: SUPABASE_URL + SUPABASE_ANON_KEY o NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_ANON_KEY en este proyecto, Production+Preview, luego Redeploy. Comprueba /api/health.${hint}`,
     };
   }
 

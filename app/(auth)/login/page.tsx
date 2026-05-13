@@ -81,7 +81,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <div className="mt-4 rounded-xl border border-[var(--color-danger)] bg-[var(--color-primary-soft)] p-3 text-sm">
             <p className="font-semibold text-[var(--color-danger)]">Supabase no está configurado en este servidor</p>
             <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
-              Añade{" "}
+              Opción A:{" "}
               <code className="rounded bg-[var(--color-surface)] px-1 text-[var(--color-text-primary)]">
                 NEXT_PUBLIC_SUPABASE_URL
               </code>{" "}
@@ -89,12 +89,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               <code className="rounded bg-[var(--color-surface)] px-1 text-[var(--color-text-primary)]">
                 NEXT_PUBLIC_SUPABASE_ANON_KEY
               </code>
-              . En <strong>Vercel</strong>: abre el <strong>mismo proyecto</strong> que genera esta URL (cada dominio
-              `*.vercel.app` viene de un proyecto con su propia lista de variables) → <strong>Settings</strong> →{" "}
-              <strong>Environment Variables</strong> → en cada variable marca{" "}
-              <strong>Production</strong> y <strong>Preview</strong> (y <strong>Development</strong> si hace falta) →
-              guarda → <strong>Redeploy</strong>. En local: <code className="rounded bg-[var(--color-surface)] px-1">.env.local</code> en la raíz del
-              repositorio.
+              . Opción B (solo servidor, a veces más fiable en Vercel):{" "}
+              <code className="rounded bg-[var(--color-surface)] px-1">SUPABASE_URL</code> y{" "}
+              <code className="rounded bg-[var(--color-surface)] px-1">SUPABASE_ANON_KEY</code> (mismos valores que en
+              el panel de Supabase: Project URL y anon public). En <strong>Vercel</strong>: el{" "}
+              <strong>mismo proyecto</strong> que despliega esta URL → <strong>Settings</strong> →{" "}
+              <strong>Environment Variables</strong> → marca <strong>Production</strong> y{" "}
+              <strong>Preview</strong> → guarda → <strong>Redeploy</strong>. Comprueba{" "}
+              <code className="rounded bg-[var(--color-surface)] px-1">/api/health</code> en esta misma URL:{" "}
+              <code className="rounded bg-[var(--color-surface)] px-1">supabaseAuthReady</code> debe ser{" "}
+              <code className="rounded bg-[var(--color-surface)] px-1">true</code>.
             </p>
           </div>
         ) : null}
