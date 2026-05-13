@@ -4,10 +4,46 @@ import { RespaldoPeligroCategoriaForms } from "@/components/admin/respaldo-pelig
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
+import { hasSupabaseEnv } from "@/lib/runtime";
 
-export default function RespaldoPage() {
+export default async function RespaldoPage() {
+  const prodDb = hasSupabaseEnv();
   const mockData =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
+
+  if (prodDb) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold">Respaldo del sistema</h2>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              Los datos en producción viven en Supabase Postgres; no se usa el archivo JSON local del modo demo.
+            </p>
+          </div>
+          <Link href="/" className="text-sm font-semibold underline">
+            ← Volver al inicio
+          </Link>
+        </div>
+
+        <Card>
+          <CardTitle>Respaldo en producción</CardTitle>
+          <CardDescription className="leading-relaxed">
+            El respaldo en producción se gestiona desde el dashboard de Supabase. Ve a{" "}
+            <a href="https://supabase.com" className="font-semibold text-[var(--color-accent)] underline">
+              supabase.com
+            </a>{" "}
+            → tu proyecto → <strong>Database</strong> → <strong>Backups</strong> (y políticas de retención según tu
+            plan).
+          </CardDescription>
+          <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+            La exportación JSON y restauración desde esta pantalla solo aplican al almacén demo local cuando la app no
+            está conectada a Supabase con las tres credenciales (URL, anon y service role).
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -15,8 +51,7 @@ export default function RespaldoPage() {
         <div>
           <h2 className="text-xl font-bold">Respaldo del sistema</h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Descarga el estado completo del taller en un único archivo JSON o restaura un respaldo
-            previo.
+            Descarga el estado completo del taller en un único archivo JSON o restaura un respaldo previo.
           </p>
         </div>
         <Link href="/" className="text-sm font-semibold underline">
@@ -28,9 +63,8 @@ export default function RespaldoPage() {
         <Card>
           <CardTitle>Descargar respaldo</CardTitle>
           <CardDescription>
-            Genera un JSON con todas las tablas del store local: caja, clientes, proveedores,
-            cotizaciones, ventas, alquileres, órdenes, sueldos y más. Guárdalo en un disco externo o
-            en Drive.
+            Genera un JSON con todas las tablas del store local: caja, clientes, proveedores, cotizaciones, ventas,
+            alquileres, órdenes, sueldos y más. Guárdalo en un disco externo o en Drive.
           </CardDescription>
           <div className="mt-3">
             <a href="/api/respaldo/export">
@@ -42,14 +76,12 @@ export default function RespaldoPage() {
         <Card className="border-[var(--color-danger)]">
           <CardTitle className="text-[var(--color-danger)]">Restaurar respaldo</CardTitle>
           <CardDescription>
-            ⚠ Reemplaza <strong>todas las tablas actuales</strong> con el contenido del archivo. Solo
-            owner_admin y gerencia. Escribe <code>RESTAURAR</code> para confirmar.
+            ⚠ Reemplaza <strong>todas las tablas actuales</strong> con el contenido del archivo. Solo owner_admin y
+            gerencia. Escribe <code>RESTAURAR</code> para confirmar.
           </CardDescription>
           <form action={restaurarRespaldoJSON} className="mt-3 space-y-3">
             <label className="space-y-1">
-              <span className="text-xs font-medium text-[var(--color-text-secondary)]">
-                Archivo JSON
-              </span>
+              <span className="text-xs font-medium text-[var(--color-text-secondary)]">Archivo JSON</span>
               <input
                 type="file"
                 name="archivo"
@@ -72,8 +104,8 @@ export default function RespaldoPage() {
       <Card className="border-[var(--color-danger)]">
         <CardTitle className="text-[var(--color-danger)]">Zona peligrosa: eliminar datos</CardTitle>
         <CardDescription>
-          ⚠ Esta acción elimina los datos operativos y reinicia el sistema local al estado base. Solo
-          owner_admin y gerencia. Para evitar errores, escribe <code>ELIMINAR TODO</code> y luego confirma.
+          ⚠ Esta acción elimina los datos operativos y reinicia el sistema local al estado base. Solo owner_admin y
+          gerencia. Para evitar errores, escribe <code>ELIMINAR TODO</code> y luego confirma.
         </CardDescription>
         <form action={eliminarDatosSistema} className="mt-3 space-y-3">
           <Field

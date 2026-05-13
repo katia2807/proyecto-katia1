@@ -6,7 +6,8 @@ export const FEATURES = {
   caja: true,
   inventario: true,
   ventas: true,
-  mueblesPersonalizados: true, // simplificado (sin Kanban)
+  /** Incluye cotizador, tabla de cotizaciones y tablero Kanban de órdenes de producción (`KanbanOrdenes`). */
+  mueblesPersonalizados: true,
   cotizacion: true,
   registro: true, // simplificado
   alquilerMixer: true, // simplificado

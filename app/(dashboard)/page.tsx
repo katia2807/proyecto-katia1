@@ -3,19 +3,30 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { MetricCard } from "@/components/metric-card";
-import { getDashboardSnapshot, getInventarioResumen, getPersonalRows } from "@/lib/data";
+import {
+  DashboardDataUnavailableError,
+  emptyDashboardSnapshot,
+  getDashboardSnapshot,
+  getInventarioResumen,
+  getPersonalRows,
+} from "@/lib/data";
 import { formatDate, formatPen } from "@/lib/utils";
 
 export default async function DashboardPage() {
-  const [
-    { caja, ventas, alquileres, empleados, alertas, utilidad, ingresosMesActual, egresosMesActual },
-    inventario,
-    personal,
-  ] = await Promise.all([
-    getDashboardSnapshot(),
-    getInventarioResumen(),
-    getPersonalRows(),
-  ]);
+  let dashboardLoadError: string | null = null;
+  let snapshot = emptyDashboardSnapshot();
+  try {
+    snapshot = await getDashboardSnapshot();
+  } catch (e) {
+    dashboardLoadError =
+      e instanceof DashboardDataUnavailableError
+        ? e.message
+        : "No se pudieron cargar los datos del panel desde la base de datos.";
+  }
+
+  const { caja, ventas, alquileres, empleados, alertas, utilidad, ingresosMesActual, egresosMesActual } = snapshot;
+
+  const [inventario, personal] = await Promise.all([getInventarioResumen(), getPersonalRows()]);
   const ventasBorrador = ventas.filter((venta) => venta.estado === "borrador").length;
   const stockBajo = inventario.stockBajo.length;
   const penalidadesActivas = alquileres.filter((row) => Number(row.penalidad) > 0 && row.estado !== "cerrado").length;
@@ -50,6 +61,15 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {dashboardLoadError ? (
+        <section>
+          <Card className="border-[var(--color-danger)] bg-[var(--color-primary-soft)]">
+            <CardTitle className="text-[var(--color-danger)]">Error al cargar datos del panel</CardTitle>
+            <CardDescription className="mt-2 text-[var(--color-text-primary)]">{dashboardLoadError}</CardDescription>
+          </Card>
+        </section>
+      ) : null}
+
       <section>
         <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Resumen operativo</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">

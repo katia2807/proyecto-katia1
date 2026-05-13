@@ -9,7 +9,12 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
-import { getCajaRows, getCierresRows, getDashboardSnapshot } from "@/lib/data";
+import {
+  emptyDashboardSnapshot,
+  getCajaRows,
+  getCierresRows,
+  getDashboardSnapshot,
+} from "@/lib/data";
 import { canCloseMonth } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 
@@ -66,7 +71,11 @@ export default async function ReporteAntifraudePage() {
     );
   }
 
-  const [caja, cierres, snapshot] = await Promise.all([getCajaRows(), getCierresRows(), getDashboardSnapshot()]);
+  const [caja, cierres, snapshot] = await Promise.all([
+    getCajaRows(),
+    getCierresRows(),
+    getDashboardSnapshot().catch(() => emptyDashboardSnapshot()),
+  ]);
   const alertas = snapshot.alertas;
 
   const egresosAltos = caja.filter((x) => x.tipo === "egreso" && Number(x.monto) >= 500);

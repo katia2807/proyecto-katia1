@@ -50,6 +50,19 @@ type RegistroCategoriaRow = Database["public"]["Tables"]["registro_categorias"][
 type RegistroGeneralRow = Database["public"]["Tables"]["registros_generales"]["Row"];
 type CompraMaderaRow = Database["public"]["Tables"]["compras_madera"]["Row"];
 type UtilidadRow = Database["public"]["Views"]["utilidad_mensual"]["Row"];
+
+/** Forma del resumen del dashboard (demo, Supabase o vacío ante error). */
+export type DashboardSnapshot = {
+  caja: CajaRow[];
+  ventas: VentaRow[];
+  alquileres: AlquilerRow[];
+  empleados: EmpleadoRow[];
+  alertas: AlertaRow[];
+  utilidad: UtilidadRow[];
+  ingresosMesActual: number;
+  egresosMesActual: number;
+};
+
 type CorteRow = Database["public"]["Tables"]["cotizacion_cortes"]["Row"];
 type CotizacionUnificadaRow = Database["public"]["Tables"]["cotizaciones_unificadas"]["Row"];
 type CierreRow = Database["public"]["Tables"]["cierres_mensuales"]["Row"];
@@ -99,7 +112,34 @@ async function safeQuery<T>(fn: () => Promise<T>, fallbackValue: T) {
   }
 }
 
-export async function getDashboardSnapshot() {
+/** Error explícito cuando el panel no puede cargar desde Supabase (no usar datos demo como fallback). */
+export class DashboardDataUnavailableError extends Error {
+  constructor(cause?: unknown) {
+    super(
+      "No se pudieron cargar los datos del panel desde la base de datos. Comprueba la conexión a Supabase, la variable SUPABASE_SERVICE_ROLE_KEY y que las migraciones estén aplicadas.",
+    );
+    this.name = "DashboardDataUnavailableError";
+    if (cause !== undefined && cause !== null) {
+      this.cause = cause;
+    }
+  }
+}
+
+/** Filas vacías para el dashboard cuando falla la carga en producción (sin confundir con demo). */
+export function emptyDashboardSnapshot(): DashboardSnapshot {
+  return {
+    caja: [],
+    ventas: [],
+    alquileres: [],
+    empleados: [],
+    alertas: [],
+    utilidad: [],
+    ingresosMesActual: 0,
+    egresosMesActual: 0,
+  };
+}
+
+export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
   if (!hasSupabaseEnv()) {
     return demoSnapshot();
   }
@@ -192,7 +232,7 @@ export async function getDashboardSnapshot() {
     if (process.env.NODE_ENV === "production") {
       console.error("[getDashboardSnapshot]", error);
     }
-    return demoSnapshot();
+    throw new DashboardDataUnavailableError(error);
   }
 }
 
