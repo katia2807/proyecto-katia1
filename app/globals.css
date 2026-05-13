@@ -194,6 +194,18 @@ select option:checked {
   animation: float 7s ease-in-out infinite;
 }
 
+.auth-orb-bg {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.auth-float-sphere {
+  filter: blur(28px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
