@@ -721,7 +721,18 @@ export function InventarioInteractivo({
           if (!deleteProductTarget) return;
           const fd = new FormData();
           fd.set("id", deleteProductTarget.id);
-          await deleteInventarioProducto(fd);
+          try {
+            await deleteInventarioProducto(fd);
+          } catch (e) {
+            const message =
+              typeof e === "string" && e.trim()
+                ? e
+                : e instanceof Error && e.message
+                  ? e.message
+                  : "No se pudo eliminar el producto.";
+            showToast({ variant: "error", message });
+            return false;
+          }
           setEditModalProductId((id) => (id === deleteProductTarget.id ? null : id));
           setDeleteProductTarget(null);
           showToast({ variant: "success", message: "Producto eliminado del catálogo." });
