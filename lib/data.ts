@@ -103,90 +103,97 @@ export async function getDashboardSnapshot() {
   if (!hasSupabaseEnv()) {
     return demoSnapshot();
   }
-  const supabase = getSupabaseServerClient();
-  const orgId = DEFAULT_ORG_ID;
-  const now = new Date();
-  const anioMesActual = now.getFullYear();
-  const mesCalendarioActual = now.getMonth() + 1;
+  try {
+    const supabase = getSupabaseServerClient();
+    const orgId = DEFAULT_ORG_ID;
+    const now = new Date();
+    const anioMesActual = now.getFullYear();
+    const mesCalendarioActual = now.getMonth() + 1;
 
-  const [caja, ventas, alquileres, empleados, alertas, utilidad, utilidadMesActual] = await Promise.all([
-    safeQuery(async () => {
-      const { data } = await supabase
-        .from("movimientos_caja")
-        .select("*")
-        .eq("organization_id", orgId)
-        .is("voided_at", null)
-        .order("fecha", { ascending: false })
-        .limit(8);
-      return data ?? fallback.caja;
-    }, fallback.caja),
-    safeQuery(async () => {
-      const { data } = await supabase
-        .from("ventas_madera")
-        .select("*")
-        .eq("organization_id", orgId)
-        .order("fecha", { ascending: false })
-        .limit(8);
-      return data ?? fallback.ventas;
-    }, fallback.ventas),
-    safeQuery(async () => {
-      const { data } = await supabase
-        .from("alquileres")
-        .select("*")
-        .eq("organization_id", orgId)
-        .order("fecha_inicio", { ascending: false })
-        .limit(8);
-      return data ?? fallback.alquileres;
-    }, fallback.alquileres),
-    safeQuery(async () => {
-      const { data } = await supabase
-        .from("empleados")
-        .select("*")
-        .eq("organization_id", orgId)
-        .order("created_at", { ascending: false });
-      return data ?? fallback.empleados;
-    }, fallback.empleados),
-    safeQuery(async () => {
-      const { data } = await supabase
-        .from("alertas_operativas")
-        .select("*")
-        .eq("organization_id", orgId)
-        .order("created_at", { ascending: false })
-        .limit(8);
-      return data ?? fallback.alertas;
-    }, fallback.alertas),
-    safeQuery(async () => {
-      const { data } = await supabase
-        .from("utilidad_mensual")
-        .select("*")
-        .eq("organization_id", orgId)
-        .order("anio", { ascending: false })
-        .order("mes", { ascending: false })
-        .limit(6);
-      return data ?? fallback.utilidad;
-    }, fallback.utilidad),
-    safeQuery(async () => {
-      const { data } = await supabase
-        .from("utilidad_mensual")
-        .select("ingresos, egresos")
-        .eq("organization_id", orgId)
-        .eq("anio", anioMesActual)
-        .eq("mes", mesCalendarioActual)
-        .maybeSingle();
-      return data;
-    }, null),
-  ]);
+    const [caja, ventas, alquileres, empleados, alertas, utilidad, utilidadMesActual] = await Promise.all([
+      safeQuery(async () => {
+        const { data } = await supabase
+          .from("movimientos_caja")
+          .select("*")
+          .eq("organization_id", orgId)
+          .is("voided_at", null)
+          .order("fecha", { ascending: false })
+          .limit(8);
+        return data ?? fallback.caja;
+      }, fallback.caja),
+      safeQuery(async () => {
+        const { data } = await supabase
+          .from("ventas_madera")
+          .select("*")
+          .eq("organization_id", orgId)
+          .order("fecha", { ascending: false })
+          .limit(8);
+        return data ?? fallback.ventas;
+      }, fallback.ventas),
+      safeQuery(async () => {
+        const { data } = await supabase
+          .from("alquileres")
+          .select("*")
+          .eq("organization_id", orgId)
+          .order("fecha_inicio", { ascending: false })
+          .limit(8);
+        return data ?? fallback.alquileres;
+      }, fallback.alquileres),
+      safeQuery(async () => {
+        const { data } = await supabase
+          .from("empleados")
+          .select("*")
+          .eq("organization_id", orgId)
+          .order("created_at", { ascending: false });
+        return data ?? fallback.empleados;
+      }, fallback.empleados),
+      safeQuery(async () => {
+        const { data } = await supabase
+          .from("alertas_operativas")
+          .select("*")
+          .eq("organization_id", orgId)
+          .order("created_at", { ascending: false })
+          .limit(8);
+        return data ?? fallback.alertas;
+      }, fallback.alertas),
+      safeQuery(async () => {
+        const { data } = await supabase
+          .from("utilidad_mensual")
+          .select("*")
+          .eq("organization_id", orgId)
+          .order("anio", { ascending: false })
+          .order("mes", { ascending: false })
+          .limit(6);
+        return data ?? fallback.utilidad;
+      }, fallback.utilidad),
+      safeQuery(async () => {
+        const { data } = await supabase
+          .from("utilidad_mensual")
+          .select("ingresos, egresos")
+          .eq("organization_id", orgId)
+          .eq("anio", anioMesActual)
+          .eq("mes", mesCalendarioActual)
+          .maybeSingle();
+        return data;
+      }, null),
+    ]);
 
-  return {
-    caja,
-    ventas,
-    alquileres,
-    empleados,
-    alertas,
-    utilidad,
-    ingresosMesActual: Number(utilidadMesActual?.ingresos ?? 0),
-    egresosMesActual: Number(utilidadMesActual?.egresos ?? 0),
-  };
+    return {
+      caja,
+      ventas,
+      alquileres,
+      empleados,
+      alertas,
+      utilidad,
+      ingresosMesActual: Number(utilidadMesActual?.ingresos ?? 0),
+      egresosMesActual: Number(utilidadMesActual?.egresos ?? 0),
+    };
+  } catch (error) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("[getDashboardSnapshot]", error);
+    }
+    return demoSnapshot();
+  }
 }
 
 export async function getCajaRows() {

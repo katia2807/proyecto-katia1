@@ -133,8 +133,13 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
 });
 
 export async function requireAuthContext(options: AccessOptions = {}) {
-  const context = await getAuthContext();
   const redirectTo = options.redirectTo ?? "/login";
+  let context: AuthContext | null;
+  try {
+    context = await getAuthContext();
+  } catch {
+    context = null;
+  }
 
   if (!context) {
     if (redirectTo) {

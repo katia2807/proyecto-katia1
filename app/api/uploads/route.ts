@@ -4,8 +4,9 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireApiAuth } from "@/lib/api-auth";
 import { WRITER_ROLES } from "@/lib/auth";
+import { getServerWritableDataDir } from "@/lib/server-data-dir";
 
-const UPLOAD_ROOT = path.join(process.cwd(), "data", "uploads");
+const UPLOAD_ROOT = path.join(getServerWritableDataDir(), "uploads");
 const ALLOWED_BUCKETS = new Set(["muebles", "caja", "compras", "comprobantes"]);
 const ALLOWED_TYPES = new Set([
   "image/png",

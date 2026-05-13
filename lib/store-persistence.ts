@@ -1,23 +1,27 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { getServerWritableDataDir } from "@/lib/server-data-dir";
 
-const DATA_DIR = join(process.cwd(), "data");
-export const STORE_JSON_PATH = join(DATA_DIR, "store.json");
-const STORE_TMP_PATH = join(DATA_DIR, "store.json.tmp");
+function storeJsonPath() {
+  return join(getServerWritableDataDir(), "store.json");
+}
+
+function storeTmpPath() {
+  return join(getServerWritableDataDir(), "store.json.tmp");
+}
 
 export function ensureDataDirectory() {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
-  }
+  getServerWritableDataDir();
 }
 
 export function readStoreFromDisk<T>(): T | null {
   ensureDataDirectory();
-  if (!existsSync(STORE_JSON_PATH)) {
+  const jsonPath = storeJsonPath();
+  if (!existsSync(jsonPath)) {
     return null;
   }
   try {
-    const raw = readFileSync(STORE_JSON_PATH, "utf8");
+    const raw = readFileSync(jsonPath, "utf8");
     return JSON.parse(raw) as T;
   } catch {
     return null;
@@ -27,6 +31,8 @@ export function readStoreFromDisk<T>(): T | null {
 export function writeStoreToDisk<T>(store: T): void {
   ensureDataDirectory();
   const json = JSON.stringify(store, null, 2);
-  writeFileSync(STORE_TMP_PATH, json, "utf8");
-  renameSync(STORE_TMP_PATH, STORE_JSON_PATH);
+  const tmp = storeTmpPath();
+  const finalPath = storeJsonPath();
+  writeFileSync(tmp, json, "utf8");
+  renameSync(tmp, finalPath);
 }

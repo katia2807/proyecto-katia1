@@ -2,8 +2,9 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { requireApiAuth } from "@/lib/api-auth";
+import { getServerWritableDataDir } from "@/lib/server-data-dir";
 
-const UPLOAD_ROOT = path.join(process.cwd(), "data", "uploads");
+const UPLOAD_ROOT = path.join(getServerWritableDataDir(), "uploads");
 
 const MIME: Record<string, string> = {
   ".png": "image/png",
