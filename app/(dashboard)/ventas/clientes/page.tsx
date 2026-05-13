@@ -24,7 +24,7 @@ function normalizeQ(value: string | string[] | undefined) {
 
 export default async function ClientesPage({ searchParams }: ClientesPageProps) {
   const q = normalizeQ((await searchParams)?.q);
-  const [clientes, ventasMuebles, ventasMadera, contratos, servicios, cotizaciones] = await Promise.all([
+  const [clientes, ventasMuebles, ventasMadera, alquilerBundle, servicios, cotizaciones] = await Promise.all([
     getClientesRows(),
     getVentasMuebleTerminadoRows(),
     getVentasRows(),
@@ -32,6 +32,7 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
     getServiciosAserraderoRows(),
     getCotizacionesRows(),
   ]);
+  const contratos = alquilerBundle.rows;
 
   const totales = new Map<string, { ops: number; total: number }>();
   for (const v of ventasMuebles) {

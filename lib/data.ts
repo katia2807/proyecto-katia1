@@ -432,20 +432,37 @@ export async function getCotizacionUnificadaById(id: string): Promise<Cotizacion
   return data ?? null;
 }
 
-export async function getAlquilerRows() {
+/** Resultado de contratos de alquiler; `loadWarning` si hubo error de Supabase y se usó respaldo. */
+export type AlquilerRowsResult = {
+  rows: AlquilerRow[];
+  loadWarning: string | null;
+};
+
+export async function getAlquilerRows(): Promise<AlquilerRowsResult> {
   if (!hasSupabaseEnv()) {
-    return demoAlquilerRows();
+    return { rows: demoAlquilerRows(), loadWarning: null };
   }
-  const supabase = getSupabaseServerClient();
-  return safeQuery(async () => {
-    const { data } = await supabase
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
       .from("alquileres")
       .select("*")
       .eq("organization_id", DEFAULT_ORG_ID)
       .order("fecha_inicio", { ascending: false })
       .limit(100);
-    return data ?? fallback.alquileres;
-  }, fallback.alquileres);
+    if (error) {
+      throw new Error(error.message);
+    }
+    return { rows: data ?? [], loadWarning: null };
+  } catch (e) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("[getAlquilerRows]", e);
+    }
+    return {
+      rows: fallback.alquileres,
+      loadWarning: "No se pudieron cargar los contratos. Intenta recargar la página.",
+    };
+  }
 }
 
 export async function getPersonalRows() {
@@ -531,41 +548,80 @@ export async function getSecurityControlRows(): Promise<SecurityControlItem[]> {
   }, []);
 }
 
-export async function getInventarioProductosRows(includeInactive = false) {
+async function loadInventarioProductosRows(includeInactive: boolean): Promise<{
+  rows: InventarioProductoRow[];
+  usedFallback: boolean;
+}> {
   if (!hasSupabaseEnv()) {
     const rows = demoInventarioProductosRows();
-    if (includeInactive) return rows;
-    return rows.filter((row) => row.activo !== false);
+    const out = includeInactive ? rows : rows.filter((row) => row.activo !== false);
+    return { rows: out, usedFallback: false };
   }
 
-  const supabase = getSupabaseServerClient();
-  let query = supabase
-    .from("inventario_productos")
-    .select("*")
-    .eq("organization_id", DEFAULT_ORG_ID)
-    .order("nombre");
-  if (!includeInactive) {
-    query = query.eq("activo", true);
+  try {
+    const supabase = getSupabaseServerClient();
+    let query = supabase
+      .from("inventario_productos")
+      .select("*")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .order("nombre");
+    if (!includeInactive) {
+      query = query.eq("activo", true);
+    }
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(error.message);
+    }
+    const rows = data ?? [];
+    return { rows, usedFallback: false };
+  } catch (e) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("[getInventarioProductosRows]", e);
+    }
+    let rows = fallback.inventarioProductos;
+    if (!includeInactive) {
+      rows = rows.filter((row) => row.activo !== false);
+    }
+    return { rows, usedFallback: true };
   }
-  const { data } = await query;
+}
 
-  return data ?? fallback.inventarioProductos;
+export async function getInventarioProductosRows(includeInactive = false) {
+  const { rows } = await loadInventarioProductosRows(includeInactive);
+  return rows;
+}
+
+async function loadInventarioMovimientosRows(): Promise<{
+  rows: InventarioMovimientoRow[];
+  usedFallback: boolean;
+}> {
+  if (!hasSupabaseEnv()) {
+    return { rows: demoInventarioMovimientosRows(), usedFallback: false };
+  }
+
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("inventario_movimientos")
+      .select("*")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .order("fecha", { ascending: false })
+      .limit(100);
+    if (error) {
+      throw new Error(error.message);
+    }
+    return { rows: data ?? [], usedFallback: false };
+  } catch (e) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("[getInventarioMovimientosRows]", e);
+    }
+    return { rows: fallback.inventarioMovimientos, usedFallback: true };
+  }
 }
 
 export async function getInventarioMovimientosRows() {
-  if (!hasSupabaseEnv()) {
-    return demoInventarioMovimientosRows();
-  }
-
-  const supabase = getSupabaseServerClient();
-  const { data } = await supabase
-    .from("inventario_movimientos")
-    .select("*")
-    .eq("organization_id", DEFAULT_ORG_ID)
-    .order("fecha", { ascending: false })
-    .limit(100);
-
-  return data ?? fallback.inventarioMovimientos;
+  const { rows } = await loadInventarioMovimientosRows();
+  return rows;
 }
 
 export async function getInventarioResumen() {
@@ -597,10 +653,17 @@ export async function getInventarioResumen() {
 }
 
 export async function getInventarioRobustoData() {
-  const [productosAll, movimientos] = await Promise.all([
-    getInventarioProductosRows(true),
-    getInventarioMovimientosRows(),
+  const [productosBundle, movimientosBundle] = await Promise.all([
+    loadInventarioProductosRows(true),
+    loadInventarioMovimientosRows(),
   ]);
+  const productosAll = productosBundle.rows;
+  const movimientos = movimientosBundle.rows;
+  const loadWarning =
+    productosBundle.usedFallback || movimientosBundle.usedFallback
+      ? "No se pudieron cargar los datos de inventario desde la base de datos. Intenta recargar la página."
+      : null;
+
   const productos = productosAll.filter((p) => p.activo !== false);
 
   const vendidos = new Map<string, number>();
@@ -722,6 +785,7 @@ export async function getInventarioRobustoData() {
       productosConStockBajo: stockBajo.length,
       productosSinMovimiento30d: sinMovimiento.length,
     },
+    loadWarning,
   };
 }
 
@@ -857,10 +921,11 @@ export type CobroVencido = {
  * mostrar alertas de cobranza tanto en el hub de ventas como en /reportes.
  */
 export async function getCobrosVencidos(hoy: string = new Date().toISOString().slice(0, 10)) {
-  const [ventas, contratos] = await Promise.all([
+  const [ventas, alquilerBundle] = await Promise.all([
     getVentasMuebleTerminadoRows(),
     getAlquilerRows(),
   ]);
+  const contratos = alquilerBundle.rows;
 
   const cobros: CobroVencido[] = [];
 

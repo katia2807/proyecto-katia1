@@ -32,7 +32,7 @@ export async function GET() {
     ventasMuebles,
     ventasMadera,
     compras,
-    alquileres,
+    alquilerResult,
     servicios,
     personal,
     cobros,
@@ -48,6 +48,8 @@ export async function GET() {
     getCobrosVencidos(),
     getClientesRows(),
   ]);
+
+  const alquileres = alquilerResult.rows;
 
   const clienteNombre = (id: string) => clientes.find((c) => c.id === id)?.nombre ?? "—";
   const wb = new ExcelJS.Workbook();

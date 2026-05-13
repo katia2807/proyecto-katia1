@@ -8,13 +8,13 @@ type PageProps = { params: Promise<{ id: string }> };
 
 export default async function ContratoPdfPage({ params }: PageProps) {
   const { id } = await params;
-  const [contratos, clientes, empresa] = await Promise.all([
+  const [alquilerResult, clientes, empresa] = await Promise.all([
     getAlquilerRows(),
     getClientesRows(),
     getEmpresaConfig(),
   ]);
 
-  const contrato = contratos.find((c) => c.id === id);
+  const contrato = alquilerResult.rows.find((c) => c.id === id);
   if (!contrato) notFound();
   const cliente = clientes.find((c) => c.id === contrato.cliente_id);
 

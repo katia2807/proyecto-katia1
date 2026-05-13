@@ -26,7 +26,7 @@ export default async function ClienteDetallePage({ params }: { params: Params })
     cotizaciones,
     ventasMuebles,
     ventasMadera,
-    contratos,
+    alquilerBundle,
     servicios,
     catalogo,
     cobrosVencidos,
@@ -43,6 +43,8 @@ export default async function ClienteDetallePage({ params }: { params: Params })
 
   const cliente = clientes.find((c) => c.id === id);
   if (!cliente) notFound();
+
+  const contratos = alquilerBundle.rows;
 
   const cotizCliente = cotizaciones.filter((c) => c.cliente_id === id);
   const vMuebles = ventasMuebles.filter((v) => v.cliente_id === id);

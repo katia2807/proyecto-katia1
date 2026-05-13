@@ -31,7 +31,7 @@ export default async function VentasDashboardPage() {
     ventasMuebles,
     ordenes,
     ventasMadera,
-    contratos,
+    alquilerBundle,
     aserradero,
     cotizaciones,
     catalogo,
@@ -48,6 +48,8 @@ export default async function VentasDashboardPage() {
     getClientesRows(),
     getCobrosVencidos(),
   ]);
+
+  const contratos = alquilerBundle.rows;
 
   const muebleById = new Map(catalogo.map((m) => [m.id, m]));
   const clienteById = new Map(clientes.map((c) => [c.id, c]));

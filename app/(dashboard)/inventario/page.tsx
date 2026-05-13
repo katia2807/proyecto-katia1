@@ -20,7 +20,8 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const quick = normalizeQuickParam((await searchParams)?.quick);
   const inventario = await getInventarioRobustoData();
-  const { productos } = inventario;
+  const { loadWarning, ...inventarioData } = inventario;
+  const { productos } = inventarioData;
   const role = await getCurrentUserRole();
   const canMutate = canMutateInventario(role);
 
@@ -33,21 +34,27 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
         </p>
       </div>
 
+      {loadWarning ? (
+        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
+          {loadWarning}
+        </p>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard
           label="Productos activos"
-          value={String(inventario.indicadores.totalProductosActivos)}
+          value={String(inventarioData.indicadores.totalProductosActivos)}
           hint="Productos disponibles en catálogo interno."
         />
         <MetricCard
           label="Con stock bajo"
-          value={String(inventario.indicadores.productosConStockBajo)}
+          value={String(inventarioData.indicadores.productosConStockBajo)}
           hint="Revisar y reponer para evitar quiebres."
         />
         <MetricCard
           label="Movimientos registrados"
-          value={String(inventario.indicadores.totalMovimientos)}
-          hint={`Valorización actual: S/ ${inventario.indicadores.valorInventario.toFixed(2)}`}
+          value={String(inventarioData.indicadores.totalMovimientos)}
+          hint={`Valorización actual: S/ ${inventarioData.indicadores.valorInventario.toFixed(2)}`}
         />
       </div>
 
@@ -67,7 +74,7 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
       </InventarioAccionesRapidas>
 
       <InventarioInteractivo
-        data={inventario}
+        data={inventarioData}
         canMutate={canMutate}
       />
     </div>

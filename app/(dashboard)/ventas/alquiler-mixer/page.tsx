@@ -13,7 +13,9 @@ import { formatDate, formatPen } from "@/lib/utils";
 export default async function AlquilerMixerPage() {
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
-  const [clientes, contratos] = await Promise.all([getClientesRows(), getAlquilerRows()]);
+  const [clientes, alquilerResult] = await Promise.all([getClientesRows(), getAlquilerRows()]);
+  const contratos = alquilerResult.rows;
+  const alquilerLoadWarning = alquilerResult.loadWarning;
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
 
@@ -90,6 +92,14 @@ export default async function AlquilerMixerPage() {
       <Card>
         <CardTitle>Contratos</CardTitle>
         <CardDescription>{contratos.length} contratos en total.</CardDescription>
+        {alquilerLoadWarning ? (
+          <p
+            role="alert"
+            className="mt-3 text-sm font-medium text-[var(--color-danger)]"
+          >
+            {alquilerLoadWarning}
+          </p>
+        ) : null}
         <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
           <Table>
             <THead>
