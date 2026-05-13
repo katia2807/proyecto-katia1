@@ -9,7 +9,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV KATIA_DOCKER_BUILD=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN npm run build && node scripts/prepare-standalone.mjs
 
 FROM node:20-alpine AS runner
 WORKDIR /app
