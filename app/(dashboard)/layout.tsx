@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { DatabaseModeBanner } from "@/components/database-mode-banner";
 import { requireAuthContext } from "@/lib/auth";
 import { buildNavHrefAllowlist } from "@/lib/permissions";
 
@@ -8,13 +9,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const navAllowlist = buildNavHrefAllowlist(context.role, context.uiRole);
 
   return (
-    <AppShell
-      navAllowlist={navAllowlist}
-      uiRole={context.uiRole}
-      userRole={context.role}
-      userName={displayName}
-    >
-      {children}
-    </AppShell>
+    <>
+      <DatabaseModeBanner />
+      <AppShell
+        navAllowlist={navAllowlist}
+        uiRole={context.uiRole}
+        userRole={context.role}
+        userName={displayName}
+      >
+        {children}
+      </AppShell>
+    </>
   );
 }

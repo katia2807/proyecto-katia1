@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getDatabaseModeSummary } from "@/lib/database-mode";
 import { isDemoDatabaseMode } from "@/lib/demo-mode";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { getServerSupabaseCredentials } from "@/lib/supabase/temp-credentials";
@@ -14,6 +15,7 @@ export async function GET() {
     process.env["SUPABASE_ANON_KEY"]?.trim() || process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"]?.trim();
   const creds = getServerSupabaseCredentials();
   const demoMode = isDemoDatabaseMode();
+  const databaseMode = getDatabaseModeSummary();
 
   return NextResponse.json({
     ok: true,
@@ -35,5 +37,7 @@ export async function GET() {
     supabaseServerDataReady: Boolean(creds.url && creds.serviceRoleKey),
     /** Igual que antes: listo para datos reales sin demo (las tres piezas). */
     supabaseConfigured: hasSupabaseEnv(),
+    /** Desglose alineado con `lib/database-mode.ts` (banners y soporte). */
+    databaseMode,
   });
 }
