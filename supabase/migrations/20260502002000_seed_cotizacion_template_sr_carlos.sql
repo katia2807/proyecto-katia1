@@ -7,6 +7,10 @@ declare
   v_cliente_id uuid;
   v_cotizacion_id uuid;
 begin
+  insert into public.organizations (id, name)
+  values ('00000000-0000-0000-0000-000000000001', 'Grupo Ark Ccatun Rumi SAC')
+  on conflict (id) do nothing;
+
   -- 1) Cliente de prueba
   insert into public.clientes (organization_id, nombre, telefono, documento)
   select v_org_id, 'Sr. Carlos', '930781012', null

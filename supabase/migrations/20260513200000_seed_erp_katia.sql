@@ -1,6 +1,9 @@
-insert into organizations (id, name)
-values ('00000000-0000-0000-0000-000000000001', 'Proyecto Katia')
-on conflict (id) do nothing;
+do $$
+begin
+  insert into public.organizations (id, name)
+  values ('00000000-0000-0000-0000-000000000001', 'Grupo Ark Ccatun Rumi SAC')
+  on conflict (id) do nothing;
+end $$;
 
 insert into clientes (organization_id, nombre, documento, telefono)
 values
