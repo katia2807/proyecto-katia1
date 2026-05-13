@@ -350,9 +350,9 @@ const registroGeneralSchema = z.object({
   ),
 });
 
-const writerRoles: readonly AppRole[] = ["owner_admin", "gerencia", "operaciones_caja", "ventas", "rrhh"];
-const ventasRoles: readonly AppRole[] = ["owner_admin", "gerencia", "ventas"];
-const cajaRoles: readonly AppRole[] = ["owner_admin", "gerencia", "operaciones_caja", "ventas"];
+const writerRoles: readonly AppRole[] = ["owner_admin", "gerencia", "almacen"];
+const ventasRoles: readonly AppRole[] = ["owner_admin", "gerencia"];
+const cajaRoles: readonly AppRole[] = ["owner_admin", "gerencia", "caja", "operaciones_caja"];
 const rrhhRoles: readonly AppRole[] = ["owner_admin", "gerencia", "rrhh"];
 const liderazgoRoles: readonly AppRole[] = ["owner_admin", "gerencia"];
 

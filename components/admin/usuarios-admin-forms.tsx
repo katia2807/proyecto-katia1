@@ -8,21 +8,25 @@ import {
   type OrgUserRow,
   type OrgUsersFormState,
 } from "@/app/(dashboard)/admin/usuarios/actions";
-import type { UiRoleSlug } from "@/lib/permissions";
+import type { AssignableRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Field, SelectField } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 
 const initialFormState: OrgUsersFormState = { error: null };
 
-function roleLabel(slug: UiRoleSlug): string {
+function roleLabel(slug: AssignableRole): string {
   switch (slug) {
     case "owner_admin":
       return "Dueña (total)";
-    case "operaciones":
-      return "Operaciones";
-    case "readonly":
-      return "Solo lectura";
+    case "gerencia":
+      return "Gerencia";
+    case "vendedor":
+      return "Vendedor (solo lectura)";
+    case "almacen":
+      return "Almacén";
+    case "caja":
+      return "Caja";
     default:
       return slug;
   }
@@ -51,9 +55,11 @@ export function InviteOrganizationUserForm() {
         autoComplete="email"
         placeholder="correo@ejemplo.com"
       />
-      <SelectField name="ui_role" label="Rol" required defaultValue="operaciones">
-        <option value="operaciones">{roleLabel("operaciones")}</option>
-        <option value="readonly">{roleLabel("readonly")}</option>
+      <SelectField name="role" label="Rol" required defaultValue="vendedor">
+        <option value="gerencia">{roleLabel("gerencia")}</option>
+        <option value="vendedor">{roleLabel("vendedor")}</option>
+        <option value="almacen">{roleLabel("almacen")}</option>
+        <option value="caja">{roleLabel("caja")}</option>
       </SelectField>
       <div className="flex flex-col gap-2 md:col-span-2">
         {state.error ? (
@@ -73,7 +79,7 @@ export function InviteOrganizationUserForm() {
 
 type UpdateUserFormProps = {
   row: OrgUserRow;
-  effectiveRole: UiRoleSlug;
+  effectiveRole: AssignableRole;
 };
 
 export function UpdateOrganizationUserForm({ row, effectiveRole }: UpdateUserFormProps) {
@@ -83,10 +89,12 @@ export function UpdateOrganizationUserForm({ row, effectiveRole }: UpdateUserFor
     <form action={action} className="grid max-w-lg gap-3 sm:grid-cols-2 sm:items-end">
       <input type="hidden" name="user_id" value={row.user_id} />
       <Field name="full_name" label="Nombre" defaultValue={row.full_name ?? ""} required />
-      <SelectField name="ui_role" label="Rol" defaultValue={effectiveRole}>
+      <SelectField name="role" label="Rol" defaultValue={effectiveRole}>
         <option value="owner_admin">{roleLabel("owner_admin")}</option>
-        <option value="operaciones">{roleLabel("operaciones")}</option>
-        <option value="readonly">{roleLabel("readonly")}</option>
+        <option value="gerencia">{roleLabel("gerencia")}</option>
+        <option value="vendedor">{roleLabel("vendedor")}</option>
+        <option value="almacen">{roleLabel("almacen")}</option>
+        <option value="caja">{roleLabel("caja")}</option>
       </SelectField>
       <div className="flex flex-col gap-1 sm:col-span-2">
         {state.error ? (
@@ -97,11 +105,6 @@ export function UpdateOrganizationUserForm({ row, effectiveRole }: UpdateUserFor
         <Button type="submit" variant="secondary" className="w-fit" disabled={pending}>
           {pending ? "Guardando…" : "Guardar cambios"}
         </Button>
-        {!row.ui_role ? (
-          <span className="text-xs text-[var(--color-text-secondary)]">
-            Perfil sin <code className="text-[11px]">ui_role</code> en BD (mapeo legado).
-          </span>
-        ) : null}
       </div>
     </form>
   );

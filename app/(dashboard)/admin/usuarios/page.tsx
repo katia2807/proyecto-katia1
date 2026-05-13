@@ -8,23 +8,23 @@ import {
 import { requireAuthContext } from "@/lib/auth";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { canManageOrganizationUsers } from "@/lib/permissions";
-import type { UiRoleSlug } from "@/lib/permissions";
+import type { AssignableRole } from "@/lib/permissions";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { listOrganizationUsers, type OrgUserRow } from "./actions";
 
-function selectUiRole(row: OrgUserRow): UiRoleSlug {
-  if (row.ui_role === "owner_admin" || row.ui_role === "operaciones" || row.ui_role === "readonly") {
-    return row.ui_role;
-  }
+function selectRole(row: OrgUserRow): AssignableRole {
   if (row.role === "owner_admin") return "owner_admin";
-  if (row.role === "partner_readonly") return "readonly";
-  return "operaciones";
+  if (row.role === "gerencia") return "gerencia";
+  if (row.role === "vendedor" || row.role === "ventas" || row.role === "partner_readonly") return "vendedor";
+  if (row.role === "almacen") return "almacen";
+  if (row.role === "caja" || row.role === "operaciones_caja") return "caja";
+  return "vendedor";
 }
 
 export default async function AdminUsuariosPage() {
   const ctx = await requireAuthContext();
   if (!canManageOrganizationUsers(ctx.role, ctx.uiRole)) {
-    redirect("/");
+    redirect("/?mensaje=no-acceso");
   }
 
   const { data: users, error: listError } = await listOrganizationUsers();
@@ -65,8 +65,8 @@ export default async function AdminUsuariosPage() {
           <Card>
             <CardTitle>Invitar usuario</CardTitle>
             <CardDescription>
-              Se envía un correo de invitación de Supabase. El rol &quot;Dueña&quot; no está disponible al
-              crear usuarios nuevos.
+              Se envía un correo de invitación de Supabase. El rol &quot;Dueña&quot; no está disponible al crear
+              usuarios nuevos.
             </CardDescription>
             <InviteOrganizationUserForm />
           </Card>
@@ -74,8 +74,7 @@ export default async function AdminUsuariosPage() {
           <Card>
             <CardTitle>Usuarios ({users.length})</CardTitle>
             <CardDescription>
-              Rol mostrado según <code className="text-xs">ui_role</code> y, si falta, el rol interno en base
-              de datos.
+              El rol se guarda directamente en <code className="text-xs">perfiles.role</code>.
             </CardDescription>
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[640px] border-collapse text-left text-sm">
@@ -89,7 +88,7 @@ export default async function AdminUsuariosPage() {
                 </thead>
                 <tbody>
                   {users.map((row) => {
-                    const effective = selectUiRole(row);
+                    const effective = selectRole(row);
                     const inactive = Boolean(row.deactivated_at);
                     return (
                       <tr

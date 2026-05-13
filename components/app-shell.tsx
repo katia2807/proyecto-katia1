@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   ChartColumn,
   Database,
@@ -24,6 +24,7 @@ import {
 import { navItems } from "@/lib/constants";
 import { logout } from "@/app/(auth)/actions";
 import type { AppRole } from "@/lib/supabase/types";
+import { canAccessPath } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 const icons = {
@@ -57,13 +58,18 @@ type AppShellProps = {
 
 function roleLabel(role: AppRole, uiRole: AppShellProps["uiRole"]) {
   if (uiRole === "owner_admin") return "Dueña / owner_admin";
-  if (uiRole === "operaciones") return "Operaciones";
-  if (uiRole === "readonly") return "Solo lectura";
+  if (uiRole === "operaciones") return "Gerencia";
+  if (uiRole === "readonly") return "Vendedor";
+  if (role === "vendedor") return "Vendedor";
+  if (role === "almacen") return "Almacén";
+  if (role === "caja") return "Caja";
   return role;
 }
 
 export function AppShell({ children, userName, userRole, uiRole, navAllowlist }: AppShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<"dark" | "light">(() => {
@@ -77,6 +83,14 @@ export function AppShell({ children, userName, userRole, uiRole, navAllowlist }:
     [...navItems]
       .filter((item) => item.href === "/" ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`))
       .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? "/";
+
+  useEffect(() => {
+    const mensaje = searchParams.get("mensaje");
+    const canAccess = canAccessPath(userRole, uiRole, pathname);
+    if (!canAccess && !(pathname === "/" && mensaje === "no-acceso")) {
+      router.replace("/?mensaje=no-acceso");
+    }
+  }, [pathname, router, searchParams, uiRole, userRole]);
 
   function toggleThemeMode() {
     const next: "dark" | "light" = themeMode === "dark" ? "light" : "dark";

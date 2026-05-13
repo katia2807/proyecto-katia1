@@ -3,6 +3,9 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type AppRole =
   | "owner_admin"
   | "gerencia"
+  | "vendedor"
+  | "almacen"
+  | "caja"
   | "operaciones_caja"
   | "ventas"
   | "rrhh"

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAuthContext } from "@/lib/auth";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
-import { mapUiRoleToDbRole, type UiRoleSlug } from "@/lib/permissions";
+import type { AssignableRole } from "@/lib/permissions";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole } from "@/lib/supabase/types";
@@ -35,7 +35,6 @@ export type OrgUserRow = {
   email: string | null;
   full_name: string | null;
   role: AppRole;
-  ui_role: UiRoleSlug | null;
   deactivated_at: string | null;
 };
 
@@ -61,7 +60,7 @@ export async function listOrganizationUsers(): Promise<OrganizationUsersListResu
   const supabase = getSupabaseServerClient();
   const { data: perfiles, error } = await supabase
     .from("perfiles")
-    .select("id,user_id,full_name,role,ui_role,deactivated_at")
+    .select("id,user_id,full_name,role,deactivated_at")
     .eq("organization_id", DEFAULT_ORG_ID)
     .order("full_name", { ascending: true });
 
@@ -103,10 +102,6 @@ export async function listOrganizationUsers(): Promise<OrganizationUsersListResu
     email: emailByUserId.get(p.user_id) ?? null,
     full_name: p.full_name,
     role: p.role,
-    ui_role:
-      p.ui_role === "owner_admin" || p.ui_role === "operaciones" || p.ui_role === "readonly"
-        ? p.ui_role
-        : null,
     deactivated_at: p.deactivated_at,
   }));
 
@@ -119,7 +114,7 @@ export async function listOrganizationUsers(): Promise<OrganizationUsersListResu
 export async function createOrganizationUser(input: {
   email: string;
   fullName: string;
-  uiRole: UiRoleSlug;
+  role: AssignableRole;
 }) {
   await requireOwnerAdminUi();
   const email = input.email.trim().toLowerCase();
@@ -127,7 +122,7 @@ export async function createOrganizationUser(input: {
   if (!email || !fullName) {
     return { ok: false as const, error: "Correo y nombre son obligatorios." };
   }
-  if (input.uiRole === "owner_admin") {
+  if (input.role === "owner_admin") {
     return {
       ok: false as const,
       error: "No se pueden crear nuevas cuentas con rol dueña desde esta pantalla.",
@@ -138,8 +133,6 @@ export async function createOrganizationUser(input: {
   }
 
   const supabase = getSupabaseServerClient();
-  const dbRole = mapUiRoleToDbRole(input.uiRole);
-
   const { data: invited, error: invErr } = await supabase.auth.admin.inviteUserByEmail(email, {
     redirectTo: `${appOrigin()}/login`,
     data: { full_name: fullName },
@@ -154,9 +147,9 @@ export async function createOrganizationUser(input: {
   const { error: insErr } = await supabase.from("perfiles").insert({
     user_id: userId,
     organization_id: DEFAULT_ORG_ID,
-    role: dbRole,
+    role: input.role,
     full_name: fullName,
-    ui_role: input.uiRole,
+    ui_role: null,
   });
 
   if (insErr) {
@@ -171,20 +164,20 @@ export async function createOrganizationUser(input: {
 export async function updateOrganizationUser(input: {
   userId: string;
   fullName: string;
-  uiRole: UiRoleSlug;
+  role: AssignableRole;
 }) {
   const ctx = await requireOwnerAdminUi();
 
   if (input.userId === ctx.userId) {
     const selfProfile = await getSupabaseServerClient()
       .from("perfiles")
-      .select("ui_role")
+      .select("role")
       .eq("user_id", ctx.userId)
       .eq("organization_id", DEFAULT_ORG_ID)
       .maybeSingle();
-    const selfUi = selfProfile.data?.ui_role;
-    if (selfUi === "owner_admin" || (!selfUi && ctx.role === "owner_admin")) {
-      if (input.uiRole !== "owner_admin") {
+    const selfRole = selfProfile.data?.role;
+    if (selfRole === "owner_admin" || ctx.role === "owner_admin") {
+      if (input.role !== "owner_admin") {
         return { ok: false as const, error: "No puedes quitarte el rol de dueña a ti misma." };
       }
     }
@@ -195,14 +188,12 @@ export async function updateOrganizationUser(input: {
   }
 
   const supabase = getSupabaseServerClient();
-  const dbRole = mapUiRoleToDbRole(input.uiRole);
-
   const { error } = await supabase
     .from("perfiles")
     .update({
       full_name: input.fullName.trim(),
-      role: dbRole,
-      ui_role: input.uiRole,
+      role: input.role,
+      ui_role: null,
     })
     .eq("user_id", input.userId)
     .eq("organization_id", DEFAULT_ORG_ID);
@@ -234,7 +225,7 @@ export async function setOrganizationUserActive(input: { userId: string; active:
 
   const { data: targetProfile } = await supabase
     .from("perfiles")
-    .select("ui_role,role")
+    .select("role")
     .eq("user_id", input.userId)
     .eq("organization_id", DEFAULT_ORG_ID)
     .maybeSingle();
@@ -246,18 +237,17 @@ export async function setOrganizationUserActive(input: { userId: string; active:
   if (!input.active) {
     const { data: ownersRows } = await supabase
       .from("perfiles")
-      .select("user_id,ui_role,role,deactivated_at")
+      .select("user_id,role,deactivated_at")
       .eq("organization_id", DEFAULT_ORG_ID);
 
     const activeOwners = (ownersRows ?? []).filter((o) => {
       if (o.deactivated_at) return false;
-      return o.ui_role === "owner_admin" || (!o.ui_role && o.role === "owner_admin");
+      return o.role === "owner_admin";
     });
     if (
       activeOwners.length === 1 &&
       activeOwners[0]?.user_id === input.userId &&
-      (targetProfile.ui_role === "owner_admin" ||
-        (!targetProfile.ui_role && targetProfile.role === "owner_admin"))
+      targetProfile.role === "owner_admin"
     ) {
       return { ok: false as const, error: "Debe existir al menos una dueña activa." };
     }
@@ -287,8 +277,8 @@ export async function setOrganizationUserActive(input: { userId: string; active:
   return { ok: true as const };
 }
 
-function parseUiRole(v: string): UiRoleSlug | null {
-  if (v === "owner_admin" || v === "operaciones" || v === "readonly") return v;
+function parseRole(v: string): AssignableRole | null {
+  if (v === "owner_admin" || v === "gerencia" || v === "vendedor" || v === "almacen" || v === "caja") return v;
   return null;
 }
 
@@ -297,12 +287,12 @@ export async function createOrganizationUserForm(
   _prevState: OrgUsersFormState,
   formData: FormData,
 ): Promise<OrgUsersFormState> {
-  const ui = parseUiRole(String(formData.get("ui_role") ?? ""));
-  if (!ui) return { error: "Selecciona un rol válido.", success: false };
+  const role = parseRole(String(formData.get("role") ?? ""));
+  if (!role) return { error: "Selecciona un rol válido.", success: false };
   const result = await createOrganizationUser({
     email: String(formData.get("email") ?? ""),
     fullName: String(formData.get("full_name") ?? ""),
-    uiRole: ui,
+    role,
   });
   if (!result.ok) return { error: result.error, success: false };
   return {
@@ -316,12 +306,12 @@ export async function updateOrganizationUserForm(
   _prevState: OrgUsersFormState,
   formData: FormData,
 ): Promise<OrgUsersFormState> {
-  const ui = parseUiRole(String(formData.get("ui_role") ?? ""));
-  if (!ui) return { error: "Selecciona un rol válido." };
+  const role = parseRole(String(formData.get("role") ?? ""));
+  if (!role) return { error: "Selecciona un rol válido." };
   const result = await updateOrganizationUser({
     userId: String(formData.get("user_id") ?? ""),
     fullName: String(formData.get("full_name") ?? ""),
-    uiRole: ui,
+    role,
   });
   if (!result.ok) return { error: result.error };
   return { error: null };

@@ -12,7 +12,17 @@ import {
 } from "@/lib/data";
 import { formatDate, formatPen } from "@/lib/utils";
 
-export default async function DashboardPage() {
+type DashboardPageProps = {
+  searchParams?: Promise<{ mensaje?: string | string[] }>;
+};
+
+function firstParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
+}
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const mensaje = firstParam((await searchParams)?.mensaje);
   let dashboardLoadError: string | null = null;
   let snapshot = emptyDashboardSnapshot();
   try {
@@ -61,6 +71,12 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {mensaje === "no-acceso" ? (
+        <Card className="border-[var(--color-danger)] bg-[var(--color-primary-soft)]">
+          <CardTitle className="text-[var(--color-danger)]">No tienes acceso a esta sección</CardTitle>
+          <CardDescription>Tu rol no tiene permisos para el módulo solicitado.</CardDescription>
+        </Card>
+      ) : null}
       {dashboardLoadError ? (
         <section>
           <Card className="border-[var(--color-danger)] bg-[var(--color-primary-soft)]">
