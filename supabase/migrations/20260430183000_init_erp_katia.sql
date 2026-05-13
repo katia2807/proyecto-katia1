@@ -1,5 +1,7 @@
 create extension if not exists pgcrypto;
 
+create schema if not exists app;
+
 create type app_role as enum (
   'owner_admin',
   'gerencia',
@@ -462,8 +464,7 @@ for all using (organization_id = app.current_org_id())
 with check (organization_id = app.current_org_id());
 
 create policy org_data_access_cierres on cierres_mensuales
-for select using (organization_id = app.current_org_id())
-with check (organization_id = app.current_org_id());
+for select using (organization_id = app.current_org_id());
 
 grant select on utilidad_mensual to authenticated;
 
