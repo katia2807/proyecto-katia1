@@ -16,7 +16,7 @@ export default defineConfig({
   webServer: isStagingRun
     ? undefined
     : {
-        command: "npm run build && node .next/standalone/server.js",
+        command: "npm run build && npx next start",
         env: {
           ...process.env,
           PORT: "3001",
