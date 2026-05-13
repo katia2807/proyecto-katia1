@@ -349,6 +349,7 @@ export type Database = {
           voided_at: string | null;
           voided_by: string | null;
           void_reason: string | null;
+          url_comprobante: string | null;
         };
         Insert: {
           id?: string;
@@ -362,6 +363,7 @@ export type Database = {
           es_personal?: boolean;
           modulo_origen?: string | null;
           referencia_id?: string | null;
+          url_comprobante?: string | null;
         };
         Update: {
           fecha?: string;
@@ -373,6 +375,7 @@ export type Database = {
           es_personal?: boolean;
           modulo_origen?: string | null;
           referencia_id?: string | null;
+          url_comprobante?: string | null;
         };
       };
       muebles_catalogo: {

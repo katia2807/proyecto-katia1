@@ -39,11 +39,22 @@ export type OrgUserRow = {
   deactivated_at: string | null;
 };
 
-export async function listOrganizationUsers(): Promise<OrgUserRow[]> {
+/** Resultado de listar usuarios: distingue lista vacía (`error: null`) de fallo al leer perfiles o Auth. */
+export type OrganizationUsersListResult = {
+  data: OrgUserRow[];
+  error: string | null;
+};
+
+export type OrgUsersFormState = {
+  error: string | null;
+};
+
+export async function listOrganizationUsers(): Promise<OrganizationUsersListResult> {
   await requireOwnerAdminUi();
   if (!hasSupabaseEnv()) {
-    return [];
+    return { data: [], error: null };
   }
+
   const supabase = getSupabaseServerClient();
   const { data: perfiles, error } = await supabase
     .from("perfiles")
@@ -51,19 +62,29 @@ export async function listOrganizationUsers(): Promise<OrgUserRow[]> {
     .eq("organization_id", DEFAULT_ORG_ID)
     .order("full_name", { ascending: true });
 
-  if (error || !perfiles?.length) {
-    return [];
+  if (error) {
+    return { data: [], error: error.message };
+  }
+
+  const rows = perfiles ?? [];
+  if (rows.length === 0) {
+    return { data: [], error: null };
   }
 
   const emailByUserId = new Map<string, string | null>();
   let page = 1;
   const perPage = 200;
+  let authListError: string | null = null;
+
   for (;;) {
     const { data: usersPage, error: listErr } = await supabase.auth.admin.listUsers({
       page,
       perPage,
     });
-    if (listErr) break;
+    if (listErr) {
+      authListError = listErr.message;
+      break;
+    }
     const users = usersPage?.users ?? [];
     for (const u of users) {
       emailByUserId.set(u.id, u.email ?? null);
@@ -73,7 +94,7 @@ export async function listOrganizationUsers(): Promise<OrgUserRow[]> {
     if (page > 50) break;
   }
 
-  return perfiles.map((p) => ({
+  const data: OrgUserRow[] = rows.map((p) => ({
     perfil_id: p.id,
     user_id: p.user_id,
     email: emailByUserId.get(p.user_id) ?? null,
@@ -85,6 +106,11 @@ export async function listOrganizationUsers(): Promise<OrgUserRow[]> {
         : null,
     deactivated_at: p.deactivated_at,
   }));
+
+  return {
+    data,
+    error: authListError ? `No se pudieron cargar todos los correos desde Auth: ${authListError}` : null,
+  };
 }
 
 export async function createOrganizationUser(input: {
@@ -263,33 +289,45 @@ function parseUiRole(v: string): UiRoleSlug | null {
   return null;
 }
 
-/** Wrapper para `<form action>` (lanza Error con mensaje legible). */
-export async function createOrganizationUserForm(formData: FormData) {
+/** Wrapper para `<form action>` con `useActionState` — mensajes visibles sin lanzar. */
+export async function createOrganizationUserForm(
+  _prevState: OrgUsersFormState,
+  formData: FormData,
+): Promise<OrgUsersFormState> {
   const ui = parseUiRole(String(formData.get("ui_role") ?? ""));
-  if (!ui) throw new Error("Selecciona un rol válido.");
+  if (!ui) return { error: "Selecciona un rol válido." };
   const result = await createOrganizationUser({
     email: String(formData.get("email") ?? ""),
     fullName: String(formData.get("full_name") ?? ""),
     uiRole: ui,
   });
-  if (!result.ok) throw new Error(result.error);
+  if (!result.ok) return { error: result.error };
+  return { error: null };
 }
 
-export async function updateOrganizationUserForm(formData: FormData) {
+export async function updateOrganizationUserForm(
+  _prevState: OrgUsersFormState,
+  formData: FormData,
+): Promise<OrgUsersFormState> {
   const ui = parseUiRole(String(formData.get("ui_role") ?? ""));
-  if (!ui) throw new Error("Selecciona un rol válido.");
+  if (!ui) return { error: "Selecciona un rol válido." };
   const result = await updateOrganizationUser({
     userId: String(formData.get("user_id") ?? ""),
     fullName: String(formData.get("full_name") ?? ""),
     uiRole: ui,
   });
-  if (!result.ok) throw new Error(result.error);
+  if (!result.ok) return { error: result.error };
+  return { error: null };
 }
 
-export async function setOrganizationUserActiveForm(formData: FormData) {
+export async function setOrganizationUserActiveForm(
+  _prevState: OrgUsersFormState,
+  formData: FormData,
+): Promise<OrgUsersFormState> {
   const result = await setOrganizationUserActive({
     userId: String(formData.get("user_id") ?? ""),
     active: String(formData.get("active") ?? "") === "true",
   });
-  if (!result.ok) throw new Error(result.error);
+  if (!result.ok) return { error: result.error };
+  return { error: null };
 }

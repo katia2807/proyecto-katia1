@@ -424,6 +424,7 @@ export async function createCajaMovimiento(formData: FormData) {
       descripcion: parsed.data.descripcion ?? null,
       modulo_origen: "caja",
       es_personal: parsed.data.esPersonal ?? false,
+      url_comprobante: parsed.data.urlComprobante ?? null,
     });
     if (error) {
       throw new Error(error.message);
@@ -533,6 +534,10 @@ export async function repetirGastosMesAnterior(formData: FormData) {
         descripcion: desc,
         modulo_origen: r.modulo_origen ?? "caja",
         es_personal: Boolean(r.es_personal),
+        url_comprobante:
+          r.url_comprobante != null && String(r.url_comprobante).trim() !== ""
+            ? String(r.url_comprobante)
+            : null,
       };
     });
 

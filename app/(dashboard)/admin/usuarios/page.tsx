@@ -1,19 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import {
+  InviteOrganizationUserForm,
+  SetOrganizationUserActiveFormClient,
+  UpdateOrganizationUserForm,
+} from "@/components/admin/usuarios-admin-forms";
 import { requireAuthContext } from "@/lib/auth";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { canManageOrganizationUsers } from "@/lib/permissions";
 import type { UiRoleSlug } from "@/lib/permissions";
-import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Field, SelectField } from "@/components/ui/field";
-import {
-  createOrganizationUserForm,
-  listOrganizationUsers,
-  setOrganizationUserActiveForm,
-  updateOrganizationUserForm,
-  type OrgUserRow,
-} from "./actions";
+import { listOrganizationUsers, type OrgUserRow } from "./actions";
 
 function selectUiRole(row: OrgUserRow): UiRoleSlug {
   if (row.ui_role === "owner_admin" || row.ui_role === "operaciones" || row.ui_role === "readonly") {
@@ -24,26 +21,13 @@ function selectUiRole(row: OrgUserRow): UiRoleSlug {
   return "operaciones";
 }
 
-function roleLabel(slug: UiRoleSlug): string {
-  switch (slug) {
-    case "owner_admin":
-      return "Dueña (total)";
-    case "operaciones":
-      return "Operaciones";
-    case "readonly":
-      return "Solo lectura";
-    default:
-      return slug;
-  }
-}
-
 export default async function AdminUsuariosPage() {
   const ctx = await requireAuthContext();
   if (!canManageOrganizationUsers(ctx.role, ctx.uiRole)) {
     redirect("/");
   }
 
-  const users = await listOrganizationUsers();
+  const { data: users, error: listError } = await listOrganizationUsers();
 
   return (
     <div className="space-y-6">
@@ -58,6 +42,15 @@ export default async function AdminUsuariosPage() {
           ← Volver al inicio
         </Link>
       </div>
+
+      {listError ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-500/50 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+          {listError}
+        </div>
+      ) : null}
 
       {!hasSupabaseEnv() ? (
         <Card>
@@ -75,26 +68,7 @@ export default async function AdminUsuariosPage() {
               Se envía un correo de invitación de Supabase. El rol &quot;Dueña&quot; no está disponible al
               crear usuarios nuevos.
             </CardDescription>
-            <form action={createOrganizationUserForm} className="mt-4 grid gap-3 md:grid-cols-2">
-              <Field name="full_name" label="Nombre completo" required placeholder="Nombre y apellido" />
-              <Field
-                name="email"
-                label="Correo"
-                type="email"
-                required
-                autoComplete="email"
-                placeholder="correo@ejemplo.com"
-              />
-              <SelectField name="ui_role" label="Rol" required defaultValue="operaciones">
-                <option value="operaciones">{roleLabel("operaciones")}</option>
-                <option value="readonly">{roleLabel("readonly")}</option>
-              </SelectField>
-              <div className="flex items-end">
-                <Button type="submit" className="w-full md:w-auto">
-                  Enviar invitación
-                </Button>
-              </div>
-            </form>
+            <InviteOrganizationUserForm />
           </Card>
 
           <Card>
@@ -128,33 +102,7 @@ export default async function AdminUsuariosPage() {
                       >
                         <td className="max-w-[200px] py-3 pr-3 align-top break-all">{row.email ?? "—"}</td>
                         <td className="py-3 pr-3 align-top">
-                          <form
-                            action={updateOrganizationUserForm}
-                            className="grid max-w-lg gap-3 sm:grid-cols-2 sm:items-end"
-                          >
-                            <input type="hidden" name="user_id" value={row.user_id} />
-                            <Field
-                              name="full_name"
-                              label="Nombre"
-                              defaultValue={row.full_name ?? ""}
-                              required
-                            />
-                            <SelectField name="ui_role" label="Rol" defaultValue={effective}>
-                              <option value="owner_admin">{roleLabel("owner_admin")}</option>
-                              <option value="operaciones">{roleLabel("operaciones")}</option>
-                              <option value="readonly">{roleLabel("readonly")}</option>
-                            </SelectField>
-                            <div className="flex flex-col gap-1 sm:col-span-2">
-                              <Button type="submit" variant="secondary" className="w-fit">
-                                Guardar cambios
-                              </Button>
-                              {!row.ui_role ? (
-                                <span className="text-xs text-[var(--color-text-secondary)]">
-                                  Perfil sin <code className="text-[11px]">ui_role</code> en BD (mapeo legado).
-                                </span>
-                              ) : null}
-                            </div>
-                          </form>
+                          <UpdateOrganizationUserForm row={row} effectiveRole={effective} />
                         </td>
                         <td className="py-3 pr-3 align-middle">
                           {inactive ? (
@@ -169,21 +117,19 @@ export default async function AdminUsuariosPage() {
                         </td>
                         <td className="py-3 align-top">
                           {inactive ? (
-                            <form action={setOrganizationUserActiveForm}>
-                              <input type="hidden" name="user_id" value={row.user_id} />
-                              <input type="hidden" name="active" value="true" />
-                              <Button type="submit" variant="secondary" className="!h-9 !px-3 !text-xs">
-                                Reactivar
-                              </Button>
-                            </form>
+                            <SetOrganizationUserActiveFormClient
+                              userId={row.user_id}
+                              active
+                              label="Reactivar"
+                              variant="secondary"
+                            />
                           ) : (
-                            <form action={setOrganizationUserActiveForm}>
-                              <input type="hidden" name="user_id" value={row.user_id} />
-                              <input type="hidden" name="active" value="false" />
-                              <Button type="submit" variant="danger" className="!h-9 !px-3 !text-xs">
-                                Desactivar
-                              </Button>
-                            </form>
+                            <SetOrganizationUserActiveFormClient
+                              userId={row.user_id}
+                              active={false}
+                              label="Desactivar"
+                              variant="danger"
+                            />
                           )}
                         </td>
                       </tr>
@@ -191,9 +137,9 @@ export default async function AdminUsuariosPage() {
                   })}
                 </tbody>
               </table>
-              {users.length === 0 ? (
+              {!listError && users.length === 0 ? (
                 <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                  No hay usuarios listados o aún no hay perfiles en esta organización.
+                  No hay perfiles en esta organización todavía. Invita al primer usuario arriba.
                 </p>
               ) : null}
             </div>
