@@ -53,7 +53,7 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
   }, [stateToggle, showToast]);
 
   return (
-    <Card className="space-y-3">
+    <Card id={`mueble-catalogo-${row.id}`} className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">{row.codigo}</p>
@@ -73,7 +73,15 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
           unoptimized
         />
       ) : null}
-      <form action={actionEdit} className="grid gap-2">
+      <form
+        action={actionEdit}
+        className="grid gap-2"
+        onSubmit={(e) => {
+          if (!window.confirm("¿Guardar los cambios de precio, descripción o foto de este mueble del catálogo?")) {
+            e.preventDefault();
+          }
+        }}
+      >
         <input type="hidden" name="id" value={row.id} />
         <Field
           name="precio_lista"
@@ -97,7 +105,26 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
           </Button>
         </div>
       </form>
-      <form action={actionToggle}>
+      <form
+        action={actionToggle}
+        onSubmit={(e) => {
+          if (row.activo) {
+            if (!window.confirm("¿Desactivar este mueble? Dejará de mostrarse en cotizaciones de mueble terminado.")) {
+              e.preventDefault();
+              return;
+            }
+            const typed = window.prompt(
+              "Confirmación estricta: escribí DESACTIVAR en mayúsculas para sacar este ítem del catálogo.",
+              "",
+            );
+            if (typed !== "DESACTIVAR") {
+              e.preventDefault();
+            }
+          } else if (!window.confirm("¿Volver a activar este mueble en el catálogo?")) {
+            e.preventDefault();
+          }
+        }}
+      >
         <input type="hidden" name="id" value={row.id} />
         <input type="hidden" name="activo" value={row.activo ? "false" : "true"} />
         <Button type="submit" variant={row.activo ? "danger" : "secondary"} disabled={!canMutate}>
@@ -143,7 +170,16 @@ export function MueblesCatalogoSection({ muebles, canMutate }: Props) {
               if (!next) setFormKey((k) => k + 1);
             }}
           >
-            <form key={formKey} action={actionCreate} className="grid gap-3 md:grid-cols-2">
+            <form
+              key={formKey}
+              action={actionCreate}
+              className="grid gap-3 md:grid-cols-2"
+              onSubmit={(e) => {
+                if (!window.confirm("¿Registrar este mueble nuevo en el catálogo?")) {
+                  e.preventDefault();
+                }
+              }}
+            >
               <Field name="codigo" label="Codigo" placeholder="CAT-001" required />
               <Field name="nombre" label="Nombre" required />
               <Field className="md:col-span-2" name="descripcion" label="Descripcion" />

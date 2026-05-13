@@ -6,7 +6,7 @@ import {
   toggleInventarioProductoActivo,
   updateInventarioProducto,
 } from "@/app/actions";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
@@ -86,6 +86,27 @@ type Props = {
   canMutate: boolean;
 };
 
+function ProductoIrAEdicion({
+  nombre,
+  productoId,
+  onGo,
+}: {
+  nombre: string;
+  productoId: string;
+  onGo: (id: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      title="Ir a edición en la pestaña Productos"
+      className="-m-1 max-w-full rounded-md px-1 py-0.5 text-left text-[var(--color-text-primary)] underline-offset-2 hover:bg-[var(--color-primary-soft)] hover:underline focus-visible:outline focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+      onClick={() => onGo(productoId)}
+    >
+      <span className="font-medium">{nombre}</span>
+    </button>
+  );
+}
+
 export function InventarioInteractivo({
   data,
   canMutate,
@@ -109,9 +130,10 @@ export function InventarioInteractivo({
   const [filterEstado, setFilterEstado] = useState<"todos" | "activos" | "inactivos" | "stock_bajo">("todos");
   const [kardexTipo, setKardexTipo] = useState<"todos" | "entrada_compra" | "salida_venta" | "ajuste">("todos");
   const [kardexProducto, setKardexProducto] = useState("todos");
+  const [pendingFocusProductoId, setPendingFocusProductoId] = useState<string | null>(null);
   const clearTimerRef = useRef<number | null>(null);
 
-  function focusProducto(productoId: string) {
+  const focusProducto = useCallback((productoId: string) => {
     const row = document.getElementById(`producto-${productoId}`);
     if (!row) return;
 
@@ -124,7 +146,40 @@ export function InventarioInteractivo({
     clearTimerRef.current = window.setTimeout(() => {
       setHighlightedId(null);
     }, 3500);
-  }
+  }, []);
+
+  const goToProductoEditor = useCallback(
+    (productoId: string) => {
+      setActiveTab("productos");
+      setPendingFocusProductoId(productoId);
+      try {
+        window.history.replaceState(null, "", `#producto-${productoId}`);
+      } catch {
+        /* ignore */
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.location.hash?.replace(/^#/, "") ?? "";
+    const m = /^producto-(.+)$/.exec(raw);
+    if (m?.[1]) {
+      setActiveTab("productos");
+      setPendingFocusProductoId(m[1]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "productos" || !pendingFocusProductoId) return;
+    const id = pendingFocusProductoId;
+    const frame = window.requestAnimationFrame(() => {
+      focusProducto(id);
+      setPendingFocusProductoId(null);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab, pendingFocusProductoId, focusProducto]);
 
   const productosFiltrados = useMemo(() => {
     const q = filterText.trim().toLowerCase();
@@ -201,6 +256,7 @@ export function InventarioInteractivo({
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardTitle>Productos más vendidos</CardTitle>
+          <CardDescription className="mt-1">Clic en un producto para abrir su edición en la pestaña Productos.</CardDescription>
           <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
             <Table>
               <THead>
@@ -212,7 +268,9 @@ export function InventarioInteractivo({
               <tbody>
                 {rankingMasVendidos.slice(0, 8).map((row) => (
                   <TRow key={`top-${row.id}`}>
-                    <TD>{row.nombre}</TD>
+                    <TD>
+                      <ProductoIrAEdicion nombre={row.nombre} productoId={row.id} onGo={goToProductoEditor} />
+                    </TD>
                     <TD className="text-right font-semibold">{row.vendido}</TD>
                   </TRow>
                 ))}
@@ -223,6 +281,7 @@ export function InventarioInteractivo({
 
         <Card>
           <CardTitle>Productos menos vendidos</CardTitle>
+          <CardDescription className="mt-1">Clic en un producto para editarlo sin salir de Inventario.</CardDescription>
           <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
             <Table>
               <THead>
@@ -234,7 +293,9 @@ export function InventarioInteractivo({
               <tbody>
                 {rankingMenosVendidos.slice(0, 8).map((row) => (
                   <TRow key={`low-${row.id}`}>
-                    <TD>{row.nombre}</TD>
+                    <TD>
+                      <ProductoIrAEdicion nombre={row.nombre} productoId={row.id} onGo={goToProductoEditor} />
+                    </TD>
                     <TD className="text-right font-semibold">{row.vendido}</TD>
                   </TRow>
                 ))}
@@ -244,6 +305,7 @@ export function InventarioInteractivo({
         </Card>
         <Card>
           <CardTitle>Más ajustados</CardTitle>
+          <CardDescription className="mt-1">Clic en el producto para revisar o corregir datos en Productos.</CardDescription>
           <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
             <Table>
               <THead>
@@ -255,7 +317,9 @@ export function InventarioInteractivo({
               <tbody>
                 {topAjustes.slice(0, 8).map((row) => (
                   <TRow key={`adj-${row.id}`}>
-                    <TD>{row.nombre}</TD>
+                    <TD>
+                      <ProductoIrAEdicion nombre={row.nombre} productoId={row.id} onGo={goToProductoEditor} />
+                    </TD>
                     <TD className="text-right font-semibold">{row.ajustes}</TD>
                   </TRow>
                 ))}
@@ -302,7 +366,19 @@ export function InventarioInteractivo({
                 highlightedId === row.id && "bg-[var(--color-highlight-bg)] ring-2 ring-[var(--color-highlight-ring)]",
               )}
             >
-              <form action={updateInventarioProducto} className="grid gap-2 md:grid-cols-7">
+              <form
+                action={updateInventarioProducto}
+                className="grid gap-2 md:grid-cols-7"
+                onSubmit={(e) => {
+                  if (
+                    !window.confirm(
+                      "¿Guardar los cambios de este producto? Revisá código, nombre, categoría y stock mínimo antes de continuar.",
+                    )
+                  ) {
+                    e.preventDefault();
+                  }
+                }}
+              >
                 <input type="hidden" name="id" value={row.id} />
                 <Field name="codigo" label="Código" defaultValue={row.codigo} required />
                 <Field name="nombre" label="Nombre" defaultValue={row.nombre} required />
@@ -318,7 +394,18 @@ export function InventarioInteractivo({
                 </div>
               </form>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <form action={toggleInventarioProductoActivo}>
+                <form
+                  action={toggleInventarioProductoActivo}
+                  onSubmit={(e) => {
+                    if (
+                      !window.confirm(
+                        "¿Cambiar el estado activo o inactivo de este producto en el catálogo?",
+                      )
+                    ) {
+                      e.preventDefault();
+                    }
+                  }}
+                >
                   <input type="hidden" name="id" value={row.id} />
                   <input type="hidden" name="activo" value={row.activo ? "false" : "true"} />
                   <Button type="submit" variant="danger" disabled={!canMutate}>
@@ -374,7 +461,13 @@ export function InventarioInteractivo({
               {kardexFiltrado.slice(0, 200).map((row) => (
                 <TRow key={row.id}>
                   <TD>{formatDate(row.fecha)}</TD>
-                  <TD>{row.producto_nombre}</TD>
+                  <TD>
+                    <ProductoIrAEdicion
+                      nombre={row.producto_nombre}
+                      productoId={row.producto_id}
+                      onGo={goToProductoEditor}
+                    />
+                  </TD>
                   <TD>{row.tipo}</TD>
                   <TD className="text-right">{row.cantidad}</TD>
                   <TD className={cn("text-right font-semibold", row.impacto >= 0 ? "text-emerald-600" : "text-red-600")}>
@@ -386,10 +479,19 @@ export function InventarioInteractivo({
                       <form
                         action={deleteInventarioMovimiento}
                         onSubmit={(event) => {
-                          const ok = window.confirm(
-                            "¿Eliminar este movimiento? Esta acción afecta el stock y no se puede deshacer.",
+                          if (
+                            !window.confirm(
+                              "Primera confirmación: vas a eliminar un movimiento del kardex. Esto altera el historial y puede dejar inconsistencias si no coordinás con contabilidad.\n\n¿Seguís adelante?",
+                            )
+                          ) {
+                            event.preventDefault();
+                            return;
+                          }
+                          const typed = window.prompt(
+                            "Confirmación estricta: escribí ELIMINAR en mayúsculas para borrar este movimiento de forma definitiva.",
+                            "",
                           );
-                          if (!ok) {
+                          if (typed !== "ELIMINAR") {
                             event.preventDefault();
                           }
                         }}
@@ -419,8 +521,7 @@ export function InventarioInteractivo({
                   key={item.id}
                   type="button"
                   onClick={() => {
-                    setActiveTab("productos");
-                    focusProducto(item.id);
+                    goToProductoEditor(item.id);
                   }}
                   className="w-full rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-soft)] px-4 py-3 text-left text-sm text-[var(--color-warning-strong)] transition hover:brightness-95"
                 >
@@ -436,12 +537,18 @@ export function InventarioInteractivo({
         </Card>
         <Card>
           <CardTitle>Sin movimiento (+30 días)</CardTitle>
-          <CardDescription>Productos con baja rotación u obsolescencia.</CardDescription>
+          <CardDescription>Clic en un producto para abrir su ficha en la pestaña Productos.</CardDescription>
           <div className="mt-4 space-y-2">
             {sinMovimiento.slice(0, 20).map((p) => (
-              <div key={p.id} className="rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm">
-                <strong>{p.nombre}</strong> · {p.dias_sin_movimiento} días sin movimiento
-              </div>
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => goToProductoEditor(p.id)}
+                className="w-full rounded-xl border border-[var(--color-border)] px-3 py-2 text-left text-sm transition hover:bg-[var(--color-primary-soft)]"
+              >
+                <strong className="text-[var(--color-text-primary)]">{p.nombre}</strong>
+                <span className="text-[var(--color-text-secondary)]"> · {p.dias_sin_movimiento} días sin movimiento</span>
+              </button>
             ))}
             {sinMovimiento.length === 0 ? <p className="text-sm text-[var(--color-text-secondary)]">Sin alertas de inactividad.</p> : null}
           </div>
@@ -449,7 +556,19 @@ export function InventarioInteractivo({
         <Card className="xl:col-span-2">
           <CardTitle>Conteo físico y ajuste automático</CardTitle>
           <CardDescription>Registra stock contado; el sistema crea ajuste con trazabilidad.</CardDescription>
-          <form action={registrarConteoInventario} className="mt-4 grid gap-3 md:grid-cols-4">
+          <form
+            action={registrarConteoInventario}
+            className="mt-4 grid gap-3 md:grid-cols-4"
+            onSubmit={(e) => {
+              if (
+                !window.confirm(
+                  "¿Aplicar el conteo físico? Se generará un ajuste en el kardex con la diferencia respecto al stock del sistema.",
+                )
+              ) {
+                e.preventDefault();
+              }
+            }}
+          >
             <SelectField name="producto_id" label="Producto" defaultValue="" required>
               <option value="" disabled>Seleccionar</option>
               {productos.filter((p) => p.activo !== false).map((p) => (
@@ -484,7 +603,7 @@ export function InventarioInteractivo({
         </Card>
         <Card>
           <CardTitle>Reposición sugerida</CardTitle>
-          <CardDescription>Basado en stock mínimo y stock actual.</CardDescription>
+          <CardDescription>Basado en stock mínimo y stock actual. Clic en el producto para editarlo.</CardDescription>
           <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
             <Table>
               <THead>
@@ -498,7 +617,9 @@ export function InventarioInteractivo({
               <tbody>
                 {reposicionSugerida.slice(0, 20).map((row) => (
                   <TRow key={row.id}>
-                    <TD>{row.nombre}</TD>
+                    <TD>
+                      <ProductoIrAEdicion nombre={row.nombre} productoId={row.id} onGo={goToProductoEditor} />
+                    </TD>
                     <TD className="text-right">{row.stock_actual}</TD>
                     <TD className="text-right">{row.stock_minimo}</TD>
                     <TD className="text-right font-semibold">{row.sugerido_reponer}</TD>
