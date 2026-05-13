@@ -3,7 +3,7 @@ import { InventarioAccionesRapidas } from "@/components/inventario-acciones-rapi
 import { InventarioContextPanels } from "@/components/inventario/inventario-context-panels";
 import { InventarioInteractivo } from "@/components/inventario-interactivo";
 import { MetricCard } from "@/components/metric-card";
-import { getCurrentUserRole } from "@/lib/current-user-role";
+import { getDashboardSession } from "@/lib/current-user-role";
 import { getInventarioRobustoData, getMueblesCatalogoRows } from "@/lib/data";
 import { canMutateInventario } from "@/lib/permissions";
 
@@ -26,8 +26,10 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
   ]);
   const { loadWarning, ...inventarioData } = inventario;
   const { productos } = inventarioData;
-  const role = await getCurrentUserRole();
-  const canMutate = canMutateInventario(role);
+  const session = await getDashboardSession();
+  const role = session?.role ?? null;
+  const uiRole = session?.uiRole ?? null;
+  const canMutate = canMutateInventario(role, uiRole);
 
   return (
     <div className="space-y-6">

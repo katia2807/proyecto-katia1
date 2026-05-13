@@ -6,7 +6,7 @@ import {
   getInventarioProductosRows,
   getMueblesCatalogoRows,
 } from "@/lib/data";
-import { getCurrentUserRole } from "@/lib/current-user-role";
+import { getDashboardSession } from "@/lib/current-user-role";
 import { previewCorrelativo } from "@/lib/numeracion";
 import { canMutateVentas } from "@/lib/permissions";
 
@@ -14,8 +14,10 @@ import { canMutateVentas } from "@/lib/permissions";
 export const dynamic = "force-dynamic";
 
 export default async function CotizacionPage() {
-  const role = await getCurrentUserRole();
-  const canSave = canMutateVentas(role);
+  const session = await getDashboardSession();
+  const role = session?.role ?? null;
+  const uiRole = session?.uiRole ?? null;
+  const canSave = canMutateVentas(role, uiRole);
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const [productos, mueblesCatalogo, clientes, cotizacionesGuardadas, empresa] = await Promise.all([

@@ -2789,7 +2789,7 @@ export function CotizacionUnificadaWizard({
                         Cobrar
                       </button>
                     ) : null}
-                    {c.estado_flujo === "pendiente" ? (
+                    {c.estado_flujo === "pendiente" && canSave ? (
                       <button
                         type="button"
                         className="text-xs font-semibold text-red-600"

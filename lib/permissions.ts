@@ -6,7 +6,7 @@ const cajaMutationRoles = new Set<AppRole>(["owner_admin", "gerencia", "caja", "
 const ventasMutationRoles = new Set<AppRole>(["owner_admin", "gerencia", "ventas"]);
 const rrhhMutationRoles = new Set<AppRole>(["owner_admin", "gerencia", "rrhh"]);
 const liderazgoRoles = new Set<AppRole>(["owner_admin", "gerencia"]);
-const inventarioMutationRoles = new Set<AppRole>(["owner_admin", "gerencia", "almacen"]);
+const inventarioMutationRoles = new Set<AppRole>(["owner_admin", "gerencia", "almacen", "ventas"]);
 const registroMutationRoles = new Set<AppRole>(["owner_admin", "gerencia", "almacen"]);
 
 /** Roles UI nuevos (persistidos en `perfiles.ui_role`). Re-export tipo útil. */
@@ -54,7 +54,7 @@ export function buildNavHrefAllowlist(role: AppRole, uiRole: string | null): Set
     vendedor: ["/", "/ventas", "/ventas/muebles-personalizados", "/cotizacion", "/caja"],
     almacen: ["/", "/inventario", "/registro"],
     caja: ["/", "/caja"],
-    ventas: ["/", "/ventas", "/ventas/muebles-personalizados", "/cotizacion", "/caja"],
+    ventas: ["/", "/ventas", "/ventas/muebles-personalizados", "/cotizacion", "/caja", "/inventario"],
     operaciones_caja: ["/", "/caja"],
     rrhh: ["/"],
     partner_readonly: ["/"],
