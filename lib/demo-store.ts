@@ -2286,7 +2286,7 @@ export function demoDeleteInventarioProducto(
     return {
       ok: false,
       error:
-        "No se puede eliminar: este producto tiene movimientos en el kardex. Eliminá primero esos movimientos o desactivá el producto.",
+        "[INV_KARDEX_BLOCK] No se puede eliminar: este producto tiene movimientos en el kardex. Eliminá primero esos movimientos o desactivá el producto.",
     };
   }
   if (opts?.forzarConMovimientos && movs.length > 0) {

@@ -31,6 +31,7 @@ import {
   demoDeleteCotizacionMueblePersonalizada,
   demoDeleteCotizacionUnificada,
   demoGetCotizacionUnificada,
+  demoInventarioMovimientosRows,
   demoCreateProveedor,
   demoCreateRegistroGeneral,
   demoDeleteByCategory,
@@ -2398,7 +2399,7 @@ export async function deleteInventarioProducto(formData: FormData) {
       if (movErr) throw new Error(`No se pudo verificar el kardex: ${movErr.message}`);
       if (movBlock && movBlock.length > 0) {
         throw new Error(
-          "No se puede eliminar: este producto tiene al menos un movimiento en el kardex. Eliminá primero esos movimientos en la pestaña Kardex o desactivá el producto.",
+          "[INV_KARDEX_BLOCK] No se puede eliminar: este producto tiene al menos un movimiento en el kardex. Eliminá primero esos movimientos en la pestaña Kardex o desactivá el producto.",
         );
       }
     } else {
@@ -2432,6 +2433,30 @@ export async function deleteInventarioProducto(formData: FormData) {
     }
   }
   revalidatePath("/inventario");
+}
+
+/** Consulta real en BD (no depende del límite de movimientos cargados en la página). */
+export async function inventarioProductoTieneMovimientosEnKardex(productoId: string): Promise<boolean> {
+  await requireAuthContext();
+  const idParsed = z.string().uuid().safeParse(productoId);
+  if (!idParsed.success) return false;
+
+  if (!hasSupabaseEnv()) {
+    return demoInventarioMovimientosRows().some((m) => m.producto_id === productoId);
+  }
+
+  const supabase = getSupabaseServerClient();
+  const { count, error } = await supabase
+    .from("inventario_movimientos")
+    .select("id", { count: "exact", head: true })
+    .eq("producto_id", productoId)
+    .eq("organization_id", DEFAULT_ORG_ID);
+
+  if (error) {
+    console.error("[inventarioProductoTieneMovimientosEnKardex]", error.message);
+    return false;
+  }
+  return (count ?? 0) > 0;
 }
 
 export async function deleteInventarioMovimiento(formData: FormData) {

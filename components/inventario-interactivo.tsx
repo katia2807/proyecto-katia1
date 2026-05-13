@@ -3,6 +3,7 @@
 import {
   deleteInventarioMovimiento,
   deleteInventarioProducto,
+  inventarioProductoTieneMovimientosEnKardex,
   registrarConteoInventario,
   toggleInventarioProductoActivo,
 } from "@/app/actions";
@@ -94,6 +95,7 @@ type Props = {
 function isInventarioProductoKardexBlockError(e: unknown): boolean {
   const msg = typeof e === "string" ? e : e instanceof Error ? e.message : "";
   return (
+    msg.includes("[INV_KARDEX_BLOCK]") ||
     /movimiento.*kardex|kardex.*movimiento/i.test(msg) ||
     /tiene al menos un movimiento/i.test(msg) ||
     /tiene movimientos en el kardex/i.test(msg)
@@ -740,8 +742,13 @@ export function InventarioInteractivo({
         onConfirm={async () => {
           if (!deleteProductTarget) return;
           const id = deleteProductTarget.id;
-          const tieneMovsEnCliente = movimientos.some((m) => m.producto_id === id);
-          if (tieneMovsEnCliente) {
+          let tieneMovsEnServidor = false;
+          try {
+            tieneMovsEnServidor = await inventarioProductoTieneMovimientosEnKardex(id);
+          } catch {
+            tieneMovsEnServidor = movimientos.some((m) => m.producto_id === id);
+          }
+          if (tieneMovsEnServidor) {
             deleteProductOpeningCascadeRef.current = true;
             setDeleteProductCascadeOpen(true);
             return;
@@ -778,6 +785,7 @@ export function InventarioInteractivo({
 
       <ConfirmDialog
         open={deleteProductCascadeOpen && Boolean(deleteProductTarget)}
+        stackAbovePhraseConfirm
         onOpenChange={(o) => {
           if (!o) {
             setDeleteProductCascadeOpen(false);

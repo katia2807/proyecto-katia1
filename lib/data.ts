@@ -68,6 +68,18 @@ type CotizacionUnificadaRow = Database["public"]["Tables"]["cotizaciones_unifica
 type CierreRow = Database["public"]["Tables"]["cierres_mensuales"]["Row"];
 type InventarioProductoRow = Database["public"]["Tables"]["inventario_productos"]["Row"];
 type InventarioMovimientoRow = Database["public"]["Tables"]["inventario_movimientos"]["Row"];
+
+/** Columnas físicas de `public.inventario_movimientos` (select explícito; coincide con el esquema del repo). */
+const INVENTARIO_MOVIMIENTOS_SELECT =
+  "id,organization_id,producto_id,fecha,tipo,cantidad,costo_unitario,referencia,created_at" as const;
+
+/** Máximo de filas cargadas para agregados / kardex; el total global usa `count` en paralelo. */
+const INVENTARIO_MOVIMIENTOS_PAGE_LIMIT = 5000;
+
+/** Columnas físicas habituales de `public.inventario_productos`. */
+const INVENTARIO_PRODUCTOS_SELECT =
+  "id,organization_id,codigo,nombre,categoria,unidad,stock_actual,stock_minimo,activo,created_at" as const;
+
 type OrdenProduccionRow = Database["public"]["Tables"]["ordenes_produccion"]["Row"];
 type MuebleCatalogoRow = Database["public"]["Tables"]["muebles_catalogo"]["Row"];
 type VentaMuebleTerminadoRow = Database["public"]["Tables"]["ventas_mueble_terminado"]["Row"];
@@ -562,7 +574,7 @@ async function loadInventarioProductosRows(includeInactive: boolean): Promise<{
     const supabase = getSupabaseServerClient();
     let query = supabase
       .from("inventario_productos")
-      .select("*")
+      .select(INVENTARIO_PRODUCTOS_SELECT)
       .eq("organization_id", DEFAULT_ORG_ID)
       .order("nombre");
     if (!includeInactive) {
@@ -572,12 +584,10 @@ async function loadInventarioProductosRows(includeInactive: boolean): Promise<{
     if (error) {
       throw new Error(error.message);
     }
-    const rows = data ?? [];
+    const rows = (data ?? []) as InventarioProductoRow[];
     return { rows, usedFallback: false };
   } catch (e) {
-    if (process.env.NODE_ENV === "production") {
-      console.error("[getInventarioProductosRows]", e);
-    }
+    console.error("[loadInventarioProductosRows]", e instanceof Error ? e.message : e);
     let rows = fallback.inventarioProductos;
     if (!includeInactive) {
       rows = rows.filter((row) => row.activo !== false);
@@ -594,28 +604,40 @@ export async function getInventarioProductosRows(includeInactive = false) {
 async function loadInventarioMovimientosRows(): Promise<{
   rows: InventarioMovimientoRow[];
   usedFallback: boolean;
+  /** Total de filas en BD para la org (head count); null si no se pudo contar o hubo fallback. */
+  totalRowCount: number | null;
 }> {
   if (!hasSupabaseEnv()) {
-    return { rows: demoInventarioMovimientosRows(), usedFallback: false };
+    const rows = demoInventarioMovimientosRows();
+    return { rows, usedFallback: false, totalRowCount: rows.length };
   }
 
   try {
     const supabase = getSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("inventario_movimientos")
-      .select("*")
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .order("fecha", { ascending: false })
-      .limit(100);
-    if (error) {
-      throw new Error(error.message);
+    const [listRes, countRes] = await Promise.all([
+      supabase
+        .from("inventario_movimientos")
+        .select(INVENTARIO_MOVIMIENTOS_SELECT)
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .order("fecha", { ascending: false })
+        .limit(INVENTARIO_MOVIMIENTOS_PAGE_LIMIT),
+      supabase
+        .from("inventario_movimientos")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", DEFAULT_ORG_ID),
+    ]);
+    if (listRes.error) {
+      throw new Error(listRes.error.message);
     }
-    return { rows: data ?? [], usedFallback: false };
+    if (countRes.error) {
+      console.error("[loadInventarioMovimientosRows] count:", countRes.error.message);
+    }
+    const rows = (listRes.data ?? []) as InventarioMovimientoRow[];
+    const totalRowCount = typeof countRes.count === "number" ? countRes.count : null;
+    return { rows, usedFallback: false, totalRowCount };
   } catch (e) {
-    if (process.env.NODE_ENV === "production") {
-      console.error("[getInventarioMovimientosRows]", e);
-    }
-    return { rows: fallback.inventarioMovimientos, usedFallback: true };
+    console.error("[loadInventarioMovimientosRows]", e instanceof Error ? e.message : e);
+    return { rows: fallback.inventarioMovimientos, usedFallback: true, totalRowCount: null };
   }
 }
 
@@ -659,9 +681,16 @@ export async function getInventarioRobustoData() {
   ]);
   const productosAll = productosBundle.rows;
   const movimientos = movimientosBundle.rows;
+  const totalMovimientosCargados = movimientos.length;
+  const totalMovimientosEnBd =
+    movimientosBundle.totalRowCount != null ? movimientosBundle.totalRowCount : totalMovimientosCargados;
+
+  const loadFailedParts: string[] = [];
+  if (productosBundle.usedFallback) loadFailedParts.push("productos");
+  if (movimientosBundle.usedFallback) loadFailedParts.push("movimientos (kardex)");
   const loadWarning =
-    productosBundle.usedFallback || movimientosBundle.usedFallback
-      ? "No se pudieron cargar los datos de inventario desde la base de datos. Intenta recargar la página."
+    loadFailedParts.length > 0
+      ? `No se pudieron cargar los datos de inventario desde la base de datos (${loadFailedParts.join(" y ")}). Revisá los logs del servidor (prefijos [loadInventarioProductosRows] / [loadInventarioMovimientosRows]).`
       : null;
 
   const productos = productosAll.filter((p) => p.activo !== false);
@@ -778,7 +807,7 @@ export async function getInventarioRobustoData() {
     indicadores: {
       totalProductosActivos: productos.length,
       totalProductosInactivos: productosAll.filter((p) => p.activo === false).length,
-      totalMovimientos: movimientos.length,
+      totalMovimientos: totalMovimientosEnBd,
       totalStock: Number(totalStock.toFixed(2)),
       valorInventario: Number(valorInventario.toFixed(2)),
       rotacionPromedio,

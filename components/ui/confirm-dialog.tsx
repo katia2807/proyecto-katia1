@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 
 const OVERLAY_Z = "z-[10100]";
 const DIALOG_Z = "z-[10101]";
+const OVERLAY_Z_FRONT = "z-[10130]";
+const DIALOG_Z_FRONT = "z-[10131]";
 
 export type ConfirmDialogProps = {
   open: boolean;
@@ -24,6 +26,8 @@ export type ConfirmDialogProps = {
   confirmVariant?: "danger" | "primary";
   /** neutral: encabezado sin tono de alerta (p. ej. guardar cambios). */
   tone?: "caution" | "neutral";
+  /** Apila el modal por encima de diálogos de confirmación por frase (z más alto). */
+  stackAbovePhraseConfirm?: boolean;
 };
 
 /**
@@ -39,6 +43,7 @@ export function ConfirmDialog({
   onConfirm,
   confirmVariant = "danger",
   tone = "caution",
+  stackAbovePhraseConfirm = false,
 }: ConfirmDialogProps) {
   const [mounted, setMounted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -89,12 +94,15 @@ export function ConfirmDialog({
 
   if (!mounted || !open) return null;
 
+  const overlayZ = stackAbovePhraseConfirm ? OVERLAY_Z_FRONT : OVERLAY_Z;
+  const dialogZ = stackAbovePhraseConfirm ? DIALOG_Z_FRONT : DIALOG_Z;
+
   return createPortal(
     <>
       <div
         className={cn(
           "fixed inset-0 transition-opacity",
-          OVERLAY_Z,
+          overlayZ,
           "bg-[color-mix(in_srgb,var(--color-bg)_72%,black)] backdrop-blur-sm",
         )}
         aria-hidden
@@ -109,7 +117,7 @@ export function ConfirmDialog({
         aria-describedby={descId}
         className={cn(
           "fixed left-1/2 top-1/2 flex w-[min(calc(100vw-1.5rem),26rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[var(--border-radius-card)] border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.55)]",
-          DIALOG_Z,
+          dialogZ,
         )}
         onClick={(e) => e.stopPropagation()}
       >
