@@ -7,7 +7,14 @@ import { getServerSupabaseCredentials } from "@/lib/supabase/temp-credentials";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+type LoginPageProps = {
+  searchParams?: Promise<{ aviso?: string | string[] }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const sp = (await searchParams) ?? {};
+  const avisoPanel = String(sp.aviso ?? "") === "panel";
+
   let context = null;
   try {
     context = await getAuthContext();
@@ -54,6 +61,22 @@ export default async function LoginPage() {
           </div>
         ) : null}
 
+        {avisoPanel ? (
+          <div className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)] p-3 text-sm text-[var(--color-text-primary)]">
+            <p className="font-semibold">No se abrió el panel</p>
+            <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
+              La sesión de Supabase puede ser válida pero falta acceso al perfil. Revisa en Supabase: una fila en{" "}
+              <code className="rounded bg-[var(--color-surface)] px-1">perfiles</code> con tu{" "}
+              <code className="rounded bg-[var(--color-surface)] px-1">user_id</code> y la organización de la app (
+              <code className="rounded bg-[var(--color-surface)] px-1">ERP_ORG_ID</code> / valor por defecto del
+              código). Si acabas de aplicar migraciones, incluye la política{" "}
+              <code className="rounded bg-[var(--color-surface)] px-1">perfiles_select_self</code> (última migración
+              del repo). En Vercel, variables distintas por <strong>proyecto</strong> y por entorno: marca{" "}
+              <strong>Production</strong> y <strong>Preview</strong> si usas URLs de preview.
+            </p>
+          </div>
+        ) : null}
+
         {showSupabasePublicKeysMissing ? (
           <div className="mt-4 rounded-xl border border-[var(--color-danger)] bg-[var(--color-primary-soft)] p-3 text-sm">
             <p className="font-semibold text-[var(--color-danger)]">Supabase no está configurado en este servidor</p>
@@ -66,8 +89,10 @@ export default async function LoginPage() {
               <code className="rounded bg-[var(--color-surface)] px-1 text-[var(--color-text-primary)]">
                 NEXT_PUBLIC_SUPABASE_ANON_KEY
               </code>
-              . En <strong>Vercel</strong>: el <strong>mismo proyecto</strong> que despliega esta URL →{" "}
-              <strong>Settings</strong> → <strong>Environment Variables</strong> → marca <strong>Production</strong> →
+              . En <strong>Vercel</strong>: abre el <strong>mismo proyecto</strong> que genera esta URL (cada dominio
+              `*.vercel.app` viene de un proyecto con su propia lista de variables) → <strong>Settings</strong> →{" "}
+              <strong>Environment Variables</strong> → en cada variable marca{" "}
+              <strong>Production</strong> y <strong>Preview</strong> (y <strong>Development</strong> si hace falta) →
               guarda → <strong>Redeploy</strong>. En local: <code className="rounded bg-[var(--color-surface)] px-1">.env.local</code> en la raíz del
               repositorio.
             </p>

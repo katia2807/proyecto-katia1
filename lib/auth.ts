@@ -8,7 +8,12 @@ import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { isDemoDatabaseMode } from "@/lib/demo-mode";
 import { getServerSupabaseCredentials } from "@/lib/supabase/temp-credentials";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import type { AppRole } from "@/lib/supabase/types";
+import type { AppRole, Database } from "@/lib/supabase/types";
+
+type PerfilAuthRow = Pick<
+  Database["public"]["Tables"]["perfiles"]["Row"],
+  "user_id" | "organization_id" | "role" | "full_name" | "ui_role" | "deactivated_at"
+>;
 
 /** Cookie antigua del login local; se borra en logout por si quedó en el navegador. */
 export const LEGACY_LOCAL_AUTH_COOKIE = "katia_local_auth";
@@ -93,20 +98,32 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
     return null;
   }
 
-  let adminClient;
-  try {
-    adminClient = getSupabaseServerClient();
-  } catch {
-    // Sin service role / URL (p. ej. Vercel mal configurado) no debe tumbar la página con 500.
-    return null;
-  }
+  const profileSelect =
+    "user_id,organization_id,role,full_name,ui_role,deactivated_at" as const;
 
-  const { data: profile, error: profileError } = await adminClient
-    .from("perfiles")
-    .select("user_id,organization_id,role,full_name,ui_role,deactivated_at")
-    .eq("user_id", user.id)
-    .eq("organization_id", DEFAULT_ORG_ID)
-    .maybeSingle();
+  let profile: PerfilAuthRow | null = null;
+  let profileError: { message: string } | null = null;
+
+  try {
+    const adminClient = getSupabaseServerClient();
+    const res = await adminClient
+      .from("perfiles")
+      .select(profileSelect)
+      .eq("user_id", user.id)
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .maybeSingle();
+    profile = res.data;
+    profileError = res.error;
+  } catch {
+    const res = await authClient
+      .from("perfiles")
+      .select(profileSelect)
+      .eq("user_id", user.id)
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .maybeSingle();
+    profile = res.data;
+    profileError = res.error;
+  }
 
   if (profileError || !profile?.role) {
     return null;
@@ -143,7 +160,15 @@ export async function requireAuthContext(options: AccessOptions = {}) {
 
   if (!context) {
     if (redirectTo) {
-      redirect(redirectTo);
+      const loginWithAviso =
+        redirectTo === "/login" || redirectTo.startsWith("/login?");
+      redirect(
+        loginWithAviso
+          ? redirectTo.includes("?")
+            ? `${redirectTo}&aviso=panel`
+            : "/login?aviso=panel"
+          : redirectTo,
+      );
     }
     throw new Error("Acceso denegado: sesión inválida.");
   }
