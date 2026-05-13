@@ -54,9 +54,12 @@ export async function loginWithPassword(_prevState: LoginFormState, formData: Fo
           "Modo demo activo (KATIA_USE_DEMO_DB): inicia con test@test.com y la contraseña de prueba indicada en la pantalla de login.",
       };
     }
+    const hint =
+      process.env.VERCEL || process.env.NODE_ENV === "production"
+        ? " En Vercel: tu proyecto → Settings → Environment Variables (marca Production), guarda y haz Redeploy."
+        : " En local: crea o edita `.env.local` en la raíz del repo.";
     return {
-      error:
-        "Supabase no está configurado. Define NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY en el servidor.",
+      error: `Supabase no está configurado. Define NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY.${hint}`,
     };
   }
 
