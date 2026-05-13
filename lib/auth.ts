@@ -111,7 +111,6 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
       .from("perfiles")
       .select(profileSelect)
       .eq("user_id", user.id)
-      .eq("organization_id", DEFAULT_ORG_ID)
       .maybeSingle();
     profile = res.data;
     profileError = res.error;
@@ -120,7 +119,6 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
       .from("perfiles")
       .select(profileSelect)
       .eq("user_id", user.id)
-      .eq("organization_id", DEFAULT_ORG_ID)
       .maybeSingle();
     profile = res.data;
     profileError = res.error;
