@@ -102,7 +102,7 @@ function ProductoIrAEdicion({
   return (
     <button
       type="button"
-      title="Ir a edición en la pestaña Productos"
+      title="Ir a la pestaña Productos y abrir el editor"
       className="-m-1 max-w-full rounded-md px-1 py-0.5 text-left text-[var(--color-text-primary)] underline-offset-2 hover:bg-[var(--color-primary-soft)] hover:underline focus-visible:outline focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
       onClick={() => onGo(productoId)}
     >
@@ -170,11 +170,21 @@ export function InventarioInteractivo({
     if (typeof window === "undefined") return;
     const raw = window.location.hash?.replace(/^#/, "") ?? "";
     const m = /^producto-(.+)$/.exec(raw);
-    if (m?.[1]) {
-      setActiveTab("productos");
-      setEditSession((s) => s + 1);
-      setEditModalProductId(m[1]);
+    if (!m?.[1]) return;
+    const productoId = m[1];
+    setActiveTab("productos");
+    const pathOnly = `${window.location.pathname}${window.location.search}`;
+    try {
+      window.history.replaceState(null, "", pathOnly);
+    } catch {
+      /* ignore */
     }
+    requestAnimationFrame(() => {
+      const row = document.getElementById(`producto-${productoId}`);
+      row?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      setHighlightedId(productoId);
+      window.setTimeout(() => setHighlightedId(null), 3200);
+    });
   }, []);
 
   useEffect(() => {
