@@ -54,9 +54,8 @@ export async function getSupabaseAuthServerClient() {
           cookiesToSet.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options as CookieOptions);
           });
-        } catch (err) {
-          // En Server Actions / algunos renders Next no permite mutar cookies: la sesión no persiste.
-          console.error("[Supabase SSR] no se pudieron escribir cookies de sesión:", err);
+        } catch {
+          // Silencioso en Server Components: solo Server Actions / Route Handlers pueden escribir cookies (Next 15+).
         }
       },
     },
