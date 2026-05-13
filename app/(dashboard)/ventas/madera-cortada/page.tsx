@@ -43,10 +43,8 @@ export default async function MaderaCortadaPage() {
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <CardTitle>Acciones rápidas</CardTitle>
-          <CardDescription>
-            Registrar una venta de madera cortada con cubicaje y entrega.
-          </CardDescription>
+          <CardTitle>Operaciones</CardTitle>
+          <CardDescription>Venta de madera cortada con cubicaje y entrega.</CardDescription>
         </div>
         {canMutate ? (
           <ContextActionPanel

@@ -25,8 +25,8 @@ export default async function PersonalPage() {
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <CardTitle>Acciones rápidas</CardTitle>
-          <CardDescription>Elige solo la acción que vas a hacer ahora.</CardDescription>
+          <CardTitle>Operaciones</CardTitle>
+          <CardDescription>Empleados, adelantos y sueldos desde paneles laterales.</CardDescription>
         </div>
         <div className="flex flex-wrap gap-2">
           {!canMutate ? (

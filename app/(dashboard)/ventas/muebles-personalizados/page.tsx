@@ -56,10 +56,8 @@ export default async function MueblesPersonalizadosPage() {
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <CardTitle>Acciones rápidas</CardTitle>
-          <CardDescription>
-            Crear cotización detallada o aprobar una existente como nueva orden.
-          </CardDescription>
+          <CardTitle>Operaciones</CardTitle>
+          <CardDescription>Nueva cotización o aprobación a orden de producción.</CardDescription>
         </div>
         <div className="flex flex-wrap gap-2">
           {canMutate ? (

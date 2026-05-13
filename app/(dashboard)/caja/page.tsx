@@ -63,8 +63,8 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <CardTitle>Acciones rápidas</CardTitle>
-          <CardDescription>Abre solo lo que necesitas en el momento.</CardDescription>
+          <CardTitle>Operaciones</CardTitle>
+          <CardDescription>Nuevo movimiento o repetir cierres del mes anterior.</CardDescription>
         </div>
         {canMutate ? (
           <div className="flex flex-wrap gap-2">

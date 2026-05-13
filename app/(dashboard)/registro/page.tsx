@@ -37,8 +37,8 @@ export default async function RegistroPage({ searchParams }: RegistroPageProps) 
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <CardTitle>Acción rápida</CardTitle>
-          <CardDescription>Empieza con un dato y evita repetir capturas en distintos módulos.</CardDescription>
+          <CardTitle>Agregar registro</CardTitle>
+          <CardDescription>Se guarda en el historial de esta misma pantalla.</CardDescription>
         </div>
         <RegistroNuevoContextPanel
           key={categoriaId || "all"}

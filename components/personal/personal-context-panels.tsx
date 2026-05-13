@@ -32,7 +32,7 @@ export function PersonalContextPanels({ empleados, mockData = false }: PersonalC
       <ContextActionPanel
         triggerLabel="Registrar empleado"
         title="Nuevo empleado"
-        description="Alta rápida del personal activo."
+        description="Datos del personal activo en nómina."
       >
         <form action={createEmpleado} className="space-y-3">
           <Field name="nombre" label="Nombre completo" required />

@@ -125,8 +125,8 @@ export function RegistroNuevoContextPanel({
   return (
     <ContextActionPanel
       triggerLabel="Nuevo registro"
-      title="Registro rápido categorizado"
-      description="Define la categoría y guarda el hecho con fecha, detalle y monto opcional."
+      title="Nuevo registro"
+      description="Elegí categoría, fecha y detalle; el monto es opcional."
       open={open}
       onOpenChange={(next) => {
         setOpen(next);

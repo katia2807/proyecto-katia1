@@ -37,10 +37,8 @@ export default async function AlquilerMixerPage() {
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <CardTitle>Acciones rápidas</CardTitle>
-          <CardDescription>
-            Crear contrato (calcula depósito y registra ingreso) o cerrarlo aplicando penalidades.
-          </CardDescription>
+          <CardTitle>Operaciones</CardTitle>
+          <CardDescription>Nuevo contrato (depósito e ingreso) o cierre con penalidades.</CardDescription>
         </div>
         <div className="flex flex-wrap gap-2">
           {canMutate ? (

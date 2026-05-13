@@ -183,10 +183,8 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <CardTitle>Acciones rápidas</CardTitle>
-          <CardDescription>
-            Crea cliente, proveedor o chofer sin entrar a un sub-flujo.
-          </CardDescription>
+          <CardTitle>Operaciones</CardTitle>
+          <CardDescription>Alta de cliente, proveedor o chofer.</CardDescription>
         </div>
         <div className="flex flex-wrap gap-2">
           {!canMutate ? (

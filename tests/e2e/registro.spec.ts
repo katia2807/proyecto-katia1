@@ -14,8 +14,8 @@ test.describe("registro general (demo DB)", () => {
     await expect(page.getByRole("heading", { name: "Registro general por categoría" })).toBeVisible();
 
     await page.getByRole("button", { name: "Nuevo registro" }).click();
-    const dialog = page.getByRole("dialog", { name: "Registro rápido categorizado" });
-    await expect(dialog.getByRole("heading", { name: "Registro rápido categorizado" })).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: "Nuevo registro" });
+    await expect(dialog.getByRole("heading", { name: "Nuevo registro" })).toBeVisible();
 
     await pickFirstComboboxOption(page, /Categoría del registro/, "Madera");
     await dialog.getByLabel("Fecha").fill("2026-05-11");

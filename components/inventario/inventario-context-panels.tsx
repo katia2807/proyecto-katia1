@@ -63,7 +63,7 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
     <>
       <ContextActionPanel
         triggerLabel="Registrar compra"
-        title="Entrada rápida de compras"
+        title="Registrar compra"
         description="Registra mercadería entrante y, si corresponde, egreso de caja por la compra."
         open={openCompra}
         onOpenChange={(next) => {

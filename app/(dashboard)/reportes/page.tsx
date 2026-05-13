@@ -169,8 +169,8 @@ export default async function ReportesPage() {
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <CardTitle>Acciones rápidas</CardTitle>
-          <CardDescription>Cierre mensual en panel separado para evitar confusión.</CardDescription>
+          <CardTitle>Operaciones</CardTitle>
+          <CardDescription>Cierre mensual del período seleccionado.</CardDescription>
         </div>
         {canDoCloseMonth ? (
           <ReportesCerrarMesPanel anio={anio} mes={mes} token={token} />

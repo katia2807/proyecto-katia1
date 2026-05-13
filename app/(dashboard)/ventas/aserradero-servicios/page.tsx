@@ -37,10 +37,8 @@ export default async function AserraderoServiciosPage() {
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <CardTitle>Acciones rápidas</CardTitle>
-          <CardDescription>
-            Registrar un servicio nuevo combinando cubicaje base y procesos extra.
-          </CardDescription>
+          <CardTitle>Operaciones</CardTitle>
+          <CardDescription>Nuevo servicio con cubicaje base y procesos extra.</CardDescription>
         </div>
         {canMutate ? (
           <ContextActionPanel

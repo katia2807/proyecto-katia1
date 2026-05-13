@@ -1289,7 +1289,7 @@ export function CotizacionUnificadaWizard({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-              Resumen rápido de cotización
+              Resumen de la cotización
             </p>
             <p className="text-sm text-[var(--color-text-primary)]">
               Paso {effectiveStepIndex + 1}/{steps.length} · Cliente: {nombreCliente || "Sin definir"} · Total:{" "}

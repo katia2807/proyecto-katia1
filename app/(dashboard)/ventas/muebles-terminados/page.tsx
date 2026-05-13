@@ -45,8 +45,8 @@ export default async function MueblesTerminadosPage() {
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <CardTitle>Acciones rápidas</CardTitle>
-          <CardDescription>Agregar al catálogo o registrar una venta.</CardDescription>
+          <CardTitle>Operaciones</CardTitle>
+          <CardDescription>Alta en catálogo o registro de venta.</CardDescription>
         </div>
         <div className="flex flex-wrap gap-2">
           {canMutate ? (
