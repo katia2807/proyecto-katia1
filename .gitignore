@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 temp/supabase.temp.json
 temp/supabase.temp.txt
 temp/login.credentials.txt
