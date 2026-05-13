@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EliminarCotizacionMuebleButton } from "@/components/ventas/eliminar-cotizacion-mueble-button";
 import { MueblesPersonalizadosContextPanels } from "@/components/ventas/muebles-personalizados-context-panels";
 import { CotizadorInteligente } from "@/components/cotizador-inteligente";
 import { KanbanOrdenes } from "@/components/sales/kanban-ordenes";
@@ -28,6 +29,7 @@ export default async function MueblesPersonalizadosPage() {
   ]);
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
+  const canDeleteCotizacionesMueble = role === "owner_admin" || role === "gerencia";
   const clientesById = new Map(clientes.map((c) => [c.id, c.nombre]));
   const cotizacionesById = new Map(cotizaciones.map((c) => [c.id, c]));
   const cotizUnificadasById = new Map(
@@ -91,6 +93,7 @@ export default async function MueblesPersonalizadosPage() {
                 <TH className="text-right">Calculado</TH>
                 <TH className="text-right">Acordado</TH>
                 <TH className="text-right">PDF</TH>
+                {canDeleteCotizacionesMueble ? <TH className="text-right">Acciones</TH> : null}
               </TRow>
             </THead>
             <tbody>
@@ -126,12 +129,20 @@ export default async function MueblesPersonalizadosPage() {
                       Imprimir
                     </Link>
                   </TD>
+                  {canDeleteCotizacionesMueble ? (
+                    <TD className="text-right">
+                      <EliminarCotizacionMuebleButton correlativo={c.correlativo ?? null} id={c.id} />
+                    </TD>
+                  ) : null}
                 </TRow>
               );
               })}
               {cotizacionesPersonalizadas.length === 0 ? (
                 <TRow>
-                  <TD colSpan={8} className="text-center text-[var(--color-text-secondary)]">
+                  <TD
+                    colSpan={canDeleteCotizacionesMueble ? 9 : 8}
+                    className="text-center text-[var(--color-text-secondary)]"
+                  >
                     Aún no hay cotizaciones personalizadas.
                   </TD>
                 </TRow>

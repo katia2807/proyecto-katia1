@@ -2123,6 +2123,35 @@ export function demoCreateCompraMadera(
   persistStore();
 }
 
+/** Elimina cotización `mueble_personalizado` si no tiene orden de producción vinculada (misma regla que Supabase `ON DELETE RESTRICT`). */
+export function demoDeleteCotizacionMueblePersonalizada(
+  id: string,
+): { ok: true } | { ok: false; error: string } {
+  const idx = store.cotizaciones.findIndex((c) => c.id === id);
+  if (idx === -1) {
+    return { ok: false, error: "Cotización no encontrada." };
+  }
+  const row = store.cotizaciones[idx];
+  if (row.tipo !== "mueble_personalizado") {
+    return {
+      ok: false,
+      error: "Solo se pueden eliminar cotizaciones de mueble personalizado desde este listado.",
+    };
+  }
+  const tieneOrden = store.ordenesProduccion.some((o) => o.cotizacion_id === id);
+  if (tieneOrden) {
+    return {
+      ok: false,
+      error:
+        "No se puede eliminar: hay una orden de producción vinculada. Quitá o completá esa orden desde el tablero Kanban antes de borrar la cotización.",
+    };
+  }
+  store.cortes = store.cortes.filter((c) => c.cotizacion_id !== id);
+  store.cotizaciones.splice(idx, 1);
+  persistStore();
+  return { ok: true };
+}
+
 export function demoCreateCotizacion(
   input: Omit<CotizacionRow, "id" | "created_at" | "correlativo"> & {
     correlativo?: string | null;

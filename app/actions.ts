@@ -27,6 +27,7 @@ import {
   demoToggleMuebleCatalogoActivo,
   demoUpdateMuebleCatalogo,
   demoCreateOrdenProduccion,
+  demoDeleteCotizacionMueblePersonalizada,
   demoDeleteCotizacionUnificada,
   demoGetCotizacionUnificada,
   demoCreateProveedor,
@@ -1799,6 +1800,72 @@ export async function createCotizacion(formData: FormData) {
   revalidatePath("/ventas/muebles-corte");
   revalidatePath("/ventas/muebles-personalizados");
   revalidatePath("/");
+}
+
+export async function deleteCotizacionMueblePersonalizada(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireMutationAccess(ventasRoles);
+    const parsedId = z.string().uuid().safeParse(id);
+    if (!parsedId.success) {
+      return { ok: false, error: "Identificador inválido." };
+    }
+    if (!hasSupabaseEnv()) {
+      const res = demoDeleteCotizacionMueblePersonalizada(id);
+      if (!res.ok) {
+        return { ok: false, error: res.error };
+      }
+      revalidatePath("/ventas/muebles-personalizados");
+      revalidatePath("/ventas");
+      return { ok: true };
+    }
+    const supabase = getSupabaseServerClient();
+    const { data: row, error: selErr } = await supabase
+      .from("cotizaciones_mueble")
+      .select("id, tipo")
+      .eq("id", id)
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .maybeSingle();
+    if (selErr) {
+      return { ok: false, error: selErr.message };
+    }
+    if (!row) {
+      return { ok: false, error: "Cotización no encontrada." };
+    }
+    if (row.tipo !== "mueble_personalizado") {
+      return {
+        ok: false,
+        error: "Solo se pueden eliminar cotizaciones de mueble personalizado desde este listado.",
+      };
+    }
+    const { data: orden } = await supabase
+      .from("ordenes_produccion")
+      .select("id")
+      .eq("cotizacion_id", id)
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .maybeSingle();
+    if (orden) {
+      return {
+        ok: false,
+        error:
+          "No se puede eliminar: hay una orden de producción vinculada. Quitá o completá esa orden desde el tablero Kanban antes de borrar la cotización.",
+      };
+    }
+    const { error } = await supabase
+      .from("cotizaciones_mueble")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+    revalidatePath("/ventas/muebles-personalizados");
+    revalidatePath("/ventas");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Ocurrió un problema, intenta de nuevo." };
+  }
 }
 
 export async function createCorteItem(formData: FormData) {
