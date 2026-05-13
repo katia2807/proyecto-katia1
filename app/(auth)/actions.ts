@@ -59,7 +59,7 @@ export async function loginWithPassword(_prevState: LoginFormState, formData: Fo
         ? " En Vercel: tu proyecto → Settings → Environment Variables (marca Production), guarda y haz Redeploy."
         : " En local: crea o edita `.env.local` en la raíz del repo.";
     return {
-      error: `Supabase no está configurado. Define NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY.${hint}`,
+      error: `[Katia] Supabase no está configurado. Define NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY.${hint}`,
     };
   }
 

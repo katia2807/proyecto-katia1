@@ -79,10 +79,16 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
     return null;
   }
 
-  const {
-    data: { user },
-    error: userError,
-  } = await authClient.auth.getUser();
+  let user: { id: string; email?: string | null } | null = null;
+  let userError: Error | null = null;
+  try {
+    const res = await authClient.auth.getUser();
+    userError = res.error;
+    user = res.data.user;
+  } catch {
+    // URL inválida, red caída, etc.: no tumbar toda la RSC con 500.
+    return null;
+  }
   if (userError || !user) {
     return null;
   }

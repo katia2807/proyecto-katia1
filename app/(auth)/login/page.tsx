@@ -5,8 +5,15 @@ import { isDemoDatabaseMode } from "@/lib/demo-mode";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { getServerSupabaseCredentials } from "@/lib/supabase/temp-credentials";
 
+export const dynamic = "force-dynamic";
+
 export default async function LoginPage() {
-  const context = await getAuthContext();
+  let context = null;
+  try {
+    context = await getAuthContext();
+  } catch {
+    context = null;
+  }
   if (context) {
     redirect("/");
   }
@@ -48,13 +55,7 @@ export default async function LoginPage() {
         ) : null}
 
         {showSupabasePublicKeysMissing ? (
-          <div
-            className="mt-4 rounded-xl border p-3 text-sm"
-            style={{
-              borderColor: "var(--color-danger)",
-              backgroundColor: "color-mix(in srgb, var(--color-danger) 14%, transparent)",
-            }}
-          >
+          <div className="mt-4 rounded-xl border border-[var(--color-danger)] bg-[var(--color-primary-soft)] p-3 text-sm">
             <p className="font-semibold text-[var(--color-danger)]">Supabase no está configurado en este servidor</p>
             <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
               Añade{" "}
