@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useEffect, useActionState, useState } from "react";
 import {
   createOrganizationUserForm,
   setOrganizationUserActiveForm,
@@ -11,6 +11,7 @@ import {
 import type { UiRoleSlug } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Field, SelectField } from "@/components/ui/field";
+import { useToast } from "@/components/ui/toast";
 
 const initialFormState: OrgUsersFormState = { error: null };
 
@@ -28,10 +29,19 @@ function roleLabel(slug: UiRoleSlug): string {
 }
 
 export function InviteOrganizationUserForm() {
+  const { showToast } = useToast();
+  const [formKey, setFormKey] = useState(0);
   const [state, action, pending] = useActionState(createOrganizationUserForm, initialFormState);
 
+  useEffect(() => {
+    if (state.success && state.message) {
+      showToast({ variant: "success", message: state.message });
+      setFormKey((k) => k + 1);
+    }
+  }, [state.success, state.message, showToast]);
+
   return (
-    <form action={action} className="mt-4 grid gap-3 md:grid-cols-2">
+    <form key={formKey} action={action} className="mt-4 grid gap-3 md:grid-cols-2">
       <Field name="full_name" label="Nombre completo" required placeholder="Nombre y apellido" />
       <Field
         name="email"

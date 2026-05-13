@@ -17,6 +17,9 @@ type ContextActionPanelProps = {
   description: string;
   children: React.ReactNode;
   openByDefault?: boolean;
+  /** Modo controlado: `open` + `onOpenChange` (p. ej. cerrar tras guardar con éxito). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   /**
    * drawer: panel lateral derecho.
    * dialog: ventana centrada (por defecto; evita recortes por el layout y el cierre con X funciona siempre).
@@ -34,10 +37,25 @@ export function ContextActionPanel({
   description,
   children,
   openByDefault = false,
+  open: controlledOpen,
+  onOpenChange,
   presentation = "dialog",
   replacePathOnClose,
 }: ContextActionPanelProps) {
-  const [open, setOpen] = useState(openByDefault);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(openByDefault);
+  const isControlled = controlledOpen !== undefined && onOpenChange !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (isControlled) {
+        onOpenChange(next);
+      } else {
+        setUncontrolledOpen(next);
+      }
+    },
+    [isControlled, onOpenChange],
+  );
   /** Tras hidratar en el cliente, montamos el portal en `document.body` (SSR devuelve false y coincide con el servidor). */
   const portalReady = useSyncExternalStore(
     () => () => {},
@@ -53,7 +71,7 @@ export function ContextActionPanel({
     if (replacePathOnClose) {
       router.replace(replacePathOnClose);
     }
-  }, [replacePathOnClose, router]);
+  }, [replacePathOnClose, router, setOpen]);
 
   useEffect(() => {
     if (!open) return;

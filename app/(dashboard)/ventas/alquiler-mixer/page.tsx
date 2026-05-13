@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { CierreContratoForm } from "@/components/sales/cierre-contrato-form";
-import { ContratoAlquilerForm } from "@/components/sales/contrato-alquiler-form";
+import { ContratoAlquilerPanel } from "@/components/sales/contrato-alquiler-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
@@ -45,13 +45,7 @@ export default async function AlquilerMixerPage() {
         <div className="flex flex-wrap gap-2">
           {canMutate ? (
             <>
-              <ContextActionPanel
-                triggerLabel="Nuevo contrato"
-                title="Contrato de alquiler"
-                description="Calcula monto total y depósito 30% en vivo. El depósito entra como ingreso al confirmar."
-              >
-                <ContratoAlquilerForm clientes={clientes} mockData={comboMock} />
-              </ContextActionPanel>
+              <ContratoAlquilerPanel clientes={clientes} mockData={comboMock} />
 
               <ContextActionPanel
                 triggerLabel="Cerrar contrato"

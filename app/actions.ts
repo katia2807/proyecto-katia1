@@ -53,6 +53,7 @@ import {
 import { nextCorrelativo } from "@/lib/numeracion";
 import type { FilaImportada } from "@/lib/importar";
 import { hasSupabaseEnv } from "@/lib/runtime";
+import type { MutationFormState } from "@/lib/mutation-form-state";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole, Json } from "@/lib/supabase/types";
 
@@ -3215,4 +3216,128 @@ export async function createServicioAserradero(formData: FormData) {
   revalidatePath("/ventas");
   revalidatePath("/ventas/aserradero-servicios");
   revalidatePath("/caja");
+}
+
+// ---------------------------------------------------------------------------
+// Form wrappers (`useActionState`): éxito/toast en cliente sin lanzar Error
+// ---------------------------------------------------------------------------
+
+export async function submitCajaMovimientoForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createCajaMovimiento(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Movimiento de caja registrado.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo registrar el movimiento.",
+      message: null,
+    };
+  }
+}
+
+export async function submitRegistroGeneralForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createRegistroGeneral(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Registro guardado.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo guardar el registro.",
+      message: null,
+    };
+  }
+}
+
+export async function submitContratoAlquilerForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createContratoAlquiler(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Contrato de alquiler registrado.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo registrar el contrato.",
+      message: null,
+    };
+  }
+}
+
+export async function submitCreateCotizacionForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createCotizacion(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Cotización guardada.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo guardar la cotización.",
+      message: null,
+    };
+  }
+}
+
+export async function submitAprobarCotizacionForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await aprobarCotizacionAOrden(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Cotización aceptada; orden creada.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo aceptar la cotización.",
+      message: null,
+    };
+  }
+}
+
+export async function submitRepetirGastosMesAnteriorForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await repetirGastosMesAnterior(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Gastos del mes anterior copiados.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudieron generar las copias.",
+      message: null,
+    };
+  }
 }

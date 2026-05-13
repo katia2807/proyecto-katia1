@@ -1,7 +1,10 @@
 "use client";
 
-import { createContratoAlquiler } from "@/app/actions";
+import type { ComponentProps } from "react";
 import { useMemo, useState } from "react";
+
+/** Firma que admite `<form action>` con `useActionState` (React tipa la acción enlazada como 1 arg). */
+type FormActionProp = Exclude<ComponentProps<"form">["action"], string | undefined>;
 import { PagoFormFields } from "@/components/sales/pago-form-fields";
 import { Button } from "@/components/ui/button";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
@@ -14,6 +17,8 @@ type Cliente = { id: string; nombre: string; ruc?: string | null };
 type ContratoAlquilerFormProps = {
   clientes: Cliente[];
   mockData?: boolean;
+  /** Acción enlazada con `useActionState` (submit + toast + cierre en el panel). */
+  panelAction: FormActionProp;
 };
 
 const tarifas = [
@@ -22,7 +27,11 @@ const tarifas = [
   { value: "dia", label: "Por día" },
 ] as const;
 
-export function ContratoAlquilerForm({ clientes, mockData = false }: ContratoAlquilerFormProps) {
+export function ContratoAlquilerForm({
+  clientes,
+  mockData = false,
+  panelAction,
+}: ContratoAlquilerFormProps) {
   const hoy = new Date().toISOString().slice(0, 10);
   const [clienteId, setClienteId] = useState("");
   const [tarifa, setTarifa] = useState(0);
@@ -41,7 +50,7 @@ export function ContratoAlquilerForm({ clientes, mockData = false }: ContratoAlq
   const clientesCombo = useMemo(() => contratoClientesToCompleto(clientes), [clientes]);
 
   return (
-    <form action={createContratoAlquiler} className="space-y-4">
+    <form action={panelAction} className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
         <ClienteCombobox
           mockData={mockData}

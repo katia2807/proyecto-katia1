@@ -47,6 +47,9 @@ export type OrganizationUsersListResult = {
 
 export type OrgUsersFormState = {
   error: string | null;
+  /** Solo invitación: éxito para toast y reset del formulario. */
+  success?: boolean;
+  message?: string | null;
 };
 
 export async function listOrganizationUsers(): Promise<OrganizationUsersListResult> {
@@ -295,14 +298,18 @@ export async function createOrganizationUserForm(
   formData: FormData,
 ): Promise<OrgUsersFormState> {
   const ui = parseUiRole(String(formData.get("ui_role") ?? ""));
-  if (!ui) return { error: "Selecciona un rol válido." };
+  if (!ui) return { error: "Selecciona un rol válido.", success: false };
   const result = await createOrganizationUser({
     email: String(formData.get("email") ?? ""),
     fullName: String(formData.get("full_name") ?? ""),
     uiRole: ui,
   });
-  if (!result.ok) return { error: result.error };
-  return { error: null };
+  if (!result.ok) return { error: result.error, success: false };
+  return {
+    error: null,
+    success: true,
+    message: "Invitación enviada. El usuario recibirá un correo para acceder.",
+  };
 }
 
 export async function updateOrganizationUserForm(
