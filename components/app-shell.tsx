@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { Suspense, useState } from "react";
 import {
   IconBuildingWarehouse,
   IconChartBar,
@@ -24,8 +24,8 @@ import {
 import { navItems } from "@/lib/constants";
 import { logout } from "@/app/(auth)/actions";
 import type { AppRole } from "@/lib/supabase/types";
-import { canAccessPath } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
+import { AppShellAccessGuard } from "@/components/app-shell-access-guard";
 
 const icons = {
   "/": IconLayoutDashboard,
@@ -87,22 +87,12 @@ function pageTitleFromPath(pathname: string) {
 
 export function AppShell({ children, userName, userRole, uiRole, navAllowlist }: AppShellProps) {
   const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const activeHref =
     [...navItems]
       .filter((item) => item.href === "/" ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`))
       .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? "/";
-
-  useEffect(() => {
-    const mensaje = searchParams.get("mensaje");
-    const canAccess = canAccessPath(userRole, uiRole, pathname);
-    if (!canAccess && !(pathname === "/" && mensaje === "no-acceso")) {
-      router.replace("/?mensaje=no-acceso");
-    }
-  }, [pathname, router, searchParams, uiRole, userRole]);
 
   const pageTitle = pageTitleFromPath(pathname);
   const userInitial = userName.trim().charAt(0).toUpperCase() || "U";
@@ -155,6 +145,9 @@ export function AppShell({ children, userName, userRole, uiRole, navAllowlist }:
 
   return (
     <div className="flex min-h-screen bg-[var(--color-bg)]">
+      <Suspense fallback={null}>
+        <AppShellAccessGuard pathname={pathname} uiRole={uiRole} userRole={userRole} />
+      </Suspense>
       <aside
         className={cn(
           "hidden shrink-0 border-r border-[var(--border-color)] bg-[var(--bg-sidebar)] p-3 lg:flex lg:flex-col",

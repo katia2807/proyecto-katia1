@@ -162,7 +162,11 @@ type CotizacionDraft = {
 };
 
 function newId() {
-  return crypto.randomUUID();
+  const c = globalThis.crypto;
+  if (c && typeof c.randomUUID === "function") {
+    return c.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
 function emptyPieza(): MuebleLineaPieza {
@@ -725,7 +729,7 @@ export function CotizacionUnificadaWizard({
     const name = window.prompt("Nombre de la plantilla de mueble:");
     if (!name || !name.trim()) return;
     const next: MuebleTemplate = {
-      id: crypto.randomUUID(),
+      id: newId(),
       name: name.trim(),
       tipoMuebleVista,
       unidadEspesorUI,
