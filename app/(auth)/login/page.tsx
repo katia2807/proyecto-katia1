@@ -3,12 +3,17 @@ import { LoginForm } from "@/components/auth/login-form";
 import { getAuthContext } from "@/lib/auth";
 import { isDemoDatabaseMode } from "@/lib/demo-mode";
 import { hasSupabaseEnv } from "@/lib/runtime";
+import { getServerSupabaseCredentials } from "@/lib/supabase/temp-credentials";
 
 export default async function LoginPage() {
   const context = await getAuthContext();
   if (context) {
     redirect("/");
   }
+
+  const { url: supabaseUrl, anonKey: supabaseAnon } = getServerSupabaseCredentials();
+  const showSupabasePublicKeysMissing =
+    !isDemoDatabaseMode() && (!supabaseUrl?.trim() || !supabaseAnon?.trim());
 
   const showLocalDemoHint =
     isDemoDatabaseMode() || (process.env.NODE_ENV === "development" && !hasSupabaseEnv());
@@ -39,6 +44,32 @@ export default async function LoginPage() {
                 archivo de ejemplo en la raíz del repo).
               </p>
             ) : null}
+          </div>
+        ) : null}
+
+        {showSupabasePublicKeysMissing ? (
+          <div
+            className="mt-4 rounded-xl border p-3 text-sm"
+            style={{
+              borderColor: "var(--color-danger)",
+              backgroundColor: "color-mix(in srgb, var(--color-danger) 14%, transparent)",
+            }}
+          >
+            <p className="font-semibold text-[var(--color-danger)]">Supabase no está configurado en este servidor</p>
+            <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
+              Añade{" "}
+              <code className="rounded bg-[var(--color-surface)] px-1 text-[var(--color-text-primary)]">
+                NEXT_PUBLIC_SUPABASE_URL
+              </code>{" "}
+              y{" "}
+              <code className="rounded bg-[var(--color-surface)] px-1 text-[var(--color-text-primary)]">
+                NEXT_PUBLIC_SUPABASE_ANON_KEY
+              </code>
+              . En <strong>Vercel</strong>: el <strong>mismo proyecto</strong> que despliega esta URL →{" "}
+              <strong>Settings</strong> → <strong>Environment Variables</strong> → marca <strong>Production</strong> →
+              guarda → <strong>Redeploy</strong>. En local: <code className="rounded bg-[var(--color-surface)] px-1">.env.local</code> en la raíz del
+              repositorio.
+            </p>
           </div>
         ) : null}
 
