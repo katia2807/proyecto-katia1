@@ -54,8 +54,9 @@ export async function getSupabaseAuthServerClient() {
           cookiesToSet.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options as CookieOptions);
           });
-        } catch {
-          // During certain renders, cookie mutations are not available.
+        } catch (err) {
+          // En Server Actions / algunos renders Next no permite mutar cookies: la sesión no persiste.
+          console.error("[Supabase SSR] no se pudieron escribir cookies de sesión:", err);
         }
       },
     },
