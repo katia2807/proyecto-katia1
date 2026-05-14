@@ -199,6 +199,9 @@ const ventaPdfSchema = z.object({
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("contado"),
   referenciaPdf: z.string().optional(),
+  banco: z.string().optional(),
+  numeroOperacion: z.string().optional(),
+  notasCompletas: z.string().optional(),
 });
 
 const aprobarCotizacionSchema = z.object({
@@ -2626,6 +2629,9 @@ export async function createVentaDesdePdf(formData: FormData) {
     metodoPago: formData.get("metodo_pago"),
     modalidadPago: formData.get("modalidad_pago"),
     referenciaPdf: formData.get("referencia_pdf"),
+    banco: formData.get("banco"),
+    numeroOperacion: formData.get("numero_operacion"),
+    notasCompletas: formData.get("notas_completas"),
   });
 
   if (!parsed.success) {
@@ -2633,7 +2639,11 @@ export async function createVentaDesdePdf(formData: FormData) {
     throw new Error("Datos de venta PDF inválidos.");
   }
 
-  const { clienteId, fecha, total, tipoEvento, detalle, metodoPago, modalidadPago, referenciaPdf } = parsed.data;
+  const { 
+    clienteId, fecha, total, tipoEvento, detalle, 
+    metodoPago, modalidadPago, referenciaPdf, 
+    banco, numeroOperacion, notasCompletas 
+  } = parsed.data;
 
   if (!hasSupabaseEnv()) {
     const correlativo = await nextCorrelativo("venta_pdf");
@@ -2653,7 +2663,7 @@ export async function createVentaDesdePdf(formData: FormData) {
       medio: mapMetodoPagoVentaToMedioCaja(metodoPago),
       categoria: `venta_pdf_${tipoEvento.toLowerCase()}`,
       monto: total,
-      descripcion: `Venta PDF (${tipoEvento}): ${detalle || "Sin detalle"}. Ref: ${referenciaPdf || "N/A"}`,
+      descripcion: `Venta PDF (${tipoEvento}): ${detalle || "Sin detalle"}. Ref: ${referenciaPdf || "N/A"}. Banco: ${banco || "N/A"}. Op: ${numeroOperacion || "N/A"}. Notas: ${notasCompletas || "N/A"}`,
       modulo_origen: "ventas_pdf",
       es_personal: false,
     });
@@ -2696,7 +2706,10 @@ export async function createVentaDesdePdf(formData: FormData) {
         tipo_evento: tipoEvento, 
         metodo_pago: metodoPago,
         modalidad_pago: modalidadPago,
-        correlativo: `PDF-${correlativo}`
+        correlativo: `PDF-${correlativo}`,
+        banco,
+        numero_operacion: numeroOperacion,
+        notas_completas: notasCompletas
       },
       created_by: actor.userId
     }).select("id").single();
@@ -2711,7 +2724,7 @@ export async function createVentaDesdePdf(formData: FormData) {
       medio: mapMetodoPagoVentaToMedioCaja(metodoPago),
       categoria: "ventas_pdf",
       monto: total,
-      descripcion: `Venta PDF ${tipoEvento} - Ref: ${referenciaPdf || correlativo}`,
+      descripcion: `Venta PDF ${tipoEvento} - Banco: ${banco || "N/A"} - Op: ${numeroOperacion || "N/A"}`,
       modulo_origen: "ventas_pdf",
       referencia_id: registro.id,
       created_by: actor.userId

@@ -21,6 +21,9 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
     total: number;
     tipoEvento: string;
     detalle: string;
+    banco: string;
+    numeroOperacion: string;
+    notasCompletas: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -40,18 +43,21 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
     setError(null);
     setExtractedData(null);
 
-    // Simulación de extracción con IA
+    // Simulación de extracción con IA avanzada
     setTimeout(() => {
-      // Intentamos "adivinar" datos basados en el nombre del archivo o simplemente devolvemos un mock profesional
       const fileName = file.name.toLowerCase();
       
       let suggestedTotal = 1250.50;
       let suggestedEvent = "Venta General";
       let suggestedClient = clientes[0]?.id || "";
+      let suggestedBank = "Banco de Crédito (BCP)";
+      let suggestedOp = "OP-" + Math.floor(Math.random() * 999999);
 
       if (fileName.includes("factura")) suggestedEvent = "Factura de Venta";
       if (fileName.includes("cotizacion")) suggestedEvent = "Cotización Aprobada";
       if (fileName.includes("recibo")) suggestedEvent = "Recibo de Pago";
+      if (fileName.includes("bbva")) suggestedBank = "BBVA";
+      if (fileName.includes("interbank")) suggestedBank = "Interbank";
 
       setExtractedData({
         clienteId: suggestedClient,
@@ -59,6 +65,9 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
         total: suggestedTotal,
         tipoEvento: suggestedEvent,
         detalle: `Importado desde archivo: ${file.name}`,
+        banco: suggestedBank,
+        numeroOperacion: suggestedOp,
+        notasCompletas: `Contenido completo detectado:\n- RUC: 20601234567\n- Dirección: Av. Principal 123\n- Ítems: 3 Puertas de Cedro\n- Fecha de emisión: ${new Date().toLocaleDateString()}\n- Términos: Entrega en 15 días.`,
       });
       setIsProcessing(false);
     }, 2000);
@@ -187,11 +196,49 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
                   </select>
                 </div>
 
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                    Banco de la Operación
+                  </label>
+                  <input
+                    name="banco"
+                    type="text"
+                    defaultValue={extractedData.banco}
+                    placeholder="Ej. BCP, BBVA..."
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-white p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                    Número de Operación
+                  </label>
+                  <input
+                    name="numero_operacion"
+                    type="text"
+                    defaultValue={extractedData.numeroOperacion}
+                    placeholder="N° de referencia"
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-white p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
+                  />
+                </div>
+
                 <div className="md:col-span-2">
                   <Field 
                     name="detalle" 
-                    label="Detalle / Observaciones" 
+                    label="Título / Resumen de la Venta" 
                     defaultValue={extractedData.detalle}
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                    Contenido Completo Detectado (Notas)
+                  </label>
+                  <textarea
+                    name="notas_completas"
+                    rows={4}
+                    defaultValue={extractedData.notasCompletas}
+                    className="mt-1 w-full rounded-xl border border-[var(--color-border)] bg-white p-3 text-xs font-mono focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
                   />
                 </div>
 
