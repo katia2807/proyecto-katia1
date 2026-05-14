@@ -39,7 +39,7 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
         <p className="text-sm text-[var(--color-text-secondary)]">
           Vista visual primero. Los <strong>muebles terminados</strong> (para ventas) se administran en la pestaña{" "}
           <strong>Catálogo muebles</strong>. Los insumos y stock general están en <strong>Productos</strong>. Prioridad
-          de compras (80/20) en <strong>Prioridad (80/20)</strong>; el kardex sigue en su pestaña.
+          de compras (Pareto ABC) en <strong>Toma de decisiones</strong>; el kardex sigue en su pestaña.
         </p>
       </div>
 

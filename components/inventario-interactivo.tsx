@@ -8,7 +8,12 @@ import {
   toggleInventarioProductoActivo,
 } from "@/app/actions";
 import { InventarioProductoEditModal } from "@/components/inventario/inventario-producto-edit-modal";
+import { InventarioTomaDecisionesCharts } from "@/components/inventario/inventario-toma-decisiones-charts";
 import { MueblesCatalogoSection } from "@/components/inventario/muebles-catalogo-section";
+import {
+  buildParetoInventarioRows,
+  type ParetoInventarioMode,
+} from "@/lib/inventario-pareto";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -102,7 +107,7 @@ type InventarioInteractiveTab =
   | "resumen"
   | "productos"
   | "muebles"
-  | "prioridad"
+  | "decisiones"
   | "kardex"
   | "alertas"
   | "reportes";
@@ -120,54 +125,16 @@ const INVENTARIO_TAB_ORDER: InventarioInteractiveTab[] = [
   "resumen",
   "productos",
   "muebles",
-  "prioridad",
+  "decisiones",
   "kardex",
   "alertas",
   "reportes",
 ];
 
-type ParetoInventarioMode = "unidades" | "valor_costo";
-
-type ParetoInventarioRow = {
-  producto: ProductoEnriched;
-  metric: number;
-  pctTotal: number;
-  pctAcum: number;
-  clase: "A" | "B" | "C";
-};
-
-function metricParetoProducto(p: ProductoEnriched, mode: ParetoInventarioMode): number {
-  if (mode === "unidades") return Number(p.vendido);
-  return Number((Number(p.vendido) * Number(p.costo_unitario_promedio)).toFixed(2));
-}
-
-function buildParetoInventarioRows(
-  productos: ProductoEnriched[],
-  mode: ParetoInventarioMode,
-): { rows: ParetoInventarioRow[]; totalMetric: number; countHasta80: number } {
-  const activos = productos.filter((p) => p.activo !== false);
-  const sorted = [...activos].sort((a, b) => metricParetoProducto(b, mode) - metricParetoProducto(a, mode));
-  const totalMetric = sorted.reduce((s, p) => s + metricParetoProducto(p, mode), 0);
-  let cumBefore = 0;
-  const rows: ParetoInventarioRow[] = [];
-  for (const p of sorted) {
-    const m = metricParetoProducto(p, mode);
-    const cumBeforePct = totalMetric > 0 ? (cumBefore / totalMetric) * 100 : 0;
-    const clase: "A" | "B" | "C" =
-      cumBeforePct < 80 ? "A" : cumBeforePct < 95 ? "B" : "C";
-    cumBefore += m;
-    const pctTotal = totalMetric > 0 ? (m / totalMetric) * 100 : 0;
-    const pctAcum = totalMetric > 0 ? (cumBefore / totalMetric) * 100 : 0;
-    rows.push({ producto: p, metric: m, pctTotal, pctAcum, clase });
-  }
-  const idx80 = rows.findIndex((r) => r.pctAcum >= 80);
-  const countHasta80 = idx80 >= 0 ? idx80 + 1 : rows.length;
-  return { rows, totalMetric, countHasta80 };
-}
-
 function inventarioTabFromSearchParam(tab: string | null): InventarioInteractiveTab {
   const raw = (tab ?? "").trim().toLowerCase();
   if (!raw) return "resumen";
+  if (raw === "prioridad") return "decisiones";
   return INVENTARIO_TAB_ORDER.includes(raw as InventarioInteractiveTab)
     ? (raw as InventarioInteractiveTab)
     : "resumen";
@@ -402,15 +369,15 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
         <CardTitle>Centro de control de inventario</CardTitle>
         <CardDescription>
           Pestaña <strong>Productos</strong>: insumos y stock del taller. <strong>Catálogo muebles</strong>: ventas.{" "}
-          <strong>Prioridad (80/20)</strong>: mismos datos de ventas y costo que el resumen, con clase A/B/C para foco
-          de compras. <strong>Kardex</strong> sin cambios. Alertas y reportes en sus pestañas.
+          <strong>Toma de decisiones</strong>: Pareto ABC, gráficos y tabla (mismos datos que el resumen).{" "}
+          <strong>Kardex</strong> sin cambios. Alertas y reportes en sus pestañas.
         </CardDescription>
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="button" className={tabBtnClass("resumen")} onClick={() => irATab("resumen")}>Resumen</button>
           <button type="button" className={tabBtnClass("productos")} onClick={() => irATab("productos")}>Productos</button>
           <button type="button" className={tabBtnClass("muebles")} onClick={() => irATab("muebles")}>Catálogo muebles</button>
-          <button type="button" className={tabBtnClass("prioridad")} onClick={() => irATab("prioridad")}>
-            Prioridad (80/20)
+          <button type="button" className={tabBtnClass("decisiones")} onClick={() => irATab("decisiones")}>
+            Toma de decisiones
           </button>
           <button type="button" className={tabBtnClass("kardex")} onClick={() => irATab("kardex")}>Kardex</button>
           <button type="button" className={tabBtnClass("alertas")} onClick={() => irATab("alertas")}>Alertas</button>
@@ -445,14 +412,13 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
 
       {activeTab === "resumen" ? (
         <Card className="border-dashed border-[var(--color-accent)]/35 bg-[var(--color-primary-soft)]/40">
-          <CardTitle className="text-base">Prioridad de compras (80/20)</CardTitle>
+          <CardTitle className="text-base">Toma de decisiones (compras y foco)</CardTitle>
           <CardDescription className="mt-1">
-            Vista dedicada con curva de Pareto y clases A/B/C sobre las mismas salidas por venta que ya usás en el
-            resumen (no reemplaza al kardex).
+            Gráficos Pareto / ABC y tabla detallada; misma base de datos que rankings y kardex (no sustituye al kardex).
           </CardDescription>
           <div className="mt-3">
-            <Button type="button" variant="secondary" onClick={() => irATab("prioridad")}>
-              Abrir pestaña Prioridad (80/20)
+            <Button type="button" variant="secondary" onClick={() => irATab("decisiones")}>
+              Abrir Toma de decisiones
             </Button>
           </div>
         </Card>
@@ -679,10 +645,10 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
         </div>
       ) : null}
 
-      {activeTab === "prioridad" ? (
-        <div id="inventario-prioridad" className="space-y-4">
+      {activeTab === "decisiones" ? (
+        <div id="inventario-toma-decisiones" className="space-y-4">
           <Card>
-            <CardTitle>Prioridad de compras · 80/20 (ABC)</CardTitle>
+            <CardTitle>Toma de decisiones · Pareto y ABC</CardTitle>
             <CardDescription className="mt-1 space-y-2">
               <span className="block">
                 Usa los mismos totales por producto que el resumen: unidades vendidas sumando movimientos{" "}
@@ -714,7 +680,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
               <CardTitle>Sin datos de venta</CardTitle>
               <CardDescription>
                 No hay salidas por venta registradas en los movimientos cargados, o todas las cantidades son cero. Cuando
-                haya ventas, acá aparecerá el ranking y el corte 80/20.
+                haya ventas, acá aparecerán los gráficos y el ranking.
               </CardDescription>
             </Card>
           ) : (
@@ -757,8 +723,14 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                 </Card>
               </div>
 
+              <InventarioTomaDecisionesCharts
+                rows={paretoInventario.rows}
+                mode={paretoMode}
+                totalMetric={paretoInventario.totalMetric}
+              />
+
               <Card>
-                <CardTitle>Ranking con % acumulado</CardTitle>
+                <CardTitle>Tabla · ranking con % acumulado</CardTitle>
                 <CardDescription>
                   Clic en el producto para editarlo. Stock bajo respecto al mínimo: podés reponer con el mismo flujo que
                   en alertas.
