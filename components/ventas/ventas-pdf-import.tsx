@@ -116,7 +116,7 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
                 <Check className="h-5 w-5 text-green-500" />
                 <span className="font-semibold text-[var(--color-text-primary)]">Datos extraídos con éxito</span>
               </div>
-              <Button variant="ghost" size="sm" onClick={reset} className="text-xs">
+              <Button variant="secondary" onClick={reset} className="h-8 px-2 text-xs">
                 Cambiar archivo
               </Button>
             </div>
