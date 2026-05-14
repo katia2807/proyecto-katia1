@@ -37,7 +37,7 @@ const tarjetas: Tarjeta[] = [
   {
     href: "/ventas/muebles-terminados",
     titulo: "Muebles terminados",
-    descripcion: "Catálogo, venta directa, regateo y entrega con chofer asignado.",
+    descripcion: "Venta directa desde el catálogo (el alta del catálogo está en Inventario). Regateo y entrega con chofer.",
     icono: Boxes,
     badge: "Catálogo",
   },

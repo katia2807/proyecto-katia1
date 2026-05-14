@@ -14,7 +14,7 @@ const PANEL_Z = "z-[9999]";
 type ContextActionPanelProps = {
   triggerLabel: string;
   title: string;
-  description: string;
+  description?: React.ReactNode;
   children: React.ReactNode;
   /** No renderiza el botón disparador (solo modo controlado con `open` / `onOpenChange`). */
   omitTrigger?: boolean;
@@ -104,7 +104,9 @@ export function ContextActionPanel({
         <h3 id={titleId} className="text-lg font-semibold text-[var(--color-text-primary)]">
           {title}
         </h3>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{description}</p>
+        {description ? (
+          <div className="mt-1 text-sm text-[var(--color-text-secondary)]">{description}</div>
+        ) : null}
       </div>
       <Button
         type="button"

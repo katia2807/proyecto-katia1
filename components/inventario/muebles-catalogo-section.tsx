@@ -157,7 +157,10 @@ export function MueblesCatalogoSection({ muebles, canMutate }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <CardTitle>Catalogo de muebles</CardTitle>
-          <CardDescription>Gestiona precio sugerido, descripcion y estado para cotizaciones de mueble terminado.</CardDescription>
+          <CardDescription>
+            Aquí se da de alta y se mantiene el catálogo de muebles terminados. Ventas y cotizaciones solo eligen ítems
+            que existan acá (no hay alta de catálogo en el módulo de ventas).
+          </CardDescription>
         </div>
         {canMutate ? (
           <ContextActionPanel

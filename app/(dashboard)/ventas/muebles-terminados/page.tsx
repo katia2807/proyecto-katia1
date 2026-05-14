@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { marcarEntregaMueble } from "@/app/actions";
 import { MueblesTerminadosContextPanels } from "@/components/ventas/muebles-terminados-context-panels";
 import { Badge } from "@/components/ui/badge";
@@ -39,14 +40,18 @@ export default async function MueblesTerminadosPage() {
       <div>
         <h2 className="text-xl font-bold">Muebles terminados</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Catálogo de muebles listos para entrega inmediata. Cada venta confirma el ingreso en caja según método de pago.
+          Catálogo de muebles listos para entrega inmediata. Las ventas usan solo ítems ya dados de alta en{" "}
+          <Link href="/inventario" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
+            Inventario
+          </Link>
+          . Cada venta confirma el ingreso en caja según método de pago.
         </p>
       </div>
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <CardTitle>Operaciones</CardTitle>
-          <CardDescription>Alta en catálogo o registro de venta.</CardDescription>
+          <CardDescription>Registrar ventas con muebles del catálogo (el catálogo se administra en Inventario).</CardDescription>
         </div>
         <div className="flex flex-wrap gap-2">
           {canMutate ? (
@@ -122,8 +127,15 @@ export default async function MueblesTerminadosPage() {
             </Card>
           ))}
           {muebles.length === 0 ? (
-            <Card className="md:col-span-2 xl:col-span-3 text-center text-sm text-[var(--color-text-secondary)]">
-              Aún no hay muebles en catálogo. Usa “Agregar mueble”.
+            <Card className="md:col-span-2 xl:col-span-3 space-y-2 text-center text-sm text-[var(--color-text-secondary)]">
+              <p>Aún no hay muebles en catálogo.</p>
+              <p>
+                Para agregar muebles al catálogo andá a{" "}
+                <Link href="/inventario" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
+                  Inventario
+                </Link>{" "}
+                → pestaña <strong>Productos</strong> → <strong>Catálogo de muebles</strong>.
+              </p>
             </Card>
           ) : null}
         </div>

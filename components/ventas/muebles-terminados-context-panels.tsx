@@ -1,9 +1,8 @@
 "use client";
 
-import { createMuebleCatalogo, createVentaMuebleTerminado } from "@/app/actions";
+import { createVentaMuebleTerminado } from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { EntregaFormFields } from "@/components/sales/entrega-form-fields";
-import { FotoUpload } from "@/components/sales/foto-upload";
 import { PagoFormFields } from "@/components/sales/pago-form-fields";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { Combobox } from "@/components/ui/Combobox";
@@ -12,6 +11,7 @@ import { Field } from "@/components/ui/field";
 import { liteClientesToCompleto, MOCK_MUEBLES_CATALOGO_VENTA } from "@/lib/combobox-mocks";
 import type { ZonaEntregaRow } from "@/lib/demo-store";
 import { formatPen } from "@/lib/utils";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 type ClienteOpt = { id: string; nombre: string };
@@ -68,52 +68,18 @@ export function MueblesTerminadosContextPanels({
   return (
     <>
       <ContextActionPanel
-        triggerLabel="Agregar mueble"
-        title="Nuevo mueble en catálogo"
-        description="Foto opcional, precio de lista y stock disponible."
-      >
-        <form action={createMuebleCatalogo} className="grid gap-3 md:grid-cols-2">
-          <Field name="codigo" label="Código" placeholder="MT-001" required />
-          <Field name="nombre" label="Nombre del mueble" required />
-          <Field
-            className="md:col-span-2"
-            name="descripcion"
-            label="Descripción"
-            placeholder="Material, dimensiones, acabado…"
-          />
-          <Field
-            name="precio_lista"
-            label="Precio de lista (S/)"
-            type="number"
-            min="0"
-            step="0.01"
-            required
-          />
-          <Field
-            name="stock_disponible"
-            label="Stock disponible"
-            type="number"
-            min="0"
-            step="1"
-            defaultValue="0"
-          />
-          <div className="md:col-span-2">
-            <FotoUpload
-              bucket="muebles"
-              name="foto_url"
-              label="Foto del mueble (PNG/JPG/WEBP, máx. 5 MB)"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <PendingSubmitButton idleText="Guardar mueble" />
-          </div>
-        </form>
-      </ContextActionPanel>
-
-      <ContextActionPanel
         triggerLabel="Vender mueble"
         title="Nueva venta de mueble"
-        description="Cliente, mueble del catálogo, regateo, chofer y pago."
+        description={
+          <>
+            Solo muebles que ya existen en el catálogo. Para dar de alta o editar precios, fotos y stock del catálogo
+            usá{" "}
+            <Link href="/inventario" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
+              Inventario
+            </Link>{" "}
+            → pestaña <strong>Productos</strong> → sección <strong>Catálogo de muebles</strong>.
+          </>
+        }
       >
         <form action={createVentaMuebleTerminado} className="space-y-4">
           <ClienteCombobox
