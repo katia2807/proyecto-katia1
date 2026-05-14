@@ -104,6 +104,9 @@ type Props = {
   mueblesCatalogo: MuebleCatalogoInventarioRow[];
 };
 
+/** Filas iniciales en pestaña Productos; “Mostrar más” amplía sin recargar. */
+const PRODUCTOS_LIST_PAGE = 50;
+
 function isInventarioProductoKardexBlockError(e: unknown): boolean {
   const msg = typeof e === "string" ? e : e instanceof Error ? e.message : "";
   return (
@@ -160,6 +163,7 @@ export function InventarioInteractivo({
   const [filterText, setFilterText] = useState("");
   const [filterCategoria, setFilterCategoria] = useState("todas");
   const [filterEstado, setFilterEstado] = useState<"todos" | "activos" | "inactivos" | "stock_bajo">("todos");
+  const [productosListLimit, setProductosListLimit] = useState(PRODUCTOS_LIST_PAGE);
   const [kardexTipo, setKardexTipo] = useState<"todos" | "entrada_compra" | "salida_venta" | "ajuste">("todos");
   const [kardexProducto, setKardexProducto] = useState("todos");
   const [editModalProductId, setEditModalProductId] = useState<string | null>(null);
@@ -173,6 +177,9 @@ export function InventarioInteractivo({
   const [kardexDeleteMovId, setKardexDeleteMovId] = useState<string | null>(null);
   const [kardexDeleteStep1Open, setKardexDeleteStep1Open] = useState(false);
   const [kardexDeletePhraseOpen, setKardexDeletePhraseOpen] = useState(false);
+  /** Seteado al detectar #producto-uuid (el hash se limpia después; la ref conserva el id para ampliar la lista). */
+  const deepLinkProductoIdRef = useRef<string | null>(null);
+  const deepLinkScrollHechoRef = useRef(false);
 
   const editingProduct = useMemo(
     () => (editModalProductId ? productos.find((p) => p.id === editModalProductId) ?? null : null),
@@ -200,6 +207,7 @@ export function InventarioInteractivo({
     const m = /^producto-(.+)$/.exec(raw);
     if (!m?.[1]) return;
     const productoId = m[1];
+    deepLinkProductoIdRef.current = productoId;
     setActiveTab("productos");
     const pathOnly = `${window.location.pathname}${window.location.search}`;
     try {
@@ -207,12 +215,6 @@ export function InventarioInteractivo({
     } catch {
       /* ignore */
     }
-    requestAnimationFrame(() => {
-      const row = document.getElementById(`producto-${productoId}`);
-      row?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      setHighlightedId(productoId);
-      window.setTimeout(() => setHighlightedId(null), 3200);
-    });
   }, []);
 
   useEffect(() => {
@@ -245,6 +247,36 @@ export function InventarioInteractivo({
       );
     });
   }, [filterCategoria, filterEstado, filterText, productos]);
+
+  useEffect(() => {
+    setProductosListLimit(PRODUCTOS_LIST_PAGE);
+  }, [filterCategoria, filterEstado, filterText]);
+
+  const productosFiltradosVisibles = useMemo(
+    () => productosFiltrados.slice(0, productosListLimit),
+    [productosFiltrados, productosListLimit],
+  );
+
+  /** Ancla #producto-uuid: ampliar lista si hace falta y centrar fila tras pintar (una vez). */
+  useEffect(() => {
+    const productoId = deepLinkProductoIdRef.current;
+    if (!productoId) return;
+    const idx = productosFiltrados.findIndex((p) => p.id === productoId);
+    if (idx < 0) return;
+    setProductosListLimit((prev) => Math.max(prev, idx + 1));
+    if (deepLinkScrollHechoRef.current) return;
+    const id = productoId;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const row = document.getElementById(`producto-${id}`);
+        if (!row) return;
+        deepLinkScrollHechoRef.current = true;
+        row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        setHighlightedId(id);
+        window.setTimeout(() => setHighlightedId(null), 3200);
+      });
+    });
+  }, [productosFiltrados]);
 
   const kardexFiltrado = useMemo(() => {
     return kardex.filter((k) => {
@@ -439,11 +471,15 @@ export function InventarioInteractivo({
             <option value="stock_bajo">Stock bajo</option>
           </SelectField>
           <div className="rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-secondary)]">
-            {productosFiltrados.length} productos encontrados
+            {productosFiltrados.length === 0
+              ? "0 productos"
+              : productosListLimit >= productosFiltrados.length
+                ? `${productosFiltrados.length} productos encontrados`
+                : `Mostrando ${productosFiltradosVisibles.length} de ${productosFiltrados.length} productos`}
           </div>
         </div>
         <div className="mt-4 space-y-3">
-          {productosFiltrados.map((row) => (
+          {productosFiltradosVisibles.map((row) => (
             <div
               key={row.id}
               id={`producto-${row.id}`}
@@ -498,6 +534,17 @@ export function InventarioInteractivo({
             </div>
           ))}
         </div>
+        {productosListLimit < productosFiltrados.length ? (
+          <div className="mt-4 flex justify-center">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setProductosListLimit((n) => n + PRODUCTOS_LIST_PAGE)}
+            >
+              Mostrar más ({productosFiltrados.length - productosListLimit} restantes)
+            </Button>
+          </div>
+        ) : null}
         <div className="mt-10 border-t border-[var(--color-border)] pt-8">
           <MueblesCatalogoSection muebles={mueblesCatalogo} canMutate={canMutate} />
         </div>
