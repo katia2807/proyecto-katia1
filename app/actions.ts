@@ -2671,62 +2671,28 @@ export async function createVentaDesdePdf(formData: FormData) {
     const supabase = getSupabaseServerClient();
     const correlativo = await nextCorrelativo("venta_pdf");
     
-    // Insertamos en registros generales o una tabla de ventas si existiera una genérica.
-    // Como no hay una tabla de ventas genérica (están divididas por sub-flujos), 
-    // usaremos registros_generales con una categoría específica o movimientos de caja directamente.
-    // Pero para que aparezca en el dashboard de ventas, lo ideal es que sea un registro general con categoría 'venta'.
-    
-    // Primero buscamos o creamos la categoría 'Ventas PDF'
-    const { data: cat } = await supabase
-      .from("registro_categorias")
-      .select("id")
-      .eq("codigo", "ventas_pdf")
-      .maybeSingle();
-    
-    let categoriaId = cat?.id;
-    if (!categoriaId) {
-      const { data: newCat } = await supabase.from("registro_categorias").insert({
-        organization_id: DEFAULT_ORG_ID,
-        codigo: "ventas_pdf",
-        nombre: "Ventas desde PDF",
-        activo: true
-      }).select("id").single();
-      categoriaId = newCat?.id;
-    }
-
-    const { data: registro, error: regErr } = await supabase.from("registros_generales").insert({
+    const { data: venta, error: ventaErr } = await supabase.from("ventas_madera").insert({
       organization_id: DEFAULT_ORG_ID,
-      categoria_id: categoriaId,
+      cliente_id: clienteId,
       fecha,
-      titulo: `Venta PDF: ${tipoEvento}`,
-      detalle: `${detalle || ""}. Ref: ${referenciaPdf || ""}`.trim(),
-      monto: total,
-      metadata: { 
-        cliente_id: clienteId, 
-        tipo_evento: tipoEvento, 
-        metodo_pago: metodoPago,
-        modalidad_pago: modalidadPago,
-        correlativo: `PDF-${correlativo}`,
-        banco,
-        numero_operacion: numeroOperacion,
-        notas_completas: notasCompletas
-      },
+      total,
+      estado: "confirmada",
+      correlativo: `PDF-${correlativo}`,
       created_by: actor.userId
     }).select("id").single();
 
-    if (regErr) throw new Error(regErr.message);
+    if (ventaErr) throw new Error(ventaErr.message);
 
-    // Asentar en caja
+    // Asentar en caja con todos los datos detallados
     const { error: cajaErr } = await supabase.from("movimientos_caja").insert({
       organization_id: DEFAULT_ORG_ID,
       fecha,
       tipo: "ingreso",
       medio: mapMetodoPagoVentaToMedioCaja(metodoPago),
       categoria: "ventas_pdf",
-      monto: total,
-      descripcion: `Venta PDF ${tipoEvento} - Banco: ${banco || "N/A"} - Op: ${numeroOperacion || "N/A"}`,
-      modulo_origen: "ventas_pdf",
-      referencia_id: registro.id,
+      descripcion: `Venta PDF ${tipoEvento} - Ref: ${referenciaPdf || correlativo} | Banco: ${banco || "N/A"} | Op: ${numeroOperacion || "N/A"} | Detalles: ${detalle || ""} | Notas: ${notasCompletas || ""}`,
+      modulo_origen: "ventas_madera",
+      referencia_id: venta.id,
       created_by: actor.userId
     });
 
