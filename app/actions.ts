@@ -190,6 +190,17 @@ const ventaMuebleTerminadoSchema = z.object({
   fechaPagoCredito: z.string().optional().or(z.literal("")),
 });
 
+const ventaPdfSchema = z.object({
+  clienteId: z.string().uuid(),
+  fecha: z.string().min(1),
+  total: z.coerce.number().positive(),
+  tipoEvento: z.string().default("General"),
+  detalle: z.string().optional(),
+  metodoPago: metodoPagoEnum.default("efectivo"),
+  modalidadPago: modalidadPagoEnum.default("contado"),
+  referenciaPdf: z.string().optional(),
+});
+
 const aprobarCotizacionSchema = z.object({
   cotizacionId: z.string().uuid(),
   notas: z.string().optional(),
@@ -2602,6 +2613,119 @@ export async function createRegistroGeneral(formData: FormData) {
 
   revalidatePath("/registro");
   revalidatePath("/");
+}
+
+export async function createVentaDesdePdf(formData: FormData) {
+  const actor = await requireMutationAccess(ventasRoles);
+  const parsed = ventaPdfSchema.safeParse({
+    clienteId: formData.get("cliente_id"),
+    fecha: formData.get("fecha"),
+    total: formData.get("total"),
+    tipoEvento: formData.get("tipo_evento"),
+    detalle: formData.get("detalle"),
+    metodoPago: formData.get("metodo_pago"),
+    modalidadPago: formData.get("modalidad_pago"),
+    referenciaPdf: formData.get("referencia_pdf"),
+  });
+
+  if (!parsed.success) {
+    console.error("[createVentaDesdePdf] Error de validación:", parsed.error);
+    throw new Error("Datos de venta PDF inválidos.");
+  }
+
+  const { clienteId, fecha, total, tipoEvento, detalle, metodoPago, modalidadPago, referenciaPdf } = parsed.data;
+
+  if (!hasSupabaseEnv()) {
+    const correlativo = await nextCorrelativo("venta_pdf");
+    demoCreateVenta({
+      organization_id: DEFAULT_ORG_ID,
+      cliente_id: clienteId,
+      fecha,
+      total,
+      estado: "confirmada",
+      correlativo: `PDF-${correlativo}`,
+    });
+    // También asentar en caja
+    demoCreateCaja({
+      organization_id: DEFAULT_ORG_ID,
+      fecha,
+      tipo: "ingreso",
+      medio: mapMetodoPagoVentaToMedioCaja(metodoPago),
+      categoria: `venta_pdf_${tipoEvento.toLowerCase()}`,
+      monto: total,
+      descripcion: `Venta PDF (${tipoEvento}): ${detalle || "Sin detalle"}. Ref: ${referenciaPdf || "N/A"}`,
+      modulo_origen: "ventas_pdf",
+      es_personal: false,
+    });
+  } else {
+    const supabase = getSupabaseServerClient();
+    const correlativo = await nextCorrelativo("venta_pdf");
+    
+    // Insertamos en registros generales o una tabla de ventas si existiera una genérica.
+    // Como no hay una tabla de ventas genérica (están divididas por sub-flujos), 
+    // usaremos registros_generales con una categoría específica o movimientos de caja directamente.
+    // Pero para que aparezca en el dashboard de ventas, lo ideal es que sea un registro general con categoría 'venta'.
+    
+    // Primero buscamos o creamos la categoría 'Ventas PDF'
+    const { data: cat } = await supabase
+      .from("registro_categorias")
+      .select("id")
+      .eq("codigo", "ventas_pdf")
+      .maybeSingle();
+    
+    let categoriaId = cat?.id;
+    if (!categoriaId) {
+      const { data: newCat } = await supabase.from("registro_categorias").insert({
+        organization_id: DEFAULT_ORG_ID,
+        codigo: "ventas_pdf",
+        nombre: "Ventas desde PDF",
+        activo: true
+      }).select("id").single();
+      categoriaId = newCat?.id;
+    }
+
+    const { data: registro, error: regErr } = await supabase.from("registros_generales").insert({
+      organization_id: DEFAULT_ORG_ID,
+      categoria_id: categoriaId,
+      fecha,
+      titulo: `Venta PDF: ${tipoEvento}`,
+      detalle: `${detalle || ""}. Ref: ${referenciaPdf || ""}`.trim(),
+      monto: total,
+      metadata: { 
+        cliente_id: clienteId, 
+        tipo_evento: tipoEvento, 
+        metodo_pago: metodoPago,
+        modalidad_pago: modalidadPago,
+        correlativo: `PDF-${correlativo}`
+      },
+      created_by: actor.userId
+    }).select("id").single();
+
+    if (regErr) throw new Error(regErr.message);
+
+    // Asentar en caja
+    const { error: cajaErr } = await supabase.from("movimientos_caja").insert({
+      organization_id: DEFAULT_ORG_ID,
+      fecha,
+      tipo: "ingreso",
+      medio: mapMetodoPagoVentaToMedioCaja(metodoPago),
+      categoria: "ventas_pdf",
+      monto: total,
+      descripcion: `Venta PDF ${tipoEvento} - Ref: ${referenciaPdf || correlativo}`,
+      modulo_origen: "ventas_pdf",
+      referencia_id: registro.id,
+      created_by: actor.userId
+    });
+
+    if (cajaErr) throw new Error(cajaErr.message);
+  }
+
+  revalidatePath("/ventas");
+  revalidatePath("/caja");
+  revalidatePath("/registro");
+  
+  const returnTo = formData.get("return_to")?.toString();
+  if (returnTo) redirect(returnTo);
 }
 
 // ---------------------------------------------------------------------------
