@@ -11,7 +11,8 @@ export type TipoCorrelativo =
   | "orden_produccion" // OP-2026-0001
   | "servicio_aserradero" // SA-2026-0001
   | "venta_madera" // MA-2026-0001
-  | "venta_mueble"; // VM-2026-0001
+  | "venta_mueble" // VM-2026-0001
+  | "venta_pdf"; // PDF-2026-0001
 
 const formatos: Record<TipoCorrelativo, (n: number, anio: number) => string> = {
   cotizacion: (n) => `N°${String(n).padStart(4, "0")}`,
@@ -20,6 +21,7 @@ const formatos: Record<TipoCorrelativo, (n: number, anio: number) => string> = {
   servicio_aserradero: (n, anio) => `SA-${anio}-${String(n).padStart(4, "0")}`,
   venta_madera: (n, anio) => `MA-${anio}-${String(n).padStart(4, "0")}`,
   venta_mueble: (n, anio) => `VM-${anio}-${String(n).padStart(4, "0")}`,
+  venta_pdf: (n, anio) => `PDF-${anio}-${String(n).padStart(4, "0")}`,
 };
 
 function correlativoStorageKey(tipo: TipoCorrelativo, anio: number): string {
