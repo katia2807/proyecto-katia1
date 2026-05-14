@@ -10,12 +10,12 @@ import {
 import { InventarioProductoEditModal } from "@/components/inventario/inventario-producto-edit-modal";
 import { MueblesCatalogoSection } from "@/components/inventario/muebles-catalogo-section";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PhraseConfirmDialog } from "@/components/ui/phrase-confirm-dialog";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatPen } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Field, SelectField } from "@/components/ui/field";
@@ -98,6 +98,15 @@ type MuebleCatalogoInventarioRow = {
   activo: boolean;
 };
 
+type InventarioInteractiveTab =
+  | "resumen"
+  | "productos"
+  | "muebles"
+  | "prioridad"
+  | "kardex"
+  | "alertas"
+  | "reportes";
+
 type Props = {
   data: InventarioData;
   canMutate: boolean;
@@ -106,6 +115,63 @@ type Props = {
 
 /** Filas iniciales en pestaña Productos; “Mostrar más” amplía sin recargar. */
 const PRODUCTOS_LIST_PAGE = 50;
+
+const INVENTARIO_TAB_ORDER: InventarioInteractiveTab[] = [
+  "resumen",
+  "productos",
+  "muebles",
+  "prioridad",
+  "kardex",
+  "alertas",
+  "reportes",
+];
+
+type ParetoInventarioMode = "unidades" | "valor_costo";
+
+type ParetoInventarioRow = {
+  producto: ProductoEnriched;
+  metric: number;
+  pctTotal: number;
+  pctAcum: number;
+  clase: "A" | "B" | "C";
+};
+
+function metricParetoProducto(p: ProductoEnriched, mode: ParetoInventarioMode): number {
+  if (mode === "unidades") return Number(p.vendido);
+  return Number((Number(p.vendido) * Number(p.costo_unitario_promedio)).toFixed(2));
+}
+
+function buildParetoInventarioRows(
+  productos: ProductoEnriched[],
+  mode: ParetoInventarioMode,
+): { rows: ParetoInventarioRow[]; totalMetric: number; countHasta80: number } {
+  const activos = productos.filter((p) => p.activo !== false);
+  const sorted = [...activos].sort((a, b) => metricParetoProducto(b, mode) - metricParetoProducto(a, mode));
+  const totalMetric = sorted.reduce((s, p) => s + metricParetoProducto(p, mode), 0);
+  let cumBefore = 0;
+  const rows: ParetoInventarioRow[] = [];
+  for (const p of sorted) {
+    const m = metricParetoProducto(p, mode);
+    const cumBeforePct = totalMetric > 0 ? (cumBefore / totalMetric) * 100 : 0;
+    const clase: "A" | "B" | "C" =
+      cumBeforePct < 80 ? "A" : cumBeforePct < 95 ? "B" : "C";
+    cumBefore += m;
+    const pctTotal = totalMetric > 0 ? (m / totalMetric) * 100 : 0;
+    const pctAcum = totalMetric > 0 ? (cumBefore / totalMetric) * 100 : 0;
+    rows.push({ producto: p, metric: m, pctTotal, pctAcum, clase });
+  }
+  const idx80 = rows.findIndex((r) => r.pctAcum >= 80);
+  const countHasta80 = idx80 >= 0 ? idx80 + 1 : rows.length;
+  return { rows, totalMetric, countHasta80 };
+}
+
+function inventarioTabFromSearchParam(tab: string | null): InventarioInteractiveTab {
+  const raw = (tab ?? "").trim().toLowerCase();
+  if (!raw) return "resumen";
+  return INVENTARIO_TAB_ORDER.includes(raw as InventarioInteractiveTab)
+    ? (raw as InventarioInteractiveTab)
+    : "resumen";
+}
 
 function isInventarioProductoKardexBlockError(e: unknown): boolean {
   const msg = typeof e === "string" ? e : e instanceof Error ? e.message : "";
@@ -138,11 +204,7 @@ function ProductoIrAEdicion({
   );
 }
 
-export function InventarioInteractivo({
-  data,
-  canMutate,
-  mueblesCatalogo,
-}: Props) {
+export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Props) {
   const {
     productos,
     movimientos,
@@ -157,15 +219,21 @@ export function InventarioInteractivo({
     indicadores,
   } = data;
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeTab = useMemo(
+    () => inventarioTabFromSearchParam(searchParams.get("tab")),
+    [searchParams],
+  );
   const { showToast } = useToast();
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"resumen" | "productos" | "kardex" | "alertas" | "reportes">("resumen");
   const [filterText, setFilterText] = useState("");
   const [filterCategoria, setFilterCategoria] = useState("todas");
   const [filterEstado, setFilterEstado] = useState<"todos" | "activos" | "inactivos" | "stock_bajo">("todos");
   const [productosListLimit, setProductosListLimit] = useState(PRODUCTOS_LIST_PAGE);
   const [kardexTipo, setKardexTipo] = useState<"todos" | "entrada_compra" | "salida_venta" | "ajuste">("todos");
   const [kardexProducto, setKardexProducto] = useState("todos");
+  const [paretoMode, setParetoMode] = useState<ParetoInventarioMode>("unidades");
   const [editModalProductId, setEditModalProductId] = useState<string | null>(null);
   const [editSession, setEditSession] = useState(0);
   const [toggleTarget, setToggleTarget] = useState<{ id: string; nextActivo: boolean; nombre: string } | null>(null);
@@ -181,25 +249,44 @@ export function InventarioInteractivo({
   const deepLinkProductoIdRef = useRef<string | null>(null);
   const deepLinkScrollHechoRef = useRef(false);
 
+  const irATab = useCallback(
+    (tab: InventarioInteractiveTab) => {
+      const qs = new URLSearchParams(searchParams.toString());
+      if (tab === "resumen") qs.delete("tab");
+      else qs.set("tab", tab);
+      const q = qs.toString();
+      const base = pathname || "/inventario";
+      router.replace(q ? `${base}?${q}` : base, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
   const editingProduct = useMemo(
     () => (editModalProductId ? productos.find((p) => p.id === editModalProductId) ?? null : null),
     [editModalProductId, productos],
   );
 
-  const goToProductoEditor = useCallback((productoId: string) => {
-    setEditSession((s) => s + 1);
-    setActiveTab("productos");
-    setEditModalProductId(productoId);
-  }, []);
+  const goToProductoEditor = useCallback(
+    (productoId: string) => {
+      setEditSession((s) => s + 1);
+      irATab("productos");
+      setEditModalProductId(productoId);
+    },
+    [irATab],
+  );
 
   const openCompraReponer = useCallback((productoId: string) => {
     router.push(`/inventario?quick=compra&producto_id=${encodeURIComponent(productoId)}`);
   }, [router]);
 
-  const openProductoModal = useCallback((productoId: string) => {
-    setEditSession((s) => s + 1);
-    setEditModalProductId(productoId);
-  }, []);
+  const openProductoModal = useCallback(
+    (productoId: string) => {
+      setEditSession((s) => s + 1);
+      irATab("productos");
+      setEditModalProductId(productoId);
+    },
+    [irATab],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -208,14 +295,14 @@ export function InventarioInteractivo({
     if (!m?.[1]) return;
     const productoId = m[1];
     deepLinkProductoIdRef.current = productoId;
-    setActiveTab("productos");
+    irATab("productos");
     const pathOnly = `${window.location.pathname}${window.location.search}`;
     try {
       window.history.replaceState(null, "", pathOnly);
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [irATab]);
 
   useEffect(() => {
     if (!deleteProductTarget) {
@@ -286,6 +373,21 @@ export function InventarioInteractivo({
     });
   }, [kardex, kardexProducto, kardexTipo]);
 
+  const paretoInventario = useMemo(
+    () => buildParetoInventarioRows(productos, paretoMode),
+    [productos, paretoMode],
+  );
+
+  const paretoConteoClase = useMemo(() => {
+    return paretoInventario.rows.reduce(
+      (acc, r) => {
+        acc[r.clase] += 1;
+        return acc;
+      },
+      { A: 0, B: 0, C: 0 },
+    );
+  }, [paretoInventario.rows]);
+
   const tabBtnClass = (key: typeof activeTab) =>
     cn(
       "rounded-full border px-3 py-1 text-xs font-semibold transition",
@@ -298,13 +400,21 @@ export function InventarioInteractivo({
     <>
       <Card>
         <CardTitle>Centro de control de inventario</CardTitle>
-        <CardDescription>Gestiona catálogo, kardex, conteos, alertas y reportes desde una sola vista.</CardDescription>
+        <CardDescription>
+          Pestaña <strong>Productos</strong>: insumos y stock del taller. <strong>Catálogo muebles</strong>: ventas.{" "}
+          <strong>Prioridad (80/20)</strong>: mismos datos de ventas y costo que el resumen, con clase A/B/C para foco
+          de compras. <strong>Kardex</strong> sin cambios. Alertas y reportes en sus pestañas.
+        </CardDescription>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" className={tabBtnClass("resumen")} onClick={() => setActiveTab("resumen")}>Resumen</button>
-          <button type="button" className={tabBtnClass("productos")} onClick={() => setActiveTab("productos")}>Productos</button>
-          <button type="button" className={tabBtnClass("kardex")} onClick={() => setActiveTab("kardex")}>Kardex</button>
-          <button type="button" className={tabBtnClass("alertas")} onClick={() => setActiveTab("alertas")}>Alertas</button>
-          <button type="button" className={tabBtnClass("reportes")} onClick={() => setActiveTab("reportes")}>Reportes</button>
+          <button type="button" className={tabBtnClass("resumen")} onClick={() => irATab("resumen")}>Resumen</button>
+          <button type="button" className={tabBtnClass("productos")} onClick={() => irATab("productos")}>Productos</button>
+          <button type="button" className={tabBtnClass("muebles")} onClick={() => irATab("muebles")}>Catálogo muebles</button>
+          <button type="button" className={tabBtnClass("prioridad")} onClick={() => irATab("prioridad")}>
+            Prioridad (80/20)
+          </button>
+          <button type="button" className={tabBtnClass("kardex")} onClick={() => irATab("kardex")}>Kardex</button>
+          <button type="button" className={tabBtnClass("alertas")} onClick={() => irATab("alertas")}>Alertas</button>
+          <button type="button" className={tabBtnClass("reportes")} onClick={() => irATab("reportes")}>Reportes</button>
         </div>
       </Card>
 
@@ -331,6 +441,21 @@ export function InventarioInteractivo({
             <p className="text-xs text-[var(--color-text-secondary)]">Revisar obsolescencia o baja rotación.</p>
           </Card>
         </div>
+      ) : null}
+
+      {activeTab === "resumen" ? (
+        <Card className="border-dashed border-[var(--color-accent)]/35 bg-[var(--color-primary-soft)]/40">
+          <CardTitle className="text-base">Prioridad de compras (80/20)</CardTitle>
+          <CardDescription className="mt-1">
+            Vista dedicada con curva de Pareto y clases A/B/C sobre las mismas salidas por venta que ya usás en el
+            resumen (no reemplaza al kardex).
+          </CardDescription>
+          <div className="mt-3">
+            <Button type="button" variant="secondary" onClick={() => irATab("prioridad")}>
+              Abrir pestaña Prioridad (80/20)
+            </Button>
+          </div>
+        </Card>
       ) : null}
 
       {activeTab === "resumen" && stockBajo.length > 0 ? (
@@ -545,10 +670,172 @@ export function InventarioInteractivo({
             </Button>
           </div>
         ) : null}
-        <div className="mt-10 border-t border-[var(--color-border)] pt-8">
+      </Card>
+      ) : null}
+
+      {activeTab === "muebles" ? (
+        <div id="catalogo-muebles-inventario" className="space-y-4">
           <MueblesCatalogoSection muebles={mueblesCatalogo} canMutate={canMutate} />
         </div>
-      </Card>
+      ) : null}
+
+      {activeTab === "prioridad" ? (
+        <div id="inventario-prioridad" className="space-y-4">
+          <Card>
+            <CardTitle>Prioridad de compras · 80/20 (ABC)</CardTitle>
+            <CardDescription className="mt-1 space-y-2">
+              <span className="block">
+                Usa los mismos totales por producto que el resumen: unidades vendidas sumando movimientos{" "}
+                <strong>salida_venta</strong> cargados en esta sesión (misma fuente que rankings y kardex).
+              </span>
+              <span className="block">
+                <strong>Clase A</strong>: hasta cubrir el 80% acumulado del criterio elegido. <strong>B</strong>: del 80%
+                al 95%. <strong>C</strong>: el resto (suele alcanzar con stock mínimo o revisar obsolescencia).
+              </span>
+              <span className="block text-[var(--color-text-secondary)]">
+                <strong>Valor a costo (estim.)</strong>: unidades vendidas × costo promedio de entradas. No es utilidad ni
+                margen; sirve para ver concentración en soles a costo.
+              </span>
+            </CardDescription>
+            <div className="mt-4 max-w-md">
+              <SelectField
+                label="Criterio de concentración"
+                value={paretoMode}
+                onChange={(e) => setParetoMode(e.target.value as ParetoInventarioMode)}
+              >
+                <option value="unidades">Por unidades vendidas</option>
+                <option value="valor_costo">Por valor a costo estimado (S/)</option>
+              </SelectField>
+            </div>
+          </Card>
+
+          {paretoInventario.totalMetric <= 0 ? (
+            <Card>
+              <CardTitle>Sin datos de venta</CardTitle>
+              <CardDescription>
+                No hay salidas por venta registradas en los movimientos cargados, o todas las cantidades son cero. Cuando
+                haya ventas, acá aparecerá el ranking y el corte 80/20.
+              </CardDescription>
+            </Card>
+          ) : (
+            <>
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardTitle className="text-sm">Corte 80%</CardTitle>
+                  <p className="mt-2 text-2xl font-black text-[var(--color-text-primary)]">
+                    {paretoInventario.countHasta80}{" "}
+                    <span className="text-base font-semibold text-[var(--color-text-secondary)]">
+                      producto{paretoInventario.countHasta80 === 1 ? "" : "s"}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                    Primeros ítems que alcanzan el 80% acumulado{" "}
+                    {paretoMode === "unidades" ? "en unidades vendidas" : "en valor a costo estimado"}.
+                  </p>
+                </Card>
+                <Card>
+                  <CardTitle className="text-sm">Productos por clase</CardTitle>
+                  <p className="mt-2 text-sm text-[var(--color-text-primary)]">
+                    <span className="font-semibold text-emerald-700">A:</span> {paretoConteoClase.A} ·{" "}
+                    <span className="font-semibold text-amber-800">B:</span> {paretoConteoClase.B} ·{" "}
+                    <span className="font-semibold text-slate-600">C:</span> {paretoConteoClase.C}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                    Clasificación según % acumulado antes de cada fila (regla típica ABC 80/15/5).
+                  </p>
+                </Card>
+                <Card>
+                  <CardTitle className="text-sm">Total referencia</CardTitle>
+                  <p className="mt-2 text-2xl font-black text-[var(--color-text-primary)]">
+                    {paretoMode === "unidades"
+                      ? `${paretoInventario.totalMetric.toLocaleString("es-PE")} u.`
+                      : formatPen(paretoInventario.totalMetric)}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                    Suma de todas las filas (productos activos). Cambiá el criterio arriba para ver otra curva.
+                  </p>
+                </Card>
+              </div>
+
+              <Card>
+                <CardTitle>Ranking con % acumulado</CardTitle>
+                <CardDescription>
+                  Clic en el producto para editarlo. Stock bajo respecto al mínimo: podés reponer con el mismo flujo que
+                  en alertas.
+                </CardDescription>
+                <div className="mt-4 max-h-[min(70vh,36rem)] overflow-auto rounded-xl border border-[var(--color-border)]">
+                  <Table>
+                    <THead>
+                      <TRow>
+                        <TH className="w-10">#</TH>
+                        <TH className="w-14">Clase</TH>
+                        <TH>Producto</TH>
+                        <TH className="text-right">{paretoMode === "unidades" ? "Vendido" : "Valor est."}</TH>
+                        <TH className="text-right">% del total</TH>
+                        <TH className="text-right">% acum.</TH>
+                        <TH className="text-right">Stock</TH>
+                        <TH className="text-right">Mín.</TH>
+                        <TH className="text-right">Compra</TH>
+                      </TRow>
+                    </THead>
+                    <tbody>
+                      {paretoInventario.rows.map((row, i) => {
+                        const p = row.producto;
+                        const bajo = Number(p.stock_actual) <= Number(p.stock_minimo);
+                        return (
+                          <TRow key={p.id}>
+                            <TD className="text-[var(--color-text-secondary)]">{i + 1}</TD>
+                            <TD>
+                              <span
+                                className={cn(
+                                  "inline-flex rounded-full px-2 py-0.5 text-xs font-bold",
+                                  row.clase === "A" && "bg-emerald-100 text-emerald-900",
+                                  row.clase === "B" && "bg-amber-100 text-amber-900",
+                                  row.clase === "C" && "bg-slate-200 text-slate-800",
+                                )}
+                              >
+                                {row.clase}
+                              </span>
+                            </TD>
+                            <TD>
+                              <ProductoIrAEdicion nombre={p.nombre} productoId={p.id} onGo={goToProductoEditor} />
+                              <span className="block text-xs text-[var(--color-text-secondary)]">{p.codigo}</span>
+                            </TD>
+                            <TD className="text-right font-semibold">
+                              {paretoMode === "unidades"
+                                ? row.metric.toLocaleString("es-PE")
+                                : formatPen(row.metric)}
+                            </TD>
+                            <TD className="text-right">{row.pctTotal.toFixed(1)}%</TD>
+                            <TD className="text-right font-medium">{row.pctAcum.toFixed(1)}%</TD>
+                            <TD className={cn("text-right", bajo && "text-amber-800 font-semibold")}>
+                              {p.stock_actual}
+                            </TD>
+                            <TD className="text-right">{p.stock_minimo}</TD>
+                            <TD className="text-right">
+                              {bajo && canMutate ? (
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  className="shrink-0 whitespace-nowrap border border-emerald-500/45 bg-emerald-500/15 text-emerald-950 hover:bg-emerald-500/25"
+                                  onClick={() => openCompraReponer(p.id)}
+                                >
+                                  Reponer
+                                </Button>
+                              ) : (
+                                "—"
+                              )}
+                            </TD>
+                          </TRow>
+                        );
+                      })}
+                    </tbody>
+                  </Table>
+                </div>
+              </Card>
+            </>
+          )}
+        </div>
       ) : null}
 
       {activeTab === "kardex" ? (

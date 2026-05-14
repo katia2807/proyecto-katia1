@@ -41,7 +41,7 @@ export default async function MueblesTerminadosPage() {
         <h2 className="text-xl font-bold">Muebles terminados</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
           Catálogo de muebles listos para entrega inmediata. Las ventas usan solo ítems ya dados de alta en{" "}
-          <Link href="/inventario" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
+          <Link href="/inventario?tab=muebles" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
             Inventario
           </Link>
           . Cada venta confirma el ingreso en caja según método de pago.
@@ -131,10 +131,10 @@ export default async function MueblesTerminadosPage() {
               <p>Aún no hay muebles en catálogo.</p>
               <p>
                 Para agregar muebles al catálogo andá a{" "}
-                <Link href="/inventario" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
+                <Link href="/inventario?tab=muebles" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
                   Inventario
                 </Link>{" "}
-                → pestaña <strong>Productos</strong> → <strong>Catálogo de muebles</strong>.
+                → pestaña <strong>Catálogo muebles</strong> → botón <strong>Agregar mueble</strong>.
               </p>
             </Card>
           ) : null}

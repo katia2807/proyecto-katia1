@@ -19,7 +19,8 @@ function normalizeQuickParam(value: string | string[] | undefined) {
 export default async function InventarioPage({ searchParams }: InventarioPageProps) {
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
-  const quick = normalizeQuickParam((await searchParams)?.quick);
+  const sp = (await searchParams) ?? {};
+  const quick = normalizeQuickParam(sp.quick);
   const [inventario, mueblesCatalogo] = await Promise.all([
     getInventarioRobustoData(),
     getMueblesCatalogoRows(true),
@@ -36,7 +37,9 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
       <div>
         <h2 className="text-xl font-bold">Inventario</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Vista visual primero. Abre acciones solo cuando las necesites.
+          Vista visual primero. Los <strong>muebles terminados</strong> (para ventas) se administran en la pestaña{" "}
+          <strong>Catálogo muebles</strong>. Los insumos y stock general están en <strong>Productos</strong>. Prioridad
+          de compras (80/20) en <strong>Prioridad (80/20)</strong>; el kardex sigue en su pestaña.
         </p>
       </div>
 
@@ -88,19 +91,28 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
         </InventarioAccionesRapidas>
       </Suspense>
 
-      <InventarioInteractivo
-        data={inventarioData}
-        canMutate={canMutate}
-        mueblesCatalogo={mueblesCatalogo.map((m) => ({
-          id: m.id,
-          codigo: m.codigo,
-          nombre: m.nombre,
-          descripcion: m.descripcion,
-          precio_lista: m.precio_lista,
-          foto_url: m.foto_url,
-          activo: m.activo,
-        }))}
-      />
+      <Suspense
+        fallback={
+          <div
+            className="min-h-[28rem] animate-pulse rounded-2xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]"
+            aria-hidden
+          />
+        }
+      >
+        <InventarioInteractivo
+          data={inventarioData}
+          canMutate={canMutate}
+          mueblesCatalogo={mueblesCatalogo.map((m) => ({
+            id: m.id,
+            codigo: m.codigo,
+            nombre: m.nombre,
+            descripcion: m.descripcion,
+            precio_lista: m.precio_lista,
+            foto_url: m.foto_url,
+            activo: m.activo,
+          }))}
+        />
+      </Suspense>
     </div>
   );
 }

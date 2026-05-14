@@ -74,7 +74,7 @@ export function MueblesTerminadosContextPanels({
           <>
             Solo muebles que ya existen en el catálogo. Para dar de alta o editar precios, fotos y stock del catálogo
             usá{" "}
-            <Link href="/inventario" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
+            <Link href="/inventario?tab=muebles" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
               Inventario
             </Link>{" "}
             → pestaña <strong>Productos</strong> → sección <strong>Catálogo de muebles</strong>.

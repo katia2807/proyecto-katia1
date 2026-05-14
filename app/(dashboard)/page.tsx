@@ -44,7 +44,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const alertasCriticas = alertas.filter((row) => row.prioridad === "alta").length;
   const accionesHoy = [
     {
-      href: "/inventario#alertas-stock",
+      href: "/inventario?tab=alertas#alertas-stock",
       titulo: "Reponer stock bajo",
       detalle: `${stockBajo} producto(s) por debajo del mínimo.`,
       prioridad: stockBajo > 0 ? "Alta" : "OK",
@@ -97,7 +97,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <Card>
           <CardTitle>Stock por revisar</CardTitle>
           <CardDescription className="mt-1">{stockBajo} producto(s) por agotarse.</CardDescription>
-          <Link href="/inventario#alertas-stock" className="mt-3 inline-flex">
+          <Link href="/inventario?tab=alertas#alertas-stock" className="mt-3 inline-flex">
             <Button type="button" variant="secondary">
               Ir a inventario
             </Button>
