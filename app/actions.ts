@@ -3932,6 +3932,37 @@ export async function deleteCliente(formData: FormData) {
     if (cliente.estado === "activo") {
       throw new Error("El cliente está activo. Cambia su estado a inactivo antes de eliminar.");
     }
+
+    const dependentTables = [
+      { table: "cotizaciones_mueble", label: "cotizaciones de muebles" },
+      { table: "cotizaciones_unificadas", label: "cotizaciones unificadas" },
+      { table: "ventas_madera", label: "ventas de madera" },
+      { table: "ventas_mueble_terminado", label: "ventas de muebles terminados" },
+      { table: "servicios_aserradero", label: "servicios de aserradero" },
+      { table: "alquileres", label: "contratos de alquiler" },
+      { table: "ordenes_produccion", label: "órdenes de producción" },
+    ];
+
+    const blocked = [] as string[];
+    for (const entry of dependentTables) {
+      const { count, error } = await supabase
+        .from(entry.table)
+        .select("id", { count: "exact", head: true })
+        .eq("cliente_id", id)
+        .eq("organization_id", DEFAULT_ORG_ID);
+      if (error) {
+        throw new Error(error.message);
+      }
+      if ((count ?? 0) > 0) {
+        blocked.push(entry.label);
+      }
+    }
+    if (blocked.length > 0) {
+      throw new Error(
+        `El cliente tiene registros relacionados en: ${blocked.join(", ")}. Elimina o desvincula esos registros antes de borrar el cliente.`,
+      );
+    }
+
     const { error } = await supabase
       .from("clientes")
       .delete()

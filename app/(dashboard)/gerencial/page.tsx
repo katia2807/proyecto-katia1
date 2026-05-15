@@ -42,7 +42,7 @@ function pct(current: number, previous: number) {
 }
 
 type GerencialPageProps = {
-  searchParams?: Promise<{ cliente?: string | string[] }>;
+  searchParams?: Promise<{ cliente?: string | string[]; q?: string | string[] }>;
 };
 
 function firstParam(value: string | string[] | undefined) {
@@ -70,6 +70,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
     getServiciosAserraderoRows(),
   ]);
 
+  const q = firstParam(params?.q).trim().toLowerCase();
   const currentKey = monthKey();
   const prevKey = previousMonthKey();
   const cajaEmpresa = caja.filter((row) => !row.es_personal);
@@ -92,6 +93,19 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
 
   const selectedClienteId = firstParam(params?.cliente).trim();
   const selectedCliente = selectedClienteId ? clientes.find((c) => c.id === selectedClienteId) ?? null : null;
+  const filteredClientes = q
+    ? clientes.filter((cliente) => {
+        const values = [
+          cliente.nombre,
+          cliente.documento ?? "",
+          "ruc" in cliente ? (cliente as any).ruc ?? "" : "",
+          cliente.telefono ?? "",
+        ];
+        return values.some((value) => String(value).toLowerCase().includes(q));
+      })
+    : clientes;
+  const selectedClienteInResults = selectedCliente ? filteredClientes.some((c) => c.id === selectedCliente.id) : false;
+  const visibleClientes = selectedCliente && !selectedClienteInResults ? [selectedCliente, ...filteredClientes] : filteredClientes;
   const clienteCotizaciones = selectedCliente ? cotizaciones.filter((c) => c.cliente_id === selectedCliente.id) : [];
   const clienteVentasMuebles = selectedCliente ? ventasMuebles.filter((v) => v.cliente_id === selectedCliente.id) : [];
   const clienteVentasMadera = selectedCliente ? ventasMadera.filter((v) => v.cliente_id === selectedCliente.id) : [];
@@ -109,6 +123,15 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
     clienteVentasMadera.length +
     clienteContratos.length +
     clienteServicios.length;
+  const relatedDependencies = [
+    { label: "Cotizaciones de muebles", count: clienteCotizaciones.length, href: "/ventas/muebles-personalizados" },
+    { label: "Ventas de muebles terminados", count: clienteVentasMuebles.length, href: "/ventas/muebles-terminados" },
+    { label: "Ventas de madera cortada", count: clienteVentasMadera.length, href: "/ventas/madera-cortada" },
+    { label: "Contratos de alquiler", count: clienteContratos.length, href: "/ventas/alquiler-mixer" },
+    { label: "Servicios de aserradero", count: clienteServicios.length, href: "/ventas/aserradero-servicios" },
+    { label: "Cobros vencidos", count: clienteCobrosVencidos.length, href: "/reportes#cobros-vencidos" },
+  ];
+  const hasRelatedDependencies = relatedDependencies.some((dependency) => dependency.count > 0);
   const pedidosActivosCliente = selectedCliente
     ? ordenes.filter((o) => o.cliente_id === selectedCliente.id && o.estado !== "entregado" && o.estado !== "terminado").length
     : 0;
@@ -160,6 +183,18 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
           </CardDescription>
           <form method="get" className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
             <label className="grid gap-2">
+              <span className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Buscar cliente</span>
+              <input
+                name="q"
+                defaultValue={q}
+                placeholder="Nombre, DNI, RUC o teléfono"
+                className="h-11 rounded-[var(--border-radius-input)] border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm text-[var(--text-primary)] outline-none ring-0 transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[rgba(124,58,237,0.2)]"
+              />
+            </label>
+            <Button type="submit">Buscar</Button>
+          </form>
+          <form method="get" className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+            <label className="grid gap-2">
               <span className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Cliente</span>
               <select
                 name="cliente"
@@ -167,15 +202,21 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                 className="h-11 rounded-[var(--border-radius-input)] border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm text-[var(--text-primary)] outline-none ring-0 transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[rgba(124,58,237,0.2)]"
               >
                 <option value="">Selecciona un cliente</option>
-                {clientes.map((cliente) => (
+                {visibleClientes.map((cliente) => (
                   <option key={cliente.id} value={cliente.id}>
                     {cliente.nombre} {cliente.documento ? `· ${cliente.documento}` : ""}
                   </option>
                 ))}
               </select>
             </label>
+            <input type="hidden" name="q" value={q} />
             <Button type="submit">Cargar cliente</Button>
           </form>
+          {q ? (
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              Mostrando {visibleClientes.length} cliente{visibleClientes.length === 1 ? "" : "s"} para "{q}".
+            </p>
+          ) : null}
         </Card>
       </section>
 
@@ -265,6 +306,34 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                     <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
                       Desactiva primero al cliente para habilitar la eliminación.
                     </p>
+                  ) : hasRelatedDependencies ? (
+                    <div className="mt-4 space-y-4">
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        Este cliente aún tiene registros relacionados. Elimina o cierra estos datos antes de borrar el cliente:
+                      </p>
+                      <div className="grid gap-3">
+                        {relatedDependencies.map((dependency) =>
+                          dependency.count > 0 ? (
+                            <div key={dependency.label} className="rounded-xl border border-[var(--border-color)] p-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-semibold">{dependency.label}</p>
+                                  <p className="text-xs text-[var(--color-text-secondary)]">
+                                    {dependency.count} registro{dependency.count === 1 ? "" : "s"}
+                                  </p>
+                                </div>
+                                <Link href={dependency.href} className="text-sm font-semibold text-[var(--color-accent)] underline">
+                                  Revisar
+                                </Link>
+                              </div>
+                            </div>
+                          ) : null,
+                        )}
+                      </div>
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        Luego de limpiar los datos relacionados, vuelve aquí para eliminar el cliente.
+                      </p>
+                    </div>
                   ) : (
                     <form action={deleteCliente} className="mt-4 grid gap-3">
                       <input type="hidden" name="id" value={selectedCliente.id} />
