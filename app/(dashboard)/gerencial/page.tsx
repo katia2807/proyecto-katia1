@@ -24,7 +24,6 @@ import { canAccessGerencial } from "@/lib/permissions";
 import { deleteCliente, updateClienteEstado } from "@/app/actions";
 import { formatDate, formatPen } from "@/lib/utils";
 import { GerencialClienteSearchSelect } from "@/components/gerencial/cliente-search-select";
-import { GerencialAlertasPanel } from "@/components/gerencial/gerencial-alertas-panel";
 import type { ClienteCompleto } from "@/lib/combobox-mocks";
 
 export const dynamic = "force-dynamic";
@@ -251,7 +250,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
               </Card>
             </div>
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4">
                 <p className="text-sm font-semibold">Detalles</p>
                 <div className="mt-3 space-y-2 text-sm text-[var(--color-text-primary)]">
@@ -270,12 +269,11 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                     <input type="hidden" name="id" value={selectedCliente.id} />
                     <select
                       name="estado"
-                      defaultValue={selectedCliente.estado ?? "activo"}
                       className="h-11 w-full rounded-[var(--border-radius-input)] border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm text-[var(--text-primary)] outline-none ring-0 transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[rgba(124,58,237,0.2)]"
                     >
-                      <option value="activo">Activo</option>
-                      <option value="inactivo">Inactivo</option>
-                      <option value="moroso">Moroso</option>
+                      <option value="activo" selected={selectedCliente.estado === "activo" || !selectedCliente.estado}>Activo</option>
+                      <option value="inactivo" selected={selectedCliente.estado === "inactivo"}>Inactivo</option>
+                      <option value="moroso" selected={selectedCliente.estado === "moroso"}>Moroso</option>
                     </select>
                     <Button type="submit">Guardar estado</Button>
                   </form>
@@ -339,15 +337,21 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
         </section>
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+      <section className="grid gap-4 xl:grid-cols-2">
         <Card>
-          <CardTitle>Flujo de caja últimos 30 días</CardTitle>
+          <CardTitle>Flujo de caja ultimos 30 dias</CardTitle>
           <CardDescription>Saldo acumulado solo con movimientos de empresa.</CardDescription>
           <div className="mt-4">
             <CashFlowChart data={points} />
           </div>
         </Card>
-        <GerencialAlertasPanel alertasCriticas={alertasCriticas} />
+        <Card>
+          <CardTitle>Alertas criticas</CardTitle>
+          <CardDescription>Stock bajo, cobros vencidos y ordenes sin entregar.</CardDescription>
+          <ul className="mt-4 space-y-2 text-sm">
+            {alertasCriticas.length > 0 ? alertasCriticas.map((item) => <li key={item} className="rounded-lg border border-[var(--color-border)] p-3">{item}</li>) : <li className="text-[var(--color-text-secondary)]">No hay alertas criticas con los datos actuales.</li>}
+          </ul>
+        </Card>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
@@ -366,7 +370,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
         <Card>
           <CardTitle>Log de actividad</CardTitle>
           <CardDescription>Ultimas 10 acciones observables desde Caja.</CardDescription>
-          <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--color-border)]">
+          <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
             <Table>
               <THead>
                 <TRow>
