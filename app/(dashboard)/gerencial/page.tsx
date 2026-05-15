@@ -173,6 +173,12 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
         </p>
       </div>
 
+      {message ? (
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm font-medium text-[var(--color-text-primary)]">
+          ✓ {message}
+        </div>
+      ) : null}
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard label="Ingresos del mes" value={formatPen(ingresosMes)} hint={`Vs mes anterior ${pct(ingresosMes, ingresosPrev)}`} />
         <MetricCard label="Egresos del mes" value={formatPen(egresosMes)} hint={`Vs mes anterior ${pct(egresosMes, egresosPrev)}`} />
@@ -195,11 +201,6 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
               Escribe el nombre, DNI, RUC o teléfono. Selecciona el cliente para cargar su ficha.
             </p>
-            {message ? (
-              <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                {message}
-              </div>
-            ) : null}
           </div>
         </Card>
       </section>

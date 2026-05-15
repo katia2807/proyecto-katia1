@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { AppShellAccessGuard } from "@/components/app-shell-access-guard";
 import { FloatingHelp } from "@/components/ui/floating-help";
 import { GlobalSearch } from "@/components/ui/global-search";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const icons = {
   "/": IconLayoutDashboard,
@@ -245,8 +246,11 @@ export function AppShell({
             <h1 className="truncate text-base font-semibold text-[var(--text-primary)]">{pageTitle}</h1>
           </div>
           <GlobalSearch items={globalSearchItems} />
-          <div className="profile-avatar flex size-9 items-center justify-center rounded-full text-sm font-semibold">
-            {userInitial}
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <div className="profile-avatar flex size-9 items-center justify-center rounded-full text-sm font-semibold">
+              {userInitial}
+            </div>
           </div>
         </header>
         <div className="dashboard-content p-4 md:p-6 lg:p-8">{children}</div>
