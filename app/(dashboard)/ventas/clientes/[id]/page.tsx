@@ -4,9 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/metric-card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
-import { updateClienteEstado } from "@/app/actions";
 import { Button } from "@/components/ui/button";
-import { SelectField } from "@/components/ui/field";
 import {
   getAlquilerRows,
   getClientesRows,
@@ -83,25 +81,45 @@ export default async function ClienteDetallePage({ params }: { params: Params })
             <p className="text-xs text-[var(--color-text-secondary)]">{cliente.direccion}</p>
           ) : null}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/ventas/clientes" className="text-sm font-semibold underline">
             ← Listado
+          </Link>
+          <Link href={`/gerencial?cliente=${cliente.id}`}>
+            <Button variant="secondary">Gestionar en Panel Gerencial</Button>
           </Link>
         </div>
       </div>
 
       <Card>
-        <CardTitle>Estado del cliente</CardTitle>
-        <CardDescription>Cambia el estado manualmente si hay algún problema (ej. moroso, inactivo).</CardDescription>
-        <form action={updateClienteEstado} className="mt-3 flex items-end gap-3 max-w-sm">
-          <input type="hidden" name="id" value={cliente.id} />
-          <SelectField name="estado" label="Estado" defaultValue={cliente.estado ?? "activo"} className="flex-1">
-            <option value="activo">Activo</option>
-            <option value="inactivo">Inactivo</option>
-            <option value="moroso">Moroso</option>
-          </SelectField>
-          <Button type="submit">Actualizar</Button>
-        </form>
+        <CardTitle>Ficha de cliente</CardTitle>
+        <CardDescription>Visualización de datos e historial. El estado y la eliminación se gestionan desde el Panel Gerencial.</CardDescription>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Registrado desde</p>
+            <p className="mt-1 text-sm text-[var(--color-text-primary)]">{formatDate(cliente.created_at)}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Tipo</p>
+            <p className="mt-1 text-sm text-[var(--color-text-primary)]">{cliente.tipo_persona ?? "No definido"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Documento</p>
+            <p className="mt-1 text-sm text-[var(--color-text-primary)]">{cliente.documento ?? "Sin documento"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Teléfono</p>
+            <p className="mt-1 text-sm text-[var(--color-text-primary)]">{cliente.telefono ?? "Sin teléfono"}</p>
+          </div>
+          <div className="sm:col-span-2">
+            <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Dirección</p>
+            <p className="mt-1 text-sm text-[var(--color-text-primary)]">{cliente.direccion ?? "Sin dirección"}</p>
+          </div>
+          <div className="sm:col-span-2">
+            <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Estado</p>
+            <p className="mt-1 text-sm text-[var(--color-text-primary)]">{cliente.estado ?? "desconocido"}</p>
+          </div>
+        </div>
       </Card>
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

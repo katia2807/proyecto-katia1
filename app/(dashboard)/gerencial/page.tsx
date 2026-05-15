@@ -4,6 +4,7 @@ import { CashFlowChart } from "@/components/gerencial/cash-flow-chart";
 import { MetricCard } from "@/components/metric-card";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { getDashboardSession } from "@/lib/current-user-role";
 import {
@@ -15,8 +16,11 @@ import {
   getOrdenesProduccionRows,
   getVentasMuebleTerminadoRows,
   getVentasRows,
+  getAlquilerRows,
+  getServiciosAserraderoRows,
 } from "@/lib/data";
 import { canAccessGerencial } from "@/lib/permissions";
+import { deleteCliente, updateClienteEstado } from "@/app/actions";
 import { formatDate, formatPen } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -37,13 +41,22 @@ function pct(current: number, previous: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
-export default async function GerencialPage() {
+type GerencialPageProps = {
+  searchParams?: { cliente?: string | string[] };
+};
+
+function firstParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
+}
+
+export default async function GerencialPage({ searchParams }: GerencialPageProps) {
   const session = await getDashboardSession();
   if (!canAccessGerencial(session?.role ?? null, session?.uiRole ?? null)) {
     redirect("/?mensaje=no-acceso");
   }
 
-  const [caja, inventario, cotizaciones, cobros, ventasMuebles, ventasMadera, clientes, ordenes] = await Promise.all([
+  const [caja, inventario, cotizaciones, cobros, ventasMuebles, ventasMadera, clientes, ordenes, alquilerBundle, servicios] = await Promise.all([
     getCajaRows(),
     getInventarioRobustoData(),
     getCotizacionesUnificadasRows(),
@@ -52,6 +65,8 @@ export default async function GerencialPage() {
     getVentasRows(),
     getClientesRows(),
     getOrdenesProduccionRows(),
+    getAlquilerRows(),
+    getServiciosAserraderoRows(),
   ]);
 
   const currentKey = monthKey();
@@ -73,6 +88,30 @@ export default async function GerencialPage() {
     .map(([clienteId, total]) => ({ cliente: clientes.find((c) => c.id === clienteId)?.nombre ?? "Cliente", total }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 3);
+
+  const selectedClienteId = firstParam(searchParams?.cliente).trim();
+  const selectedCliente = selectedClienteId ? clientes.find((c) => c.id === selectedClienteId) ?? null : null;
+  const clienteCotizaciones = selectedCliente ? cotizaciones.filter((c) => c.cliente_id === selectedCliente.id) : [];
+  const clienteVentasMuebles = selectedCliente ? ventasMuebles.filter((v) => v.cliente_id === selectedCliente.id) : [];
+  const clienteVentasMadera = selectedCliente ? ventasMadera.filter((v) => v.cliente_id === selectedCliente.id) : [];
+  const clienteContratos = selectedCliente ? alquilerBundle.rows.filter((c) => c.cliente_id === selectedCliente.id) : [];
+  const clienteServicios = selectedCliente ? servicios.filter((s) => s.cliente_id === selectedCliente.id) : [];
+  const clienteCobrosVencidos = selectedCliente ? cobros.filter((c) => c.cliente_id === selectedCliente.id) : [];
+  const totalFacturadoCliente =
+    clienteVentasMuebles.reduce((a, v) => a + Number(v.total), 0) +
+    clienteVentasMadera.reduce((a, v) => a + Number(v.total), 0) +
+    clienteContratos.reduce((a, c) => a + Number(c.monto_total ?? c.tarifa), 0) +
+    clienteServicios.reduce((a, s) => a + Number(s.precio_cobrado), 0);
+  const totalOperacionesCliente =
+    clienteCotizaciones.length +
+    clienteVentasMuebles.length +
+    clienteVentasMadera.length +
+    clienteContratos.length +
+    clienteServicios.length;
+  const pedidosActivosCliente = selectedCliente
+    ? ordenes.filter((o) => o.cliente_id === selectedCliente.id && o.estado !== "entregado" && o.estado !== "terminado").length
+    : 0;
+  const pagosPendientesCliente = selectedCliente ? clienteCobrosVencidos.length : 0;
 
   const start30 = new Date();
   start30.setDate(start30.getDate() - 29);
@@ -116,15 +155,135 @@ export default async function GerencialPage() {
         <Card className="xl:col-span-3">
           <CardTitle>Gestión de clientes</CardTitle>
           <CardDescription>
-            Abre la lista completa de clientes para ver detalles 360, pedidos activos y pagos pendientes desde el panel gerencial.
+            Selecciona un cliente para ver su ficha completa, desactivarlo y eliminarlo con confirmación desde el panel gerencial.
           </CardDescription>
-          <div className="mt-4">
-            <Link href="/ventas/clientes">
-              <Button variant="secondary">Abrir gestión de clientes</Button>
-            </Link>
-          </div>
+          <form method="get" className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+            <label className="grid gap-2">
+              <span className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Cliente</span>
+              <select
+                name="cliente"
+                defaultValue={selectedClienteId}
+                className="h-11 rounded-[var(--border-radius-input)] border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm text-[var(--text-primary)] outline-none ring-0 transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[rgba(124,58,237,0.2)]"
+              >
+                <option value="">Selecciona un cliente</option>
+                {clientes.map((cliente) => (
+                  <option key={cliente.id} value={cliente.id}>
+                    {cliente.nombre} {cliente.documento ? `· ${cliente.documento}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button type="submit">Cargar cliente</Button>
+          </form>
         </Card>
       </section>
+
+      {selectedCliente ? (
+        <section className="grid gap-4 xl:grid-cols-3">
+          <Card className="xl:col-span-3">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold">{selectedCliente.nombre}</h3>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+                  {selectedCliente.tipo_persona === "empresa" ? "Empresa" : "Persona natural"} · {selectedCliente.documento ?? "Sin documento"}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link href={`/ventas/clientes/${selectedCliente.id}`}>
+                  <Button variant="secondary">Ver en ventas</Button>
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Registrado desde</p>
+                <p className="mt-1 text-sm text-[var(--color-text-primary)]">{formatDate(selectedCliente.created_at)}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Estado</p>
+                <p className="mt-1 text-sm text-[var(--color-text-primary)]">{selectedCliente.estado ?? "desconocido"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Pagos pendientes</p>
+                <p className="mt-1 text-sm text-[var(--color-text-primary)]">{pagosPendientesCliente}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 lg:grid-cols-3">
+              <Card className="col-span-1 rounded-xl border border-[var(--border-color)]">
+                <CardTitle>Total facturado</CardTitle>
+                <CardDescription>{formatPen(totalFacturadoCliente)}</CardDescription>
+              </Card>
+              <Card className="col-span-1 rounded-xl border border-[var(--border-color)]">
+                <CardTitle>Operaciones</CardTitle>
+                <CardDescription>{totalOperacionesCliente} registros</CardDescription>
+              </Card>
+              <Card className="col-span-1 rounded-xl border border-[var(--border-color)]">
+                <CardTitle>Pedidos activos</CardTitle>
+                <CardDescription>{pedidosActivosCliente}</CardDescription>
+              </Card>
+            </div>
+
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] p-4">
+                <p className="text-sm font-semibold">Detalles</p>
+                <div className="mt-3 space-y-2 text-sm text-[var(--color-text-primary)]">
+                  <p>Teléfono: {selectedCliente.telefono ?? "Sin teléfono"}</p>
+                  <p>Dirección: {selectedCliente.direccion ?? "Sin dirección"}</p>
+                  <p>Tipo: {selectedCliente.tipo_persona ?? "No definido"}</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <Card className="rounded-xl border border-[var(--border-color)] p-4">
+                  <CardTitle>Actualizar estado</CardTitle>
+                  <CardDescription>
+                    Cambia el estado del cliente antes de usar la opción de eliminar.
+                  </CardDescription>
+                  <form action={updateClienteEstado} className="mt-4 grid gap-3">
+                    <input type="hidden" name="id" value={selectedCliente.id} />
+                    <select
+                      name="estado"
+                      defaultValue={selectedCliente.estado ?? "activo"}
+                      className="h-11 w-full rounded-[var(--border-radius-input)] border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm text-[var(--text-primary)] outline-none ring-0 transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[rgba(124,58,237,0.2)]"
+                    >
+                      <option value="activo">Activo</option>
+                      <option value="inactivo">Inactivo</option>
+                      <option value="moroso">Moroso</option>
+                    </select>
+                    <Button type="submit">Guardar estado</Button>
+                  </form>
+                </Card>
+
+                <Card className="rounded-xl border border-[var(--border-color)] p-4">
+                  <CardTitle>Eliminar cliente</CardTitle>
+                  <CardDescription>
+                    Solo disponible si el cliente está desactivado o moroso. La eliminación es irreversible.
+                  </CardDescription>
+                  {selectedCliente.estado === "activo" ? (
+                    <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
+                      Desactiva primero al cliente para habilitar la eliminación.
+                    </p>
+                  ) : (
+                    <form action={deleteCliente} className="mt-4 grid gap-3">
+                      <input type="hidden" name="id" value={selectedCliente.id} />
+                      <Field
+                        label="Escribe ELIMINAR CLIENTE para confirmar"
+                        name="confirmacion"
+                        placeholder="ELIMINAR CLIENTE"
+                        required
+                      />
+                      <Button type="submit" variant="danger">
+                        Eliminar cliente
+                      </Button>
+                    </form>
+                  )}
+                </Card>
+              </div>
+            </div>
+          </Card>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 xl:grid-cols-2">
         <Card>

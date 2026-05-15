@@ -30,6 +30,7 @@ import {
   demoCreateOrdenProduccion,
   demoDeleteCotizacionMueblePersonalizada,
   demoDeleteCotizacionUnificada,
+  demoDeleteCliente,
   demoUpdateClienteEstado,
   demoGetCotizacionUnificada,
   demoInventarioMovimientosRows,
@@ -3900,4 +3901,46 @@ export async function updateClienteEstado(formData: FormData) {
   }
   revalidatePath("/ventas/clientes");
   revalidatePath(`/ventas/clientes/${id}`);
+}
+
+export async function deleteCliente(formData: FormData) {
+  await requireMutationAccess(ventasRoles);
+  const id = String(formData.get("id") ?? "");
+  const confirmacion = String(formData.get("confirmacion") ?? "").trim();
+  if (!id) {
+    throw new Error("Identificador inválido.");
+  }
+  if (confirmacion !== "ELIMINAR CLIENTE") {
+    throw new Error('Escribe "ELIMINAR CLIENTE" en el campo de confirmación.');
+  }
+  if (!hasSupabaseEnv()) {
+    demoDeleteCliente(id);
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { data: cliente, error: clienteError } = await supabase
+      .from("clientes")
+      .select("estado")
+      .eq("id", id)
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .maybeSingle();
+    if (clienteError) {
+      throw new Error(clienteError.message);
+    }
+    if (!cliente) {
+      throw new Error("Cliente no encontrado.");
+    }
+    if (cliente.estado === "activo") {
+      throw new Error("El cliente está activo. Cambia su estado a inactivo antes de eliminar.");
+    }
+    const { error } = await supabase
+      .from("clientes")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+  revalidatePath("/ventas/clientes");
+  revalidatePath("/gerencial");
 }

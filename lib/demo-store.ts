@@ -2846,3 +2846,11 @@ export function demoUpdateClienteEstado(id: string, estado: "activo" | "inactivo
     persistStore();
   }
 }
+
+export function demoDeleteCliente(id: string) {
+  const idx = store.clientes.findIndex((c) => c.id === id);
+  if (idx !== -1) {
+    store.clientes.splice(idx, 1);
+    persistStore();
+  }
+}
