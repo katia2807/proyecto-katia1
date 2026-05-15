@@ -289,8 +289,8 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
         </CardDescription>
         <div className="mt-3 grid gap-3 md:grid-cols-4">
           <Resumen titulo="Clientes" valor={clientes.length} href="/gerencial" />
-          <Resumen titulo="Proveedores" valor={proveedores.length} href="#" />
-          <Resumen titulo="Choferes" valor={choferes.length} href="#" />
+          <Resumen titulo="Proveedores" valor={proveedores.length} href="/ventas/proveedores-comparador" />
+          <Resumen titulo="Choferes" valor={choferes.length} href="/ventas/zonas-entrega" />
           <Resumen titulo="Muebles en catálogo" valor={muebles.length} href="/ventas/muebles-terminados" />
         </div>
         {serviciosAserradero.length > 0 ? (

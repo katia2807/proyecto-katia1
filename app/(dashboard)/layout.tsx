@@ -18,7 +18,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ...clientes.slice(0, 200).map((cliente) => ({
       label: cliente.nombre,
       detail: [cliente.documento, cliente.telefono].filter(Boolean).join(" · ") || "Cliente",
-      href: `/ventas/clientes?cliente=${cliente.id}`,
+      href: `/ventas/clientes/${cliente.id}`,
       type: "Cliente" as const,
     })),
     ...inventario.productos.slice(0, 200).map((producto) => ({

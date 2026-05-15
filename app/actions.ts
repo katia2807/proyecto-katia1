@@ -438,17 +438,12 @@ export async function createCajaMovimiento(formData: FormData) {
   await requireMutationAccess(cajaRoles);
   const parsed = cajaSchema.safeParse({
     fecha: formData.get("fecha"),
-  const redirectWithMessage = (message: string) => {
-    const baseUrl = id ? `/gerencial?cliente=${encodeURIComponent(id)}` : "/gerencial";
-    const separator = id ? "&" : "?";
-    redirect(`${baseUrl}${separator}mensaje=${encodeURIComponent(message)}`);
-  };
     tipo: formData.get("tipo"),
     medio: formData.get("medio"),
-    redirectWithMessage("Identificador inválido para eliminar el cliente.");
+    categoria: formData.get("categoria"),
     monto: formData.get("monto"),
     descripcion: formData.get("descripcion"),
-    redirectWithMessage('Escribe "ELIMINAR CLIENTE" en el campo de confirmación.');
+    esPersonal: formData.get("es_personal") === "on" || formData.get("es_personal") === "true",
     urlComprobante: formData.get("url_comprobante"),
   });
 
@@ -461,13 +456,13 @@ export async function createCajaMovimiento(formData: FormData) {
       organization_id: DEFAULT_ORG_ID,
       fecha: parsed.data.fecha,
       tipo: parsed.data.tipo,
-      redirectWithMessage(clienteError.message || "No se pudo verificar el estado del cliente.");
+      medio: parsed.data.medio,
       categoria: parsed.data.categoria,
       monto: parsed.data.monto,
-      redirectWithMessage("Cliente no encontrado.");
+      descripcion: parsed.data.descripcion ?? null,
       modulo_origen: "caja",
       es_personal: parsed.data.esPersonal ?? false,
-      redirectWithMessage("El cliente está activo. Cambia su estado a inactivo antes de eliminar.");
+      url_comprobante: parsed.data.urlComprobante ?? null,
     });
   } else {
     const supabase = getSupabaseServerClient();
@@ -3905,6 +3900,7 @@ export async function updateClienteEstado(formData: FormData) {
   }
   revalidatePath("/ventas/clientes");
   revalidatePath(`/ventas/clientes/${id}`);
+  revalidatePath("/gerencial");
 }
 
 export async function deleteCliente(formData: FormData) {
