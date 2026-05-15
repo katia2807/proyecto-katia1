@@ -440,11 +440,11 @@ export async function createCajaMovimiento(formData: FormData) {
     fecha: formData.get("fecha"),
     tipo: formData.get("tipo"),
     medio: formData.get("medio"),
-    categoria: formData.get("categoria"),
     monto: formData.get("monto"),
     descripcion: formData.get("descripcion"),
-    esPersonal: formData.get("es_personal") === "on" || formData.get("es_personal") === "true",
     urlComprobante: formData.get("url_comprobante"),
+    categoria: formData.get("categoria"),
+    esPersonal: formData.get("es_personal"),
   });
 
   if (!parsed.success) {
@@ -541,16 +541,15 @@ export async function repetirGastosMesAnterior(formData: FormData) {
       );
     }
   } else {
-        redirectWithMessage(error.message || "Error al verificar los datos relacionados del cliente.");
     const startPrev = `${anioPrevio}-${String(mesPrevio).padStart(2, "0")}-01`;
     const lastDayPrev = new Date(anioPrevio, mesPrevio, 0).getDate();
     const endPrev = `${anioPrevio}-${String(mesPrevio).padStart(2, "0")}-${String(lastDayPrev).padStart(2, "0")}`;
 
     const { data: rows, error: qErr } = await supabase
       .from("movimientos_caja")
-      redirectWithMessage(
-        `El cliente tiene registros relacionados en: ${blocked.join(", ")}. Elimina o desvincula esos registros antes de borrar el cliente.`,
-      );
+      .select("*")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .eq("tipo", "egreso")
       .gte("fecha", startPrev)
       .lte("fecha", endPrev);
 
@@ -559,7 +558,6 @@ export async function repetirGastosMesAnterior(formData: FormData) {
     }
 
     const candidatos = (rows ?? []).filter((r) => !(r.es_personal && !incluirPersonal));
-      redirectWithMessage(error.message || "No se pudo eliminar el cliente.");
     if (candidatos.length === 0) {
       throw new Error(
         `No se encontraron egresos en ${String(mesPrevio).padStart(2, "0")}/${anioPrevio} para repetir.`,
@@ -3900,7 +3898,6 @@ export async function updateClienteEstado(formData: FormData) {
   }
   revalidatePath("/ventas/clientes");
   revalidatePath(`/ventas/clientes/${id}`);
-  revalidatePath("/gerencial");
 }
 
 export async function deleteCliente(formData: FormData) {
