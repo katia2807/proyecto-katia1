@@ -22,6 +22,8 @@ import {
 import { canAccessGerencial } from "@/lib/permissions";
 import { deleteCliente, updateClienteEstado } from "@/app/actions";
 import { formatDate, formatPen } from "@/lib/utils";
+import { GerencialClienteSearchSelect } from "@/components/gerencial/cliente-search-select";
+import type { ClienteCompleto } from "@/lib/combobox-mocks";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +44,7 @@ function pct(current: number, previous: number) {
 }
 
 type GerencialPageProps = {
-  searchParams?: Promise<{ cliente?: string | string[]; q?: string | string[] }>;
+  searchParams?: Promise<{ cliente?: string | string[] }>;
 };
 
 function firstParam(value: string | string[] | undefined) {
@@ -70,7 +72,6 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
     getServiciosAserraderoRows(),
   ]);
 
-  const q = firstParam(params?.q).trim().toLowerCase();
   const currentKey = monthKey();
   const prevKey = previousMonthKey();
   const cajaEmpresa = caja.filter((row) => !row.es_personal);
@@ -91,21 +92,17 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
     .sort((a, b) => b.total - a.total)
     .slice(0, 3);
 
+  const clientesCompleto: ClienteCompleto[] = clientes.map((cliente) => ({
+    id: cliente.id,
+    nombre: cliente.nombre,
+    documento: cliente.documento ?? null,
+    telefono: (cliente as any).telefono ?? null,
+    direccion: (cliente as any).direccion ?? null,
+    ruc: (cliente as any).ruc ?? null,
+  }));
+
   const selectedClienteId = firstParam(params?.cliente).trim();
   const selectedCliente = selectedClienteId ? clientes.find((c) => c.id === selectedClienteId) ?? null : null;
-  const filteredClientes = q
-    ? clientes.filter((cliente) => {
-        const values = [
-          cliente.nombre,
-          cliente.documento ?? "",
-          "ruc" in cliente ? (cliente as any).ruc ?? "" : "",
-          cliente.telefono ?? "",
-        ];
-        return values.some((value) => String(value).toLowerCase().includes(q));
-      })
-    : clientes;
-  const selectedClienteInResults = selectedCliente ? filteredClientes.some((c) => c.id === selectedCliente.id) : false;
-  const visibleClientes = selectedCliente && !selectedClienteInResults ? [selectedCliente, ...filteredClientes] : filteredClientes;
   const clienteCotizaciones = selectedCliente ? cotizaciones.filter((c) => c.cliente_id === selectedCliente.id) : [];
   const clienteVentasMuebles = selectedCliente ? ventasMuebles.filter((v) => v.cliente_id === selectedCliente.id) : [];
   const clienteVentasMadera = selectedCliente ? ventasMadera.filter((v) => v.cliente_id === selectedCliente.id) : [];
@@ -181,42 +178,15 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
           <CardDescription>
             Selecciona un cliente para ver su ficha completa, desactivarlo y eliminarlo con confirmación desde el panel gerencial.
           </CardDescription>
-          <form method="get" className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-            <label className="grid gap-2">
-              <span className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Buscar cliente</span>
-              <input
-                name="q"
-                defaultValue={q}
-                placeholder="Nombre, DNI, RUC o teléfono"
-                className="h-11 rounded-[var(--border-radius-input)] border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm text-[var(--text-primary)] outline-none ring-0 transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[rgba(124,58,237,0.2)]"
-              />
-            </label>
-            <Button type="submit">Buscar</Button>
-          </form>
-          <form method="get" className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-            <label className="grid gap-2">
-              <span className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Cliente</span>
-              <select
-                name="cliente"
-                defaultValue={selectedClienteId}
-                className="h-11 rounded-[var(--border-radius-input)] border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm text-[var(--text-primary)] outline-none ring-0 transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[rgba(124,58,237,0.2)]"
-              >
-                <option value="">Selecciona un cliente</option>
-                {visibleClientes.map((cliente) => (
-                  <option key={cliente.id} value={cliente.id}>
-                    {cliente.nombre} {cliente.documento ? `· ${cliente.documento}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <input type="hidden" name="q" value={q} />
-            <Button type="submit">Cargar cliente</Button>
-          </form>
-          {q ? (
+          <div className="mt-4">
+            <GerencialClienteSearchSelect
+              clientes={clientesCompleto}
+              value={selectedClienteId}
+            />
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-              Mostrando {visibleClientes.length} cliente{visibleClientes.length === 1 ? "" : "s"} para "{q}".
+              Escribe el nombre, DNI, RUC o teléfono. Selecciona el cliente para cargar su ficha.
             </p>
-          ) : null}
+          </div>
         </Card>
       </section>
 
