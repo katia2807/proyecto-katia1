@@ -46,7 +46,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         globalSearchItems={globalSearchItems}
         navBadges={{
           "/inventario": inventario.stockBajo.length,
-          "/cotizacion": cobros.length,
+          "/ventas": cobros.length,
         }}
       >
         {children}

@@ -2139,6 +2139,10 @@ export function demoDeleteCotizacionMueblePersonalizada(
       error: "Solo se pueden eliminar cotizaciones de mueble personalizado desde este listado.",
     };
   }
+  const cliente = store.clientes.find((c) => c.id === row.cliente_id);
+  if (cliente && cliente.estado === "activo") {
+    return { ok: false, error: "El cliente está activo. Cambie su estado manualmente." };
+  }
   const tieneOrden = store.ordenesProduccion.some((o) => o.cotizacion_id === id);
   if (tieneOrden) {
     return {
