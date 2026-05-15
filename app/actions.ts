@@ -541,6 +541,7 @@ export async function repetirGastosMesAnterior(formData: FormData) {
       );
     }
   } else {
+    const supabase = getSupabaseServerClient();
     const startPrev = `${anioPrevio}-${String(mesPrevio).padStart(2, "0")}-01`;
     const lastDayPrev = new Date(anioPrevio, mesPrevio, 0).getDate();
     const endPrev = `${anioPrevio}-${String(mesPrevio).padStart(2, "0")}-${String(lastDayPrev).padStart(2, "0")}`;
