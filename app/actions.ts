@@ -3931,6 +3931,7 @@ export async function deleteCliente(formData: FormData) {
     }
     if (!cliente) {
       redirectWithMessage("Cliente no encontrado.");
+      return;
     }
     if (cliente.estado === "activo") {
       redirectWithMessage("El cliente está activo. Cambia su estado a inactivo antes de eliminar.");
