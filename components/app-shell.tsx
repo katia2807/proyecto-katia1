@@ -66,7 +66,7 @@ const navSections = [
   { label: "General", items: ["/", "/caja", "/inventario", "/gerencial", "/registro"] },
   {
     label: "Ventas",
-    items: ["/ventas", "/ventas/muebles-personalizados", "/cotizacion", "/ventas/alquiler-mixer"],
+    items: ["/ventas"],
   },
   { label: "Admin", items: ["/admin/empresa", "/admin/importar", "/admin/respaldo", "/admin/usuarios", "/cuenta"] },
   { label: "Control", items: ["/reportes", "/reportes/antifraude", "/seguridad", "/personal"] },
