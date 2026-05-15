@@ -21,9 +21,10 @@ import {
   getServiciosAserraderoRows,
 } from "@/lib/data";
 import { canAccessGerencial } from "@/lib/permissions";
-import { deleteCliente, updateClienteEstado, forzarEliminarClienteCompleto } from "@/app/actions";
+import { deleteCliente, forzarEliminarClienteCompleto } from "@/app/actions";
 import { formatDate, formatPen } from "@/lib/utils";
 import { GerencialClienteSearchSelect } from "@/components/gerencial/cliente-search-select";
+import { ClienteEstadoForm } from "@/components/gerencial/cliente-estado-form";
 import type { ClienteCompleto } from "@/lib/combobox-mocks";
 
 export const dynamic = "force-dynamic";
@@ -265,18 +266,10 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                   <CardDescription>
                     Cambia el estado del cliente antes de usar la opción de eliminar.
                   </CardDescription>
-                  <form action={updateClienteEstado} className="mt-4 grid gap-3">
-                    <input type="hidden" name="id" value={selectedCliente.id} />
-                    <select
-                      name="estado"
-                      className="h-11 w-full rounded-[var(--border-radius-input)] border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm text-[var(--text-primary)] outline-none ring-0 transition focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[rgba(124,58,237,0.2)]"
-                    >
-                      <option value="activo" selected={selectedCliente.estado === "activo" || !selectedCliente.estado}>Activo</option>
-                      <option value="inactivo" selected={selectedCliente.estado === "inactivo"}>Inactivo</option>
-                      <option value="moroso" selected={selectedCliente.estado === "moroso"}>Moroso</option>
-                    </select>
-                    <Button type="submit">Guardar estado</Button>
-                  </form>
+                  <ClienteEstadoForm
+                    clienteId={selectedCliente.id}
+                    estadoActual={selectedCliente.estado ?? null}
+                  />
                 </Card>
 
                 <Card className="rounded-xl border border-[var(--border-color)] p-4">
