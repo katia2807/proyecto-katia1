@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { CashFlowChart } from "@/components/gerencial/cash-flow-chart";
 import { MetricCard } from "@/components/metric-card";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { getDashboardSession } from "@/lib/current-user-role";
 import {
@@ -108,6 +110,20 @@ export default async function GerencialPage() {
         <MetricCard label="Utilidad neta real" value={formatPen(utilidad)} hint="Ingresos - egresos de empresa" />
         <MetricCard label="Pendiente de cobro" value={formatPen(totalCotPendientes)} hint={`${cotPendientes.length} cotizaciones abiertas`} />
         <MetricCard label="Stock valorizado" value={formatPen(inventario.indicadores.valorInventario)} hint={`${inventario.indicadores.totalProductosActivos} productos activos`} />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-3">
+        <Card className="xl:col-span-3">
+          <CardTitle>Gestión de clientes</CardTitle>
+          <CardDescription>
+            Abre la lista completa de clientes para ver detalles 360, pedidos activos y pagos pendientes desde el panel gerencial.
+          </CardDescription>
+          <div className="mt-4">
+            <Link href="/ventas/clientes">
+              <Button variant="secondary">Abrir gestión de clientes</Button>
+            </Link>
+          </div>
+        </Card>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">

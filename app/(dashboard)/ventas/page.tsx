@@ -115,6 +115,9 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
           <p className="text-sm text-[var(--color-text-secondary)]">
             Cinco sub-flujos del taller: muebles terminados, personalizados, madera cortada, alquiler de Bomba Mixer y servicio de aserradero.
           </p>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            En ventas puedes registrar clientes rápidamente; para ver la ficha completa y gestionar clientes usa el Panel Gerencial.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/ventas/dashboard">
@@ -285,7 +288,7 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
           Datos maestros que alimentan los formularios de cada sub-flujo.
         </CardDescription>
         <div className="mt-3 grid gap-3 md:grid-cols-4">
-          <Resumen titulo="Clientes" valor={clientes.length} href="#" />
+          <Resumen titulo="Clientes" valor={clientes.length} href="/gerencial" />
           <Resumen titulo="Proveedores" valor={proveedores.length} href="#" />
           <Resumen titulo="Choferes" valor={choferes.length} href="#" />
           <Resumen titulo="Muebles en catálogo" valor={muebles.length} href="/ventas/muebles-terminados" />

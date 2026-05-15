@@ -100,7 +100,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         steps={[
           { label: "Configura empresa", done: Boolean(empresa?.nombre), href: "/admin/empresa" },
           { label: "Agrega productos", done: inventario.productos.length > 0, href: "/inventario?tab=productos" },
-          { label: "Registra cliente", done: clientes.length > 0, href: "/ventas/clientes" },
+          { label: "Registra cliente", done: clientes.length > 0, href: "/ventas?quick=cliente" },
           { label: "Crea cotizacion", done: cotizaciones.length > 0, href: "/cotizacion" },
         ]}
       />
