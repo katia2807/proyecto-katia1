@@ -42,7 +42,7 @@ function pct(current: number, previous: number) {
 }
 
 type GerencialPageProps = {
-  searchParams?: { cliente?: string | string[] };
+  searchParams?: Promise<{ cliente?: string | string[] }>;
 };
 
 function firstParam(value: string | string[] | undefined) {
@@ -51,6 +51,7 @@ function firstParam(value: string | string[] | undefined) {
 }
 
 export default async function GerencialPage({ searchParams }: GerencialPageProps) {
+  const params = await searchParams;
   const session = await getDashboardSession();
   if (!canAccessGerencial(session?.role ?? null, session?.uiRole ?? null)) {
     redirect("/?mensaje=no-acceso");
@@ -89,7 +90,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
     .sort((a, b) => b.total - a.total)
     .slice(0, 3);
 
-  const selectedClienteId = firstParam(searchParams?.cliente).trim();
+  const selectedClienteId = firstParam(params?.cliente).trim();
   const selectedCliente = selectedClienteId ? clientes.find((c) => c.id === selectedClienteId) ?? null : null;
   const clienteCotizaciones = selectedCliente ? cotizaciones.filter((c) => c.cliente_id === selectedCliente.id) : [];
   const clienteVentasMuebles = selectedCliente ? ventasMuebles.filter((v) => v.cliente_id === selectedCliente.id) : [];
