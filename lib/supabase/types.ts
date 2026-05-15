@@ -57,6 +57,7 @@ export type Database = {
           ruc: string | null;
           direccion: string | null;
           tipo_persona: "natural" | "empresa" | null;
+            estado?: "activo" | "inactivo" | "moroso" | null;
           created_at: string;
         };
         Insert: {
@@ -68,6 +69,7 @@ export type Database = {
           ruc?: string | null;
           direccion?: string | null;
           tipo_persona?: "natural" | "empresa" | null;
+            estado?: "activo" | "inactivo" | "moroso" | null;
           created_at?: string;
         };
         Update: {
@@ -77,6 +79,7 @@ export type Database = {
           ruc?: string | null;
           direccion?: string | null;
           tipo_persona?: "natural" | "empresa" | null;
+            estado?: "activo" | "inactivo" | "moroso" | null;
         };
       };
       choferes: {

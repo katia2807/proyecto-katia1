@@ -7,6 +7,8 @@ import {
   getClientesRows,
   getCobrosVencidos,
   getComprasMaderaRows,
+  getInventarioMovimientosRows,
+  getInventarioProductosRows,
   getPersonalRows,
   getServiciosAserraderoRows,
   getVentasMuebleTerminadoRows,
@@ -37,6 +39,8 @@ export async function GET() {
     personal,
     cobros,
     clientes,
+    inventarioMovimientos,
+    inventarioProductos,
   ] = await Promise.all([
     getCajaRows(),
     getVentasMuebleTerminadoRows(),
@@ -47,6 +51,8 @@ export async function GET() {
     getPersonalRows(),
     getCobrosVencidos(),
     getClientesRows(),
+    getInventarioMovimientosRows(),
+    getInventarioProductosRows(true),
   ]);
 
   const alquileres = alquilerResult.rows;
@@ -233,6 +239,31 @@ export async function GET() {
       fecha_vencimiento: c.fecha_vencimiento,
       monto: c.monto,
     })),
+  );
+
+  addSheet(
+    "Kardex completo",
+    [
+      { header: "Fecha", key: "fecha", width: 12 },
+      { header: "Producto", key: "producto", width: 32 },
+      { header: "Codigo", key: "codigo", width: 16 },
+      { header: "Tipo", key: "tipo", width: 18 },
+      { header: "Cantidad", key: "cantidad", width: 12 },
+      { header: "Costo unitario", key: "costo_unitario", width: 14 },
+      { header: "Referencia", key: "referencia", width: 36 },
+    ],
+    inventarioMovimientos.map((m) => {
+      const producto = inventarioProductos.find((p) => p.id === m.producto_id);
+      return {
+        fecha: m.fecha,
+        producto: producto?.nombre ?? "Producto eliminado",
+        codigo: producto?.codigo ?? "",
+        tipo: m.tipo,
+        cantidad: Number(m.cantidad),
+        costo_unitario: Number(m.costo_unitario ?? 0),
+        referencia: m.referencia ?? "",
+      };
+    }),
   );
 
   const buffer = await wb.xlsx.writeBuffer();

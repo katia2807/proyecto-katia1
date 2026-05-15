@@ -1,4 +1,6 @@
 import { CotizacionUnificadaWizard } from "@/components/cotizacion-unificada-wizard";
+import { CotizacionMasterDetail } from "@/components/cotizacion-master-detail";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getEmpresaConfig } from "@/lib/company-config";
 import {
   getClientesRows,
@@ -10,7 +12,6 @@ import { getDashboardSession } from "@/lib/current-user-role";
 import { previewCorrelativo } from "@/lib/numeracion";
 import { canMutateVentas } from "@/lib/permissions";
 
-/** Evita prerender estático con sesión vacía; la página depende de rol y datos en vivo. */
 export const dynamic = "force-dynamic";
 
 export default async function CotizacionPage() {
@@ -51,18 +52,38 @@ export default async function CotizacionPage() {
   ]);
   const correlativoPreview = await previewCorrelativo("cotizacion").catch((error) => {
     console.error("[cotizacion/page] previewCorrelativo failed:", error);
-    return "N°0001";
+    return "N 0001";
   });
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold">Cotización</h2>
+        <h2 className="text-xl font-bold">Cotizacion</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Asistente por pasos: tipo de cliente, datos, rubros (muebles, aserradero, alquiler), resumen y guardado en
-          base de datos. Podés volver atrás en cualquier momento.
+          Ver lista, abrir detalle, editar y luego crear nuevas cotizaciones desde un solo flujo.
         </p>
       </div>
+
+      <Card>
+        <CardTitle>Cotizaciones guardadas</CardTitle>
+        <CardDescription>Haz clic en una fila para abrir detalle, items, cliente, fechas, estado e historial.</CardDescription>
+        <div className="mt-3">
+          <CotizacionMasterDetail
+            cotizaciones={cotizacionesGuardadas.map((row) => ({
+              id: row.id,
+              cliente: clientes.find((cliente) => cliente.id === row.cliente_id)?.nombre ?? "Cliente",
+              fecha: row.fecha,
+              correlativo: row.correlativo,
+              total: Number(row.total),
+              estado_flujo: row.estado_flujo,
+              tipo_cliente: row.tipo_cliente,
+              detalle: row.detalle,
+              created_at: row.created_at,
+            }))}
+          />
+        </div>
+      </Card>
+
       <CotizacionUnificadaWizard
         canSave={canSave}
         correlativoPreview={correlativoPreview}

@@ -5,6 +5,7 @@ export const FEATURES = {
   inicio: true,
   caja: true,
   inventario: true,
+  gerencial: true,
   ventas: true,
   /** Incluye cotizador, tabla de cotizaciones y tablero Kanban de órdenes de producción (`KanbanOrdenes`). */
   mueblesPersonalizados: true,
@@ -40,6 +41,7 @@ const NAV_MENU_FEATURE: Record<NavHref, FeatureKey | readonly FeatureKey[] | nul
   "/": "inicio",
   "/caja": "caja",
   "/inventario": "inventario",
+  "/gerencial": "gerencial",
   "/ventas": "ventas",
   "/ventas/muebles-personalizados": ["ventas", "mueblesPersonalizados"],
   "/cotizacion": "cotizacion",

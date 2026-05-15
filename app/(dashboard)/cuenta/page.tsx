@@ -1,4 +1,5 @@
 import { AccountSettingsForm } from "@/components/auth/account-settings-form";
+import { AccountTutorialButton } from "@/components/account-tutorial-button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { requireAuthContext } from "@/lib/auth";
 
@@ -32,6 +33,14 @@ export default async function CuentaPage() {
           No hay restablecimiento público de contraseña en esta pantalla más allá del cambio autenticado. Para recuperar
           acceso, usa la recuperación de Supabase Auth en el proyecto o contacta al administrador del proyecto.
         </CardDescription>
+      </Card>
+
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <CardTitle>Tutorial</CardTitle>
+          <CardDescription>Reactiva el banner de primeros pasos en el dashboard.</CardDescription>
+        </div>
+        <AccountTutorialButton />
       </Card>
     </div>
   );

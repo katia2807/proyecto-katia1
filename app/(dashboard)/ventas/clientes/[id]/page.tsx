@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { WhatsAppButton } from "@/components/sales/whatsapp-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/metric-card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
+import { updateClienteEstado } from "@/app/actions";
+import { Button } from "@/components/ui/button";
+import { SelectField } from "@/components/ui/field";
 import {
   getAlquilerRows,
   getClientesRows,
@@ -63,13 +65,16 @@ export default async function ClienteDetallePage({ params }: { params: Params })
   const totalOperaciones =
     cotizCliente.length + vMuebles.length + vMadera.length + cContratos.length + sServicios.length;
 
-  const mensajeWa = `Hola ${cliente.nombre}, te escribo del taller Katia.`;
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold">{cliente.nombre}</h2>
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            {cliente.nombre}
+            {cliente.estado ? (
+              <Badge variant={cliente.estado === "activo" ? "success" : cliente.estado === "moroso" ? "danger" : "warning"}>{cliente.estado}</Badge>
+            ) : null}
+          </h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
             {cliente.tipo_persona === "empresa" ? "Empresa" : "Persona natural"} ·{" "}
             {cliente.documento ?? "Sin documento"} · {cliente.telefono ?? "Sin teléfono"}
@@ -79,12 +84,25 @@ export default async function ClienteDetallePage({ params }: { params: Params })
           ) : null}
         </div>
         <div className="flex gap-2">
-          <WhatsAppButton telefono={cliente.telefono} mensaje={mensajeWa} variant="pill" />
           <Link href="/ventas/clientes" className="text-sm font-semibold underline">
             ← Listado
           </Link>
         </div>
       </div>
+
+      <Card>
+        <CardTitle>Estado del cliente</CardTitle>
+        <CardDescription>Cambia el estado manualmente si hay algún problema (ej. moroso, inactivo).</CardDescription>
+        <form action={updateClienteEstado} className="mt-3 flex items-end gap-3 max-w-sm">
+          <input type="hidden" name="id" value={cliente.id} />
+          <SelectField name="estado" label="Estado" defaultValue={cliente.estado ?? "activo"} className="flex-1">
+            <option value="activo">Activo</option>
+            <option value="inactivo">Inactivo</option>
+            <option value="moroso">Moroso</option>
+          </SelectField>
+          <Button type="submit">Actualizar</Button>
+        </form>
+      </Card>
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard

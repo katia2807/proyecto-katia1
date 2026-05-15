@@ -23,6 +23,7 @@ import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { formatDate, formatPen } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { DetailDrawer, DetailField } from "@/components/ui/detail-drawer";
 import { Field, SelectField } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 
@@ -85,6 +86,7 @@ type InventarioData = {
     totalProductosActivos: number;
     totalProductosInactivos: number;
     totalMovimientos: number;
+    movimientosDelMes?: number;
     totalStock: number;
     valorInventario: number;
     rotacionPromedio: number;
@@ -106,7 +108,6 @@ type MuebleCatalogoInventarioRow = {
 type InventarioInteractiveTab =
   | "resumen"
   | "productos"
-  | "muebles"
   | "decisiones"
   | "kardex"
   | "alertas"
@@ -119,12 +120,11 @@ type Props = {
 };
 
 /** Filas iniciales en pestaña Productos; “Mostrar más” amplía sin recargar. */
-const PRODUCTOS_LIST_PAGE = 50;
+const PRODUCTOS_LIST_PAGE = 20;
 
 const INVENTARIO_TAB_ORDER: InventarioInteractiveTab[] = [
   "resumen",
   "productos",
-  "muebles",
   "decisiones",
   "kardex",
   "alertas",
@@ -197,6 +197,10 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
   const [filterText, setFilterText] = useState("");
   const [filterCategoria, setFilterCategoria] = useState("todas");
   const [filterEstado, setFilterEstado] = useState<"todos" | "activos" | "inactivos" | "stock_bajo">("todos");
+  const [filterStockMin, setFilterStockMin] = useState("");
+  const [filterStockMax, setFilterStockMax] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set());
   const [productosListLimit, setProductosListLimit] = useState(PRODUCTOS_LIST_PAGE);
   const [kardexTipo, setKardexTipo] = useState<"todos" | "entrada_compra" | "salida_venta" | "ajuste">("todos");
   const [kardexProducto, setKardexProducto] = useState("todos");
@@ -293,6 +297,8 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
       if (filterEstado === "activos" && p.activo === false) return false;
       if (filterEstado === "inactivos" && p.activo !== false) return false;
       if (filterEstado === "stock_bajo" && Number(p.stock_actual) > Number(p.stock_minimo)) return false;
+      if (filterStockMin !== "" && Number(p.stock_actual) < Number(filterStockMin)) return false;
+      if (filterStockMax !== "" && Number(p.stock_actual) > Number(filterStockMax)) return false;
       if (!q) return true;
       return (
         p.codigo.toLowerCase().includes(q) ||
@@ -300,11 +306,29 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
         p.categoria.toLowerCase().includes(q)
       );
     });
-  }, [filterCategoria, filterEstado, filterText, productos]);
+  }, [filterCategoria, filterEstado, filterStockMax, filterStockMin, filterText, productos]);
 
   useEffect(() => {
     setProductosListLimit(PRODUCTOS_LIST_PAGE);
-  }, [filterCategoria, filterEstado, filterText]);
+  }, [filterCategoria, filterEstado, filterStockMax, filterStockMin, filterText]);
+
+  const selectedProduct = useMemo(
+    () => (selectedProductId ? productos.find((p) => p.id === selectedProductId) ?? null : null),
+    [productos, selectedProductId],
+  );
+  const selectedProductKardex = useMemo(
+    () => (selectedProduct ? kardex.filter((row) => row.producto_id === selectedProduct.id).slice(0, 10) : []),
+    [kardex, selectedProduct],
+  );
+  const selectedProductPriceHistory = useMemo(
+    () =>
+      selectedProduct
+        ? movimientos
+            .filter((row) => row.producto_id === selectedProduct.id && row.tipo === "entrada_compra" && row.costo_unitario)
+            .slice(0, 5)
+        : [],
+    [movimientos, selectedProduct],
+  );
 
   const productosFiltradosVisibles = useMemo(
     () => productosFiltrados.slice(0, productosListLimit),
@@ -368,14 +392,13 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
       <Card>
         <CardTitle>Centro de control de inventario</CardTitle>
         <CardDescription>
-          Pestaña <strong>Productos</strong>: insumos y stock del taller. <strong>Catálogo muebles</strong>: ventas.{" "}
+          Pestaña <strong>Productos</strong>: insumos, stock del taller y catalogo de muebles.{" "}
           <strong>Toma de decisiones</strong>: Pareto ABC, gráficos y tabla (mismos datos que el resumen).{" "}
           <strong>Kardex</strong> sin cambios. Alertas y reportes en sus pestañas.
         </CardDescription>
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="button" className={tabBtnClass("resumen")} onClick={() => irATab("resumen")}>Resumen</button>
           <button type="button" className={tabBtnClass("productos")} onClick={() => irATab("productos")}>Productos</button>
-          <button type="button" className={tabBtnClass("muebles")} onClick={() => irATab("muebles")}>Catálogo muebles</button>
           <button type="button" className={tabBtnClass("decisiones")} onClick={() => irATab("decisiones")}>
             Toma de decisiones
           </button>
@@ -543,7 +566,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
           Editá cada producto desde el panel lateral (botón Editar). Desactivar y eliminar piden confirmación; eliminar
           exige escribir ELIMINAR.
         </CardDescription>
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className="mt-4 grid gap-3 md:grid-cols-6">
           <Field label="Buscar" value={filterText} onChange={(e) => setFilterText(e.target.value)} placeholder="Código, nombre..." />
           <SelectField label="Categoría" value={filterCategoria} onChange={(e) => setFilterCategoria(e.target.value)}>
             <option value="todas">Todas</option>
@@ -561,6 +584,8 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
             <option value="inactivos">Inactivos</option>
             <option value="stock_bajo">Stock bajo</option>
           </SelectField>
+          <Field label="Stock min." type="number" value={filterStockMin} onChange={(e) => setFilterStockMin(e.target.value)} placeholder="0" />
+          <Field label="Stock max." type="number" value={filterStockMax} onChange={(e) => setFilterStockMax(e.target.value)} placeholder="999" />
           <div className="rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-secondary)]">
             {productosFiltrados.length === 0
               ? "0 productos"
@@ -569,17 +594,42 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                 : `Mostrando ${productosFiltradosVisibles.length} de ${productosFiltrados.length} productos`}
           </div>
         </div>
+        {selectedBatchIds.size > 0 ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--bg-surface)] p-3">
+            <span className="text-sm font-semibold">{selectedBatchIds.size} seleccionados</span>
+            <Button type="button" variant="secondary" disabled={!canMutate}>Desactivar</Button>
+            <Button type="button" variant="secondary">Exportar</Button>
+            <Button type="button" variant="secondary" disabled={!canMutate}>Ajustar stock</Button>
+          </div>
+        ) : null}
         <div className="mt-4 space-y-3">
           {productosFiltradosVisibles.map((row) => (
             <div
               key={row.id}
               id={`producto-${row.id}`}
               className={cn(
-                "rounded-xl border border-[var(--color-border)] p-4",
+                "cursor-pointer rounded-xl border border-[var(--color-border)] p-4",
                 highlightedId === row.id && "bg-[var(--color-highlight-bg)] ring-2 ring-[var(--color-highlight-ring)]",
               )}
+              onClick={() => setSelectedProductId(row.id)}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
+                <input
+                  type="checkbox"
+                  aria-label={`Seleccionar ${row.nombre}`}
+                  checked={selectedBatchIds.has(row.id)}
+                  onChange={(event) => {
+                    event.stopPropagation();
+                    setSelectedBatchIds((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(row.id)) next.delete(row.id);
+                      else next.add(row.id);
+                      return next;
+                    });
+                  }}
+                  onClick={(event) => event.stopPropagation()}
+                  className="mt-1 size-4"
+                />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-[var(--color-text-primary)]">{row.nombre}</p>
                   <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
@@ -592,19 +642,20 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="secondary" onClick={() => openProductoModal(row.id)} disabled={!canMutate}>
+                  <Button type="button" variant="secondary" onClick={(event) => { event.stopPropagation(); openProductoModal(row.id); }} disabled={!canMutate}>
                     Editar
                   </Button>
                   <Button
                     type="button"
                     variant={row.activo ? "danger" : "secondary"}
-                    onClick={() =>
+                    onClick={(event) => {
+                      event.stopPropagation();
                       setToggleTarget({
                         id: row.id,
                         nextActivo: !row.activo,
                         nombre: row.nombre,
                       })
-                    }
+                    }}
                     disabled={!canMutate}
                   >
                     {row.activo ? "Desactivar" : "Activar"}
@@ -612,7 +663,8 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                   <Button
                     type="button"
                     variant="danger"
-                    onClick={() => {
+                    onClick={(event) => {
+                      event.stopPropagation();
                       setDeleteProductTarget({ id: row.id, nombre: row.nombre });
                       setDeleteProductStep1Open(true);
                     }}
@@ -639,7 +691,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
       </Card>
       ) : null}
 
-      {activeTab === "muebles" ? (
+      {activeTab === "productos" ? (
         <div id="catalogo-muebles-inventario" className="space-y-4">
           <MueblesCatalogoSection muebles={mueblesCatalogo} canMutate={canMutate} />
         </div>
@@ -1237,6 +1289,62 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
       >
         <p>Confirmá la baja del movimiento seleccionado. El stock se actualizará en consecuencia.</p>
       </PhraseConfirmDialog>
+
+      <DetailDrawer
+        open={Boolean(selectedProduct)}
+        title={selectedProduct?.nombre ?? "Producto"}
+        description="Stock, valorizacion, precios de compra y ultimos movimientos"
+        onClose={() => setSelectedProductId(null)}
+        onEdit={() => selectedProduct && openProductoModal(selectedProduct.id)}
+      >
+        {selectedProduct ? (
+          <div className="space-y-4">
+            <div className="grid gap-2">
+              <DetailField label="Stock actual" value={`${selectedProduct.stock_actual} ${selectedProduct.unidad}`} />
+              <DetailField label="Stock minimo" value={`${selectedProduct.stock_minimo} ${selectedProduct.unidad}`} />
+              <DetailField label="Valorizacion" value={formatPen(selectedProduct.valor_stock)} />
+              <DetailField label="Proveedor favorito" value="Campo opcional pendiente de ficha" />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="secondary" onClick={() => openCompraReponer(selectedProduct.id)} disabled={!canMutate}>
+                Registrar compra
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => router.push(`/inventario?quick=movimiento&producto_id=${selectedProduct.id}`)} disabled={!canMutate}>
+                Registrar movimiento
+              </Button>
+            </div>
+            <section>
+              <h3 className="text-sm font-semibold">Historial de precios de compra</h3>
+              <div className="mt-2 space-y-2">
+                {selectedProductPriceHistory.length > 0 ? (
+                  selectedProductPriceHistory.map((row) => (
+                    <div key={row.id} className="rounded-lg border border-[var(--color-border)] p-3 text-sm">
+                      <p className="font-semibold">{formatPen(Number(row.costo_unitario ?? 0))}</p>
+                      <p className="text-xs text-[var(--color-text-secondary)]">{formatDate(row.fecha)} · {row.referencia ?? "Sin proveedor"}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-[var(--color-text-secondary)]">Sin compras registradas para este producto.</p>
+                )}
+              </div>
+            </section>
+            <section>
+              <h3 className="text-sm font-semibold">Ultimos 10 movimientos del kardex</h3>
+              <div className="mt-2 space-y-2">
+                {selectedProductKardex.map((row) => (
+                  <div key={row.id} className="rounded-lg border border-[var(--color-border)] p-3 text-sm">
+                    <p className="font-semibold">{row.tipo} · {row.impacto}</p>
+                    <p className="text-xs text-[var(--color-text-secondary)]">{formatDate(row.fecha)} · {row.referencia ?? "Sin referencia"}</p>
+                  </div>
+                ))}
+                {selectedProductKardex.length === 0 ? (
+                  <p className="text-sm text-[var(--color-text-secondary)]">Sin movimientos recientes.</p>
+                ) : null}
+              </div>
+            </section>
+          </div>
+        ) : null}
+      </DetailDrawer>
 
       {!canMutate ? (
         <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-800">

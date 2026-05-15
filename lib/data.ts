@@ -765,6 +765,10 @@ export async function getInventarioRobustoData() {
           ).toFixed(2),
         )
       : 0;
+  const inicioMes = new Date();
+  inicioMes.setDate(1);
+  inicioMes.setHours(0, 0, 0, 0);
+  const movimientosDelMes = movimientos.filter((m) => new Date(m.fecha).getTime() >= inicioMes.getTime()).length;
 
   const categorias = Array.from(new Set(enriched.map((p) => p.categoria))).sort((a, b) => a.localeCompare(b));
   const rankingMasVendidos = [...enriched]
@@ -816,6 +820,7 @@ export async function getInventarioRobustoData() {
       totalProductosActivos: productos.length,
       totalProductosInactivos: productosAll.filter((p) => p.activo === false).length,
       totalMovimientos: totalMovimientosEnBd,
+      movimientosDelMes,
       totalStock: Number(totalStock.toFixed(2)),
       valorInventario: Number(valorInventario.toFixed(2)),
       rotacionPromedio,

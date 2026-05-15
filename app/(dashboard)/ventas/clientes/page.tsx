@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Field } from "@/components/ui/field";
-import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
+import { Field, SelectField } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import { ClientesMasterDetail } from "@/components/ventas/clientes-master-detail";
 import {
   getAlquilerRows,
   getClientesRows,
@@ -10,11 +10,12 @@ import {
   getServiciosAserraderoRows,
   getVentasMuebleTerminadoRows,
   getVentasRows,
+  getOrdenesProduccionRows,
+  getCobrosVencidos,
 } from "@/lib/data";
-import { formatPen } from "@/lib/utils";
 
 type ClientesPageProps = {
-  searchParams?: Promise<{ q?: string | string[] }>;
+  searchParams?: Promise<{ q?: string | string[]; tipo?: string | string[]; estado?: string | string[] }>;
 };
 
 function normalizeQ(value: string | string[] | undefined) {
@@ -23,14 +24,20 @@ function normalizeQ(value: string | string[] | undefined) {
 }
 
 export default async function ClientesPage({ searchParams }: ClientesPageProps) {
-  const q = normalizeQ((await searchParams)?.q);
-  const [clientes, ventasMuebles, ventasMadera, alquilerBundle, servicios, cotizaciones] = await Promise.all([
+  const params = await searchParams;
+  const q = normalizeQ(params?.q);
+  const tipo = normalizeQ(params?.tipo);
+  const estado = normalizeQ(params?.estado);
+
+  const [clientes, ventasMuebles, ventasMadera, alquilerBundle, servicios, cotizaciones, ordenes, cobros] = await Promise.all([
     getClientesRows(),
     getVentasMuebleTerminadoRows(),
     getVentasRows(),
     getAlquilerRows(),
     getServiciosAserraderoRows(),
     getCotizacionesRows(),
+    getOrdenesProduccionRows(),
+    getCobrosVencidos(),
   ]);
   const contratos = alquilerBundle.rows;
 
@@ -66,20 +73,51 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
     totales.set(c.cliente_id, acc);
   }
 
+  const pedidosActivos = new Map<string, number>();
+  for (const o of ordenes) {
+    if (o.estado !== "entregado" && o.estado !== "terminado") {
+      pedidosActivos.set(o.cliente_id, (pedidosActivos.get(o.cliente_id) ?? 0) + 1);
+    }
+  }
+
+  const pagosPendientes = new Map<string, number>();
+  for (const c of cobros) {
+    pagosPendientes.set(c.cliente_id, (pagosPendientes.get(c.cliente_id) ?? 0) + 1);
+  }
+
+  const cotizacionesPorCliente = new Map<string, { id: string; fecha: string; monto: number; estado: string; href: string }[]>();
+  for (const c of cotizaciones) {
+    const rows = cotizacionesPorCliente.get(c.cliente_id) ?? [];
+    rows.push({
+      id: c.id,
+      fecha: c.fecha,
+      monto: Number(c.precio_acordado),
+      estado: c.estado,
+      href: `/ventas/muebles-personalizados/${c.id}/pdf`,
+    });
+    cotizacionesPorCliente.set(c.cliente_id, rows);
+  }
+
   const filtrados = clientes
     .filter((c) => {
-      if (!q) return true;
-      return (
-        c.nombre.toLowerCase().includes(q) ||
-        (c.documento ?? "").toLowerCase().includes(q) ||
-        (c.telefono ?? "").toLowerCase().includes(q)
-      );
+      if (q && !(c.nombre.toLowerCase().includes(q) || (c.documento ?? "").toLowerCase().includes(q) || (c.telefono ?? "").toLowerCase().includes(q))) return false;
+      if (tipo && c.tipo_persona !== tipo) return false;
+      if (estado && c.estado !== estado) return false;
+      return true;
     })
-    .sort((a, b) => {
-      const tA = totales.get(a.id)?.total ?? 0;
-      const tB = totales.get(b.id)?.total ?? 0;
-      return tB - tA;
-    });
+    .sort((a, b) => (totales.get(b.id)?.total ?? 0) - (totales.get(a.id)?.total ?? 0));
+
+  const clientesDetalle = filtrados.map((c) => {
+    const t = totales.get(c.id) ?? { ops: 0, total: 0 };
+    return {
+      ...c,
+      operaciones: t.ops,
+      facturado: t.total,
+      pedidosActivos: pedidosActivos.get(c.id) ?? 0,
+      pagosPendientes: pagosPendientes.get(c.id) ?? 0,
+      cotizaciones: (cotizacionesPorCliente.get(c.id) ?? []).slice(0, 5),
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -87,81 +125,39 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
         <div>
           <h2 className="text-xl font-bold">Clientes</h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Vista 360 con todo el historial: cotizaciones, ventas, alquileres y servicios.
+            Lista, seleccion y detalle 360 del cliente con cotizaciones, pedidos y pagos pendientes.
           </p>
         </div>
         <Link href="/ventas" className="text-sm font-semibold underline">
-          ← Volver al hub
+          Volver al hub
         </Link>
       </div>
 
       <Card>
-        <CardTitle>Buscar cliente</CardTitle>
-        <CardDescription>Por nombre, documento o teléfono.</CardDescription>
-        <form className="mt-3 flex gap-2" method="get">
-          <Field
-            name="q"
-            label="Búsqueda"
-            defaultValue={q}
-            placeholder="Ej. Lenin, 12345678…"
-            className="flex-1"
-          />
+        <CardTitle>Buscar y filtrar clientes</CardTitle>
+        <CardDescription>Por nombre, documento, tipo y estado.</CardDescription>
+        <form className="mt-3 grid items-end gap-3 md:grid-cols-4" method="get">
+          <Field name="q" label="Busqueda" defaultValue={q} placeholder="Ej. Lenin, 12345678" />
+          <SelectField name="tipo" label="Tipo" defaultValue={tipo}>
+            <option value="">Todos</option>
+            <option value="empresa">Empresa</option>
+            <option value="natural">Persona natural</option>
+          </SelectField>
+          <SelectField name="estado" label="Estado" defaultValue={estado}>
+            <option value="">Todos</option>
+            <option value="activo">Activo</option>
+            <option value="inactivo">Inactivo</option>
+            <option value="moroso">Moroso</option>
+          </SelectField>
+          <Button type="submit">Filtrar</Button>
         </form>
       </Card>
 
       <Card>
-        <CardTitle>Listado ({filtrados.length})</CardTitle>
-        <CardDescription>Ordenado por facturación total descendente.</CardDescription>
-        <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
-          <Table>
-            <THead>
-              <TRow>
-                <TH>Nombre</TH>
-                <TH>Documento</TH>
-                <TH>Teléfono</TH>
-                <TH>Tipo</TH>
-                <TH className="text-right">Operaciones</TH>
-                <TH className="text-right">Facturado</TH>
-                <TH className="text-right">Detalle</TH>
-              </TRow>
-            </THead>
-            <tbody>
-              {filtrados.map((c) => {
-                const t = totales.get(c.id) ?? { ops: 0, total: 0 };
-                return (
-                  <TRow key={c.id}>
-                    <TD className="font-semibold">{c.nombre}</TD>
-                    <TD>{c.documento ?? "—"}</TD>
-                    <TD>{c.telefono ?? "—"}</TD>
-                    <TD>
-                      {c.tipo_persona ? (
-                        <Badge variant="neutral">{c.tipo_persona}</Badge>
-                      ) : (
-                        <span className="text-[var(--color-text-secondary)]">—</span>
-                      )}
-                    </TD>
-                    <TD className="text-right">{t.ops}</TD>
-                    <TD className="text-right font-semibold">{formatPen(t.total)}</TD>
-                    <TD className="text-right">
-                      <Link
-                        href={`/ventas/clientes/${c.id}`}
-                        className="text-xs font-semibold text-[var(--color-accent)] underline"
-                      >
-                        Ver 360
-                      </Link>
-                    </TD>
-                  </TRow>
-                );
-              })}
-              {filtrados.length === 0 ? (
-                <TRow>
-                  <TD colSpan={7} className="text-center text-[var(--color-text-secondary)]">
-                    Sin resultados.
-                  </TD>
-                </TRow>
-              ) : null}
-            </tbody>
-          </Table>
+        <CardTitle>Listado ({clientesDetalle.length})</CardTitle>
+        <CardDescription>Haz clic en una fila para abrir el drawer lateral.</CardDescription>
+        <div className="mt-3">
+          <ClientesMasterDetail clientes={clientesDetalle} />
         </div>
       </Card>
     </div>

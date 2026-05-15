@@ -5,13 +5,13 @@ import { ContextActionPanel } from "@/components/context-action-panel";
 import { NotasSelector } from "@/components/sales/notas-selector";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/Combobox";
-import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field, SelectField } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { liteClientesToCompleto, MOCK_COTIZACIONES_APROBACION } from "@/lib/combobox-mocks";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import type { ComponentProps } from "react";
 import { useEffect, useMemo, useState, useActionState } from "react";
+import Link from "next/link";
 
 type FormActionProp = Exclude<ComponentProps<"form">["action"], string | undefined>;
 
@@ -24,72 +24,7 @@ type MueblesPersonalizadosContextPanelsProps = {
   mockData?: boolean;
 };
 
-function NuevaCotizacionFormFields({
-  clientes,
-  mockData,
-  formAction,
-}: {
-  clientes: ClienteOpt[];
-  mockData: boolean;
-  formAction: FormActionProp;
-}) {
-  const [clienteCotId, setClienteCotId] = useState("");
-  const clientesCombo = useMemo(() => liteClientesToCompleto(clientes), [clientes]);
 
-  return (
-    <form action={formAction} className="grid gap-3 md:grid-cols-2">
-      <ClienteCombobox
-        mockData={mockData}
-        clientes={clientesCombo}
-        value={clienteCotId}
-        onChange={setClienteCotId}
-        hiddenInputName="cliente_id"
-        label="Cliente"
-        placeholder="Buscar cliente…"
-        inputAriaLabel="Cliente para cotización personalizada"
-      />
-      <Field name="fecha" type="date" label="Fecha" required />
-      <input type="hidden" name="tipo" value="mueble_personalizado" />
-      <Field
-        name="especie_madera"
-        label="Especie de madera"
-        placeholder="Tornillo / Pino / Cedro"
-        required
-      />
-      <SelectField name="unidad_medida" label="Unidad base" defaultValue="cm">
-        <option value="cm">Centímetros</option>
-        <option value="in">Pulgadas</option>
-        <option value="otro">Otra</option>
-      </SelectField>
-      <Field
-        name="precio_calculado"
-        label="Precio calculado (S/)"
-        type="number"
-        min="0"
-        step="0.01"
-        required
-      />
-      <Field
-        name="precio_acordado"
-        label="Precio acordado (S/)"
-        type="number"
-        min="0"
-        step="0.01"
-        required
-      />
-      <SelectField name="estado" label="Estado" defaultValue="confirmada">
-        <option value="borrador">Borrador</option>
-        <option value="confirmada">Confirmada</option>
-      </SelectField>
-      <div className="md:col-span-2">
-        <NotasSelector name="motivo_ajuste" label="Notas para incluir en la cotización" />
-      </div>
-      <div className="md:col-span-2">
-        <Button>Guardar cotización</Button>
-      </div>
-    </form>
-  );
-}
 
 function AceptarCotizacionFormFields({
   cotizacionAprOptions,
@@ -151,19 +86,7 @@ export function MueblesPersonalizadosContextPanels({
 }: MueblesPersonalizadosContextPanelsProps) {
   const { showToast } = useToast();
 
-  const [openCot, setOpenCot] = useState(false);
-  const [cotKey, setCotKey] = useState(0);
-  const [stateCot, actionCot] = useActionState(submitCreateCotizacionForm, mutationFormInitialState);
 
-  useEffect(() => {
-    if (stateCot.success && stateCot.message) {
-      showToast({ variant: "success", message: stateCot.message });
-      setOpenCot(false);
-      setCotKey((k) => k + 1);
-    } else if (stateCot.error) {
-      showToast({ variant: "error", message: stateCot.error });
-    }
-  }, [stateCot, showToast]);
 
   const [openApr, setOpenApr] = useState(false);
   const [aprKey, setAprKey] = useState(0);
@@ -189,23 +112,11 @@ export function MueblesPersonalizadosContextPanels({
 
   return (
     <>
-      <ContextActionPanel
-        triggerLabel="Nueva cotización"
-        title="Cotización personalizada"
-        description="Cliente, especie, precio calculado y precio acordado."
-        open={openCot}
-        onOpenChange={(next) => {
-          setOpenCot(next);
-          if (!next) setCotKey((k) => k + 1);
-        }}
-      >
-        <NuevaCotizacionFormFields
-          key={cotKey}
-          clientes={clientes}
-          mockData={mockData}
-          formAction={actionCot}
-        />
-      </ContextActionPanel>
+      <Link href="/cotizacion">
+        <Button type="button" variant="primary">
+          Nueva cotización
+        </Button>
+      </Link>
 
       <ContextActionPanel
         triggerLabel="Aceptar (orden + adelanto)"

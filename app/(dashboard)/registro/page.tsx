@@ -29,9 +29,9 @@ export default async function RegistroPage({ searchParams }: RegistroPageProps) 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold">Registro general por categoría</h2>
+        <h2 className="text-xl font-bold">Bitacora</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Captura flexible: registras cualquier hecho y el sistema lo ordena por tema.
+          Anota eventos, gastos, notas e incidencias del dia.
         </p>
       </div>
 

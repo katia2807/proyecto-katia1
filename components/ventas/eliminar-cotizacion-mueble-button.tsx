@@ -10,9 +10,10 @@ import { useToast } from "@/components/ui/toast";
 type EliminarCotizacionMuebleButtonProps = {
   id: string;
   correlativo: string | null;
+  clienteId: string;
 };
 
-export function EliminarCotizacionMuebleButton({ id, correlativo }: EliminarCotizacionMuebleButtonProps) {
+export function EliminarCotizacionMuebleButton({ id, correlativo, clienteId }: EliminarCotizacionMuebleButtonProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
@@ -39,6 +40,11 @@ export function EliminarCotizacionMuebleButton({ id, correlativo }: EliminarCoti
         onConfirm={async () => {
           const res = await deleteCotizacionMueblePersonalizada(id);
           if (!res.ok) {
+            if (res.error.toLowerCase().includes("activo")) {
+              showToast({ message: res.error, variant: "error" });
+              router.push(`/ventas/clientes/${clienteId}`);
+              return true;
+            }
             showToast({ message: res.error, variant: "error" });
             return false;
           }

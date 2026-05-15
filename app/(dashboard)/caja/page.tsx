@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { CajaContextPanels } from "@/components/caja/caja-context-panels";
-import { Badge } from "@/components/ui/badge";
+import { CajaMasterDetail } from "@/components/caja/caja-master-detail";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import { getCajaRows } from "@/lib/data";
 import { canMutateCaja } from "@/lib/permissions";
-import { formatDate, formatPen } from "@/lib/utils";
+import { formatPen } from "@/lib/utils";
 
 type CajaPageProps = {
   searchParams?: Promise<{ vista?: string | string[] }>;
@@ -33,22 +32,12 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
   const totalEmpresa = allRows
     .filter((r) => !r.es_personal)
     .reduce((acc, r) => acc + (r.tipo === "ingreso" ? Number(r.monto) : -Number(r.monto)), 0);
-  const totalPersonal = allRows
-    .filter((r) => r.es_personal)
-    .reduce((acc, r) => acc + Number(r.monto), 0);
+  const totalPersonal = allRows.filter((r) => r.es_personal).reduce((acc, r) => acc + Number(r.monto), 0);
 
   const tabs: { value: typeof vista; label: string; hint: string }[] = [
     { value: "todos", label: "Todos", hint: `${allRows.length} movimientos` },
-    {
-      value: "empresa",
-      label: "Empresa",
-      hint: `Saldo neto ${formatPen(totalEmpresa)}`,
-    },
-    {
-      value: "personal",
-      label: "Personal (jefa)",
-      hint: `Total ${formatPen(totalPersonal)} (no afecta utilidad)`,
-    },
+    { value: "empresa", label: "Empresa", hint: `Saldo neto ${formatPen(totalEmpresa)}` },
+    { value: "personal", label: "Personal", hint: `Total ${formatPen(totalPersonal)} separado` },
   ];
 
   return (
@@ -56,15 +45,14 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
       <div>
         <h2 className="text-xl font-bold">Caja chica</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Ingresos, egresos, transferencias y pagos por Yape. Separa lo personal de la dueña para no
-          ensuciar la utilidad empresarial.
+          Ver lista, seleccionar movimiento, revisar detalle y editar desde el flujo autorizado.
         </p>
       </div>
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <CardTitle>Operaciones</CardTitle>
-          <CardDescription>Nuevo movimiento o repetir cierres del mes anterior.</CardDescription>
+          <CardDescription>Nuevo movimiento con notas opcionales, medio, origen y comprobante.</CardDescription>
         </div>
         {canMutate ? (
           <div className="flex flex-wrap gap-2">
@@ -104,66 +92,11 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
           {vista === "personal"
             ? "Solo gastos personales de la jefa, separados de la utilidad empresarial."
             : vista === "empresa"
-              ? "Movimientos que sí afectan la utilidad neta del taller."
+              ? "Movimientos que si afectan la utilidad neta del taller."
               : "Vista combinada de personal y empresa."}
         </CardDescription>
-        <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
-          <Table>
-            <THead>
-              <TRow>
-                <TH>Fecha</TH>
-                <TH>Tipo</TH>
-                <TH>Medio</TH>
-                <TH>Categoría</TH>
-                <TH>Marca</TH>
-                <TH>Comprobante</TH>
-                <TH className="text-right">Monto</TH>
-              </TRow>
-            </THead>
-            <tbody>
-              {rows.map((row) => (
-                <TRow key={row.id}>
-                  <TD>{formatDate(row.fecha)}</TD>
-                  <TD className="capitalize">{row.tipo}</TD>
-                  <TD className="capitalize">{row.medio}</TD>
-                  <TD>
-                    {row.categoria}
-                    {row.descripcion ? (
-                      <p className="text-xs text-[var(--color-text-secondary)]">{row.descripcion}</p>
-                    ) : null}
-                  </TD>
-                  <TD>
-                    {row.es_personal ? (
-                      <Badge variant="warning">Personal</Badge>
-                    ) : (
-                      <Badge variant="neutral">Empresa</Badge>
-                    )}
-                  </TD>
-                  <TD>
-                    {row.url_comprobante ? (
-                      <Link
-                        href={row.url_comprobante}
-                        target="_blank"
-                        className="text-xs text-[var(--color-accent)] underline"
-                      >
-                        Ver
-                      </Link>
-                    ) : (
-                      <span className="text-xs text-[var(--color-text-secondary)]">—</span>
-                    )}
-                  </TD>
-                  <TD className="text-right font-semibold">{formatPen(Number(row.monto))}</TD>
-                </TRow>
-              ))}
-              {rows.length === 0 ? (
-                <TRow>
-                  <TD colSpan={7} className="text-center text-[var(--color-text-secondary)]">
-                    Sin movimientos en esta vista.
-                  </TD>
-                </TRow>
-              ) : null}
-            </tbody>
-          </Table>
+        <div className="mt-4">
+          <CajaMasterDetail rows={rows} />
         </div>
       </Card>
     </div>

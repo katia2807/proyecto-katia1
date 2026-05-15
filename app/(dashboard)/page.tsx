@@ -3,13 +3,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { MetricCard } from "@/components/metric-card";
+import { OnboardingBanner } from "@/components/onboarding-banner";
 import {
   DashboardDataUnavailableError,
   emptyDashboardSnapshot,
+  getClientesRows,
+  getCotizacionesUnificadasRows,
   getDashboardSnapshot,
   getInventarioResumen,
   getPersonalRows,
 } from "@/lib/data";
+import { getEmpresaConfig } from "@/lib/company-config";
 import { formatDate, formatPen } from "@/lib/utils";
 
 type DashboardPageProps = {
@@ -36,7 +40,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const { caja, ventas, alquileres, empleados, alertas, utilidad, ingresosMesActual, egresosMesActual } = snapshot;
 
-  const [inventario, personal] = await Promise.all([getInventarioResumen(), getPersonalRows()]);
+  const [inventario, personal, clientes, cotizaciones, empresa] = await Promise.all([
+    getInventarioResumen(),
+    getPersonalRows(),
+    getClientesRows(),
+    getCotizacionesUnificadasRows(),
+    getEmpresaConfig().catch(() => null),
+  ]);
   const ventasBorrador = ventas.filter((venta) => venta.estado === "borrador").length;
   const stockBajo = inventario.stockBajo.length;
   const penalidadesActivas = alquileres.filter((row) => Number(row.penalidad) > 0 && row.estado !== "cerrado").length;
@@ -85,6 +95,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </Card>
         </section>
       ) : null}
+
+      <OnboardingBanner
+        steps={[
+          { label: "Configura empresa", done: Boolean(empresa?.nombre), href: "/admin/empresa" },
+          { label: "Agrega productos", done: inventario.productos.length > 0, href: "/inventario?tab=productos" },
+          { label: "Registra cliente", done: clientes.length > 0, href: "/ventas/clientes" },
+          { label: "Crea cotizacion", done: cotizaciones.length > 0, href: "/cotizacion" },
+        ]}
+      />
 
       <section>
         <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Resumen operativo</h2>

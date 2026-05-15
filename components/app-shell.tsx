@@ -6,6 +6,7 @@ import { Suspense, useState } from "react";
 import {
   IconBuildingWarehouse,
   IconChartBar,
+  IconChartLine,
   IconFileDownload,
   IconFileText,
   IconLayoutDashboard,
@@ -26,11 +27,14 @@ import { logout } from "@/app/(auth)/actions";
 import type { AppRole } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 import { AppShellAccessGuard } from "@/components/app-shell-access-guard";
+import { FloatingHelp } from "@/components/ui/floating-help";
+import { GlobalSearch } from "@/components/ui/global-search";
 
 const icons = {
   "/": IconLayoutDashboard,
   "/caja": IconWallet,
   "/inventario": IconPackages,
+  "/gerencial": IconChartLine,
   "/ventas": IconBuildingWarehouse,
   "/ventas/muebles-personalizados": IconTool,
   "/cotizacion": IconReceipt,
@@ -54,10 +58,12 @@ type AppShellProps = {
   uiRole: "owner_admin" | "operaciones" | "readonly" | null;
   /** Si se pasa, solo esos `href` aparecen en el menú lateral. */
   navAllowlist: Set<string>;
+  globalSearchItems?: React.ComponentProps<typeof GlobalSearch>["items"];
+  navBadges?: Record<string, number>;
 };
 
 const navSections = [
-  { label: "General", items: ["/", "/caja", "/inventario", "/registro"] },
+  { label: "General", items: ["/", "/caja", "/inventario", "/gerencial", "/registro"] },
   {
     label: "Ventas",
     items: ["/ventas", "/ventas/muebles-personalizados", "/cotizacion", "/ventas/alquiler-mixer"],
@@ -85,7 +91,15 @@ function pageTitleFromPath(pathname: string) {
   return active?.label ?? "Panel";
 }
 
-export function AppShell({ children, userName, userRole, uiRole, navAllowlist }: AppShellProps) {
+export function AppShell({
+  children,
+  userName,
+  userRole,
+  uiRole,
+  navAllowlist,
+  globalSearchItems = [],
+  navBadges = {},
+}: AppShellProps) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -134,6 +148,11 @@ export function AppShell({ children, userName, userRole, uiRole, navAllowlist }:
                 >
                   <Icon className="size-4 shrink-0" />
                   <span className={cn("truncate text-sm", !isMenuOpen && "hidden")}>{item.label}</span>
+                  {isMenuOpen && (navBadges[item.href] ?? 0) > 0 ? (
+                    <span className="ml-auto rounded-full bg-[var(--color-danger)] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      {navBadges[item.href]}
+                    </span>
+                  ) : null}
                 </Link>
               );
             })}
@@ -225,12 +244,14 @@ export function AppShell({ children, userName, userRole, uiRole, navAllowlist }:
             </button>
             <h1 className="truncate text-base font-semibold text-[var(--text-primary)]">{pageTitle}</h1>
           </div>
+          <GlobalSearch items={globalSearchItems} />
           <div className="profile-avatar flex size-9 items-center justify-center rounded-full text-sm font-semibold">
             {userInitial}
           </div>
         </header>
         <div className="dashboard-content p-4 md:p-6 lg:p-8">{children}</div>
       </main>
+      <FloatingHelp />
     </div>
   );
 }

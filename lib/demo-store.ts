@@ -51,6 +51,7 @@ type ClienteRow = {
   ruc: string | null;
   direccion: string | null;
   tipo_persona: "natural" | "empresa" | null;
+  estado?: "activo" | "inactivo" | "moroso" | null;
   created_at: string;
 };
 
@@ -2831,5 +2832,13 @@ function mapMetodoPagoToMedio(metodo: MetodoPago): CajaRow["medio"] {
       return "banco";
     default:
       return "otro";
+  }
+}
+
+export function demoUpdateClienteEstado(id: string, estado: "activo" | "inactivo" | "moroso") {
+  const idx = store.clientes.findIndex((c) => c.id === id);
+  if (idx !== -1) {
+    store.clientes[idx].estado = estado;
+    persistStore();
   }
 }

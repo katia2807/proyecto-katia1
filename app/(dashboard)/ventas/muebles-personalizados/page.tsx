@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { EliminarCotizacionMuebleButton } from "@/components/ventas/eliminar-cotizacion-mueble-button";
 import { MueblesPersonalizadosContextPanels } from "@/components/ventas/muebles-personalizados-context-panels";
-import { CotizadorInteligente } from "@/components/cotizador-inteligente";
 import { KanbanOrdenes } from "@/components/sales/kanban-ordenes";
-import { WhatsAppButton } from "@/components/sales/whatsapp-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
@@ -50,7 +48,7 @@ export default async function MueblesPersonalizadosPage() {
       <div>
         <h2 className="text-xl font-bold">Muebles personalizados</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Cotizador inteligente, aprobación a orden de producción y tablero de seguimiento por estado.
+          Lista de cotizaciones y Kanban de produccion unificados. El cotizador inteligente vive en Cotizacion.
         </p>
       </div>
 
@@ -105,7 +103,6 @@ export default async function MueblesPersonalizadosPage() {
                   <TD>
                     <span className="inline-flex items-center gap-2">
                       {clientesById.get(c.cliente_id) ?? "—"}
-                      <WhatsAppButton telefono={cliente?.telefono ?? null} mensaje={mensaje} />
                     </span>
                   </TD>
                   <TD>{c.especie_madera}</TD>
@@ -129,7 +126,7 @@ export default async function MueblesPersonalizadosPage() {
                   </TD>
                   {canDeleteCotizacionesMueble ? (
                     <TD className="text-right">
-                      <EliminarCotizacionMuebleButton correlativo={c.correlativo ?? null} id={c.id} />
+                      <EliminarCotizacionMuebleButton correlativo={c.correlativo ?? null} id={c.id} clienteId={c.cliente_id} />
                     </TD>
                   ) : null}
                 </TRow>
@@ -189,15 +186,7 @@ export default async function MueblesPersonalizadosPage() {
         </div>
       </Card>
 
-      <Card>
-        <CardTitle>Cotizador inteligente</CardTitle>
-        <CardDescription>
-          Asistente paso a paso para calcular costo de madera, insumos y utilidad neta.
-        </CardDescription>
-        <div className="mt-3">
-          <CotizadorInteligente canSave={canMutate} />
-        </div>
-      </Card>
+
     </div>
   );
 }

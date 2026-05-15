@@ -21,10 +21,7 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const sp = (await searchParams) ?? {};
   const quick = normalizeQuickParam(sp.quick);
-  const [inventario, mueblesCatalogo] = await Promise.all([
-    getInventarioRobustoData(),
-    getMueblesCatalogoRows(true),
-  ]);
+  const [inventario, mueblesCatalogo] = await Promise.all([getInventarioRobustoData(), getMueblesCatalogoRows(true)]);
   const { loadWarning, ...inventarioData } = inventario;
   const { productos } = inventarioData;
   const session = await getDashboardSession();
@@ -37,9 +34,7 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
       <div>
         <h2 className="text-xl font-bold">Inventario</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Vista visual primero. Los <strong>muebles terminados</strong> (para ventas) se administran en la pestaña{" "}
-          <strong>Catálogo muebles</strong>. Los insumos y stock general están en <strong>Productos</strong>. Prioridad
-          de compras (Pareto ABC) en <strong>Toma de decisiones</strong>; el kardex sigue en su pestaña.
+          Control real de productos, kardex, alertas, compras y movimientos desde un flujo consistente.
         </p>
       </div>
 
@@ -49,11 +44,11 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
         </p>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <MetricCard
           label="Productos activos"
           value={String(inventarioData.indicadores.totalProductosActivos)}
-          hint="Productos disponibles en catálogo interno."
+          hint="Productos disponibles en catalogo interno."
         />
         <MetricCard
           label="Con stock bajo"
@@ -61,20 +56,18 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
           hint="Revisar y reponer para evitar quiebres."
         />
         <MetricCard
-          label="Movimientos registrados"
-          value={String(inventarioData.indicadores.totalMovimientos)}
-          hint={`Valorización actual: S/ ${inventarioData.indicadores.valorInventario.toFixed(2)}`}
+          label="Valorizacion total"
+          value={`S/ ${inventarioData.indicadores.valorInventario.toFixed(2)}`}
+          hint="Stock actual valorizado con costo promedio."
+        />
+        <MetricCard
+          label="Movimientos del mes"
+          value={String(inventarioData.indicadores.movimientosDelMes ?? 0)}
+          hint={`${inventarioData.indicadores.totalMovimientos} movimientos historicos cargados.`}
         />
       </div>
 
-      <Suspense
-        fallback={
-          <div
-            className="h-24 animate-pulse rounded-2xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]"
-            aria-hidden
-          />
-        }
-      >
+      <Suspense fallback={<div className="h-24 animate-pulse rounded-2xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]" aria-hidden />}>
         <InventarioAccionesRapidas
           canMutate={canMutate}
           noPermisoHint={
@@ -91,14 +84,7 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
         </InventarioAccionesRapidas>
       </Suspense>
 
-      <Suspense
-        fallback={
-          <div
-            className="min-h-[28rem] animate-pulse rounded-2xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]"
-            aria-hidden
-          />
-        }
-      >
+      <Suspense fallback={<div className="min-h-[28rem] animate-pulse rounded-2xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]" aria-hidden />}>
         <InventarioInteractivo
           data={inventarioData}
           canMutate={canMutate}
