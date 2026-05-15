@@ -3979,3 +3979,66 @@ export async function deleteCliente(formData: FormData) {
   revalidatePath("/ventas/clientes");
   revalidatePath("/gerencial");
 }
+
+/**
+ * Elimina un cliente y TODOS sus registros relacionados en cascada.
+ * Solo disponible para owner_admin. Requiere confirmación escrita.
+ */
+export async function forzarEliminarClienteCompleto(formData: FormData) {
+  await requireMutationAccess(["owner_admin"]);
+  const id = String(formData.get("id") ?? "").trim();
+  const confirmacion = String(formData.get("confirmacion") ?? "").trim();
+  const clienteIdParam = id ? `?cliente=${encodeURIComponent(id)}` : "";
+  const baseRedirect = `/gerencial${clienteIdParam}`;
+
+  const fail = (msg: string) => redirect(`${baseRedirect}&mensaje=${encodeURIComponent(msg)}`);
+
+  if (!id) fail("Identificador inválido.");
+  if (confirmacion !== "ELIMINAR TODO") fail('Escribe "ELIMINAR TODO" en el campo de confirmación.');
+
+  if (!hasSupabaseEnv()) {
+    fail("Esta acción solo está disponible con base de datos activa.");
+    return;
+  }
+
+  const supabase = getSupabaseServerClient();
+
+  // Eliminar en orden para evitar violaciones de FK
+  const tablas = [
+    "ordenes_produccion",
+    "cotizaciones_unificadas",
+    "cotizaciones_mueble",
+    "ventas_mueble_terminado",
+    "ventas_madera",
+    "servicios_aserradero",
+    "alquileres",
+  ] as const;
+
+  for (const tabla of tablas) {
+    const { error } = await supabase
+      .from(tabla)
+      .delete()
+      .eq("cliente_id", id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+    if (error) {
+      fail(`Error al limpiar ${tabla}: ${error.message}`);
+      return;
+    }
+  }
+
+  // Ahora eliminar el cliente
+  const { error: delError } = await supabase
+    .from("clientes")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", DEFAULT_ORG_ID);
+
+  if (delError) {
+    fail(delError.message || "No se pudo eliminar el cliente.");
+    return;
+  }
+
+  revalidatePath("/ventas/clientes");
+  revalidatePath("/gerencial");
+  redirect("/gerencial?mensaje=" + encodeURIComponent("Cliente y todos sus registros eliminados correctamente."));
+}

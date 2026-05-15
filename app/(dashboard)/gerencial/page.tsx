@@ -21,7 +21,7 @@ import {
   getServiciosAserraderoRows,
 } from "@/lib/data";
 import { canAccessGerencial } from "@/lib/permissions";
-import { deleteCliente, updateClienteEstado } from "@/app/actions";
+import { deleteCliente, updateClienteEstado, forzarEliminarClienteCompleto } from "@/app/actions";
 import { formatDate, formatPen } from "@/lib/utils";
 import { GerencialClienteSearchSelect } from "@/components/gerencial/cliente-search-select";
 import type { ClienteCompleto } from "@/lib/combobox-mocks";
@@ -286,35 +286,52 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                   </CardDescription>
                   {selectedCliente.estado === "activo" ? (
                     <p className="mt-3 text-sm text-[var(--color-text-secondary)]">
-                      Desactiva primero al cliente para habilitar la eliminación.
+                      Cambia el estado a Inactivo o Moroso arriba para habilitar la eliminación.
                     </p>
                   ) : hasRelatedDependencies ? (
                     <div className="mt-4 space-y-4">
                       <p className="text-sm text-[var(--color-text-secondary)]">
-                        Este cliente aún tiene registros relacionados. Elimina o cierra estos datos antes de borrar el cliente:
+                        Este cliente tiene registros relacionados:
                       </p>
-                      <div className="grid gap-3">
-                        {relatedDependencies.map((dependency) =>
-                          dependency.count > 0 ? (
-                            <div key={dependency.label} className="rounded-xl border border-[var(--border-color)] p-3">
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <p className="text-sm font-semibold">{dependency.label}</p>
-                                  <p className="text-xs text-[var(--color-text-secondary)]">
-                                    {dependency.count} registro{dependency.count === 1 ? "" : "s"}
-                                  </p>
-                                </div>
-                                <Link href={dependency.href} className="text-sm font-semibold text-[var(--color-accent)] underline">
-                                  Revisar
-                                </Link>
-                              </div>
+                      <div className="grid gap-2">
+                        {relatedDependencies.filter((d) => d.count > 0).map((dependency) => (
+                          <div key={dependency.label} className="flex items-center justify-between rounded-lg border border-[var(--border-color)] px-3 py-2">
+                            <div>
+                              <p className="text-sm font-semibold">{dependency.label}</p>
+                              <p className="text-xs text-[var(--color-text-secondary)]">{dependency.count} registro{dependency.count === 1 ? "" : "s"}</p>
                             </div>
-                          ) : null,
-                        )}
+                            <Link href={dependency.href} className="text-xs font-semibold text-[var(--color-accent)] underline">
+                              Revisar
+                            </Link>
+                          </div>
+                        ))}
                       </div>
-                      <p className="text-sm text-[var(--color-text-secondary)]">
-                        Luego de limpiar los datos relacionados, vuelve aquí para eliminar el cliente.
-                      </p>
+                      {session?.role === "owner_admin" ? (
+                        <details className="mt-2 rounded-xl border border-[var(--color-danger)] bg-red-50/10 p-4">
+                          <summary className="cursor-pointer text-sm font-semibold text-[var(--color-danger)]">
+                            ⚠ Eliminar cliente y TODOS sus registros (owner_admin)
+                          </summary>
+                          <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+                            Esta acción eliminará en cascada: cotizaciones, órdenes, ventas, contratos y servicios de este cliente. Es irreversible.
+                          </p>
+                          <form action={forzarEliminarClienteCompleto} className="mt-3 grid gap-3">
+                            <input type="hidden" name="id" value={selectedCliente.id} />
+                            <Field
+                              label='Escribe ELIMINAR TODO para confirmar'
+                              name="confirmacion"
+                              placeholder="ELIMINAR TODO"
+                              required
+                            />
+                            <Button type="submit" variant="danger">
+                              Eliminar cliente y todos sus registros
+                            </Button>
+                          </form>
+                        </details>
+                      ) : (
+                        <p className="text-xs text-[var(--color-text-secondary)]">
+                          Limpia los registros relacionados primero, o contacta al administrador para forzar la eliminación.
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <form action={deleteCliente} className="mt-4 grid gap-3">
