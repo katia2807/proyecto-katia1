@@ -438,12 +438,17 @@ export async function createCajaMovimiento(formData: FormData) {
   await requireMutationAccess(cajaRoles);
   const parsed = cajaSchema.safeParse({
     fecha: formData.get("fecha"),
+  const redirectWithMessage = (message: string) => {
+    const baseUrl = id ? `/gerencial?cliente=${encodeURIComponent(id)}` : "/gerencial";
+    const separator = id ? "&" : "?";
+    redirect(`${baseUrl}${separator}mensaje=${encodeURIComponent(message)}`);
+  };
     tipo: formData.get("tipo"),
     medio: formData.get("medio"),
-    categoria: formData.get("categoria"),
+    redirectWithMessage("Identificador inválido para eliminar el cliente.");
     monto: formData.get("monto"),
     descripcion: formData.get("descripcion"),
-    esPersonal: formData.get("es_personal") === "on" || formData.get("es_personal") === "true",
+    redirectWithMessage('Escribe "ELIMINAR CLIENTE" en el campo de confirmación.');
     urlComprobante: formData.get("url_comprobante"),
   });
 
@@ -456,13 +461,13 @@ export async function createCajaMovimiento(formData: FormData) {
       organization_id: DEFAULT_ORG_ID,
       fecha: parsed.data.fecha,
       tipo: parsed.data.tipo,
-      medio: parsed.data.medio,
+      redirectWithMessage(clienteError.message || "No se pudo verificar el estado del cliente.");
       categoria: parsed.data.categoria,
       monto: parsed.data.monto,
-      descripcion: parsed.data.descripcion ?? null,
+      redirectWithMessage("Cliente no encontrado.");
       modulo_origen: "caja",
       es_personal: parsed.data.esPersonal ?? false,
-      url_comprobante: parsed.data.urlComprobante || null,
+      redirectWithMessage("El cliente está activo. Cambia su estado a inactivo antes de eliminar.");
     });
   } else {
     const supabase = getSupabaseServerClient();
@@ -541,17 +546,16 @@ export async function repetirGastosMesAnterior(formData: FormData) {
       );
     }
   } else {
-    const supabase = getSupabaseServerClient();
+        redirectWithMessage(error.message || "Error al verificar los datos relacionados del cliente.");
     const startPrev = `${anioPrevio}-${String(mesPrevio).padStart(2, "0")}-01`;
     const lastDayPrev = new Date(anioPrevio, mesPrevio, 0).getDate();
     const endPrev = `${anioPrevio}-${String(mesPrevio).padStart(2, "0")}-${String(lastDayPrev).padStart(2, "0")}`;
 
     const { data: rows, error: qErr } = await supabase
       .from("movimientos_caja")
-      .select("*")
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .eq("tipo", "egreso")
-      .is("voided_at", null)
+      redirectWithMessage(
+        `El cliente tiene registros relacionados en: ${blocked.join(", ")}. Elimina o desvincula esos registros antes de borrar el cliente.`,
+      );
       .gte("fecha", startPrev)
       .lte("fecha", endPrev);
 
@@ -560,7 +564,7 @@ export async function repetirGastosMesAnterior(formData: FormData) {
     }
 
     const candidatos = (rows ?? []).filter((r) => !(r.es_personal && !incluirPersonal));
-
+      redirectWithMessage(error.message || "No se pudo eliminar el cliente.");
     if (candidatos.length === 0) {
       throw new Error(
         `No se encontraron egresos en ${String(mesPrevio).padStart(2, "0")}/${anioPrevio} para repetir.`,
@@ -3907,11 +3911,16 @@ export async function deleteCliente(formData: FormData) {
   await requireMutationAccess(ventasRoles);
   const id = String(formData.get("id") ?? "");
   const confirmacion = String(formData.get("confirmacion") ?? "").trim();
+  const redirectWithMessage = (message: string) => {
+    const baseUrl = id ? `/gerencial?cliente=${encodeURIComponent(id)}` : "/gerencial";
+    const separator = id ? "&" : "?";
+    redirect(`${baseUrl}${separator}mensaje=${encodeURIComponent(message)}`);
+  };
   if (!id) {
-    throw new Error("Identificador inválido.");
+    redirectWithMessage("Identificador inválido para eliminar el cliente.");
   }
   if (confirmacion !== "ELIMINAR CLIENTE") {
-    throw new Error('Escribe "ELIMINAR CLIENTE" en el campo de confirmación.');
+    redirectWithMessage('Escribe "ELIMINAR CLIENTE" en el campo de confirmación.');
   }
   if (!hasSupabaseEnv()) {
     demoDeleteCliente(id);
@@ -3924,13 +3933,13 @@ export async function deleteCliente(formData: FormData) {
       .eq("organization_id", DEFAULT_ORG_ID)
       .maybeSingle();
     if (clienteError) {
-      throw new Error(clienteError.message);
+      redirectWithMessage(clienteError.message || "No se pudo verificar el estado del cliente.");
     }
     if (!cliente) {
-      throw new Error("Cliente no encontrado.");
+      redirectWithMessage("Cliente no encontrado.");
     }
     if (cliente.estado === "activo") {
-      throw new Error("El cliente está activo. Cambia su estado a inactivo antes de eliminar.");
+      redirectWithMessage("El cliente está activo. Cambia su estado a inactivo antes de eliminar.");
     }
 
     const dependentTables = [
@@ -3951,14 +3960,14 @@ export async function deleteCliente(formData: FormData) {
         .eq("cliente_id", id)
         .eq("organization_id", DEFAULT_ORG_ID);
       if (error) {
-        throw new Error(error.message);
+        redirectWithMessage(error.message || "Error al verificar los datos relacionados del cliente.");
       }
       if ((count ?? 0) > 0) {
         blocked.push(entry.label);
       }
     }
     if (blocked.length > 0) {
-      throw new Error(
+      redirectWithMessage(
         `El cliente tiene registros relacionados en: ${blocked.join(", ")}. Elimina o desvincula esos registros antes de borrar el cliente.`,
       );
     }
@@ -3969,7 +3978,7 @@ export async function deleteCliente(formData: FormData) {
       .eq("id", id)
       .eq("organization_id", DEFAULT_ORG_ID);
     if (error) {
-      throw new Error(error.message);
+      redirectWithMessage(error.message || "No se pudo eliminar el cliente.");
     }
   }
   revalidatePath("/ventas/clientes");

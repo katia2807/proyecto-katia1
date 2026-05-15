@@ -10,6 +10,7 @@ import { getDashboardSession } from "@/lib/current-user-role";
 import {
   getCajaRows,
   getClientesRows,
+  getCotizacionesRows,
   getCobrosVencidos,
   getCotizacionesUnificadasRows,
   getInventarioRobustoData,
@@ -44,7 +45,7 @@ function pct(current: number, previous: number) {
 }
 
 type GerencialPageProps = {
-  searchParams?: Promise<{ cliente?: string | string[] }>;
+  searchParams?: Promise<{ cliente?: string | string[]; mensaje?: string | string[] }>;
 };
 
 function firstParam(value: string | string[] | undefined) {
@@ -59,10 +60,11 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
     redirect("/?mensaje=no-acceso");
   }
 
-  const [caja, inventario, cotizaciones, cobros, ventasMuebles, ventasMadera, clientes, ordenes, alquilerBundle, servicios] = await Promise.all([
+  const [caja, inventario, cotizacionesUnificadas, cotizacionesMueble, cobros, ventasMuebles, ventasMadera, clientes, ordenes, alquilerBundle, servicios] = await Promise.all([
     getCajaRows(),
     getInventarioRobustoData(),
     getCotizacionesUnificadasRows(),
+    getCotizacionesRows(),
     getCobrosVencidos(),
     getVentasMuebleTerminadoRows(),
     getVentasRows(),
@@ -80,7 +82,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
   const egresosMes = cajaEmpresa.filter((row) => row.fecha.startsWith(currentKey) && row.tipo === "egreso").reduce((acc, row) => acc + Number(row.monto), 0);
   const egresosPrev = cajaEmpresa.filter((row) => row.fecha.startsWith(prevKey) && row.tipo === "egreso").reduce((acc, row) => acc + Number(row.monto), 0);
   const utilidad = ingresosMes - egresosMes;
-  const cotPendientes = cotizaciones.filter((row) => row.estado_flujo !== "cobrada");
+  const cotPendientes = cotizacionesUnificadas.filter((row) => row.estado_flujo !== "cobrada");
   const totalCotPendientes = cotPendientes.reduce((acc, row) => acc + Number(row.total), 0);
 
   const ventasMesProductos = inventario.rankingMasVendidos.slice(0, 3);
@@ -101,9 +103,12 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
     ruc: (cliente as any).ruc ?? null,
   }));
 
+  const message = firstParam(params?.mensaje).trim();
+
   const selectedClienteId = firstParam(params?.cliente).trim();
   const selectedCliente = selectedClienteId ? clientes.find((c) => c.id === selectedClienteId) ?? null : null;
-  const clienteCotizaciones = selectedCliente ? cotizaciones.filter((c) => c.cliente_id === selectedCliente.id) : [];
+  const clienteCotizacionesUnificadas = selectedCliente ? cotizacionesUnificadas.filter((c) => c.cliente_id === selectedCliente.id) : [];
+  const clienteCotizacionesMueble = selectedCliente ? cotizacionesMueble.filter((c) => c.cliente_id === selectedCliente.id) : [];
   const clienteVentasMuebles = selectedCliente ? ventasMuebles.filter((v) => v.cliente_id === selectedCliente.id) : [];
   const clienteVentasMadera = selectedCliente ? ventasMadera.filter((v) => v.cliente_id === selectedCliente.id) : [];
   const clienteContratos = selectedCliente ? alquilerBundle.rows.filter((c) => c.cliente_id === selectedCliente.id) : [];
@@ -115,18 +120,21 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
     clienteContratos.reduce((a, c) => a + Number(c.monto_total ?? c.tarifa), 0) +
     clienteServicios.reduce((a, s) => a + Number(s.precio_cobrado), 0);
   const totalOperacionesCliente =
-    clienteCotizaciones.length +
+    clienteCotizacionesUnificadas.length +
+    clienteCotizacionesMueble.length +
     clienteVentasMuebles.length +
     clienteVentasMadera.length +
     clienteContratos.length +
     clienteServicios.length;
   const relatedDependencies = [
-    { label: "Cotizaciones de muebles", count: clienteCotizaciones.length, href: "/ventas/muebles-personalizados" },
+    { label: "Cotizaciones de muebles", count: clienteCotizacionesMueble.length, href: "/ventas/muebles-personalizados" },
+    { label: "Cotizaciones unificadas", count: clienteCotizacionesUnificadas.length, href: "/cotizacion" },
     { label: "Ventas de muebles terminados", count: clienteVentasMuebles.length, href: "/ventas/muebles-terminados" },
     { label: "Ventas de madera cortada", count: clienteVentasMadera.length, href: "/ventas/madera-cortada" },
     { label: "Contratos de alquiler", count: clienteContratos.length, href: "/ventas/alquiler-mixer" },
     { label: "Servicios de aserradero", count: clienteServicios.length, href: "/ventas/aserradero-servicios" },
     { label: "Cobros vencidos", count: clienteCobrosVencidos.length, href: "/reportes#cobros-vencidos" },
+    { label: "Órdenes de producción", count: selectedCliente ? ordenes.filter((o) => o.cliente_id === selectedCliente.id).length : 0, href: "/ventas/muebles-personalizados" },
   ];
   const hasRelatedDependencies = relatedDependencies.some((dependency) => dependency.count > 0);
   const pedidosActivosCliente = selectedCliente
@@ -186,6 +194,11 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
               Escribe el nombre, DNI, RUC o teléfono. Selecciona el cliente para cargar su ficha.
             </p>
+            {message ? (
+              <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {message}
+              </div>
+            ) : null}
           </div>
         </Card>
       </section>
