@@ -35,6 +35,51 @@ export default async function RespaldoPage() {
 
         <RespaldoProduccionResumen resumen={resumen} />
 
+        {/* ── Export masivo Excel ── */}
+        <Card>
+          <CardTitle>Exportar datos a Excel</CardTitle>
+          <CardDescription className="leading-relaxed">
+            Descarga un archivo <strong>.xlsx</strong> con todas las tablas principales en hojas separadas y bien
+            ordenadas: Compradores, Choferes, Proveedores, Inventario, Ventas de madera, Ventas de muebles y Personal.
+            Cada hoja tiene encabezados claros, filas alternas y totales donde aplica.
+          </CardDescription>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <a
+              href="/admin/respaldo/export"
+              className="inline-flex items-center gap-2 rounded-[var(--katia-radius-md)] bg-[var(--katia-primary)] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              download
+            >
+              ↓ Descargar respaldo completo (.xlsx)
+            </a>
+            <a
+              href="/inventario/export?type=full"
+              className="inline-flex items-center gap-2 rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-2 text-sm font-semibold text-[var(--katia-text-primary)] transition-colors hover:bg-[var(--katia-bg-elevated)]"
+              download
+            >
+              ↓ Solo Inventario + Kardex (.xlsx)
+            </a>
+          </div>
+          <div className="mt-4 rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-3 text-xs text-[var(--katia-text-secondary)]">
+            <strong className="text-[var(--katia-text-primary)]">Estructura del archivo:</strong>
+            <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+              {[
+                ["📋 Índice", "Mapa de hojas y conteos"],
+                ["👥 Compradores", "Clientes con tipo, estado y contacto"],
+                ["🚛 Choferes", "Transportistas con placa y estado"],
+                ["🏭 Proveedores", "Razón social, documento, teléfono"],
+                ["📦 Inventario", "Stock, costo, valor y alertas"],
+                ["💰 Ventas madera", "Correlativo, fecha, total, modalidad"],
+                ["🛋️ Ventas muebles", "Correlativo, fecha, total, modalidad"],
+                ["👷 Personal", "Colaboradores con cargo e ingreso"],
+              ].map(([h, d]) => (
+                <li key={h} className="flex gap-1">
+                  <span className="font-semibold text-[var(--katia-text-primary)]">{h}:</span> {d}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Card>
+
         <Card className="border-[var(--katia-danger)]/50">
           <CardTitle className="text-[var(--katia-danger)]">Resetear datos para entrega limpia</CardTitle>
           <CardDescription className="leading-relaxed">

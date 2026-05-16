@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { OnboardingBanner } from "@/components/onboarding-banner";
+import { UrgenciasPanel } from "@/components/inicio/urgencias-panel";
 import {
   DashboardDataUnavailableError,
   emptyDashboardSnapshot,
@@ -143,39 +144,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </div>
 
       {/* Urgencias — visible y prominentes solo si existen */}
-      {urgencias.length > 0 ? (
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {urgencias.map((u) => (
-            <Link key={u.key} href={u.href} className="group block">
-              <div className="h-full rounded-[var(--katia-radius-lg)] border border-[var(--katia-danger)]/30 bg-[var(--katia-danger)]/5 p-4 transition-colors hover:border-[var(--katia-danger)]/60 hover:bg-[var(--katia-danger)]/10">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-[var(--katia-text-primary)]">{u.titulo}</p>
-                    <p className="mt-0.5 text-xs text-[var(--katia-text-secondary)]">{u.detalle}</p>
-                  </div>
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--katia-danger)] text-xs font-bold text-white">
-                    {u.count}
-                  </span>
-                </div>
-                <p className="mt-3 text-xs font-semibold text-[var(--katia-danger)] group-hover:underline">
-                  {u.cta} →
-                </p>
-              </div>
-            </Link>
-          ))}
-        </section>
-      ) : (
-        <div className="rounded-[var(--katia-radius-lg)] border border-[var(--katia-success)]/30 bg-[var(--katia-success)]/8 px-5 py-4 flex items-center gap-3">
-          <span className="text-xl">✓</span>
-          <div>
-            <p className="text-sm font-semibold text-[var(--katia-success)]">Sin urgencias hoy</p>
-            <p className="text-xs text-[var(--katia-text-secondary)]">Stock, cobros, ventas y personal están al día.</p>
-          </div>
-          <Link href="/gerencial" className="ml-auto text-xs font-semibold text-[var(--katia-primary)] hover:underline shrink-0">
-            Ver análisis completo →
-          </Link>
-        </div>
-      )}
+      <UrgenciasPanel urgencias={urgencias} />
 
       {/* ── MÉTRICAS DEL PERÍODO (secundario) ── */}
       <section>

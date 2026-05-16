@@ -10,10 +10,7 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
-  Legend,
   Line,
-  Pie,
-  PieChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -21,11 +18,10 @@ import {
   YAxis,
 } from "recharts";
 
-const COL_ABC = { A: "#059669", B: "#d97706", C: "#64748b" };
+const COL: Record<string, string> = { A: "#059669", B: "#d97706", C: "#64748b" };
 
-function truncLabel(s: string, max = 22) {
-  const t = s.trim();
-  return t.length <= max ? t : `${t.slice(0, max - 1)}…`;
+function trunc(s: string, n = 22) {
+  return s.length <= n ? s : `${s.slice(0, n - 1)}…`;
 }
 
 type Props = {
@@ -37,84 +33,136 @@ type Props = {
 export function InventarioTomaDecisionesCharts({ rows, mode, totalMetric }: Props) {
   if (rows.length === 0 || totalMetric <= 0) return null;
 
-  const pieData = sumMetricByClase(rows);
-  const topBars = rows.slice(0, 12).map((r) => ({
-    label: truncLabel(r.producto.nombre, 20),
+  const fmtVal = (v: number) =>
+    mode === "unidades" ? `${v.toLocaleString("es-PE")} u.` : formatPen(v);
+
+  const claseData = sumMetricByClase(rows);
+  const topBars = rows.slice(0, 15).map((r) => ({
+    label: trunc(r.producto.nombre),
     nombre: r.producto.nombre,
     metric: r.metric,
     clase: r.clase,
   }));
-
-  const paretoSlice = rows.slice(0, Math.min(40, rows.length)).map((r, i) => ({
+  const paretoLine = rows.slice(0, Math.min(50, rows.length)).map((r, i) => ({
     rank: i + 1,
-    metric: r.metric,
-    pctAcum: Number(r.pctAcum.toFixed(2)),
+    pctAcum: Number(r.pctAcum.toFixed(1)),
     nombre: r.producto.nombre,
+    clase: r.clase,
   }));
-
-  const formatMetric = (v: number) =>
-    mode === "unidades" ? `${v.toLocaleString("es-PE")} u.` : formatPen(v);
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
+
+      {/* ── Stat cards por clase ── */}
       <Card>
-        <CardTitle className="text-base">Concentración por clase A/B/C</CardTitle>
+        <CardTitle className="text-base">Distribución A / B / C</CardTitle>
         <CardDescription className="mt-1">
-          Participación del criterio actual (unidades o valor a costo) dentro de cada clase del análisis.
+          Cuánto representa cada clase del total ({mode === "unidades" ? "unidades vendidas" : "valor a costo"}).
         </CardDescription>
-        <div className="mt-4 h-72 w-full min-w-0">
+        <div className="mt-5 space-y-3">
+          {claseData.map((d) => {
+            const pct = totalMetric > 0 ? (d.value / totalMetric) * 100 : 0;
+            const countClase = rows.filter((r) => r.clase === d.clase).length;
+            return (
+              <div key={d.clase} className="flex items-center gap-3">
+                <div
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--katia-radius-sm)] text-xs font-black text-white"
+                  style={{ background: COL[d.clase] }}
+                >
+                  {d.clase}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-[var(--katia-text-primary)]">
+                      {d.clase === "A" ? "Prioritarios · foco de compra" : d.clase === "B" ? "Intermedios · mantener" : "Bajo movimiento · revisar"}
+                    </span>
+                    <span className="font-mono font-semibold text-[var(--katia-text-primary)]">
+                      {countClase} prods · {pct.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[var(--katia-surface-raised)]">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${Math.min(100, pct)}%`, background: COL[d.clase] }}
+                    />
+                  </div>
+                  <p className="mt-0.5 text-right font-mono text-[10px] text-[var(--katia-text-tertiary)]">
+                    {fmtVal(d.value)}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* ── Curva acumulada (solo línea, sin barras mezcladas) ── */}
+      <Card>
+        <CardTitle className="text-base">Curva acumulada — Pareto</CardTitle>
+        <CardDescription className="mt-1">
+          % acumulado de {mode === "unidades" ? "unidades" : "valor"} al incluir cada producto (orden desc.). A=80%, B=95%.
+        </CardDescription>
+        <div className="mt-4 h-56 w-full min-w-0">
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={pieData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={52}
-                outerRadius={88}
-                paddingAngle={2}
-                label={(props) => {
-                  const pct = typeof props.percent === "number" ? props.percent * 100 : 0;
-                  const c = (props as { payload?: { clase?: string } }).payload?.clase ?? "";
-                  return `${c} ${pct.toFixed(0)}%`;
-                }}
-              >
-                {pieData.map((entry) => (
-                  <Cell key={entry.clase} fill={COL_ABC[entry.clase as keyof typeof COL_ABC]} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(value) => formatMetric(Number(value))}
-                contentStyle={{ borderRadius: 12 }}
+            <ComposedChart data={paretoLine} margin={{ top: 8, right: 20, left: 0, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--katia-border-subtle)" />
+              <XAxis
+                dataKey="rank"
+                tick={{ fontSize: 10, fill: "var(--katia-text-tertiary)" }}
+                label={{ value: "# producto", position: "insideBottom", offset: -2, fontSize: 10 }}
               />
-            </PieChart>
+              <YAxis
+                domain={[0, 100]}
+                tick={{ fontSize: 10, fill: "var(--katia-text-tertiary)" }}
+                tickFormatter={(v) => `${v}%`}
+              />
+              <Tooltip
+                formatter={(v) => [`${Number(v).toFixed(1)}%`, "Acumulado"]}
+                labelFormatter={(_, p) => {
+                  const d = p?.[0]?.payload as { nombre?: string; rank?: number; clase?: string } | undefined;
+                  return `#${d?.rank} · ${d?.nombre ?? ""} (${d?.clase ?? ""})`;
+                }}
+                contentStyle={{ borderRadius: 10, fontSize: 12 }}
+              />
+              <ReferenceLine y={80} stroke={COL.A} strokeDasharray="6 3" label={{ value: "Clase A · 80%", fill: COL.A, fontSize: 10, position: "insideTopLeft" }} />
+              <ReferenceLine y={95} stroke={COL.B} strokeDasharray="6 3" label={{ value: "Clase B · 95%", fill: COL.B, fontSize: 10, position: "insideTopLeft" }} />
+              <Line
+                type="monotone"
+                dataKey="pctAcum"
+                stroke="#6366f1"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </Card>
 
-      <Card>
-        <CardTitle className="text-base">Top 12 por volumen del criterio</CardTitle>
+      {/* ── Top 15 productos (barras horizontales) ── */}
+      <Card className="xl:col-span-2">
+        <CardTitle className="text-base">Top {topBars.length} productos por {mode === "unidades" ? "unidades vendidas" : "valor estimado"}</CardTitle>
         <CardDescription className="mt-1">
-          Barras horizontales; el color indica la clase ABC de cada producto en el ranking completo.
+          Verde = Clase A (foco), Naranja = Clase B, Gris = Clase C.
         </CardDescription>
-        <div className="mt-4 h-72 w-full min-w-0">
+        <div className="mt-4 h-64 w-full min-w-0">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart layout="vertical" data={topBars} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-[var(--color-border)]" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => (mode === "unidades" ? String(v) : `S/${v}`)} />
-              <YAxis type="category" dataKey="label" width={118} tick={{ fontSize: 10 }} />
-              <Tooltip
-                formatter={(value) => formatMetric(Number(value))}
-                labelFormatter={(_, payload) => {
-                  const p = payload?.[0]?.payload as { nombre?: string } | undefined;
-                  return p?.nombre ?? "";
-                }}
-                contentStyle={{ borderRadius: 12 }}
+            <BarChart layout="vertical" data={topBars} margin={{ left: 4, right: 16, top: 4, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--katia-border-subtle)" horizontal={false} />
+              <XAxis
+                type="number"
+                tick={{ fontSize: 10, fill: "var(--katia-text-tertiary)" }}
+                tickFormatter={(v) => (mode === "unidades" ? String(v) : `S/${v}`)}
               />
-              <Bar dataKey="metric" radius={[0, 6, 6, 0]}>
-                {topBars.map((row) => (
-                  <Cell key={row.nombre} fill={COL_ABC[row.clase as keyof typeof COL_ABC]} />
+              <YAxis type="category" dataKey="label" width={120} tick={{ fontSize: 10, fill: "var(--katia-text-secondary)" }} />
+              <Tooltip
+                formatter={(v) => [fmtVal(Number(v)), "Volumen"]}
+                labelFormatter={(_, p) => (p?.[0]?.payload as { nombre?: string } | undefined)?.nombre ?? ""}
+                contentStyle={{ borderRadius: 10, fontSize: 12 }}
+              />
+              <Bar dataKey="metric" radius={[0, 5, 5, 0]} maxBarSize={18}>
+                {topBars.map((r) => (
+                  <Cell key={r.nombre} fill={COL[r.clase] ?? "#6366f1"} />
                 ))}
               </Bar>
             </BarChart>
@@ -122,69 +170,6 @@ export function InventarioTomaDecisionesCharts({ rows, mode, totalMetric }: Prop
         </div>
       </Card>
 
-      <Card className="xl:col-span-2">
-        <CardTitle className="text-base">Curva de Pareto (primeros {paretoSlice.length} ítems)</CardTitle>
-        <CardDescription className="mt-1">
-          Barras: magnitud del criterio por ranking. Línea: % acumulado (eje derecho). Líneas de referencia 80% y 95%.
-        </CardDescription>
-        <div className="mt-4 h-80 w-full min-w-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={paretoSlice} margin={{ top: 12, right: 28, left: 8, bottom: 28 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-[var(--color-border)]" />
-              <XAxis dataKey="rank" tick={{ fontSize: 10 }} label={{ value: "Ranking", position: "bottom", offset: 0, fontSize: 11 }} />
-              <YAxis
-                yAxisId="left"
-                tick={{ fontSize: 10 }}
-                tickFormatter={(v) => (mode === "unidades" ? String(v) : `${Number(v) >= 1000 ? (Number(v) / 1000).toFixed(1) + "k" : v}`)}
-              />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                domain={[0, 100]}
-                tick={{ fontSize: 10 }}
-                tickFormatter={(v) => `${v}%`}
-              />
-              <Tooltip
-                formatter={(value, name) => {
-                  const n = String(name);
-                  if (n === "% acumulado") return [`${Number(value).toFixed(1)}%`, n];
-                  return [formatMetric(Number(value)), mode === "unidades" ? "Volumen" : "Valor est."];
-                }}
-                labelFormatter={(_, payload) => {
-                  const p = payload?.[0]?.payload as { nombre?: string; rank?: number } | undefined;
-                  return `#${p?.rank ?? ""} · ${p?.nombre ?? ""}`;
-                }}
-                contentStyle={{ borderRadius: 12 }}
-              />
-              <Legend />
-              <Bar yAxisId="left" dataKey="metric" name={mode === "unidades" ? "Unidades" : "Valor (S/)"} fill="#3b82f6" radius={[3, 3, 0, 0]} maxBarSize={28} />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="pctAcum"
-                name="% acumulado"
-                stroke="#b45309"
-                strokeWidth={2}
-                dot={{ r: 2 }}
-              />
-              <ReferenceLine
-                yAxisId="right"
-                y={80}
-                stroke="#059669"
-                strokeDasharray="5 5"
-                label={{ value: "80%", position: "insideTopRight", fill: "#059669", fontSize: 11 }}
-              />
-              <ReferenceLine
-                yAxisId="right"
-                y={95}
-                stroke="#d97706"
-                strokeDasharray="5 5"
-                label={{ value: "95%", position: "insideBottomRight", fill: "#d97706", fontSize: 11 }}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
     </div>
   );
 }

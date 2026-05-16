@@ -2,197 +2,343 @@ import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Field, SelectField } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { ClientesMasterDetail } from "@/components/ventas/clientes-master-detail";
 import { NuevoClienteInline } from "@/components/ventas/nuevo-cliente-inline";
 import {
   getAlquilerRows,
+  getChoferesRows,
   getClientesRows,
   getCotizacionesRows,
+  getCobrosVencidos,
+  getOrdenesProduccionRows,
+  getProveedoresRows,
   getServiciosAserraderoRows,
   getVentasMuebleTerminadoRows,
   getVentasRows,
-  getOrdenesProduccionRows,
-  getCobrosVencidos,
 } from "@/lib/data";
+import { formatPen } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
-type ClientesPageProps = {
-  searchParams?: Promise<{ q?: string | string[]; tipo?: string | string[]; estado?: string | string[] }>;
+type PageProps = {
+  searchParams?: Promise<{
+    tab?: string | string[];
+    q?: string | string[];
+    tipo?: string | string[];
+    estado?: string | string[];
+  }>;
 };
 
-function normalizeQ(value: string | string[] | undefined) {
+function first(value: string | string[] | undefined, fallback = "") {
   const v = Array.isArray(value) ? value[0] : value;
-  return (v ?? "").trim().toLowerCase();
+  return (v ?? fallback).trim().toLowerCase();
 }
 
-export default async function ClientesPage({ searchParams }: ClientesPageProps) {
-  const params = await searchParams;
-  const q = normalizeQ(params?.q);
-  const tipo = normalizeQ(params?.tipo);
-  const estado = normalizeQ(params?.estado);
+const TABS = [
+  { id: "compradores", label: "Compradores" },
+  { id: "choferes",    label: "Choferes" },
+  { id: "proveedores", label: "Proveedores" },
+] as const;
 
-  const [clientes, ventasMuebles, ventasMadera, alquilerBundle, servicios, cotizaciones, ordenes, cobros] = await Promise.all([
-    getClientesRows(),
-    getVentasMuebleTerminadoRows(),
-    getVentasRows(),
-    getAlquilerRows(),
-    getServiciosAserraderoRows(),
-    getCotizacionesRows(),
-    getOrdenesProduccionRows(),
-    getCobrosVencidos(),
-  ]);
+export default async function ClientesPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const tab   = first(params?.tab, "compradores");
+  const q     = first(params?.q);
+  const tipo  = first(params?.tipo);
+  const estado = first(params?.estado);
+
+  const [clientes, ventasMuebles, ventasMadera, alquilerBundle, servicios, cotizaciones, ordenes, cobros, choferes, proveedores] =
+    await Promise.all([
+      getClientesRows(),
+      getVentasMuebleTerminadoRows(),
+      getVentasRows(),
+      getAlquilerRows(),
+      getServiciosAserraderoRows(),
+      getCotizacionesRows(),
+      getOrdenesProduccionRows(),
+      getCobrosVencidos(),
+      getChoferesRows(),
+      getProveedoresRows(),
+    ]);
   const contratos = alquilerBundle.rows;
 
-  const totales = new Map<string, { ops: number; total: number }>();
-  for (const v of ventasMuebles) {
-    const acc = totales.get(v.cliente_id) ?? { ops: 0, total: 0 };
-    acc.ops += 1;
-    acc.total += Number(v.total);
-    totales.set(v.cliente_id, acc);
-  }
-  for (const v of ventasMadera) {
-    const acc = totales.get(v.cliente_id) ?? { ops: 0, total: 0 };
-    acc.ops += 1;
-    acc.total += Number(v.total);
-    totales.set(v.cliente_id, acc);
-  }
-  for (const c of contratos) {
-    const acc = totales.get(c.cliente_id) ?? { ops: 0, total: 0 };
-    acc.ops += 1;
-    acc.total += Number(c.monto_total ?? c.tarifa);
-    totales.set(c.cliente_id, acc);
-  }
-  for (const s of servicios) {
-    if (!s.cliente_id) continue;
-    const acc = totales.get(s.cliente_id) ?? { ops: 0, total: 0 };
-    acc.ops += 1;
-    acc.total += Number(s.precio_cobrado);
-    totales.set(s.cliente_id, acc);
-  }
-  for (const c of cotizaciones) {
-    const acc = totales.get(c.cliente_id) ?? { ops: 0, total: 0 };
-    acc.ops += 1;
-    totales.set(c.cliente_id, acc);
-  }
+  // ── Calcular totales por cliente ──────────────────────────────
+  const totales = new Map<string, { ops: number; total: number; tipos: Set<string> }>();
 
-  const pedidosActivos = new Map<string, number>();
-  for (const o of ordenes) {
-    if (o.estado !== "entregado" && o.estado !== "terminado") {
+  const addTotales = (clienteId: string, amount: number, tipoLabel: string) => {
+    const acc = totales.get(clienteId) ?? { ops: 0, total: 0, tipos: new Set<string>() };
+    acc.ops   += 1;
+    acc.total += amount;
+    acc.tipos.add(tipoLabel);
+    totales.set(clienteId, acc);
+  };
+
+  for (const v of ventasMuebles) addTotales(v.cliente_id, Number(v.total), "Mueble");
+  for (const v of ventasMadera)  addTotales(v.cliente_id, Number(v.total), "Madera");
+  for (const c of contratos)     addTotales(c.cliente_id, Number(c.monto_total ?? c.tarifa), "Alquiler");
+  for (const s of servicios)     if (s.cliente_id) addTotales(s.cliente_id, Number(s.precio_cobrado), "Servicio");
+  for (const c of cotizaciones)  addTotales(c.cliente_id, 0, "Cotización");
+
+  const pedidosActivos  = new Map<string, number>();
+  for (const o of ordenes)
+    if (o.estado !== "entregado" && o.estado !== "terminado")
       pedidosActivos.set(o.cliente_id, (pedidosActivos.get(o.cliente_id) ?? 0) + 1);
-    }
-  }
 
   const pagosPendientes = new Map<string, number>();
-  for (const c of cobros) {
+  for (const c of cobros)
     pagosPendientes.set(c.cliente_id, (pagosPendientes.get(c.cliente_id) ?? 0) + 1);
-  }
 
   const cotizacionesPorCliente = new Map<string, { id: string; fecha: string; monto: number; estado: string; href: string }[]>();
   for (const c of cotizaciones) {
     const rows = cotizacionesPorCliente.get(c.cliente_id) ?? [];
-    rows.push({
-      id: c.id,
-      fecha: c.fecha,
-      monto: Number(c.precio_acordado),
-      estado: c.estado,
-      href: `/ventas/muebles-personalizados/${c.id}/pdf`,
-    });
+    rows.push({ id: c.id, fecha: c.fecha, monto: Number(c.precio_acordado), estado: c.estado, href: `/ventas/muebles-personalizados/${c.id}/pdf` });
     cotizacionesPorCliente.set(c.cliente_id, rows);
   }
 
+  // ── Filtrar compradores ───────────────────────────────────────
   const filtrados = clientes
     .filter((c) => {
       if (q && !(c.nombre.toLowerCase().includes(q) || (c.documento ?? "").toLowerCase().includes(q) || (c.telefono ?? "").toLowerCase().includes(q))) return false;
-      if (tipo && c.tipo_persona !== tipo) return false;
-      if (estado && c.estado !== estado) return false;
+      if (tipo  && c.tipo_persona !== tipo)  return false;
+      if (estado && c.estado !== estado)     return false;
       return true;
     })
     .sort((a, b) => (totales.get(b.id)?.total ?? 0) - (totales.get(a.id)?.total ?? 0));
 
   const clientesDetalle = filtrados.map((c) => {
-    const t = totales.get(c.id) ?? { ops: 0, total: 0 };
+    const t = totales.get(c.id) ?? { ops: 0, total: 0, tipos: new Set<string>() };
     return {
       ...c,
-      operaciones: t.ops,
-      facturado: t.total,
+      operaciones:    t.ops,
+      facturado:      t.total,
       pedidosActivos: pedidosActivos.get(c.id) ?? 0,
       pagosPendientes: pagosPendientes.get(c.id) ?? 0,
-      cotizaciones: (cotizacionesPorCliente.get(c.id) ?? []).slice(0, 5),
+      cotizaciones:   (cotizacionesPorCliente.get(c.id) ?? []).slice(0, 5),
     };
   });
 
+  // ── Tab heading labels ────────────────────────────────────────
+  const tabCounts: Record<string, number> = {
+    compradores: clientes.length,
+    choferes:    choferes.length,
+    proveedores: proveedores.length,
+  };
+
+  const tabHref = (id: string) => `/ventas/clientes?tab=${id}`;
+
   return (
     <div className="space-y-6">
+
+      {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">
-            Clientes
-          </h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Contactos</h2>
           <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
-            {clientes.length} cliente{clientes.length !== 1 ? "s" : ""} registrado{clientes.length !== 1 ? "s" : ""}.
-            {cobros.length > 0 ? (
-              <span className="ml-2 inline-flex items-center rounded-full bg-[var(--katia-danger)]/15 px-2 py-0.5 text-xs font-semibold text-[var(--katia-danger)]">
-                {cobros.length} cobro{cobros.length !== 1 ? "s" : ""} vencido{cobros.length !== 1 ? "s" : ""}
-              </span>
-            ) : null}
+            Compradores, choferes contratados y proveedores de la empresa.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <NuevoClienteInline />
+          {tab === "compradores" && <NuevoClienteInline />}
           <Link href="/ventas">
-            <Button type="button" variant="ghost" size="sm">← Volver a ventas</Button>
+            <Button type="button" variant="ghost" size="sm">← Ventas</Button>
           </Link>
         </div>
       </div>
 
-      <Card>
-        <CardTitle>Buscar y filtrar</CardTitle>
-        <form className="mt-3 grid items-end gap-3 sm:grid-cols-2 md:grid-cols-4" method="get">
-          <Field name="q" label="Búsqueda" defaultValue={q} placeholder="Nombre, DNI, teléfono…" />
-          <SelectField name="tipo" label="Tipo" defaultValue={tipo}>
-            <option value="">Todos los tipos</option>
-            <option value="empresa">Empresa</option>
-            <option value="natural">Persona natural</option>
-          </SelectField>
-          <SelectField name="estado" label="Estado" defaultValue={estado}>
-            <option value="">Todos los estados</option>
-            <option value="activo">Activo</option>
-            <option value="inactivo">Inactivo</option>
-            <option value="moroso">Con deuda</option>
-            <option value="vip">VIP</option>
-          </SelectField>
-          <Button type="submit">Filtrar</Button>
-        </form>
-      </Card>
+      {/* Tabs navigation */}
+      <div className="flex gap-1 overflow-x-auto rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-bg-elevated)] p-1">
+        {TABS.map((t) => (
+          <Link
+            key={t.id}
+            href={tabHref(t.id)}
+            className={cn(
+              "flex flex-shrink-0 items-center gap-1.5 rounded-[calc(var(--katia-radius-md)-2px)] px-4 py-1.5 text-sm font-medium transition-all duration-150",
+              tab === t.id
+                ? "bg-[var(--katia-primary-soft)] text-[var(--katia-primary)] shadow-[0_1px_3px_rgba(0,0,0,0.2)]"
+                : "text-[var(--katia-text-secondary)] hover:bg-[var(--katia-glass-bg)] hover:text-[var(--katia-text-primary)]",
+            )}
+          >
+            {t.label}
+            <span className={cn(
+              "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+              tab === t.id
+                ? "bg-[var(--katia-primary)] text-white"
+                : "bg-[var(--katia-surface-raised)] text-[var(--katia-text-tertiary)]",
+            )}>
+              {tabCounts[t.id] ?? 0}
+            </span>
+          </Link>
+        ))}
+      </div>
 
-      {clientesDetalle.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center gap-3 py-14 text-center">
-          <div className="flex size-14 items-center justify-center rounded-full border border-[var(--katia-border-subtle)] bg-[var(--katia-bg-overlay)] text-[var(--katia-text-tertiary)]">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-          </div>
-          <p className="text-base font-medium text-[var(--katia-text-primary)]">
-            {q || tipo || estado ? "Sin resultados para los filtros aplicados" : "Aún no hay clientes registrados"}
-          </p>
-          <p className="max-w-sm text-sm text-[var(--katia-text-secondary)]">
-            {q || tipo || estado
-              ? "Prueba con otros criterios de búsqueda."
-              : "Registra el primer cliente para empezar a cotizar y vender."}
-          </p>
-        </Card>
-      ) : (
+      {/* ── TAB: COMPRADORES ─────────────────────────────── */}
+      {tab === "compradores" && (
+        <>
+          {cobros.length > 0 && (
+            <div className="flex items-center gap-2 rounded-[var(--katia-radius-md)] border border-[var(--katia-danger)]/30 bg-[var(--katia-danger)]/5 px-3 py-2 text-xs font-semibold text-[var(--katia-danger)]">
+              ⚠ {cobros.length} cobro(s) vencido(s) — revisa el estado de cada cliente.
+            </div>
+          )}
+
+          <Card>
+            <CardTitle>Buscar y filtrar</CardTitle>
+            <form className="mt-3 grid items-end gap-3 sm:grid-cols-2 md:grid-cols-4" method="get">
+              <input type="hidden" name="tab" value="compradores" />
+              <Field name="q" label="Búsqueda" defaultValue={q} placeholder="Nombre, DNI, teléfono…" />
+              <SelectField name="tipo" label="Tipo" defaultValue={tipo}>
+                <option value="">Todos los tipos</option>
+                <option value="empresa">Empresa</option>
+                <option value="natural">Persona natural</option>
+              </SelectField>
+              <SelectField name="estado" label="Estado" defaultValue={estado}>
+                <option value="">Todos los estados</option>
+                <option value="activo">Activo</option>
+                <option value="inactivo">Inactivo</option>
+                <option value="moroso">Con deuda</option>
+                <option value="vip">VIP</option>
+              </SelectField>
+              <Button type="submit">Filtrar</Button>
+            </form>
+          </Card>
+
+          {clientesDetalle.length === 0 ? (
+            <Card className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--katia-text-tertiary)]" aria-hidden>
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              <p className="text-base font-medium text-[var(--katia-text-primary)]">
+                {q || tipo || estado ? "Sin resultados para los filtros" : "Aún no hay compradores"}
+              </p>
+            </Card>
+          ) : (
+            <Card>
+              <div className="flex items-center justify-between">
+                <CardTitle>Compradores ({clientesDetalle.length})</CardTitle>
+                <p className="text-xs text-[var(--katia-text-tertiary)]">Clic en una fila para ver el detalle</p>
+              </div>
+              <div className="mt-4">
+                <ClientesMasterDetail clientes={clientesDetalle} />
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* ── TAB: CHOFERES ────────────────────────────────── */}
+      {tab === "choferes" && (
         <Card>
-          <div className="flex items-center justify-between">
-            <CardTitle>Listado ({clientesDetalle.length})</CardTitle>
-            <p className="text-xs text-[var(--katia-text-tertiary)]">
-              Clic en una fila para ver el detalle
-            </p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle>Choferes contratados</CardTitle>
+              <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
+                Transportistas que realiza entregas a domicilio o en obra.
+              </p>
+            </div>
           </div>
-          <div className="mt-4">
-            <ClientesMasterDetail clientes={clientesDetalle} />
-          </div>
+
+          {choferes.length === 0 ? (
+            <div className="mt-8 flex flex-col items-center justify-center gap-2 py-10 text-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--katia-text-tertiary)]" aria-hidden>
+                <rect x="1" y="3" width="15" height="13" rx="1" /><path d="M16 8h4l3 3v5h-7V8z" />
+                <circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
+              </svg>
+              <p className="text-sm text-[var(--katia-text-secondary)]">
+                No hay choferes registrados. Agrégalos desde la sección de Entregas o al procesar una venta.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
+              <Table>
+                <THead>
+                  <tr>
+                    <TH>Nombre</TH>
+                    <TH>Teléfono</TH>
+                    <TH>Placa vehículo</TH>
+                    <TH>Estado</TH>
+                  </tr>
+                </THead>
+                <tbody>
+                  {choferes.map((c) => (
+                    <TRow key={c.id}>
+                      <TD className="font-medium">{c.nombre}</TD>
+                      <TD className="font-mono text-xs">{c.telefono ?? "—"}</TD>
+                      <TD className="font-mono text-xs font-semibold uppercase">{c.placa ?? "—"}</TD>
+                      <TD>
+                        <span className={cn(
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
+                          c.activo
+                            ? "bg-[var(--katia-success)]/15 text-[var(--katia-success)]"
+                            : "bg-[var(--katia-text-tertiary)]/10 text-[var(--katia-text-tertiary)]",
+                        )}>
+                          {c.activo ? "Activo" : "Inactivo"}
+                        </span>
+                      </TD>
+                    </TRow>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+          )}
         </Card>
       )}
+
+      {/* ── TAB: PROVEEDORES ─────────────────────────────── */}
+      {tab === "proveedores" && (
+        <Card>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle>Proveedores</CardTitle>
+              <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
+                Empresas y personas que suministran materia prima, insumos y servicios.
+              </p>
+            </div>
+            <Link
+              href="/inventario?tab=proveedores"
+              className="shrink-0 text-xs font-semibold text-[var(--katia-primary)] hover:underline"
+            >
+              Gestionar en Inventario →
+            </Link>
+          </div>
+
+          {proveedores.length === 0 ? (
+            <div className="mt-8 flex flex-col items-center justify-center gap-2 py-10 text-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--katia-text-tertiary)]" aria-hidden>
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+              <p className="text-sm text-[var(--katia-text-secondary)]">
+                No hay proveedores registrados. Agrégalos desde el módulo de Inventario.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
+              <Table>
+                <THead>
+                  <tr>
+                    <TH>Nombre / Razón social</TH>
+                    <TH>Documento / RUC</TH>
+                    <TH>Teléfono</TH>
+                    <TH>Registrado</TH>
+                  </tr>
+                </THead>
+                <tbody>
+                  {proveedores.map((p) => (
+                    <TRow key={p.id}>
+                      <TD className="font-medium">{p.nombre}</TD>
+                      <TD className="font-mono text-xs">{p.documento ?? "—"}</TD>
+                      <TD className="font-mono text-xs">{p.telefono ?? "—"}</TD>
+                      <TD className="text-xs text-[var(--katia-text-tertiary)]">
+                        {new Date(p.created_at).toLocaleDateString("es-PE")}
+                      </TD>
+                    </TRow>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+          )}
+        </Card>
+      )}
+
     </div>
   );
 }
