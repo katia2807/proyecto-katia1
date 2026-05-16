@@ -175,13 +175,13 @@ export function AppShell({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  // Returns effective badge count: 0 if seen today, original count otherwise
+  // Returns effective badge display: 0+red if unseen, count+yellow if seen today
   function effectiveBadge(href: string): { count: number; seen: boolean } {
     const count = navBadges[href] ?? 0;
     if (count === 0) return { count: 0, seen: false };
     const today = getTodayStr();
     const seen = seenRoutes[href] === today;
-    return { count: seen ? 0 : count, seen };
+    return { count, seen };
   }
   const activeHref =
     [...navItems]
@@ -229,9 +229,15 @@ export function AppShell({
                   <Icon className="size-4 shrink-0" />
                   <span className={cn("truncate text-sm", !isMenuOpen && "hidden")}>{item.label}</span>
                   {isMenuOpen && (() => {
-                    const { count } = effectiveBadge(item.href);
+                    const { count, seen } = effectiveBadge(item.href);
                     return count > 0 ? (
-                      <span className="ml-auto rounded-full bg-[var(--katia-danger)] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      <span
+                        className={`ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white ${
+                          seen
+                            ? "bg-[var(--katia-warning)]"
+                            : "bg-[var(--katia-danger)]"
+                        }`}
+                      >
                         {count}
                       </span>
                     ) : null;

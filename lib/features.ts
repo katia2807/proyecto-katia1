@@ -21,7 +21,7 @@ export const FEATURES = {
   ayuda: true,
 
   // V2 — OCULTOS (cobrar extra para activar)
-  equipoPersonal: false,
+  equipoPersonal: true,   // habilitado para gestión de equipo/personal
   controlSocios: false,
   seguridad: false,
   importar: false,

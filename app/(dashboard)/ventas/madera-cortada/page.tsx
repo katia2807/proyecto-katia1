@@ -22,7 +22,7 @@ export default async function MaderaCortadaPage() {
     getChoferesRows(),
     getInventarioProductosRows(),
     getVentasRows(),
-    getZonasEntregaRows(),
+    getZonasEntregaRows().catch(() => []),
   ]);
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);

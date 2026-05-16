@@ -156,6 +156,20 @@ export function EntregaFormFields({
         <input type="hidden" name={name("direccion_entrega")} value="" />
       )}
 
+      {requiereDireccion ? (
+        <Field
+          name={name("costo_envio")}
+          label="Costo de envío (S/)"
+          type="number"
+          min="0"
+          step="0.50"
+          placeholder="0.00"
+          defaultValue="0"
+        />
+      ) : (
+        <input type="hidden" name={name("costo_envio")} value="0" />
+      )}
+
       {requiereDireccion && effectiveZonas.length > 0 ? (
         <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
           Zona de entrega (tarifa)

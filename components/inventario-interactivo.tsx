@@ -431,25 +431,6 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
         </div>
       ) : null}
 
-      {activeTab === "resumen" && (
-        <Card className="border-dashed border-[var(--katia-primary)]/30 bg-[var(--katia-surface-raised)]/40">
-          <CardTitle className="text-sm font-medium text-[var(--katia-text-secondary)]">
-            Análisis de compras y foco (Pareto ABC)
-          </CardTitle>
-          <CardDescription className="mt-1 text-xs">
-            Los gráficos y análisis de decisiones están centralizados en el Centro de Mando.
-          </CardDescription>
-          <div className="mt-3">
-            <a
-              href="/gerencial"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--katia-primary)]/10 px-3 py-1.5 text-xs font-medium text-[var(--katia-primary)] transition-colors hover:bg-[var(--katia-primary)]/20"
-            >
-              Ir a Centro de Mando →
-            </a>
-          </div>
-        </Card>
-      )}
-
       {activeTab === "resumen" && stockBajo.length > 0 ? (
         <Card>
           <CardTitle>Alertas activas</CardTitle>

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { IconPhoto } from "@tabler/icons-react";
 import { marcarEntregaMueble } from "@/app/actions";
 import { MueblesTerminadosContextPanels } from "@/components/ventas/muebles-terminados-context-panels";
 import { Badge } from "@/components/ui/badge";
@@ -103,8 +104,8 @@ export default async function MueblesTerminadosPage() {
                   unoptimized
                 />
               ) : (
-                <div className="flex h-36 items-center justify-center rounded-xl bg-[var(--color-primary-soft)]/30 text-xs text-[var(--color-text-secondary)]">
-                  Sin foto
+                <div className="flex h-36 items-center justify-center rounded-[var(--katia-radius-lg)] bg-[var(--katia-surface-raised)]">
+                  <IconPhoto className="size-8 text-[var(--katia-text-tertiary)]/40" />
                 </div>
               )}
               <div className="flex items-start justify-between">

@@ -6,6 +6,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
+import { buildParetoInventarioRows } from "@/lib/inventario-pareto";
 import { getDashboardSession } from "@/lib/current-user-role";
 import {
   getCajaRows,
@@ -28,6 +29,7 @@ import { ClienteEstadoForm } from "@/components/gerencial/cliente-estado-form";
 import { ClientesMasivoTable } from "@/components/gerencial/clientes-masivo-table";
 import type { ClienteCompleto } from "@/lib/combobox-mocks";
 import { CentroMandoTabs } from "@/components/gerencial/centro-mando-tabs";
+import { AlertasBannerHoy } from "@/components/gerencial/alertas-banner-hoy";
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +114,12 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
 
   // Datos para "Pasado"
   const ventasMesProductos = inventario.rankingMasVendidos.slice(0, 3);
+
+  // Pareto ABC para Centro de Mando
+  const paretoData = buildParetoInventarioRows(inventario.productos, "unidades");
+  const claseCount = { A: 0, B: 0, C: 0 };
+  for (const r of paretoData.rows) claseCount[r.clase]++;
+  const topABC = paretoData.rows.slice(0, 5);
   const totalPorCliente = new Map<string, number>();
   for (const row of ventasMuebles) totalPorCliente.set(row.cliente_id, (totalPorCliente.get(row.cliente_id) ?? 0) + Number(row.total));
   for (const row of ventasMadera) totalPorCliente.set(row.cliente_id, (totalPorCliente.get(row.cliente_id) ?? 0) + Number(row.total));
@@ -239,17 +247,17 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
       {/* ── HOY ── */}
       {activeTab === "hoy" ? (
         <div className="space-y-6">
-          {/* Banner crítico — solo si hay algo urgente */}
-          {alertasCriticas > 0 ? (
-            <div className="flex items-center gap-3 rounded-[var(--katia-radius-md)] border border-[var(--katia-danger)]/40 bg-[var(--katia-danger)]/10 px-4 py-3">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--katia-danger)] text-xs font-bold text-white">
-                {alertasCriticas}
-              </span>
-              <p className="text-sm font-medium text-[var(--katia-text-primary)]">
-                {alertasCriticas === 1 ? "Hay 1 alerta crítica que requiere atención." : `Hay ${alertasCriticas} alertas críticas que requieren atención.`}
-              </p>
+          {/* Banner + pendientes priorizados con lógica seen/amarillo */}
+          <Card>
+            <CardTitle>Qué resolver hoy</CardTitle>
+            <CardDescription>Acciones priorizadas. Haz clic para ir al módulo. Marca como revisado para cambiar a amarillo.</CardDescription>
+            <div className="mt-4">
+              <AlertasBannerHoy
+                alertasCriticas={alertasCriticas}
+                pendientesHoy={pendientesHoy}
+              />
             </div>
-          ) : null}
+          </Card>
 
           {/* KPI hero + gráfico tendencia */}
           <div className="grid gap-4 lg:grid-cols-5">
@@ -400,9 +408,75 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
             </Card>
           </section>
 
+          {/* ABC / Pareto */}
           <Card>
-            <CardTitle>Flujo de caja — últimos 30 días</CardTitle>
-            <CardDescription>Saldo acumulado solo con movimientos de empresa.</CardDescription>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <CardTitle>Análisis ABC · Pareto de inventario</CardTitle>
+                <CardDescription>Concentración de ventas por producto (criterio: unidades vendidas).</CardDescription>
+              </div>
+              <Link href="/inventario?tab=decisiones" className="shrink-0 text-xs font-semibold text-[var(--katia-primary)] hover:underline">
+                Ver análisis completo →
+              </Link>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {(["A", "B", "C"] as const).map((clase) => (
+                <div key={clase} className={`rounded-[var(--katia-radius-md)] border px-4 py-3 ${
+                  clase === "A"
+                    ? "border-[var(--katia-success)]/30 bg-[var(--katia-success)]/8"
+                    : clase === "B"
+                    ? "border-[var(--katia-warning)]/30 bg-[var(--katia-warning)]/8"
+                    : "border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)]"
+                }`}>
+                  <p className="text-xs font-bold uppercase tracking-widest text-[var(--katia-text-tertiary)]">
+                    Clase {clase}
+                    {clase === "A" ? " · Foco" : clase === "B" ? " · Intermedio" : " · Revisar"}
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-[var(--katia-text-primary)]">{claseCount[clase]}</p>
+                  <p className="text-xs text-[var(--katia-text-tertiary)]">producto(s)</p>
+                </div>
+              ))}
+            </div>
+            {topABC.length > 0 ? (
+              <div className="mt-4 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
+                <Table>
+                  <THead>
+                    <TRow>
+                      <TH>Producto</TH>
+                      <TH className="text-right">Unidades</TH>
+                      <TH className="text-right">% acum.</TH>
+                      <TH className="text-right">Clase</TH>
+                    </TRow>
+                  </THead>
+                  <tbody>
+                    {topABC.map((r) => (
+                      <TRow key={r.producto.id}>
+                        <TD className="font-medium">{r.producto.nombre}</TD>
+                        <TD className="text-right font-mono">{r.metric.toLocaleString("es-PE")}</TD>
+                        <TD className="text-right font-mono text-xs">{r.pctAcum.toFixed(1)}%</TD>
+                        <TD className="text-right">
+                          <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                            r.clase === "A"
+                              ? "bg-[var(--katia-success)]/15 text-[var(--katia-success)]"
+                              : r.clase === "B"
+                              ? "bg-[var(--katia-warning)]/15 text-[var(--katia-warning)]"
+                              : "bg-[var(--katia-text-tertiary)]/10 text-[var(--katia-text-tertiary)]"
+                          }`}>{r.clase}</span>
+                        </TD>
+                      </TRow>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-[var(--katia-text-secondary)]">
+                Sin datos de ventas para calcular el Pareto. Registra ventas primero.
+              </p>
+            )}
+          </Card>
+
+          <Card>
+            <CardTitle>Flujo de caja — últimos 30 días</CardTitle>            <CardDescription>Saldo acumulado solo con movimientos de empresa.</CardDescription>
             <div className="mt-4">
               <CashFlowChart data={points} />
             </div>
