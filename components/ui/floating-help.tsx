@@ -129,8 +129,7 @@ export function FloatingHelp() {
 
   function handleRestartTour() {
     try {
-      localStorage.removeItem("katia_tour_done");
-      localStorage.removeItem("katia_tour_step");
+      localStorage.removeItem("katia_tour_completado");
     } catch {
       // ignore
     }

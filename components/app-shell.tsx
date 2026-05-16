@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import {
   IconBuildingWarehouse,
   IconChartBar,
@@ -111,6 +111,30 @@ function pageTitleFromPath(pathname: string) {
   return active?.label ?? "Panel";
 }
 
+const BADGE_SEEN_KEY = "katia_badge_seen";
+
+function getTodayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function loadSeenRoutes(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(BADGE_SEEN_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function saveSeenRoutes(seen: Record<string, string>) {
+  try {
+    localStorage.setItem(BADGE_SEEN_KEY, JSON.stringify(seen));
+  } catch {
+    // ignore
+  }
+}
+
 export function AppShell({
   children,
   userName,
@@ -125,6 +149,40 @@ export function AppShell({
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Tracks which badge routes the user has "seen" today (localStorage)
+  const [seenRoutes, setSeenRoutes] = useState<Record<string, string>>({});
+
+  // Load seen routes on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setSeenRoutes(loadSeenRoutes());
+  }, []);
+
+  // When user visits a badge route, mark it as seen today
+  useEffect(() => {
+    const today = getTodayStr();
+    const badgeRoutes = Object.keys(navBadges).filter((r) => (navBadges[r] ?? 0) > 0);
+    const matchedRoute = badgeRoutes.find(
+      (r) => pathname === r || pathname.startsWith(`${r}/`),
+    );
+    if (!matchedRoute) return;
+    setSeenRoutes((prev) => {
+      if (prev[matchedRoute] === today) return prev; // already marked today
+      const next = { ...prev, [matchedRoute]: today };
+      saveSeenRoutes(next);
+      return next;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // Returns effective badge count: 0 if seen today, original count otherwise
+  function effectiveBadge(href: string): { count: number; seen: boolean } {
+    const count = navBadges[href] ?? 0;
+    if (count === 0) return { count: 0, seen: false };
+    const today = getTodayStr();
+    const seen = seenRoutes[href] === today;
+    return { count: seen ? 0 : count, seen };
+  }
   const activeHref =
     [...navItems]
       .filter((item) => item.href === "/" ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`))
@@ -170,11 +228,14 @@ export function AppShell({
                 >
                   <Icon className="size-4 shrink-0" />
                   <span className={cn("truncate text-sm", !isMenuOpen && "hidden")}>{item.label}</span>
-                  {isMenuOpen && (navBadges[item.href] ?? 0) > 0 ? (
-                    <span className="ml-auto rounded-full bg-[var(--color-danger)] px-1.5 py-0.5 text-[10px] font-bold text-white">
-                      {navBadges[item.href]}
-                    </span>
-                  ) : null}
+                  {isMenuOpen && (() => {
+                    const { count } = effectiveBadge(item.href);
+                    return count > 0 ? (
+                      <span className="ml-auto rounded-full bg-[var(--katia-danger)] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                        {count}
+                      </span>
+                    ) : null;
+                  })()}
                 </Link>
               );
             })}
