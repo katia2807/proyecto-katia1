@@ -8,7 +8,8 @@ async function loginWithSupabase(page: Page) {
   await page.getByLabel(/correo/i).fill(e2eEmail!);
   await page.getByLabel(/^Contraseña$/i).fill(e2ePassword!);
   await page.getByRole("button", { name: "Ingresar al panel" }).click();
-  await expect(page.getByRole("heading", { name: "Resumen operativo" })).toBeVisible();
+  // Esperar redirección al dashboard
+  await page.waitForURL("**/");
 }
 
 test.describe("critical path (Supabase Auth)", () => {
@@ -20,30 +21,36 @@ test.describe("critical path (Supabase Auth)", () => {
 
   test("dashboard and modules render in critical path", async ({ page }) => {
     await loginWithSupabase(page);
-    await expect(page.getByRole("heading", { name: "Resumen operativo" })).toBeVisible();
 
+    // Centro de Mando
+    await page.goto("/gerencial");
+    await expect(page.getByRole("heading", { name: "Centro de Mando" })).toBeVisible();
+
+    // Caja
     await page.goto("/caja");
-    await expect(page.getByRole("heading", { name: "Caja chica" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Caja" })).toBeVisible();
 
+    // Ventas hub
     await page.goto("/ventas");
-    await expect(page.getByRole("heading", { name: "Módulo de venta" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ventas" })).toBeVisible();
 
+    // Muebles personalizados
     await page.goto("/ventas/muebles-personalizados");
     await expect(
       page.getByRole("heading", { name: "Muebles personalizados" }),
     ).toBeVisible();
 
+    // Alquiler Mixer
     await page.goto("/ventas/alquiler-mixer");
     await expect(page.getByRole("heading", { name: "Alquiler Bomba Mixer" })).toBeVisible();
 
-    await page.goto("/personal");
-    await expect(page.getByRole("heading", { name: "Gestión de personal" })).toBeVisible();
-
+    // Reportes
     await page.goto("/reportes");
-    await expect(page.getByRole("heading", { name: "Reportes gerenciales" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Reportes" })).toBeVisible();
 
-    await page.goto("/cuenta");
-    await expect(page.getByRole("heading", { name: "Cuenta administradora" })).toBeVisible();
+    // Configuracion
+    await page.goto("/configuracion");
+    await expect(page.getByRole("heading", { name: "Configuración" })).toBeVisible();
   });
 
   test("client-like flow works with Supabase session", async ({ page }) => {

@@ -17,6 +17,8 @@ export const FEATURES = {
   empresa: true,
   respaldo: true,
   usuarios: true,
+  configuracion: true,
+  ayuda: true,
 
   // V2 — OCULTOS (cobrar extra para activar)
   equipoPersonal: false,
@@ -43,6 +45,7 @@ const NAV_MENU_FEATURE: Record<NavHref, FeatureKey | readonly FeatureKey[] | nul
   "/inventario": "inventario",
   "/gerencial": "gerencial",
   "/ventas": "ventas",
+  "/ventas/clientes": "ventas",
   "/ventas/muebles-personalizados": ["ventas", "mueblesPersonalizados"],
   "/cotizacion": "cotizacion",
   "/registro": "registro",
@@ -56,6 +59,8 @@ const NAV_MENU_FEATURE: Record<NavHref, FeatureKey | readonly FeatureKey[] | nul
   "/admin/importar": "importar",
   "/admin/respaldo": "respaldo",
   "/admin/usuarios": "usuarios",
+  "/configuracion": "configuracion",
+  "/ayuda": "ayuda",
 };
 
 function evalNavFeatureRule(rule: FeatureKey | readonly FeatureKey[] | null): boolean {

@@ -111,12 +111,12 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold">Módulo de venta</h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Cinco sub-flujos del taller: muebles terminados, personalizados, madera cortada, alquiler de Bomba Mixer y servicio de aserradero.
+          <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Ventas</h2>
+          <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
+            Muebles terminados, personalizados, madera cortada, alquiler de Mixer y servicio de aserradero.
           </p>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            En ventas puedes registrar clientes rápidamente; para ver la ficha completa y gestionar clientes usa el Panel Gerencial.
+          <p className="text-sm text-[var(--katia-text-secondary)]">
+            Para la ficha completa de clientes y análisis ejecutivo, usa el Centro de Mando.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

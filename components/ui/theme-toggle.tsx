@@ -9,6 +9,7 @@ export function ThemeToggle() {
   useEffect(() => {
     const stored = localStorage.getItem("theme_override");
     const current = document.documentElement.getAttribute("data-theme");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme((stored ?? current ?? "dark") as "light" | "dark");
   }, []);
 
@@ -24,7 +25,7 @@ export function ThemeToggle() {
       type="button"
       onClick={toggle}
       aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-      className="flex size-9 items-center justify-center rounded-[var(--border-radius-input)] border border-[var(--border-color)] text-[var(--text-secondary)] transition hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+      className="flex size-9 items-center justify-center rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] text-[var(--katia-text-secondary)] transition-all duration-150 hover:bg-[var(--katia-bg-elevated)] hover:text-[var(--katia-text-primary)] hover:border-[var(--katia-border-emphasis)]"
     >
       {theme === "dark" ? <IconSun className="size-4" /> : <IconMoon className="size-4" />}
     </button>

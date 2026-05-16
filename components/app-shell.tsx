@@ -9,17 +9,20 @@ import {
   IconChartLine,
   IconFileDownload,
   IconFileText,
+  IconHelp,
   IconLayoutDashboard,
   IconMenu2,
   IconNotes,
   IconPackages,
   IconReceipt,
+  IconSettings,
   IconShieldCheck,
   IconShieldX,
   IconTool,
   IconTruck,
   IconUserCircle,
   IconUsers,
+  IconUsersGroup,
   IconWallet,
 } from "@tabler/icons-react";
 import { navItems } from "@/lib/constants";
@@ -27,8 +30,10 @@ import { logout } from "@/app/(auth)/actions";
 import type { AppRole } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 import { AppShellAccessGuard } from "@/components/app-shell-access-guard";
+import { AppFooter } from "@/components/app-footer";
 import { FloatingHelp } from "@/components/ui/floating-help";
 import { GlobalSearch } from "@/components/ui/global-search";
+import { NotificationBell, type Notification } from "@/components/ui/notification-bell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const icons = {
@@ -37,6 +42,7 @@ const icons = {
   "/inventario": IconPackages,
   "/gerencial": IconChartLine,
   "/ventas": IconBuildingWarehouse,
+  "/ventas/clientes": IconUsersGroup,
   "/ventas/muebles-personalizados": IconTool,
   "/cotizacion": IconReceipt,
   "/registro": IconNotes,
@@ -50,6 +56,8 @@ const icons = {
   "/admin/importar": IconFileDownload,
   "/admin/respaldo": IconFileText,
   "/admin/usuarios": IconUsers,
+  "/configuracion": IconSettings,
+  "/ayuda": IconHelp,
 } as const;
 
 type AppShellProps = {
@@ -61,16 +69,27 @@ type AppShellProps = {
   navAllowlist: Set<string>;
   globalSearchItems?: React.ComponentProps<typeof GlobalSearch>["items"];
   navBadges?: Record<string, number>;
+  companyName?: string | null;
+  notifications?: Notification[];
 };
 
 const navSections = [
-  { label: "General", items: ["/", "/caja", "/inventario", "/gerencial", "/registro"] },
   {
-    label: "Ventas",
-    items: ["/ventas"],
+    label: "Operación diaria",
+    items: ["/", "/caja", "/ventas", "/cotizacion"],
   },
-  { label: "Admin", items: ["/admin/empresa", "/admin/importar", "/admin/respaldo", "/admin/usuarios", "/cuenta"] },
-  { label: "Control", items: ["/reportes", "/reportes/antifraude", "/seguridad", "/personal"] },
+  {
+    label: "Catálogo",
+    items: ["/inventario", "/ventas/clientes"],
+  },
+  {
+    label: "Gestión",
+    items: ["/gerencial", "/reportes", "/reportes/antifraude", "/registro"],
+  },
+  {
+    label: "Configuración",
+    items: ["/configuracion", "/admin/respaldo", "/admin/usuarios", "/admin/importar", "/seguridad", "/personal", "/ayuda"],
+  },
 ] as const;
 
 function roleLabel(role: AppRole, uiRole: AppShellProps["uiRole"]) {
@@ -100,6 +119,8 @@ export function AppShell({
   navAllowlist,
   globalSearchItems = [],
   navBadges = {},
+  companyName,
+  notifications = [],
 }: AppShellProps) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(true);
@@ -124,7 +145,7 @@ export function AppShell({
           <div key={section.label} className="space-y-1.5">
             <p
               className={cn(
-                "px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]",
+                "px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--katia-text-tertiary)]",
                 !isMenuOpen && "hidden",
               )}
             >
@@ -140,11 +161,11 @@ export function AppShell({
                   title={item.label}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={cn(
-                    "flex min-h-10 items-center rounded-[var(--border-radius-input)] border-l-[3px] transition",
+                    "flex min-h-10 items-center rounded-[var(--katia-radius-md)] border-l-[3px] transition-all duration-150",
                     isMenuOpen ? "gap-2 px-3" : "justify-center px-2",
                     active
-                      ? "border-l-[var(--accent-primary)] bg-[rgba(124,58,237,0.15)] text-[var(--text-primary)]"
-                      : "border-l-transparent text-[var(--text-secondary)] hover:bg-[rgba(124,58,237,0.1)] hover:text-[var(--text-primary)]",
+                      ? "border-l-[var(--katia-primary)] bg-[var(--katia-primary-soft)] text-[var(--katia-text-primary)] font-medium"
+                      : "border-l-transparent text-[var(--katia-text-secondary)] hover:bg-[var(--katia-primary-soft)]/60 hover:text-[var(--katia-text-primary)]",
                   )}
                 >
                   <Icon className="size-4 shrink-0" />
@@ -164,13 +185,13 @@ export function AppShell({
   );
 
   return (
-    <div className="flex min-h-screen bg-[var(--color-bg)]">
+    <div className="flex min-h-screen bg-[var(--katia-bg-base)]">
       <Suspense fallback={null}>
         <AppShellAccessGuard pathname={pathname} uiRole={uiRole} userRole={userRole} />
       </Suspense>
       <aside
         className={cn(
-          "hidden shrink-0 border-r border-[var(--border-color)] bg-[var(--bg-sidebar)] p-3 lg:flex lg:flex-col",
+          "hidden shrink-0 border-r border-[var(--katia-border-subtle)] bg-[var(--bg-sidebar)] p-3 lg:flex lg:flex-col",
           "transition-[width] duration-200 ease-out",
           isMenuOpen ? "w-[220px]" : "w-16",
         )}
@@ -178,11 +199,11 @@ export function AppShell({
         <div className={cn("mb-4 flex items-center", isMenuOpen ? "justify-between" : "justify-center")}>
           <div className={cn("flex items-center gap-2", !isMenuOpen && "hidden")}>
             <div className="menu-orb flex size-8 items-center justify-center rounded-full text-xs font-semibold">K</div>
-            <p className="text-sm font-semibold tracking-wide text-[var(--text-primary)]">ERP KATIA</p>
+            <p className="text-sm font-semibold tracking-wide text-[var(--katia-text-primary)]">Katia Suite</p>
           </div>
           <button
             type="button"
-            className="flex size-9 items-center justify-center rounded-[var(--border-radius-input)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[rgba(124,58,237,0.1)]"
+            className="flex size-9 items-center justify-center rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] text-[var(--katia-text-secondary)] transition-all duration-150 hover:bg-[var(--katia-primary-soft)] hover:text-[var(--katia-text-primary)]"
             onClick={() => setIsMenuOpen((prev) => !prev)}
             aria-label={isMenuOpen ? "Contraer menú" : "Expandir menú"}
           >
@@ -190,19 +211,19 @@ export function AppShell({
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">{navMarkup}</div>
-        <div className="mt-4 space-y-2 border-t border-[var(--border-color)] pt-3">
+        <div className="mt-4 space-y-2 border-t border-[var(--katia-border-subtle)] pt-3">
           <div className={cn("flex items-center gap-2", !isMenuOpen && "justify-center")}>
             <div className="profile-avatar flex size-9 items-center justify-center rounded-full text-sm font-semibold">{userInitial}</div>
             <div className={cn(!isMenuOpen && "hidden")}>
-              <p className="text-sm font-medium text-[var(--text-primary)]">{userName}</p>
-              <p className="text-xs text-[var(--text-secondary)]">{roleLabel(userRole, uiRole)}</p>
+              <p className="text-sm font-medium text-[var(--katia-text-primary)]">{userName}</p>
+              <p className="text-xs text-[var(--katia-text-secondary)]">{roleLabel(userRole, uiRole)}</p>
             </div>
           </div>
           <form action={logout}>
             <button
               type="submit"
               className={cn(
-                "w-full rounded-[var(--border-radius-input)] border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.04)]",
+                "w-full rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] px-3 py-2 text-xs font-semibold text-[var(--katia-text-secondary)] transition-all duration-150 hover:bg-[var(--katia-bg-overlay)] hover:text-[var(--katia-text-primary)]",
                 !isMenuOpen && "px-0",
               )}
             >
@@ -216,15 +237,15 @@ export function AppShell({
       ) : null}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[220px] border-r border-[var(--border-color)] bg-[var(--bg-sidebar)] p-3 transition-transform lg:hidden",
+          "fixed inset-y-0 left-0 z-50 w-[220px] border-r border-[var(--katia-border-subtle)] bg-[var(--bg-sidebar)] p-3 transition-transform lg:hidden",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="mb-4 flex items-center justify-between">
-          <p className="text-sm font-semibold tracking-wide text-[var(--text-primary)]">ERP KATIA</p>
+          <p className="text-sm font-semibold tracking-wide text-[var(--katia-text-primary)]">Katia Suite</p>
           <button
             type="button"
-            className="rounded-[var(--border-radius-input)] border border-[var(--border-color)] px-3 py-1 text-xs text-[var(--text-secondary)]"
+            className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] px-3 py-1 text-xs text-[var(--katia-text-secondary)]"
             onClick={() => setIsMobileMenuOpen(false)}
           >
             Cerrar
@@ -233,20 +254,21 @@ export function AppShell({
         {navMarkup}
       </aside>
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="header-chrome flex h-16 items-center justify-between border-b border-[rgba(255,255,255,0.05)] bg-[var(--bg-primary)] px-4 md:px-6">
+        <header className="header-chrome flex h-14 items-center justify-between border-b border-[var(--katia-border-subtle)] bg-[var(--katia-bg-base)] px-4 md:px-6">
           <div className="flex min-w-0 items-center gap-2">
             <button
               type="button"
-              className="rounded-[var(--border-radius-input)] border border-[var(--border-color)] p-2 text-[var(--text-secondary)] lg:hidden"
+              className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] p-2 text-[var(--katia-text-secondary)] transition-colors hover:bg-[var(--katia-primary-soft)] lg:hidden"
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Abrir menú"
             >
               <IconMenu2 className="size-4" />
             </button>
-            <h1 className="truncate text-base font-semibold text-[var(--text-primary)]">{pageTitle}</h1>
+            <h1 className="truncate text-base font-semibold text-[var(--katia-text-primary)]">{pageTitle}</h1>
           </div>
           <GlobalSearch items={globalSearchItems} />
           <div className="flex items-center gap-2">
+            <NotificationBell notifications={notifications} />
             <ThemeToggle />
             <div className="profile-avatar flex size-9 items-center justify-center rounded-full text-sm font-semibold">
               {userInitial}
@@ -254,6 +276,7 @@ export function AppShell({
           </div>
         </header>
         <div className="dashboard-content p-4 md:p-6 lg:p-8">{children}</div>
+        <AppFooter companyName={companyName} />
       </main>
       <FloatingHelp />
     </div>

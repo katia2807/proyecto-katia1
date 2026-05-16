@@ -1,18 +1,21 @@
 import { AppShell } from "@/components/app-shell";
 import { DatabaseModeBanner } from "@/components/database-mode-banner";
+import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
 import { requireAuthContext } from "@/lib/auth";
 import { getClientesRows, getCobrosVencidos, getCotizacionesUnificadasRows, getInventarioResumen } from "@/lib/data";
 import { buildNavHrefAllowlist } from "@/lib/permissions";
+import { getEmpresaConfig } from "@/lib/company-config";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const context = await requireAuthContext();
   const displayName = context.fullName?.trim() || "Usuario";
   const navAllowlist = buildNavHrefAllowlist(context.role, context.uiRole);
-  const [clientes, cotizaciones, inventario, cobros] = await Promise.all([
+  const [clientes, cotizaciones, inventario, cobros, empresa] = await Promise.all([
     getClientesRows().catch(() => []),
     getCotizacionesUnificadasRows().catch(() => []),
     getInventarioResumen().catch(() => ({ productos: [], stockBajo: [] })),
     getCobrosVencidos().catch(() => []),
+    getEmpresaConfig().catch(() => null),
   ]);
   const globalSearchItems = [
     ...clientes.slice(0, 200).map((cliente) => ({
@@ -38,12 +41,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <>
       <DatabaseModeBanner />
+      <OnboardingTour />
       <AppShell
         navAllowlist={navAllowlist}
         uiRole={context.uiRole}
         userRole={context.role}
         userName={displayName}
         globalSearchItems={globalSearchItems}
+        companyName={empresa?.nombre ?? null}
         navBadges={{
           "/inventario": inventario.stockBajo.length,
           "/ventas": cobros.length,

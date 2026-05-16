@@ -15,6 +15,7 @@ import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { IconArrowsLeftRight, IconCirclePlus, IconShoppingCart } from "@tabler/icons-react";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { CodigoProductoPreview } from "@/components/inventario/codigo-producto-preview";
 
 type ProductoOpt = { id: string; nombre: string };
 
@@ -48,6 +49,7 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (quick === "compra") setOpenCompra(true);
   }, [quick]);
 
@@ -55,8 +57,10 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
     const q = searchParams.get("quick");
     const pid = searchParams.get("producto_id")?.trim();
     if (q === "compra") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenCompra(true);
       if (pid && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pid)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setProductoCompraId(pid);
       }
     }
@@ -65,8 +69,11 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
   useEffect(() => {
     if (compraState.success && compraState.message) {
       showToast({ variant: "success", message: compraState.message });
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenCompra(false);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCompraFormKey((k) => k + 1);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProductoCompraId("");
     } else if (compraState.error) {
       showToast({ variant: "error", message: compraState.error });
@@ -131,23 +138,47 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
         replacePathOnClose="/inventario"
       >
         <form action={createInventarioProducto} className="grid gap-3 md:grid-cols-2">
-          <Field name="codigo" label="Código" placeholder="MAD-TOR-01" required />
-          <Field name="nombre" label="Nombre" placeholder="Tabla Tornillo 2x10x240" required />
-          <Field name="categoria" label="Categoría" placeholder="Madera" required />
-          <Field name="unidad" label="Unidad" placeholder="unidad / caja / lata" required />
+          {/* Nombre + código con sugerencia automática */}
+          <CodigoProductoPreview />
+
+          <SelectField name="categoria" label="Categoría" required>
+            <option value="">Seleccionar…</option>
+            <option value="Madera">Madera</option>
+            <option value="Tornillería">Tornillería / Ferretería</option>
+            <option value="Barnices y Químicos">Barnices y Químicos</option>
+            <option value="Muebles">Muebles</option>
+            <option value="Servicio">Servicio</option>
+            <option value="Herramientas">Herramientas</option>
+            <option value="Accesorios">Accesorios</option>
+            <option value="Otro">Otro</option>
+          </SelectField>
+          <SelectField name="unidad" label="Unidad" required>
+            <option value="">Seleccionar…</option>
+            <option value="unidad">Unidad</option>
+            <option value="caja">Caja</option>
+            <option value="lata">Lata</option>
+            <option value="litro">Litro</option>
+            <option value="galón">Galón</option>
+            <option value="pie tablar">Pie tablar</option>
+            <option value="m2">m²</option>
+            <option value="m3">m³</option>
+            <option value="kg">kg</option>
+            <option value="bolsa">Bolsa</option>
+          </SelectField>
           <Field
             name="stock_minimo"
-            label="Stock mínimo"
+            label="Stock mínimo de alerta"
             type="number"
             min="0"
             step="1"
+            placeholder="0"
             required
             className="md:col-span-2"
           />
           <input type="hidden" name="return_to" value="/inventario" />
           <input type="hidden" name="next_quick" value="movimiento" />
-          <div className="md:col-span-2">
-            <Button>Guardar producto</Button>
+          <div className="md:col-span-2 flex gap-2">
+            <Button>Guardar y agregar movimiento</Button>
           </div>
         </form>
       </ContextActionPanel>

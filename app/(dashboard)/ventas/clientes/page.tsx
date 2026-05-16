@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import { Field, SelectField } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { ClientesMasterDetail } from "@/components/ventas/clientes-master-detail";
@@ -123,43 +123,72 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold">Clientes</h2>
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Lista, seleccion y detalle 360 del cliente con cotizaciones, pedidos y pagos pendientes.
+          <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">
+            Clientes
+          </h2>
+          <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
+            {clientes.length} cliente{clientes.length !== 1 ? "s" : ""} registrado{clientes.length !== 1 ? "s" : ""}.
+            {cobros.length > 0 ? (
+              <span className="ml-2 inline-flex items-center rounded-full bg-[var(--katia-danger)]/15 px-2 py-0.5 text-xs font-semibold text-[var(--katia-danger)]">
+                {cobros.length} cobro{cobros.length !== 1 ? "s" : ""} vencido{cobros.length !== 1 ? "s" : ""}
+              </span>
+            ) : null}
           </p>
         </div>
-        <Link href="/ventas" className="text-sm font-semibold underline">
-          Volver al hub
+        <Link href="/ventas">
+          <Button type="button" variant="ghost" size="sm">← Volver a ventas</Button>
         </Link>
       </div>
 
       <Card>
-        <CardTitle>Buscar y filtrar clientes</CardTitle>
-        <CardDescription>Por nombre, documento, tipo y estado.</CardDescription>
-        <form className="mt-3 grid items-end gap-3 md:grid-cols-4" method="get">
-          <Field name="q" label="Busqueda" defaultValue={q} placeholder="Ej. Lenin, 12345678" />
+        <CardTitle>Buscar y filtrar</CardTitle>
+        <form className="mt-3 grid items-end gap-3 sm:grid-cols-2 md:grid-cols-4" method="get">
+          <Field name="q" label="Búsqueda" defaultValue={q} placeholder="Nombre, DNI, teléfono…" />
           <SelectField name="tipo" label="Tipo" defaultValue={tipo}>
-            <option value="">Todos</option>
+            <option value="">Todos los tipos</option>
             <option value="empresa">Empresa</option>
             <option value="natural">Persona natural</option>
           </SelectField>
           <SelectField name="estado" label="Estado" defaultValue={estado}>
-            <option value="">Todos</option>
+            <option value="">Todos los estados</option>
             <option value="activo">Activo</option>
             <option value="inactivo">Inactivo</option>
-            <option value="moroso">Moroso</option>
+            <option value="moroso">Con deuda</option>
+            <option value="vip">VIP</option>
           </SelectField>
           <Button type="submit">Filtrar</Button>
         </form>
       </Card>
 
-      <Card>
-        <CardTitle>Listado ({clientesDetalle.length})</CardTitle>
-        <CardDescription>Haz clic en una fila para abrir el drawer lateral.</CardDescription>
-        <div className="mt-3">
-          <ClientesMasterDetail clientes={clientesDetalle} />
-        </div>
-      </Card>
+      {clientesDetalle.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+          <div className="flex size-14 items-center justify-center rounded-full border border-[var(--katia-border-subtle)] bg-[var(--katia-bg-overlay)] text-[var(--katia-text-tertiary)]">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </div>
+          <p className="text-base font-medium text-[var(--katia-text-primary)]">
+            {q || tipo || estado ? "Sin resultados para los filtros aplicados" : "Aún no hay clientes registrados"}
+          </p>
+          <p className="max-w-sm text-sm text-[var(--katia-text-secondary)]">
+            {q || tipo || estado
+              ? "Prueba con otros criterios de búsqueda."
+              : "Registra el primer cliente para empezar a cotizar y vender."}
+          </p>
+        </Card>
+      ) : (
+        <Card>
+          <div className="flex items-center justify-between">
+            <CardTitle>Listado ({clientesDetalle.length})</CardTitle>
+            <p className="text-xs text-[var(--katia-text-tertiary)]">
+              Clic en una fila para ver el detalle
+            </p>
+          </div>
+          <div className="mt-4">
+            <ClientesMasterDetail clientes={clientesDetalle} />
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

@@ -32,16 +32,18 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold">Inventario</h2>
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          Control real de productos, kardex, alertas, compras y movimientos desde un flujo consistente.
+        <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">
+          Inventario
+        </h2>
+        <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
+          Catálogo de productos con stock, alertas, movimientos y valorización en tiempo real.
         </p>
       </div>
 
       {loadWarning ? (
-        <p role="alert" className="text-sm font-medium text-[var(--color-danger)]">
+        <div role="alert" className="rounded-[var(--katia-radius-md)] border border-[var(--katia-warning)]/40 bg-[var(--katia-warning)]/10 px-4 py-3 text-sm font-medium text-[var(--katia-warning)]">
           {loadWarning}
-        </p>
+        </div>
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-4">

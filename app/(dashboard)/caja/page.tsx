@@ -43,9 +43,12 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold">Caja chica</h2>
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          Ver lista, seleccionar movimiento, revisar detalle y editar desde el flujo autorizado.
+        <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Caja</h2>
+        <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
+          Registro de ingresos y egresos. Saldo empresa:{" "}
+          <span className={totalEmpresa >= 0 ? "font-semibold text-[var(--katia-success)]" : "font-semibold text-[var(--katia-danger)]"}>
+            {formatPen(totalEmpresa)}
+          </span>
         </p>
       </div>
 

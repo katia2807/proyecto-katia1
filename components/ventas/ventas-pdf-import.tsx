@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { FileText, Upload, Check, AlertCircle, Loader2, Edit2, Save } from "lucide-react";
+import { FileText, Upload, Check, AlertCircle, Loader2, Save } from "lucide-react";
 import { createVentaDesdePdf } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
-import { formatPen } from "@/lib/utils";
 
 type VentasPdfImportProps = {
   clientes: { id: string; nombre: string }[];
@@ -47,11 +46,11 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
     setTimeout(() => {
       const fileName = file.name.toLowerCase();
       
-      let suggestedTotal = 1250.50;
+      const suggestedTotal = 1250.50;
       let suggestedEvent = "Venta General";
-      let suggestedClient = clientes[0]?.id || "";
+      const suggestedClient = clientes[0]?.id || "";
       let suggestedBank = "Banco de Crédito (BCP)";
-      let suggestedOp = "OP-" + Math.floor(Math.random() * 999999);
+      const suggestedOp = "OP-" + Math.floor(Math.random() * 999999);
 
       if (fileName.includes("factura")) suggestedEvent = "Factura de Venta";
       if (fileName.includes("cotizacion")) suggestedEvent = "Cotización Aprobada";

@@ -58,9 +58,10 @@ export default async function CotizacionPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold">Cotizacion</h2>
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          Ver lista, abrir detalle, editar y luego crear nuevas cotizaciones desde un solo flujo.
+        <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Cotizaciones</h2>
+        <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
+          {cotizacionesGuardadas.length} cotización{cotizacionesGuardadas.length !== 1 ? "es" : ""} registrada{cotizacionesGuardadas.length !== 1 ? "s" : ""}.
+          Los documentos generados son internos y privados — sin referencias fiscales.
         </p>
       </div>
 
