@@ -15,7 +15,7 @@ export function AuthSplitLayout({ title, subtitle, children }: AuthSplitLayoutPr
         <div className="auth-orb-bg left-1/3 top-1/2 h-40 w-40 bg-white/50" />
 
         <div className="relative z-10 w-full max-w-md rounded-[var(--border-radius-card)] border border-white/10 bg-white/5 p-7 shadow-[var(--shadow-card)] backdrop-blur-[20px]">
-          <p className="text-xs uppercase tracking-[0.22em] text-[var(--text-secondary)]">ERP KATIA</p>
+          <p className="text-xs uppercase tracking-[0.22em] text-[var(--text-secondary)]">Katia Suite</p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--text-primary)]">{title}</h1>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">{subtitle}</p>
           {children}
@@ -30,7 +30,7 @@ export function AuthSplitLayout({ title, subtitle, children }: AuthSplitLayoutPr
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(124,58,237,0.14),transparent_58%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(6,182,212,0.14),transparent_50%)]" />
         <div className="absolute inset-x-0 bottom-[16%] px-10">
-          <p className="text-3xl font-semibold tracking-[0.14em] text-[var(--text-primary)]">ERP KATIA</p>
+          <p className="text-3xl font-semibold tracking-[0.14em] text-[var(--text-primary)]">Katia Suite</p>
           <p className="mt-3 max-w-sm text-sm text-[var(--text-secondary)]">
             Control total del taller con una experiencia moderna, rápida y segura.
           </p>
