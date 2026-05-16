@@ -25,6 +25,7 @@ import { deleteCliente, forzarEliminarClienteCompleto } from "@/app/actions";
 import { formatDate, formatPen } from "@/lib/utils";
 import { GerencialClienteSearchSelect } from "@/components/gerencial/cliente-search-select";
 import { ClienteEstadoForm } from "@/components/gerencial/cliente-estado-form";
+import { ClientesMasivoTable } from "@/components/gerencial/clientes-masivo-table";
 import type { ClienteCompleto } from "@/lib/combobox-mocks";
 import { CentroMandoTabs } from "@/components/gerencial/centro-mando-tabs";
 
@@ -150,6 +151,31 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
     direccion: (cliente as Record<string, unknown>).direccion as string | null ?? null,
     ruc: (cliente as Record<string, unknown>).ruc as string | null ?? null,
   }));
+
+  // Para la tabla masiva de clientes
+  const clientesMasivo = clientes.map((cliente) => {
+    const totalFacturado =
+      ventasMuebles.filter((v) => v.cliente_id === cliente.id).reduce((a, v) => a + Number(v.total), 0) +
+      ventasMadera.filter((v) => v.cliente_id === cliente.id).reduce((a, v) => a + Number(v.total), 0) +
+      alquilerBundle.rows.filter((c) => c.cliente_id === cliente.id).reduce((a, c) => a + Number(c.monto_total ?? c.tarifa), 0) +
+      servicios.filter((s) => s.cliente_id === cliente.id).reduce((a, s) => a + Number(s.precio_cobrado), 0);
+    const totalOperaciones =
+      cotizacionesUnificadas.filter((c) => c.cliente_id === cliente.id).length +
+      ventasMuebles.filter((v) => v.cliente_id === cliente.id).length +
+      ventasMadera.filter((v) => v.cliente_id === cliente.id).length;
+    const cobrosVencidos = cobros.filter((c) => c.cliente_id === cliente.id).length;
+    return {
+      id: cliente.id,
+      nombre: cliente.nombre,
+      documento: cliente.documento ?? null,
+      telefono: (cliente as Record<string, unknown>).telefono as string | null ?? null,
+      estado: (cliente as Record<string, unknown>).estado as string | null ?? null,
+      tipo_persona: (cliente as Record<string, unknown>).tipo_persona as string | null ?? null,
+      totalFacturado,
+      totalOperaciones,
+      cobrosVencidos,
+    };
+  });
 
   const message = firstParam(params?.mensaje).trim();
   const selectedClienteId = firstParam(params?.cliente).trim();
@@ -468,19 +494,41 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
       {/* ── CLIENTES 360 ── */}
       {activeTab === "clientes360" ? (
         <div className="space-y-6">
+          {/* Tabla masiva de todos los clientes */}
           <Card>
-            <CardTitle>Vista 360° de cliente</CardTitle>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <CardTitle>Gestión masiva de clientes</CardTitle>
+                <CardDescription>
+                  Todos los clientes con su historial, estado y acciones directas.
+                  Selecciona uno para ver la ficha detallada.
+                </CardDescription>
+              </div>
+              <Link href="/ventas/clientes">
+                <button type="button" className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--katia-text-secondary)] hover:bg-[var(--katia-surface-raised)] transition-colors">
+                  + Nuevo cliente
+                </button>
+              </Link>
+            </div>
+            <div className="mt-4">
+              <ClientesMasivoTable
+                clientes={clientesMasivo}
+                isOwner={session?.role === "owner_admin"}
+              />
+            </div>
+          </Card>
+
+          {/* Ficha detallada de cliente seleccionado (via search select) */}
+          <Card>
+            <CardTitle>Ficha detallada — búsqueda rápida</CardTitle>
             <CardDescription>
-              Selecciona un cliente para ver su ficha completa desde el panel gerencial.
+              Busca un cliente específico para ver su resumen completo, cambiar estado o eliminarlo.
             </CardDescription>
             <div className="mt-4">
               <GerencialClienteSearchSelect
                 clientes={clientesCompleto}
                 value={selectedClienteId}
               />
-              <p className="mt-2 text-sm text-[var(--katia-text-tertiary)]">
-                Busca por nombre, DNI, RUC o teléfono.
-              </p>
             </div>
           </Card>
 

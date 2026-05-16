@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
-import { MetricCard } from "@/components/metric-card";
 import { OnboardingBanner } from "@/components/onboarding-banner";
 import {
   DashboardDataUnavailableError,
@@ -38,7 +37,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         : "No se pudieron cargar los datos del panel desde la base de datos.";
   }
 
-  const { caja, ventas, alquileres, empleados, alertas, utilidad, ingresosMesActual, egresosMesActual } = snapshot;
+  const { caja, ventas, alquileres, empleados, alertas, ingresosMesActual, egresosMesActual } = snapshot;
 
   const [inventario, personal, clientes, cotizaciones, empresa] = await Promise.all([
     getInventarioResumen(),
@@ -52,138 +51,175 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const penalidadesActivas = alquileres.filter((row) => Number(row.penalidad) > 0 && row.estado !== "cerrado").length;
   const adelantosPendientes = personal.adelantos.filter((row) => row.estado === "pendiente").length;
   const alertasCriticas = alertas.filter((row) => row.prioridad === "alta").length;
-  const accionesHoy = [
-    {
+
+  // Calcular urgencias para jerarquía visual
+  const urgencias = [
+    stockBajo > 0 && {
+      key: "stock",
+      titulo: "Stock por reponer",
+      detalle: `${stockBajo} producto(s) por debajo del mínimo`,
       href: "/inventario?tab=alertas#alertas-stock",
-      titulo: "Reponer stock bajo",
-      detalle: `${stockBajo} producto(s) por debajo del mínimo.`,
-      prioridad: stockBajo > 0 ? "Alta" : "OK",
+      cta: "Ver alertas de stock",
+      count: stockBajo,
     },
-    {
-      href: "/reportes/antifraude",
-      titulo: "Revisar alertas críticas",
-      detalle: `${alertasCriticas} alerta(s) de prioridad alta.`,
-      prioridad: alertasCriticas > 0 ? "Alta" : "OK",
+    alertasCriticas > 0 && {
+      key: "alertas",
+      titulo: "Alertas críticas",
+      detalle: `${alertasCriticas} alerta(s) de prioridad alta`,
+      href: "/gerencial",
+      cta: "Abrir Centro de Mando",
+      count: alertasCriticas,
     },
-    {
-      href: "/ventas#ventas-borrador",
-      titulo: "Confirmar ventas en borrador",
-      detalle: `${ventasBorrador} venta(s) pendientes de confirmar.`,
-      prioridad: ventasBorrador > 0 ? "Media" : "OK",
+    ventasBorrador > 0 && {
+      key: "ventas",
+      titulo: "Ventas sin confirmar",
+      detalle: `${ventasBorrador} venta(s) aún en borrador`,
+      href: "/ventas",
+      cta: "Ir a ventas",
+      count: ventasBorrador,
     },
-    {
-      href: "/personal#adelantos-pendientes",
-      titulo: "Regularizar adelantos",
-      detalle: `${adelantosPendientes} adelanto(s) por descontar o cerrar.`,
-      prioridad: adelantosPendientes > 0 ? "Media" : "OK",
+    penalidadesActivas > 0 && {
+      key: "penalidades",
+      titulo: "Penalidades activas",
+      detalle: `${penalidadesActivas} contrato(s) con penalidad`,
+      href: "/ventas/alquiler-mixer",
+      cta: "Revisar contratos",
+      count: penalidadesActivas,
     },
-  ];
+    adelantosPendientes > 0 && {
+      key: "adelantos",
+      titulo: "Adelantos pendientes",
+      detalle: `${adelantosPendientes} adelanto(s) por regularizar`,
+      href: "/personal",
+      cta: "Ir a personal",
+      count: adelantosPendientes,
+    },
+  ].filter(Boolean) as Array<{ key: string; titulo: string; detalle: string; href: string; cta: string; count: number }>;
+
+  const todoOk = urgencias.length === 0;
 
   return (
     <div className="space-y-6">
+      {/* Errores y acceso denegado */}
       {mensaje === "no-acceso" ? (
-        <Card className="border-[var(--color-danger)] bg-[var(--color-primary-soft)]">
-          <CardTitle className="text-[var(--color-danger)]">No tienes acceso a esta sección</CardTitle>
+        <Card className="border-[var(--katia-danger)]/40 bg-[var(--katia-danger)]/5">
+          <CardTitle className="text-[var(--katia-danger)]">No tienes acceso a esta sección</CardTitle>
           <CardDescription>Tu rol no tiene permisos para el módulo solicitado.</CardDescription>
         </Card>
       ) : null}
       {dashboardLoadError ? (
-        <section>
-          <Card className="border-[var(--color-danger)] bg-[var(--color-primary-soft)]">
-            <CardTitle className="text-[var(--color-danger)]">Error al cargar datos del panel</CardTitle>
-            <CardDescription className="mt-2 text-[var(--color-text-primary)]">{dashboardLoadError}</CardDescription>
-          </Card>
-        </section>
+        <Card className="border-[var(--katia-danger)]/40 bg-[var(--katia-danger)]/5">
+          <CardTitle className="text-[var(--katia-danger)]">Error al cargar datos</CardTitle>
+          <CardDescription className="mt-2">{dashboardLoadError}</CardDescription>
+        </Card>
       ) : null}
 
+      {/* Checklist de primeros pasos (solo si hay pasos sin completar) */}
       <OnboardingBanner
         steps={[
-          { label: "Configura empresa", done: Boolean(empresa?.nombre), href: "/admin/empresa" },
+          { label: "Configura empresa", done: Boolean(empresa?.nombre), href: "/configuracion" },
           { label: "Agrega productos", done: inventario.productos.length > 0, href: "/inventario?tab=productos" },
-          { label: "Registra cliente", done: clientes.length > 0, href: "/ventas?quick=cliente" },
+          { label: "Registra cliente", done: clientes.length > 0, href: "/ventas/clientes" },
           { label: "Crea cotizacion", done: cotizaciones.length > 0, href: "/cotizacion" },
         ]}
       />
 
+      {/* ── ZONA CRÍTICA: lo más importante primero ── */}
+      <div>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Inicio</h2>
+            <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
+              {todoOk ? "Todo bajo control. No hay urgencias hoy." : "Hay elementos que requieren tu atención."}
+            </p>
+          </div>
+          <Link
+            href="/gerencial"
+            className="shrink-0 rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--katia-text-secondary)] hover:bg-[var(--katia-surface-raised)] transition-colors"
+          >
+            Panel ejecutivo →
+          </Link>
+        </div>
+      </div>
+
+      {/* Urgencias — visible y prominentes solo si existen */}
+      {urgencias.length > 0 ? (
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {urgencias.map((u) => (
+            <Link key={u.key} href={u.href} className="group block">
+              <div className="h-full rounded-[var(--katia-radius-lg)] border border-[var(--katia-danger)]/30 bg-[var(--katia-danger)]/5 p-4 transition-colors hover:border-[var(--katia-danger)]/60 hover:bg-[var(--katia-danger)]/10">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--katia-text-primary)]">{u.titulo}</p>
+                    <p className="mt-0.5 text-xs text-[var(--katia-text-secondary)]">{u.detalle}</p>
+                  </div>
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--katia-danger)] text-xs font-bold text-white">
+                    {u.count}
+                  </span>
+                </div>
+                <p className="mt-3 text-xs font-semibold text-[var(--katia-danger)] group-hover:underline">
+                  {u.cta} →
+                </p>
+              </div>
+            </Link>
+          ))}
+        </section>
+      ) : (
+        <div className="rounded-[var(--katia-radius-lg)] border border-[var(--katia-success)]/30 bg-[var(--katia-success)]/8 px-5 py-4 flex items-center gap-3">
+          <span className="text-xl">✓</span>
+          <div>
+            <p className="text-sm font-semibold text-[var(--katia-success)]">Sin urgencias hoy</p>
+            <p className="text-xs text-[var(--katia-text-secondary)]">Stock, cobros, ventas y personal están al día.</p>
+          </div>
+          <Link href="/gerencial" className="ml-auto text-xs font-semibold text-[var(--katia-primary)] hover:underline shrink-0">
+            Ver análisis completo →
+          </Link>
+        </div>
+      )}
+
+      {/* ── MÉTRICAS DEL PERÍODO (secundario) ── */}
       <section>
-        <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Resumen operativo</h2>
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          Lo más importante para atender hoy, con acceso directo en un clic.
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[var(--katia-text-tertiary)]">Este período</p>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-3">
+            <p className="text-xs text-[var(--katia-text-tertiary)]">Ingresos del mes</p>
+            <p className="mt-1 font-mono text-lg font-bold text-[var(--katia-text-primary)]">{formatPen(ingresosMesActual)}</p>
+          </div>
+          <div className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-3">
+            <p className="text-xs text-[var(--katia-text-tertiary)]">Egresos del mes</p>
+            <p className="mt-1 font-mono text-lg font-bold text-[var(--katia-text-primary)]">{formatPen(egresosMesActual)}</p>
+          </div>
+          <div className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-3">
+            <p className="text-xs text-[var(--katia-text-tertiary)]">Utilidad estimada</p>
+            <p className={`mt-1 font-mono text-lg font-bold ${ingresosMesActual - egresosMesActual >= 0 ? "text-[var(--katia-success)]" : "text-[var(--katia-danger)]"}`}>
+              {formatPen(ingresosMesActual - egresosMesActual)}
+            </p>
+          </div>
+          <div className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-3">
+            <p className="text-xs text-[var(--katia-text-tertiary)]">Empleados activos</p>
+            <p className="mt-1 font-mono text-lg font-bold text-[var(--katia-text-primary)]">
+              {empleados.filter((e) => e.activo).length}
+            </p>
+          </div>
+        </div>
+        <p className="mt-2 text-right text-xs text-[var(--katia-text-tertiary)]">
+          <Link href="/gerencial?tab=pasado" className="hover:text-[var(--katia-primary)] hover:underline">
+            Ver análisis detallado en Centro de Mando →
+          </Link>
         </p>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <Card>
-          <CardTitle>Stock por revisar</CardTitle>
-          <CardDescription className="mt-1">{stockBajo} producto(s) por agotarse.</CardDescription>
-          <Link href="/inventario?tab=alertas#alertas-stock" className="mt-3 inline-flex">
-            <Button type="button" variant="secondary">
-              Ir a inventario
-            </Button>
-          </Link>
-        </Card>
-
-        <Card>
-          <CardTitle>Penalidades activas</CardTitle>
-          <CardDescription className="mt-1">{penalidadesActivas} contrato(s) con penalidad.</CardDescription>
-          <Link href="/alquiler#penalidades-activas" className="mt-3 inline-flex">
-            <Button type="button" variant="secondary">
-              Revisar maquinaria
-            </Button>
-          </Link>
-        </Card>
-
-        <Card>
-          <CardTitle>Adelantos pendientes</CardTitle>
-          <CardDescription className="mt-1">{adelantosPendientes} adelanto(s) por regularizar.</CardDescription>
-          <Link href="/personal#adelantos-pendientes" className="mt-3 inline-flex">
-            <Button type="button" variant="secondary">
-              Ir a personal
-            </Button>
-          </Link>
-        </Card>
-
-        <Card>
-          <CardTitle>Ventas por confirmar</CardTitle>
-          <CardDescription className="mt-1">{ventasBorrador} venta(s) aún en borrador.</CardDescription>
-          <Link href="/ventas#ventas-borrador" className="mt-3 inline-flex">
-            <Button type="button" variant="secondary">
-              Ir a ventas
-            </Button>
-          </Link>
-        </Card>
-
-        <Card>
-          <CardTitle>Alertas críticas</CardTitle>
-          <CardDescription className="mt-1">{alertasCriticas} alerta(s) de prioridad alta.</CardDescription>
-          <Link href="/reportes/antifraude" className="mt-3 inline-flex">
-            <Button type="button" variant="secondary">
-              Abrir control socios
-            </Button>
-          </Link>
-        </Card>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Ingresos del período"
-          value={formatPen(ingresosMesActual)}
-          hint="Mes calendario actual (vista utilidad mensual, mismo criterio que Reportes)"
-        />
-        <MetricCard
-          label="Egresos del período"
-          value={formatPen(egresosMesActual)}
-          hint="Egresos de caja del mes (utilidad mensual)"
-        />
-        <MetricCard label="Empleados activos" value={String(empleados.filter((e) => e.activo).length)} hint="Choferes y operarios habilitados" />
-        <MetricCard label="Alertas operativas" value={String(alertas.length)} hint="Stock, deudas, penalidades y anomalías" />
-      </section>
-
+      {/* ── ACTIVIDAD RECIENTE (compacto) ── */}
       <section className="grid gap-4 xl:grid-cols-2">
         <Card>
-          <CardTitle>Movimientos de caja recientes</CardTitle>
-          <CardDescription>Registro inalterable después del cierre mensual.</CardDescription>
-          <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>Caja reciente</CardTitle>
+            <Link href="/caja" className="text-xs font-semibold text-[var(--katia-primary)] hover:underline">
+              Ver todos →
+            </Link>
+          </div>
+          <CardDescription>Últimos movimientos registrados.</CardDescription>
+          <div className="mt-3 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
             <Table>
               <THead>
                 <TRow>
@@ -194,115 +230,75 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </TRow>
               </THead>
               <tbody>
-                {caja.slice(0, 5).map((row) => (
+                {caja.slice(0, 4).map((row) => (
                   <TRow key={row.id}>
                     <TD>{formatDate(row.fecha)}</TD>
-                    <TD>{row.tipo}</TD>
-                    <TD>{row.categoria}</TD>
-                    <TD className="text-right font-semibold">{formatPen(Number(row.monto))}</TD>
+                    <TD>
+                      <span className={`text-xs font-medium ${row.tipo === "ingreso" ? "text-[var(--katia-success)]" : "text-[var(--katia-danger)]"}`}>
+                        {row.tipo}
+                      </span>
+                    </TD>
+                    <TD className="text-xs">{row.categoria}</TD>
+                    <TD className="text-right font-mono font-semibold">{formatPen(Number(row.monto))}</TD>
                   </TRow>
                 ))}
-              </tbody>
-            </Table>
-          </div>
-        </Card>
-
-        <Card>
-          <CardTitle>Plan de acción de hoy</CardTitle>
-          <CardDescription>Prioridades operativas con enlace directo al módulo responsable.</CardDescription>
-          <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
-            <Table>
-              <THead>
-                <TRow>
-                  <TH>Acción</TH>
-                  <TH>Detalle</TH>
-                  <TH>Prioridad</TH>
-                  <TH className="text-right">Ir</TH>
-                </TRow>
-              </THead>
-              <tbody>
-                {accionesHoy.map((row) => (
-                  <TRow key={row.titulo}>
-                    <TD className="font-semibold">{row.titulo}</TD>
-                    <TD>{row.detalle}</TD>
-                    <TD>{row.prioridad}</TD>
-                    <TD className="text-right">
-                      <Link href={row.href} className="text-xs font-semibold text-[var(--color-accent)] underline">
-                        Abrir
+                {caja.length === 0 ? (
+                  <TRow>
+                    <TD colSpan={4} className="text-center text-xs text-[var(--katia-text-tertiary)]">
+                      Sin movimientos aún.{" "}
+                      <Link href="/caja" className="text-[var(--katia-primary)] hover:underline">
+                        Ir a caja
                       </Link>
                     </TD>
                   </TRow>
-                ))}
+                ) : null}
               </tbody>
             </Table>
           </div>
         </Card>
-      </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
         <Card>
-          <CardTitle>Ventas recientes</CardTitle>
-          <CardDescription>{ventas.length} registros de madera encontrados.</CardDescription>
-          <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>Ventas recientes</CardTitle>
+            <Link href="/ventas" className="text-xs font-semibold text-[var(--katia-primary)] hover:underline">
+              Ver todas →
+            </Link>
+          </div>
+          <CardDescription>{ventas.length} venta(s) de madera registradas.</CardDescription>
+          <div className="mt-3 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
             <Table>
               <THead>
                 <TRow>
                   <TH>Fecha</TH>
                   <TH>Estado</TH>
                   <TH className="text-right">Total</TH>
-                  <TH className="text-right">Detalle</TH>
+                  <TH className="text-right">Ir</TH>
                 </TRow>
               </THead>
               <tbody>
-                {ventas.slice(0, 5).map((row) => (
+                {ventas.slice(0, 4).map((row) => (
                   <TRow key={row.id}>
                     <TD>{formatDate(row.fecha)}</TD>
-                    <TD>{row.estado}</TD>
-                    <TD className="text-right font-semibold">{formatPen(Number(row.total))}</TD>
+                    <TD>
+                      <span className={`text-xs font-medium ${row.estado === "borrador" ? "text-[var(--katia-warning)]" : "text-[var(--katia-success)]"}`}>
+                        {row.estado}
+                      </span>
+                    </TD>
+                    <TD className="text-right font-mono font-semibold">{formatPen(Number(row.total))}</TD>
                     <TD className="text-right">
-                      <Link href="/ventas/madera-cortada" className="text-xs font-semibold text-[var(--color-accent)] underline">
-                        Ver módulo
+                      <Link href="/ventas/madera-cortada" className="text-xs text-[var(--katia-primary)] hover:underline">
+                        Abrir
                       </Link>
                     </TD>
                   </TRow>
                 ))}
                 {ventas.length === 0 ? (
                   <TRow>
-                    <TD colSpan={4} className="text-center text-[var(--color-text-secondary)]">
-                      Aún no hay ventas registradas.
-                    </TD>
-                  </TRow>
-                ) : null}
-              </tbody>
-            </Table>
-          </div>
-        </Card>
-        <Card>
-          <CardTitle>Alquileres recientes</CardTitle>
-          <CardDescription>{alquileres.length} contratos en seguimiento.</CardDescription>
-          <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
-            <Table>
-              <THead>
-                <TRow>
-                  <TH>Equipo</TH>
-                  <TH>Inicio</TH>
-                  <TH>Estado</TH>
-                  <TH className="text-right">Tarifa</TH>
-                </TRow>
-              </THead>
-              <tbody>
-                {alquileres.slice(0, 5).map((row) => (
-                  <TRow key={row.id}>
-                    <TD className="font-semibold">{row.activo}</TD>
-                    <TD>{formatDate(row.fecha_inicio)}</TD>
-                    <TD>{row.estado}</TD>
-                    <TD className="text-right">{formatPen(Number(row.tarifa))}</TD>
-                  </TRow>
-                ))}
-                {alquileres.length === 0 ? (
-                  <TRow>
-                    <TD colSpan={4} className="text-center text-[var(--color-text-secondary)]">
-                      Aún no hay alquileres registrados.
+                    <TD colSpan={4} className="text-center text-xs text-[var(--katia-text-tertiary)]">
+                      Sin ventas aún.{" "}
+                      <Link href="/ventas" className="text-[var(--katia-primary)] hover:underline">
+                        Registrar venta
+                      </Link>
                     </TD>
                   </TRow>
                 ) : null}
@@ -312,33 +308,26 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </Card>
       </section>
 
+      {/* ── ACCESOS RÁPIDOS (lo menos importante, muy discreto) ── */}
       <section>
-        <Card>
-          <CardTitle>Utilidad mensual</CardTitle>
-          <CardDescription>Vista gerencial consolidada desde todos los módulos.</CardDescription>
-          <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
-            <Table>
-              <THead>
-                <TRow>
-                  <TH>Periodo</TH>
-                  <TH className="text-right">Ingresos</TH>
-                  <TH className="text-right">Egresos + Nómina</TH>
-                  <TH className="text-right">Utilidad</TH>
-                </TRow>
-              </THead>
-              <tbody>
-                {utilidad.map((row) => (
-                  <TRow key={`${row.anio}-${row.mes}`}>
-                    <TD>{`${row.mes.toString().padStart(2, "0")}/${row.anio}`}</TD>
-                    <TD className="text-right">{formatPen(Number(row.ingresos))}</TD>
-                    <TD className="text-right">{formatPen(Number(row.egresos) + Number(row.sueldos))}</TD>
-                    <TD className="text-right font-semibold">{formatPen(Number(row.utilidad_neta))}</TD>
-                  </TRow>
-                ))}
-              </tbody>
-            </Table>
-          </div>
-        </Card>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[var(--katia-text-tertiary)]">Accesos rápidos</p>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/cotizacion">
+            <Button type="button" variant="secondary" size="sm">Nueva cotización</Button>
+          </Link>
+          <Link href="/ventas/clientes">
+            <Button type="button" variant="secondary" size="sm">Ver clientes</Button>
+          </Link>
+          <Link href="/inventario?tab=productos">
+            <Button type="button" variant="secondary" size="sm">Catálogo</Button>
+          </Link>
+          <Link href="/reportes">
+            <Button type="button" variant="ghost" size="sm">Exportar reportes</Button>
+          </Link>
+          <Link href="/gerencial">
+            <Button type="button" variant="ghost" size="sm">Centro de Mando</Button>
+          </Link>
+        </div>
       </section>
     </div>
   );

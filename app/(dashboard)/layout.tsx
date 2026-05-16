@@ -50,8 +50,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
         globalSearchItems={globalSearchItems}
         companyName={empresa?.nombre ?? null}
         navBadges={{
+          // Centro de Mando muestra el total de alertas críticas del negocio
+          "/gerencial": inventario.stockBajo.length + cobros.length,
+          // Inventario solo muestra badge si hay stock bajo que atender
           "/inventario": inventario.stockBajo.length,
-          "/ventas": cobros.length,
         }}
       >
         {children}

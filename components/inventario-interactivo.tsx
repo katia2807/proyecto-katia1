@@ -392,16 +392,14 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
       <Card>
         <CardTitle>Centro de control de inventario</CardTitle>
         <CardDescription>
-          Pestaña <strong>Productos</strong>: insumos, stock del taller y catalogo de muebles.{" "}
-          <strong>Toma de decisiones</strong>: Pareto ABC, gráficos y tabla (mismos datos que el resumen).{" "}
-          <strong>Kardex</strong> sin cambios. Alertas y reportes en sus pestañas.
+          <strong>Productos</strong>: stock, catálogo e insumos.{" "}
+          <strong>Kardex</strong>: movimientos trazables.{" "}
+          <strong>Alertas</strong>: stock bajo y reposición.{" "}
+          El análisis de decisiones (Pareto ABC) está en el <a href="/gerencial" className="underline text-[var(--katia-primary)]">Centro de Mando</a>.
         </CardDescription>
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="button" className={tabBtnClass("resumen")} onClick={() => irATab("resumen")}>Resumen</button>
           <button type="button" className={tabBtnClass("productos")} onClick={() => irATab("productos")}>Productos</button>
-          <button type="button" className={tabBtnClass("decisiones")} onClick={() => irATab("decisiones")}>
-            Toma de decisiones
-          </button>
           <button type="button" className={tabBtnClass("kardex")} onClick={() => irATab("kardex")}>Kardex</button>
           <button type="button" className={tabBtnClass("alertas")} onClick={() => irATab("alertas")}>Alertas</button>
           <button type="button" className={tabBtnClass("reportes")} onClick={() => irATab("reportes")}>Reportes</button>
@@ -433,19 +431,24 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
         </div>
       ) : null}
 
-      {activeTab === "resumen" ? (
-        <Card className="border-dashed border-[var(--color-accent)]/35 bg-[var(--color-primary-soft)]/40">
-          <CardTitle className="text-base">Toma de decisiones (compras y foco)</CardTitle>
-          <CardDescription className="mt-1">
-            Gráficos Pareto / ABC y tabla detallada; misma base de datos que rankings y kardex (no sustituye al kardex).
+      {activeTab === "resumen" && (
+        <Card className="border-dashed border-[var(--katia-primary)]/30 bg-[var(--katia-surface-raised)]/40">
+          <CardTitle className="text-sm font-medium text-[var(--katia-text-secondary)]">
+            Análisis de compras y foco (Pareto ABC)
+          </CardTitle>
+          <CardDescription className="mt-1 text-xs">
+            Los gráficos y análisis de decisiones están centralizados en el Centro de Mando.
           </CardDescription>
           <div className="mt-3">
-            <Button type="button" variant="secondary" onClick={() => irATab("decisiones")}>
-              Abrir Toma de decisiones
-            </Button>
+            <a
+              href="/gerencial"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--katia-primary)]/10 px-3 py-1.5 text-xs font-medium text-[var(--katia-primary)] transition-colors hover:bg-[var(--katia-primary)]/20"
+            >
+              Ir a Centro de Mando →
+            </a>
           </div>
         </Card>
-      ) : null}
+      )}
 
       {activeTab === "resumen" && stockBajo.length > 0 ? (
         <Card>
