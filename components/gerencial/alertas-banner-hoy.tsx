@@ -23,25 +23,22 @@ type Props = {
 export function AlertasBannerHoy({ alertasCriticas, pendientesHoy }: Props) {
   const [seenToday, setSeenToday] = useState(false);
 
+  // Al montar: si hay alertas y el usuario las está viendo → marcar como vistas (amarillo)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    const today = getTodayStr();
     try {
-      const raw = localStorage.getItem(SEEN_KEY);
-      if (raw === getTodayStr()) {
+      const stored = localStorage.getItem(SEEN_KEY);
+      if (stored === today) {
+        setSeenToday(true);
+      } else if (alertasCriticas > 0 || pendientesHoy.length > 0) {
+        localStorage.setItem(SEEN_KEY, today);
         setSeenToday(true);
       }
     } catch {
       // ignore
     }
   }, []);
-
-  function markSeen() {
-    try {
-      localStorage.setItem(SEEN_KEY, getTodayStr());
-    } catch {
-      // ignore
-    }
-    setSeenToday(true);
-  }
 
   if (alertasCriticas === 0 && pendientesHoy.length === 0) {
     return (
@@ -53,44 +50,31 @@ export function AlertasBannerHoy({ alertasCriticas, pendientesHoy }: Props) {
 
   return (
     <div className="space-y-3">
-      {/* Banner crítico con color dinámico */}
       {alertasCriticas > 0 ? (
         <div
-          className={`flex items-center justify-between gap-3 rounded-[var(--katia-radius-md)] border px-4 py-3 transition-colors ${
+          className={`flex items-center gap-3 rounded-[var(--katia-radius-md)] border px-4 py-3 transition-colors ${
             seenToday
               ? "border-[var(--katia-warning)]/40 bg-[var(--katia-warning)]/10"
               : "border-[var(--katia-danger)]/40 bg-[var(--katia-danger)]/10"
           }`}
         >
-          <div className="flex items-center gap-3">
-            <span
-              className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
-                seenToday ? "bg-[var(--katia-warning)]" : "bg-[var(--katia-danger)]"
-              }`}
-            >
-              {alertasCriticas}
-            </span>
-            <p className="text-sm font-medium text-[var(--katia-text-primary)]">
-              {seenToday
-                ? `${alertasCriticas} alerta(s) revisada(s) — pendiente de resolver.`
-                : alertasCriticas === 1
-                ? "Hay 1 alerta crítica que requiere atención."
-                : `Hay ${alertasCriticas} alertas críticas que requieren atención.`}
-            </p>
-          </div>
-          {!seenToday ? (
-            <button
-              type="button"
-              onClick={markSeen}
-              className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-[var(--katia-text-secondary)] hover:bg-[var(--katia-surface-raised)] transition-colors"
-            >
-              Marcar revisado
-            </button>
-          ) : null}
+          <span
+            className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
+              seenToday ? "bg-[var(--katia-warning)]" : "bg-[var(--katia-danger)]"
+            }`}
+          >
+            {alertasCriticas}
+          </span>
+          <p className="text-sm font-medium text-[var(--katia-text-primary)]">
+            {seenToday
+              ? `${alertasCriticas} alerta(s) pendiente(s) — ya revisadas hoy.`
+              : alertasCriticas === 1
+              ? "Hay 1 alerta crítica que requiere atención."
+              : `Hay ${alertasCriticas} alertas críticas que requieren atención.`}
+          </p>
         </div>
       ) : null}
 
-      {/* Lista de pendientes priorizados */}
       {pendientesHoy.length > 0 ? (
         <div className="space-y-2">
           {pendientesHoy.map((item) => (
@@ -107,9 +91,7 @@ export function AlertasBannerHoy({ alertasCriticas, pendientesHoy }: Props) {
                 <span
                   className={`h-2 w-2 shrink-0 rounded-full ${
                     item.prioridad === "alta"
-                      ? seenToday
-                        ? "bg-[var(--katia-warning)]"
-                        : "bg-[var(--katia-danger)]"
+                      ? seenToday ? "bg-[var(--katia-warning)]" : "bg-[var(--katia-danger)]"
                       : item.prioridad === "media"
                       ? "bg-[var(--katia-warning)]"
                       : "bg-[var(--katia-text-tertiary)]"

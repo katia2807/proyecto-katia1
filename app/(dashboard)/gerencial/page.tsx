@@ -334,6 +334,44 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
             )}
           </Card>
 
+          {/* ABC compacto — resumen de clasificación de inventario */}
+          {paretoData.rows.length > 0 ? (
+            <Card>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle>Análisis ABC · inventario</CardTitle>
+                  <CardDescription>Clasificación Pareto de productos por unidades vendidas.</CardDescription>
+                </div>
+                <Link href="/gerencial?tab=pasado" className="shrink-0 text-xs font-semibold text-[var(--katia-primary)] hover:underline">
+                  Ver completo en Pasado →
+                </Link>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                {(["A", "B", "C"] as const).map((clase) => (
+                  <div key={clase} className={`flex-1 min-w-[80px] rounded-[var(--katia-radius-md)] border px-4 py-3 text-center ${
+                    clase === "A"
+                      ? "border-[var(--katia-success)]/30 bg-[var(--katia-success)]/8"
+                      : clase === "B"
+                      ? "border-[var(--katia-warning)]/30 bg-[var(--katia-warning)]/8"
+                      : "border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)]"
+                  }`}>
+                    <p className="text-xs font-bold text-[var(--katia-text-tertiary)]">Clase {clase}</p>
+                    <p className="mt-1 text-2xl font-black text-[var(--katia-text-primary)]">{claseCount[clase]}</p>
+                    <p className="text-[10px] text-[var(--katia-text-tertiary)]">
+                      {clase === "A" ? "foco" : clase === "B" ? "intermedio" : "revisar"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {topABC.length > 0 ? (
+                <p className="mt-3 text-xs text-[var(--katia-text-tertiary)]">
+                  Top producto: <span className="font-semibold text-[var(--katia-text-primary)]">{topABC[0].producto.nombre}</span>
+                  {" "}({topABC[0].metric} u. · {topABC[0].pctAcum.toFixed(1)}% acum.)
+                </p>
+              ) : null}
+            </Card>
+          ) : null}
+
           {/* Atajos rápidos */}
           <Card>
             <CardTitle>Acciones rápidas</CardTitle>

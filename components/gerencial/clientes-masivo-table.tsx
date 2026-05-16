@@ -107,13 +107,12 @@ export function ClientesMasivoTable({ clientes, isOwner }: Props) {
           <p className="mt-3 text-sm text-[var(--katia-text-secondary)]">
             {query || filterEstado !== "todos" ? "Sin resultados para ese filtro." : "No hay clientes registrados."}
           </p>
-          <Link
+              <Link
             href="/ventas/clientes"
             className="mt-3 inline-block text-xs font-semibold text-[var(--katia-primary)] hover:underline"
           >
             Agregar primer cliente →
-          </Link>
-        </div>
+          </Link>        </div>
       ) : (
         <div className="overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
           <Table>

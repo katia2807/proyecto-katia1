@@ -3,6 +3,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Field, SelectField } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { ClientesMasterDetail } from "@/components/ventas/clientes-master-detail";
+import { NuevoClienteInline } from "@/components/ventas/nuevo-cliente-inline";
 import {
   getAlquilerRows,
   getClientesRows,
@@ -135,9 +136,12 @@ export default async function ClientesPage({ searchParams }: ClientesPageProps) 
             ) : null}
           </p>
         </div>
-        <Link href="/ventas">
-          <Button type="button" variant="ghost" size="sm">← Volver a ventas</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <NuevoClienteInline />
+          <Link href="/ventas">
+            <Button type="button" variant="ghost" size="sm">← Volver a ventas</Button>
+          </Link>
+        </div>
       </div>
 
       <Card>
