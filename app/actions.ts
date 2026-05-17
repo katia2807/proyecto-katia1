@@ -982,7 +982,7 @@ export async function createCliente(formData: FormData) {
       ? parsed.data.tipoPersona
       : null;
   if (!hasSupabaseEnv()) {
-    demoCreateCliente({
+    const newId = demoCreateCliente({
       organization_id: DEFAULT_ORG_ID,
       nombre: parsed.data.nombre,
       documento: parsed.data.documento || null,
@@ -991,24 +991,37 @@ export async function createCliente(formData: FormData) {
       direccion: parsed.data.direccion || null,
       tipo_persona: tipoPersona,
     });
+    revalidatePath("/ventas");
+    revalidatePath("/alquiler");
+    const skipRedirect = formData.get("skip_redirect") === "true";
+    if (skipRedirect) return { id: newId, nombre: parsed.data.nombre };
+    maybeRedirectToQuickStep(formData);
+    return;
   } else {
     const supabase = getSupabaseServerClient();
-    const { error } = await supabase.from("clientes").insert({
-      organization_id: DEFAULT_ORG_ID,
-      nombre: parsed.data.nombre,
-      documento: parsed.data.documento || parsed.data.ruc || null,
-      telefono: parsed.data.telefono || null,
-      ruc: parsed.data.ruc || null,
-      direccion: parsed.data.direccion || null,
-      tipo_persona: tipoPersona,
-    });
+    const { data: newCliente, error } = await supabase
+      .from("clientes")
+      .insert({
+        organization_id: DEFAULT_ORG_ID,
+        nombre: parsed.data.nombre,
+        documento: parsed.data.documento || parsed.data.ruc || null,
+        telefono: parsed.data.telefono || null,
+        ruc: parsed.data.ruc || null,
+        direccion: parsed.data.direccion || null,
+        tipo_persona: tipoPersona,
+      })
+      .select("id")
+      .single();
     if (error) {
       throw new Error(error.message);
     }
+    revalidatePath("/ventas");
+    revalidatePath("/alquiler");
+    const skipRedirect = formData.get("skip_redirect") === "true";
+    if (skipRedirect) return { id: newCliente.id, nombre: parsed.data.nombre };
+    maybeRedirectToQuickStep(formData);
+    return;
   }
-  revalidatePath("/ventas");
-  revalidatePath("/alquiler");
-  maybeRedirectToQuickStep(formData);
 }
 
 export async function createClienteCotizacionRapida(input: {
