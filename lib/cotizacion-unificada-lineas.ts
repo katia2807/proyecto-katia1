@@ -1,8 +1,6 @@
 import {
-  calcularPieTablar,
   computeTotalesDetalle,
   round2,
-  totalPtLinea,
 } from "@/lib/cotizacion-calculos";
 import type { CotizacionDetalleV1 } from "@/lib/cotizacion-unificada-payload";
 import { formatPen } from "@/lib/utils";
@@ -18,34 +16,60 @@ export type LineaFormal = {
 /** Arma las filas tipo documento comercial (ítem, cant., descripción con viñetas, unitario, total). */
 export function buildLineasResumen(detalle: CotizacionDetalleV1): LineaFormal[] {
   const lineas: LineaFormal[] = [];
-  const des = Math.max(0, detalle.desperdicioPctMuebles);
 
   if (detalle.rubros.muebles && detalle.muebles_lineas.length > 0) {
+    // Calcular total de todas las líneas de madera juntas para mostrar un solo ítem
+    let totalMonto = 0;
+    let totalCantidad = 0;
+    const des = Math.max(0, detalle.desperdicioPctMuebles);
+
     for (const linea of detalle.muebles_lineas) {
-      const ptNet = totalPtLinea(linea.piezas);
+      const ptNet = linea.piezas.reduce((acc, p) => {
+        // PT = (espesor_in × ancho_in × largo_ft) / 12
+        return acc + (p.cantidad * p.espesor * p.ancho * p.largo) / 12;
+      }, 0);
       const ptCompra = ptNet * (1 + des / 100);
       const montoLinea = round2(ptCompra * Math.max(0, linea.precioPorPt));
-      const cantidad = Math.max(1, linea.piezas.reduce((acc, p) => acc + p.cantidad, 0));
-
-      const bullets: string[] = [
-        `PT neto ${ptNet.toFixed(2)} · PT compra (${des}% desp.) ${ptCompra.toFixed(2)} · S/ por PT ${formatPen(linea.precioPorPt)}`,
-      ];
-      for (const p of linea.piezas) {
-        const pt = calcularPieTablar(p.cantidad, p.espesor, p.ancho, p.largo);
-        bullets.push(
-          `${p.descripcion}: ${p.cantidad} × ${p.espesor}″ × ${p.ancho}″ × ${p.largo}′ → ${pt.toFixed(2)} PT`,
-        );
-      }
-
-      const titulo = (linea.especie_label || "Madera").trim().toUpperCase();
-      lineas.push({
-        cantidad,
-        titulo,
-        bullets,
-        precioUnit: round2(montoLinea / cantidad),
-        precioTotal: montoLinea,
-      });
+      const cantLinea = Math.max(1, linea.piezas.reduce((acc, p) => acc + p.cantidad, 0));
+      totalMonto += montoLinea;
+      totalCantidad += cantLinea;
     }
+
+    totalCantidad = Math.max(1, totalCantidad);
+
+    // Descripción visible al cliente: usa el campo editable si existe, sino genera texto limpio
+    const descCliente = (detalle.descripcion_cliente ?? "").trim();
+    const bullets: string[] = [];
+    if (descCliente) {
+      // Katia escribió una descripción personalizada → mostrarla tal cual
+      bullets.push(descCliente);
+    } else {
+      // Generación automática: solo nombres de piezas, sin datos técnicos internos
+      const piezasLabels: string[] = [];
+      for (const linea of detalle.muebles_lineas) {
+        for (const p of linea.piezas) {
+          const label = (p.descripcion || linea.especie_label || "Pieza").trim();
+          if (label && !piezasLabels.includes(label)) {
+            piezasLabels.push(label);
+          }
+        }
+      }
+      if (piezasLabels.length > 0) {
+        bullets.push(piezasLabels.join(", "));
+      }
+    }
+
+    // Título: especie de la primera línea, o "MUEBLE PERSONALIZADO"
+    const primeraEspecie = detalle.muebles_lineas[0]?.especie_label?.trim().toUpperCase();
+    const titulo = primeraEspecie || "MUEBLE PERSONALIZADO";
+
+    lineas.push({
+      cantidad: totalCantidad,
+      titulo,
+      bullets,
+      precioUnit: round2(totalMonto / totalCantidad),
+      precioTotal: round2(totalMonto),
+    });
   }
 
   const totRubros = computeTotalesDetalle(detalle);

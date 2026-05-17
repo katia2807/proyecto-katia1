@@ -35,6 +35,12 @@ export type CotizacionDetalleV1 = {
   muebles_lineas: MuebleLineaMadera[];
   /** Texto libre para el bloque NOTA al pie (condiciones, exclusiones, etc.). */
   notas_generales: string;
+  /**
+   * Descripción visible al cliente en la cotización formal.
+   * Si se deja vacío, se genera automáticamente a partir del tipo de mueble/material.
+   * NO incluye datos técnicos internos (PT, dimensiones en pulgadas, etc.).
+   */
+  descripcion_cliente?: string;
   aserradero: {
     modo: "hora" | "total";
     precioHora: number;
@@ -113,6 +119,7 @@ export const cotizacionDetalleV1Schema = z.object({
   costoAcabadoSoles: z.number().nonnegative().optional().default(0),
   muebles_lineas: z.array(lineaMaderaSchema),
   notas_generales: z.string().optional().default(""),
+  descripcion_cliente: z.string().optional().default(""),
   aserradero: aserraderoSchema,
   alquiler: alquilerSchema,
 });
@@ -125,6 +132,7 @@ export function defaultCotizacionDetalleV1(): CotizacionDetalleV1 {
     costoAcabadoSoles: 0,
     muebles_lineas: [],
     notas_generales: "",
+    descripcion_cliente: "",
     aserradero: {
       modo: "hora",
       precioHora: 0,
@@ -151,10 +159,13 @@ export function parseCotizacionDetalle(raw: unknown): CotizacionDetalleV1 {
     return parsed.data;
   }
   const base = defaultCotizacionDetalleV1();
-  if (raw && typeof raw === "object" && "notas_generales" in raw) {
-    const n = (raw as { notas_generales?: unknown }).notas_generales;
-    if (typeof n === "string") {
-      return { ...base, notas_generales: n };
+  if (raw && typeof raw === "object") {
+    const r = raw as Record<string, unknown>;
+    if (typeof r.notas_generales === "string") {
+      base.notas_generales = r.notas_generales;
+    }
+    if (typeof r.descripcion_cliente === "string") {
+      base.descripcion_cliente = r.descripcion_cliente;
     }
   }
   return base;

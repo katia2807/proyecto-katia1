@@ -2550,7 +2550,27 @@ export function CotizacionUnificadaWizard({
             </p>
           </div>
 
-          <div className="space-y-2 border-t border-[var(--color-border)] px-5 py-4">
+          <div className="space-y-4 border-t border-[var(--color-border)] px-5 py-4">
+            <label className="block space-y-1">
+              <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                Descripción para el cliente{" "}
+                <span className="font-normal text-[var(--color-text-secondary)]/70">
+                  (aparece en la cotización en lugar de los datos técnicos internos)
+                </span>
+              </span>
+              <textarea
+                className={`${inputClass} min-h-[72px] py-2`}
+                placeholder="Ej: Mesita de noche en madera cedro con acabado barniz natural. Incluye 2 cajones."
+                value={detalle.descripcion_cliente ?? ""}
+                onChange={(e) =>
+                  setDetalle((d) => ({ ...d, descripcion_cliente: e.target.value }))
+                }
+              />
+              <p className="text-[11px] text-[var(--color-text-secondary)]/70">
+                Si se deja vacío se muestra automáticamente el nombre de las piezas. Los datos técnicos (PT, pulgadas) nunca van al documento del cliente.
+              </p>
+            </label>
+
             <label className="block space-y-1">
               <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
                 Notas al pie del documento (una por línea aparece como viñeta bajo NOTA:)
