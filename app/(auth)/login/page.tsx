@@ -3,7 +3,6 @@ import Link from "next/link";
 import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
 import { LoginForm } from "@/components/auth/login-form";
 import { getAuthContext } from "@/lib/auth";
-import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { isDemoDatabaseMode } from "@/lib/demo-mode";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { getServerSupabaseCredentials } from "@/lib/supabase/temp-credentials";
@@ -68,12 +67,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       ) : null}
 
       {avisoPanel ? (
-        <div className="mt-4 rounded-[var(--border-radius-input)] border border-[var(--border-color)] bg-[var(--bg-card)] p-3 text-sm text-[var(--text-primary)]">
-          <p className="font-semibold">No se abrió el panel</p>
-          <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-            Sesión válida, pero no existe tu fila en <code className="rounded bg-[var(--bg-primary)] px-1">public.perfiles</code> para:
+        <div className="mt-4 rounded-[var(--border-radius-input)] border border-amber-500/40 bg-amber-900/20 p-3 text-sm text-[var(--text-primary)]">
+          <p className="font-semibold text-amber-400">Sesión expirada</p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
+            Tu sesión cerró automáticamente por inactividad. Vuelve a ingresar con tus datos.
           </p>
-          <p className="mt-2 break-all font-mono text-xs text-[var(--text-primary)]">{DEFAULT_ORG_ID}</p>
         </div>
       ) : null}
 
