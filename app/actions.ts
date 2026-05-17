@@ -2849,7 +2849,7 @@ export async function deleteMuebleCatalogo(
       if (row.activo) return { ok: false, error: "Solo se pueden eliminar muebles inactivos." };
       const { error } = await supabase
         .from("muebles_catalogo")
-        .update({ deleted_at: new Date().toISOString() })
+        .delete()
         .eq("id", id)
         .eq("organization_id", DEFAULT_ORG_ID);
       if (error) return { ok: false, error: error.message };

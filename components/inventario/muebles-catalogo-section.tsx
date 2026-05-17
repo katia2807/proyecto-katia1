@@ -15,7 +15,6 @@ import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { formatPen } from "@/lib/utils";
-import Image from "next/image";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 type MuebleRow = {
@@ -45,6 +44,9 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
 
   const editFormRef = useRef<HTMLFormElement>(null);
   const toggleFormRef = useRef<HTMLFormElement>(null);
+  // These refs prevent the confirm dialogs from re-opening when requestSubmit() re-fires onSubmit
+  const editConfirmedRef = useRef(false);
+  const toggleConfirmedRef = useRef(false);
 
   useEffect(() => {
     if (stateEdit.success && stateEdit.message) {
@@ -84,21 +86,17 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
           {row.activo ? "Activo" : "Inactivo"}
         </span>
       </div>
-      {row.foto_url ? (
-        <Image
-          src={row.foto_url}
-          alt={row.nombre}
-          width={260}
-          height={140}
-          className="h-28 w-full rounded-xl object-cover"
-          unoptimized
-        />
-      ) : null}
+
+      {/* Edit form — includes FotoUpload for changing the image */}
       <form
         ref={editFormRef}
         action={actionEdit}
         className="grid gap-2"
         onSubmit={(e) => {
+          if (editConfirmedRef.current) {
+            editConfirmedRef.current = false;
+            return;
+          }
           e.preventDefault();
           setConfirmGuardar(true);
         }}
@@ -119,7 +117,12 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
           placeholder="Material, medidas, acabado..."
           defaultValue={row.descripcion ?? ""}
         />
-        <Field name="foto_url" label="Foto URL (opcional)" defaultValue={row.foto_url ?? ""} />
+        <FotoUpload
+          bucket="muebles"
+          name="foto_url"
+          label="Foto del mueble (opcional)"
+          defaultUrl={row.foto_url ?? ""}
+        />
         <div>
           <Button type="submit" variant="secondary" disabled={!canMutate}>
             Guardar cambios
@@ -127,10 +130,15 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
         </div>
       </form>
 
+      {/* Activate / Deactivate / Delete */}
       <form
         ref={toggleFormRef}
         action={actionToggle}
         onSubmit={(e) => {
+          if (toggleConfirmedRef.current) {
+            toggleConfirmedRef.current = false;
+            return;
+          }
           e.preventDefault();
           setConfirmToggle(true);
         }}
@@ -165,6 +173,7 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
         confirmLabel="Guardar"
         onConfirm={() => {
           setConfirmGuardar(false);
+          editConfirmedRef.current = true;
           editFormRef.current?.requestSubmit();
         }}
       >
@@ -180,6 +189,7 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
         confirmLabel={row.activo ? "Desactivar" : "Activar"}
         onConfirm={() => {
           setConfirmToggle(false);
+          toggleConfirmedRef.current = true;
           toggleFormRef.current?.requestSubmit();
         }}
       >
@@ -206,7 +216,7 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
       >
         <p>
           Se eliminará <strong>{row.nombre}</strong> ({row.codigo}) del catálogo de forma permanente.
-          Esta acción no se puede deshacer. Solo se pueden eliminar muebles inactivos.
+          Esta acción no se puede deshacer.
         </p>
       </ConfirmDialog>
     </Card>
@@ -219,6 +229,7 @@ export function MueblesCatalogoSection({ muebles, canMutate }: Props) {
   const [formKey, setFormKey] = useState(0);
   const [confirmCrear, setConfirmCrear] = useState(false);
   const createFormRef = useRef<HTMLFormElement>(null);
+  const createConfirmedRef = useRef(false);
   const [stateCreate, actionCreate] = useActionState(submitCreateMuebleCatalogoForm, mutationFormInitialState);
 
   useEffect(() => {
@@ -258,6 +269,10 @@ export function MueblesCatalogoSection({ muebles, canMutate }: Props) {
               action={actionCreate}
               className="grid gap-3 md:grid-cols-2"
               onSubmit={(e) => {
+                if (createConfirmedRef.current) {
+                  createConfirmedRef.current = false;
+                  return;
+                }
                 e.preventDefault();
                 setConfirmCrear(true);
               }}
@@ -284,6 +299,7 @@ export function MueblesCatalogoSection({ muebles, canMutate }: Props) {
               confirmLabel="Registrar"
               onConfirm={() => {
                 setConfirmCrear(false);
+                createConfirmedRef.current = true;
                 createFormRef.current?.requestSubmit();
               }}
             >
