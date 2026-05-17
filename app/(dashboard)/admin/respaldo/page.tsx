@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { eliminarDatosSistema, restaurarRespaldoJSON } from "@/app/actions";
+import { ImportExcelPanel } from "@/components/admin/import-excel-panel";
 import { RespaldoPeligroCategoriaForms } from "@/components/admin/respaldo-peligro-categoria-forms";
 import { RespaldoProduccionResumen } from "@/components/admin/respaldo-produccion-resumen";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,9 @@ export default async function RespaldoPage() {
         </div>
 
         <RespaldoProduccionResumen resumen={resumen} />
+
+        {/* ── Import desde Excel ── */}
+        <ImportExcelPanel />
 
         {/* ── Export masivo Excel ── */}
         <Card>

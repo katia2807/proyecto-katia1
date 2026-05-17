@@ -25,6 +25,7 @@ import {
   demoDeleteInventarioMovimiento,
   demoDeleteInventarioProducto,
   demoCreateMuebleCatalogo,
+  demoDeleteMuebleCatalogo,
   demoToggleMuebleCatalogoActivo,
   demoUpdateMuebleCatalogo,
   demoCreateOrdenProduccion,
@@ -2824,6 +2825,43 @@ export async function toggleMuebleCatalogoActivo(formData: FormData) {
   revalidatePath("/ventas");
   revalidatePath("/ventas/muebles-terminados");
   revalidatePath("/cotizacion");
+}
+
+export async function deleteMuebleCatalogo(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireMutationAccess(ventasRoles);
+    const parsedId = z.string().uuid().safeParse(id);
+    if (!parsedId.success) return { ok: false, error: "Identificador inválido." };
+    if (!hasSupabaseEnv()) {
+      const ok = demoDeleteMuebleCatalogo(id);
+      if (!ok) return { ok: false, error: "Mueble no encontrado." };
+    } else {
+      const supabase = getSupabaseServerClient();
+      const { data: row } = await supabase
+        .from("muebles_catalogo")
+        .select("activo")
+        .eq("id", id)
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .maybeSingle();
+      if (!row) return { ok: false, error: "Mueble no encontrado." };
+      if (row.activo) return { ok: false, error: "Solo se pueden eliminar muebles inactivos." };
+      const { error } = await supabase
+        .from("muebles_catalogo")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("organization_id", DEFAULT_ORG_ID);
+      if (error) return { ok: false, error: error.message };
+    }
+    revalidatePath("/inventario");
+    revalidatePath("/ventas");
+    revalidatePath("/ventas/muebles-terminados");
+    revalidatePath("/cotizacion");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al eliminar el mueble." };
+  }
 }
 
 export async function createVentaMuebleTerminado(formData: FormData) {

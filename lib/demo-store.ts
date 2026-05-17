@@ -2475,6 +2475,14 @@ export function demoToggleMuebleCatalogoActivo(id: string, activo: boolean) {
   return row;
 }
 
+export function demoDeleteMuebleCatalogo(id: string): boolean {
+  const idx = store.mueblesCatalogo.findIndex((m) => m.id === id);
+  if (idx === -1) return false;
+  store.mueblesCatalogo.splice(idx, 1);
+  persistStore();
+  return true;
+}
+
 export function demoVentasMuebleTerminadoRows() {
   return [...store.ventasMuebleTerminado].sort((a, b) => b.fecha.localeCompare(a.fecha));
 }

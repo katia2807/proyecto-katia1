@@ -43,7 +43,7 @@ export function DetailDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80]">
+    <div className="fixed inset-0 z-[200]">
       <button
         type="button"
         aria-label="Cerrar detalle"

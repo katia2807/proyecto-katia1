@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  deleteMuebleCatalogo,
   submitCreateMuebleCatalogoForm,
   submitToggleMuebleCatalogoForm,
   submitUpdateMuebleCatalogoForm,
@@ -9,12 +10,13 @@ import { ContextActionPanel } from "@/components/context-action-panel";
 import { FotoUpload } from "@/components/sales/foto-upload";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { formatPen } from "@/lib/utils";
 import Image from "next/image";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 type MuebleRow = {
   id: string;
@@ -36,6 +38,14 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
   const [stateEdit, actionEdit] = useActionState(submitUpdateMuebleCatalogoForm, mutationFormInitialState);
   const [stateToggle, actionToggle] = useActionState(submitToggleMuebleCatalogoForm, mutationFormInitialState);
 
+  const [confirmGuardar, setConfirmGuardar] = useState(false);
+  const [confirmToggle, setConfirmToggle] = useState(false);
+  const [confirmEliminar, setConfirmEliminar] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const editFormRef = useRef<HTMLFormElement>(null);
+  const toggleFormRef = useRef<HTMLFormElement>(null);
+
   useEffect(() => {
     if (stateEdit.success && stateEdit.message) {
       showToast({ variant: "success", message: stateEdit.message });
@@ -51,6 +61,17 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
       showToast({ variant: "error", message: stateToggle.error });
     }
   }, [stateToggle, showToast]);
+
+  async function handleEliminar() {
+    setDeleting(true);
+    const res = await deleteMuebleCatalogo(row.id);
+    setDeleting(false);
+    if (!res.ok) {
+      showToast({ variant: "error", message: res.error });
+      return false;
+    }
+    showToast({ variant: "success", message: "Mueble eliminado del catálogo." });
+  }
 
   return (
     <Card id={`mueble-catalogo-${row.id}`} className="space-y-3">
@@ -74,12 +95,12 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
         />
       ) : null}
       <form
+        ref={editFormRef}
         action={actionEdit}
         className="grid gap-2"
         onSubmit={(e) => {
-          if (!window.confirm("¿Guardar los cambios de precio, descripción o foto de este mueble del catálogo?")) {
-            e.preventDefault();
-          }
+          e.preventDefault();
+          setConfirmGuardar(true);
         }}
       >
         <input type="hidden" name="id" value={row.id} />
@@ -105,33 +126,89 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
           </Button>
         </div>
       </form>
+
       <form
+        ref={toggleFormRef}
         action={actionToggle}
         onSubmit={(e) => {
-          if (row.activo) {
-            if (!window.confirm("¿Desactivar este mueble? Dejará de mostrarse en cotizaciones de mueble terminado.")) {
-              e.preventDefault();
-              return;
-            }
-            const typed = window.prompt(
-              "Confirmación estricta: escribí DESACTIVAR en mayúsculas para sacar este ítem del catálogo.",
-              "",
-            );
-            if (typed !== "DESACTIVAR") {
-              e.preventDefault();
-            }
-          } else if (!window.confirm("¿Volver a activar este mueble en el catálogo?")) {
-            e.preventDefault();
-          }
+          e.preventDefault();
+          setConfirmToggle(true);
         }}
       >
         <input type="hidden" name="id" value={row.id} />
         <input type="hidden" name="activo" value={row.activo ? "false" : "true"} />
-        <Button type="submit" variant={row.activo ? "danger" : "secondary"} disabled={!canMutate}>
-          {row.activo ? "Desactivar" : "Activar"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" variant={row.activo ? "danger" : "secondary"} disabled={!canMutate}>
+            {row.activo ? "Desactivar" : "Activar"}
+          </Button>
+          {!row.activo && canMutate ? (
+            <Button
+              type="button"
+              variant="danger"
+              disabled={deleting}
+              onClick={() => setConfirmEliminar(true)}
+            >
+              Eliminar
+            </Button>
+          ) : null}
+        </div>
       </form>
+
       <p className="text-sm font-semibold">{formatPen(Number(row.precio_lista))}</p>
+
+      <ConfirmDialog
+        open={confirmGuardar}
+        onOpenChange={setConfirmGuardar}
+        title="¿Guardar cambios?"
+        tone="neutral"
+        confirmVariant="primary"
+        confirmLabel="Guardar"
+        onConfirm={() => {
+          setConfirmGuardar(false);
+          editFormRef.current?.requestSubmit();
+        }}
+      >
+        <p>Se actualizará el precio, descripción o foto de <strong>{row.nombre}</strong>.</p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={confirmToggle}
+        onOpenChange={setConfirmToggle}
+        title={row.activo ? "¿Desactivar este mueble?" : "¿Activar este mueble?"}
+        tone={row.activo ? "caution" : "neutral"}
+        confirmVariant={row.activo ? "danger" : "primary"}
+        confirmLabel={row.activo ? "Desactivar" : "Activar"}
+        onConfirm={() => {
+          setConfirmToggle(false);
+          toggleFormRef.current?.requestSubmit();
+        }}
+      >
+        {row.activo ? (
+          <p>
+            <strong>{row.nombre}</strong> dejará de mostrarse en cotizaciones y ventas de mueble terminado.
+            Podés volver a activarlo cuando quieras.
+          </p>
+        ) : (
+          <p>
+            <strong>{row.nombre}</strong> volverá a estar disponible en cotizaciones y ventas.
+          </p>
+        )}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={confirmEliminar}
+        onOpenChange={setConfirmEliminar}
+        title="¿Eliminar este mueble?"
+        tone="caution"
+        confirmVariant="danger"
+        confirmLabel="Eliminar permanentemente"
+        onConfirm={handleEliminar}
+      >
+        <p>
+          Se eliminará <strong>{row.nombre}</strong> ({row.codigo}) del catálogo de forma permanente.
+          Esta acción no se puede deshacer. Solo se pueden eliminar muebles inactivos.
+        </p>
+      </ConfirmDialog>
     </Card>
   );
 }
@@ -140,6 +217,8 @@ export function MueblesCatalogoSection({ muebles, canMutate }: Props) {
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  const [confirmCrear, setConfirmCrear] = useState(false);
+  const createFormRef = useRef<HTMLFormElement>(null);
   const [stateCreate, actionCreate] = useActionState(submitCreateMuebleCatalogoForm, mutationFormInitialState);
 
   useEffect(() => {
@@ -175,12 +254,12 @@ export function MueblesCatalogoSection({ muebles, canMutate }: Props) {
           >
             <form
               key={formKey}
+              ref={createFormRef}
               action={actionCreate}
               className="grid gap-3 md:grid-cols-2"
               onSubmit={(e) => {
-                if (!window.confirm("¿Registrar este mueble nuevo en el catálogo?")) {
-                  e.preventDefault();
-                }
+                e.preventDefault();
+                setConfirmCrear(true);
               }}
             >
               <Field name="codigo" label="Codigo" placeholder="CAT-001" required />
@@ -195,6 +274,21 @@ export function MueblesCatalogoSection({ muebles, canMutate }: Props) {
                 <Button>Guardar mueble</Button>
               </div>
             </form>
+
+            <ConfirmDialog
+              open={confirmCrear}
+              onOpenChange={setConfirmCrear}
+              title="¿Registrar nuevo mueble?"
+              tone="neutral"
+              confirmVariant="primary"
+              confirmLabel="Registrar"
+              onConfirm={() => {
+                setConfirmCrear(false);
+                createFormRef.current?.requestSubmit();
+              }}
+            >
+              <p>El mueble quedará disponible para selección en cotizaciones y ventas de mueble terminado.</p>
+            </ConfirmDialog>
           </ContextActionPanel>
         ) : null}
       </div>
