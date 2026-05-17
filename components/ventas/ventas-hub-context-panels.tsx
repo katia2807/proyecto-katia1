@@ -20,7 +20,7 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
         description="Datos completos: persona o empresa, RUC/DNI y dirección."
         openByDefault={quick === "cliente"}
       >
-        <form action={createCliente} className="space-y-3">
+        <form action={async (fd) => { await createCliente(fd); }} className="space-y-3">
           <ClienteFormFields />
           <input type="hidden" name="return_to" value="/ventas" />
           <div>
