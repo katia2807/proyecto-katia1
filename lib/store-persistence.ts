@@ -29,10 +29,14 @@ export function readStoreFromDisk<T>(): T | null {
 }
 
 export function writeStoreToDisk<T>(store: T): void {
-  ensureDataDirectory();
-  const json = JSON.stringify(store, null, 2);
-  const tmp = storeTmpPath();
-  const finalPath = storeJsonPath();
-  writeFileSync(tmp, json, "utf8");
-  renameSync(tmp, finalPath);
+  try {
+    ensureDataDirectory();
+    const json = JSON.stringify(store, null, 2);
+    const tmp = storeTmpPath();
+    const finalPath = storeJsonPath();
+    writeFileSync(tmp, json, "utf8");
+    renameSync(tmp, finalPath);
+  } catch {
+    // Fail silently in read-only environments (e.g. Vercel build, edge)
+  }
 }

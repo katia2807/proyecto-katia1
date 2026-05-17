@@ -9,7 +9,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * El resultado es que el usuario queda "logueado" en el navegador pero el
  * servidor lo rechaza → pantalla de "No se abrió el panel".
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Leer credenciales públicas (disponibles en Edge y Node)
   const supabaseUrl =
     process.env["NEXT_PUBLIC_SUPABASE_URL"] ??

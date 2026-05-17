@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireAuthContext } from "@/lib/auth";
 import { getUtilidadRows } from "@/lib/data";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   await requireAuthContext({ redirectTo: null });
   const rows = await getUtilidadRows();

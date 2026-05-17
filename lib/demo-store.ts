@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readStoreFromDisk, writeStoreToDisk } from "@/lib/store-persistence";
+import { isDemoDatabaseMode } from "@/lib/demo-mode";
 
 export type MetodoPago =
   | "efectivo"
@@ -1649,20 +1650,21 @@ function loadPersistedStore(): DemoStore {
   const fromDisk = readStoreFromDisk<unknown>();
   if (!fromDisk || typeof fromDisk !== "object") {
     const fresh = createDefaultDemoStore();
-    writeStoreToDisk(fresh);
+    // Solo escribir en disco en modo demo (no durante builds de Vercel)
+    if (isDemoDatabaseMode()) writeStoreToDisk(fresh);
     return fresh;
   }
   try {
     const migrated = migrateDemoStore(fromDisk as Record<string, unknown>);
     if (!isValidDemoStore(migrated)) {
       const fresh = createDefaultDemoStore();
-      writeStoreToDisk(fresh);
+      if (isDemoDatabaseMode()) writeStoreToDisk(fresh);
       return fresh;
     }
     return migrated;
   } catch {
     const fresh = createDefaultDemoStore();
-    writeStoreToDisk(fresh);
+    if (isDemoDatabaseMode()) writeStoreToDisk(fresh);
     return fresh;
   }
 }
