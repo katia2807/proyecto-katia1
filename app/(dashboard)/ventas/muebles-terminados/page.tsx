@@ -195,27 +195,37 @@ export default async function MueblesTerminadosPage() {
                       ) : null}
                     </TD>
                     <TD className="text-right">
-                      {canMutate && venta.estado_entrega !== "entregado" ? (
-                        <form action={marcarEntregaMueble} className="inline-flex">
-                          <input type="hidden" name="id" value={venta.id} />
-                          <input
-                            type="hidden"
-                            name="nuevo_estado"
-                            value={
-                              venta.estado_entrega === "pendiente" ? "en_proceso" : "entregado"
-                            }
-                          />
-                          <PendingSubmitButton
-                            variant="secondary"
-                            className="h-8 px-3 text-xs"
-                            idleText={
-                              venta.estado_entrega === "pendiente"
-                                ? "Marcar en proceso"
-                                : "Marcar entregado"
-                            }
-                          />
-                        </form>
-                      ) : null}
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Link
+                          href={`/ventas/comprobante/mueble/${venta.id}`}
+                          target="_blank"
+                          className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                          title="Imprimir comprobante"
+                        >
+                          🖨️
+                        </Link>
+                        {canMutate && venta.estado_entrega !== "entregado" ? (
+                          <form action={marcarEntregaMueble} className="inline-flex">
+                            <input type="hidden" name="id" value={venta.id} />
+                            <input
+                              type="hidden"
+                              name="nuevo_estado"
+                              value={
+                                venta.estado_entrega === "pendiente" ? "en_proceso" : "entregado"
+                              }
+                            />
+                            <PendingSubmitButton
+                              variant="secondary"
+                              className="h-8 px-3 text-xs"
+                              idleText={
+                                venta.estado_entrega === "pendiente"
+                                  ? "Marcar en proceso"
+                                  : "Marcar entregado"
+                              }
+                            />
+                          </form>
+                        ) : null}
+                      </div>
                     </TD>
                   </TRow>
                 );

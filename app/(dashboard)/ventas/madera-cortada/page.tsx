@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { MaderaCortadaForm } from "@/components/sales/madera-cortada-form";
 import { Badge } from "@/components/ui/badge";
@@ -109,6 +110,7 @@ export default async function MaderaCortadaPage() {
                 <TH>Cliente</TH>
                 <TH>Estado</TH>
                 <TH className="text-right">Total</TH>
+                <TH />
               </TRow>
             </THead>
             <tbody>
@@ -118,6 +120,16 @@ export default async function MaderaCortadaPage() {
                   <TD>{clientesById.get(venta.cliente_id) ?? "—"}</TD>
                   <TD className="capitalize">{venta.estado}</TD>
                   <TD className="text-right font-semibold">{formatPen(Number(venta.total))}</TD>
+                  <TD>
+                    <Link
+                      href={`/ventas/comprobante/madera/${venta.id}`}
+                      target="_blank"
+                      className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                      title="Imprimir comprobante"
+                    >
+                      🖨️
+                    </Link>
+                  </TD>
                 </TRow>
               ))}
               {ventas.length === 0 ? (

@@ -6,6 +6,7 @@ import {
   submitInventarioCompraRapidaForm,
 } from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
+import { CubicajeInput } from "@/components/sales/cubicaje-input";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/Combobox";
 import { useToast } from "@/components/ui/toast";
@@ -31,6 +32,8 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
   const [productoCompraId, setProductoCompraId] = useState("");
   const [openCompra, setOpenCompra] = useState(quick === "compra");
   const [compraFormKey, setCompraFormKey] = useState(0);
+  const [showCubicaje, setShowCubicaje] = useState(false);
+  const [cantidadCubicada, setCantidadCubicada] = useState("");
   const { showToast } = useToast();
   const [compraState, compraFormAction] = useActionState(submitInventarioCompraRapidaForm, mutationFormInitialState);
 
@@ -110,7 +113,56 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
               inputAriaLabel="Producto para registrar compra"
             />
           </label>
-          <Field name="cantidad" label="Cantidad recibida" type="number" min="0.01" step="0.01" required />
+
+          {/* Cubicaje toggle — útil para compras de madera */}
+          <div className="md:col-span-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowCubicaje((v) => !v);
+                setCantidadCubicada("");
+              }}
+              className="text-xs font-semibold text-[var(--color-accent)] underline underline-offset-2"
+            >
+              {showCubicaje ? "▲ Ocultar calculadora de cubicaje" : "📐 Usar calculadora de cubicaje (madera)"}
+            </button>
+          </div>
+
+          {showCubicaje ? (
+            <div className="md:col-span-2 rounded-xl border border-[var(--color-border)] bg-[var(--bg-surface)] p-3">
+              <p className="mb-2 text-xs font-semibold text-[var(--color-text-secondary)]">
+                Calculadora de cubicaje — el total en PT se copiará al campo &quot;Cantidad&quot;
+              </p>
+              <CubicajeInput
+                name="cubicaje_lineas"
+                totalPtName="cubicaje_total_pt"
+                totalM3Name="cubicaje_total_m3"
+                precioEditable={false}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const ptInput = document.querySelector<HTMLInputElement>('input[name="cubicaje_total_pt"]');
+                  const pt = ptInput?.value ?? "";
+                  setCantidadCubicada(pt);
+                }}
+                className="mt-2 rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                ← Copiar {cantidadCubicada ? `${parseFloat(cantidadCubicada).toFixed(2)} PT` : "total PT"} a cantidad
+              </button>
+            </div>
+          ) : null}
+
+          <Field
+            name="cantidad"
+            label="Cantidad recibida"
+            type="number"
+            min="0.01"
+            step="0.01"
+            required
+            value={cantidadCubicada || undefined}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCantidadCubicada(e.target.value)}
+          />
           <Field
             name="costo_unitario"
             label="Costo unitario compra (opcional)"

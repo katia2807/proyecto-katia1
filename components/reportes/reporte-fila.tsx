@@ -17,6 +17,14 @@ type ReporteDetalle = {
   href?: string;
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function formatUsuario(u: string | null | undefined): string {
+  if (!u) return "Sistema / no registrado";
+  if (UUID_RE.test(u.trim())) return "Sistema / no registrado";
+  return u;
+}
+
 export function ReporteFila({ children, detalle }: { children: React.ReactNode; detalle: ReporteDetalle }) {
   const [open, setOpen] = useState(false);
   const modulo = detalle.modulo || "sin modulo";
@@ -37,7 +45,7 @@ export function ReporteFila({ children, detalle }: { children: React.ReactNode; 
         <div className="space-y-3">
           <DetailField label="Modulo origen" value={modulo.replace(/_/g, " ")} />
           {detalle.fecha ? <DetailField label="Fecha" value={formatDate(detalle.fecha)} /> : null}
-          <DetailField label="Usuario que registro" value={detalle.usuario ?? "Sistema / no registrado"} />
+          <DetailField label="Usuario que registro" value={formatUsuario(detalle.usuario)} />
           <DetailField label="Monto" value={formatPen(Number(detalle.monto))} />
           {detalle.categoria ? <DetailField label="Categoria" value={detalle.categoria.replace(/_/g, " ")} /> : null}
           {detalle.descripcion ? <DetailField label="Detalle" value={detalle.descripcion} /> : null}
