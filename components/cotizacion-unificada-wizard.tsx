@@ -1614,22 +1614,10 @@ export function CotizacionUnificadaWizard({
                       type="button"
                       onClick={() => {
                         setSelectedPiezaIndexUI(idx);
-                        // Convertir dimensiones de la pieza (guardadas en pulgadas/pies) a la unidad actual de la UI
-                        const espIn = pieza.espesor; // guardado en inches
-                        const ancIn = pieza.ancho;   // guardado en inches
-                        const larFt = pieza.largo;   // guardado en feet
-                        // Convertir a la unidad seleccionada en la UI
-                        const toUI = (valIn: number, unit: string, isFt?: boolean) => {
-                          // Round to avoid floating point noise (e.g. 7.874015748... inches → 20.00 cm)
-                          if (unit === "mm") return (isFt ? Math.round(valIn * 3048) / 10 : Math.round(valIn * 254) / 10).toFixed(1);
-                          if (unit === "cm") return (isFt ? Math.round(valIn * 3048) / 100 : Math.round(valIn * 254) / 100).toFixed(2);
-                          if (unit === "m") return (isFt ? Math.round(valIn * 30480) / 100000 : Math.round(valIn * 2540) / 100000).toFixed(4);
-                          if (unit === "ft") return (isFt ? Math.round(valIn * 100) / 100 : Math.round(valIn * 100 / 12) / 100).toFixed(3);
-                          return (isFt ? Math.round(valIn * 1200) / 100 : Math.round(valIn * 100) / 100).toFixed(2); // in
-                        };
-                        setMedidaEspesorUI(toUI(espIn, unidadEspesorUI));
-                        setMedidaAnchoUI(toUI(ancIn, unidadAnchoUI));
-                        setMedidaLargoUI(toUI(larFt, unidadLargoUI, true));
+                        // Limpiar calculadora al cambiar de pieza — cada pieza es independiente
+                        setMedidaEspesorUI("");
+                        setMedidaAnchoUI("");
+                        setMedidaLargoUI("");
                       }}
                       className={`rounded-md border px-2 py-1 text-xs font-semibold ${
                         idx === selectedPiezaIndexSafe
@@ -1644,18 +1632,10 @@ export function CotizacionUnificadaWizard({
                   })}
                 </div>
               </div>
-              {/* PT individual pieza activa */}
-              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2 space-y-1">
-                <p className="text-[11px] font-semibold text-[var(--color-text-secondary)]">
-                  Pieza {selectedPiezaIndexSafe + 1} — individual
-                </p>
-                <p className="text-[11px] text-[var(--color-text-secondary)]">
-                  {conversionMedidasUI.espIn.toFixed(3)}" × {conversionMedidasUI.ancIn.toFixed(3)}" × {conversionMedidasUI.larFt.toFixed(3)}'
-                </p>
-                <p className="text-xs font-bold">
-                  PT esta pieza: <span className="text-[var(--color-accent)]">{conversionMedidasUI.pt.toFixed(2)} PT</span>
-                </p>
-              </div>
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                Conversión: Espesor {conversionMedidasUI.espIn.toFixed(2)} in · Ancho {conversionMedidasUI.ancIn.toFixed(2)} in · Largo{" "}
+                {conversionMedidasUI.larFt.toFixed(2)} ft · PT ref: <strong>{conversionMedidasUI.pt.toFixed(2)}</strong>
+              </p>
               {/* PT acumulado todas las piezas */}
               {piezasMuebleActual.length > 0 && (
                 <div className="rounded-lg border border-[var(--color-accent)]/30 bg-[var(--color-primary-soft)]/20 p-2 space-y-1">
@@ -1677,8 +1657,8 @@ export function CotizacionUnificadaWizard({
                   </p>
                 </div>
               )}
-              <p className="text-[11px] text-[var(--color-text-secondary)]">
-                Medidas se convierten automáticamente a pulgadas/pies internamente.
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                Cada unidad se convierte automáticamente a pulgadas/pies para el cálculo.
               </p>
             </div>
             ) : null}
