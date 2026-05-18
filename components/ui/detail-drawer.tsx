@@ -56,7 +56,7 @@ export function DetailDrawer({
         aria-labelledby="detail-drawer-title"
         className={cn(
           "absolute right-0 top-0 flex h-full w-full flex-col border-l border-[var(--color-border)] bg-[var(--bg-card)] shadow-2xl",
-          "md:w-[480px]",
+          "md:w-[680px] lg:w-[780px]",
         )}
       >
         <header className="flex items-start justify-between gap-3 border-b border-[var(--color-border)] p-5">
