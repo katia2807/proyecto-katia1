@@ -1606,7 +1606,9 @@ export function CotizacionUnificadaWizard({
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {(piezasMuebleActual.length > 0 ? piezasMuebleActual : [emptyPieza()]).map((pieza, idx) => (
+                  {(piezasMuebleActual.length > 0 ? piezasMuebleActual : [emptyPieza()]).map((pieza, idx) => {
+                    const ptPieza = (pieza.cantidad * pieza.espesor * pieza.ancho * pieza.largo) / 12;
+                    return (
                     <button
                       key={`pieza-pos-${idx}`}
                       type="button"
@@ -1618,12 +1620,12 @@ export function CotizacionUnificadaWizard({
                         const larFt = pieza.largo;   // guardado en feet
                         // Convertir a la unidad seleccionada en la UI
                         const toUI = (valIn: number, unit: string, isFt?: boolean) => {
-                          const base = isFt ? valIn * 12 : valIn; // base en inches
-                          if (unit === "mm") return (isFt ? valIn * 304.8 : valIn * 25.4).toFixed(2);
-                          if (unit === "cm") return (isFt ? valIn * 30.48 : valIn * 2.54).toFixed(2);
-                          if (unit === "m") return (isFt ? valIn * 0.3048 : valIn * 0.0254).toFixed(4);
-                          if (unit === "ft") return (isFt ? valIn : valIn / 12).toFixed(3);
-                          return (isFt ? valIn * 12 : valIn).toFixed(2); // in
+                          // Round to avoid floating point noise (e.g. 7.874015748... inches → 20.00 cm)
+                          if (unit === "mm") return (isFt ? Math.round(valIn * 3048) / 10 : Math.round(valIn * 254) / 10).toFixed(1);
+                          if (unit === "cm") return (isFt ? Math.round(valIn * 3048) / 100 : Math.round(valIn * 254) / 100).toFixed(2);
+                          if (unit === "m") return (isFt ? Math.round(valIn * 30480) / 100000 : Math.round(valIn * 2540) / 100000).toFixed(4);
+                          if (unit === "ft") return (isFt ? Math.round(valIn * 100) / 100 : Math.round(valIn * 100 / 12) / 100).toFixed(3);
+                          return (isFt ? Math.round(valIn * 1200) / 100 : Math.round(valIn * 100) / 100).toFixed(2); // in
                         };
                         setMedidaEspesorUI(toUI(espIn, unidadEspesorUI));
                         setMedidaAnchoUI(toUI(ancIn, unidadAnchoUI));
@@ -1635,17 +1637,48 @@ export function CotizacionUnificadaWizard({
                           : "border-[var(--color-border)] bg-[var(--color-surface)]"
                       }`}
                     >
-                      Pieza {idx + 1}
+                      <span>Pieza {idx + 1}</span>
+                      <span className="ml-1 opacity-75 text-[10px]">{ptPieza.toFixed(2)} PT</span>
                     </button>
-                  ))}
+                  );
+                  })}
                 </div>
               </div>
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                Conversión: Espesor {conversionMedidasUI.espIn.toFixed(2)} in · Ancho {conversionMedidasUI.ancIn.toFixed(2)} in · Largo{" "}
-                {conversionMedidasUI.larFt.toFixed(2)} ft · PT ref: <strong>{conversionMedidasUI.pt.toFixed(2)}</strong>
-              </p>
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                Cada unidad se convierte automáticamente a pulgadas/pies para el cálculo.
+              {/* PT individual pieza activa */}
+              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2 space-y-1">
+                <p className="text-[11px] font-semibold text-[var(--color-text-secondary)]">
+                  Pieza {selectedPiezaIndexSafe + 1} — individual
+                </p>
+                <p className="text-[11px] text-[var(--color-text-secondary)]">
+                  {conversionMedidasUI.espIn.toFixed(3)}" × {conversionMedidasUI.ancIn.toFixed(3)}" × {conversionMedidasUI.larFt.toFixed(3)}'
+                </p>
+                <p className="text-xs font-bold">
+                  PT esta pieza: <span className="text-[var(--color-accent)]">{conversionMedidasUI.pt.toFixed(2)} PT</span>
+                </p>
+              </div>
+              {/* PT acumulado todas las piezas */}
+              {piezasMuebleActual.length > 0 && (
+                <div className="rounded-lg border border-[var(--color-accent)]/30 bg-[var(--color-primary-soft)]/20 p-2 space-y-1">
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                    {piezasMuebleActual.map((p, i) => {
+                      const pt = (p.cantidad * p.espesor * p.ancho * p.largo) / 12;
+                      return (
+                        <span key={i} className="text-[11px] text-[var(--color-text-secondary)]">
+                          P{i + 1}: <strong className="text-[var(--color-text-primary)]">{pt.toFixed(2)}</strong>
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs font-bold text-[var(--color-accent)]">
+                    PT TOTAL ({piezasMuebleActual.length} pieza{piezasMuebleActual.length !== 1 ? "s" : ""}):{" "}
+                    <strong>
+                      {piezasMuebleActual.reduce((acc, p) => acc + (p.cantidad * p.espesor * p.ancho * p.largo) / 12, 0).toFixed(2)} PT
+                    </strong>
+                  </p>
+                </div>
+              )}
+              <p className="text-[11px] text-[var(--color-text-secondary)]">
+                Medidas se convierten automáticamente a pulgadas/pies internamente.
               </p>
             </div>
             ) : null}
