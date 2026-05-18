@@ -7,6 +7,7 @@ import { DetailDrawer, DetailField } from "@/components/ui/detail-drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { formatDate, formatPen } from "@/lib/utils";
+import { parseCotizacionDetalle } from "@/lib/cotizacion-unificada-payload";
 
 type Cotizacion = {
   id: string;
@@ -19,6 +20,239 @@ type Cotizacion = {
   detalle: unknown;
   created_at: string;
 };
+
+function EstadoBadge({ estado }: { estado: string }) {
+  const colores: Record<string, string> = {
+    pendiente: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
+    lista_produccion: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+    en_produccion: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+    cobrada: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300",
+  };
+  const labels: Record<string, string> = {
+    pendiente: "Pendiente",
+    lista_produccion: "Lista para producción",
+    en_produccion: "En producción",
+    cobrada: "Cobrada",
+  };
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${colores[estado] ?? "bg-gray-100 text-gray-700"}`}>
+      {labels[estado] ?? estado}
+    </span>
+  );
+}
+
+function DetalleVisual({ detalle }: { detalle: unknown }) {
+  const d = useMemo(() => parseCotizacionDetalle(detalle), [detalle]);
+
+  const metodoLabel: Record<string, string> = {
+    efectivo: "Efectivo",
+    yape: "Yape / Plin",
+    transferencia: "Transferencia bancaria",
+    billetera_digital: "Billetera digital",
+    otro: "Otro",
+  };
+
+  const modalidadLabel: Record<string, string> = {
+    contado: "Contado",
+    adelanto: "Adelanto",
+    credito: "Crédito",
+  };
+
+  // Extraer info de pago de notas_generales si fue guardada ahí
+  const notasLineas = (d.notas_generales ?? "")
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const notasPago = notasLineas.filter((l) =>
+    l.startsWith("Modalidad:") || l.startsWith("Monto adelantado:") ||
+    l.startsWith("Saldo pendiente:") || l.startsWith("Plazo")
+  );
+  const notasCliente = notasLineas.filter((l) => !notasPago.includes(l));
+
+  return (
+    <div className="space-y-4 text-sm">
+
+      {/* ── RUBROS ACTIVOS ── */}
+      <section>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+          Rubros
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {d.rubros.muebles && (
+            <span className="rounded-full bg-[var(--color-primary-soft)] px-3 py-1 text-xs font-semibold">
+              Muebles personalizados
+            </span>
+          )}
+          {d.rubros.aserradero && (
+            <span className="rounded-full bg-[var(--color-primary-soft)] px-3 py-1 text-xs font-semibold">
+              Aserradero / Mano de obra
+            </span>
+          )}
+          {d.rubros.alquiler && (
+            <span className="rounded-full bg-[var(--color-primary-soft)] px-3 py-1 text-xs font-semibold">
+              Alquiler de maquinaria
+            </span>
+          )}
+        </div>
+      </section>
+
+      {/* ── MUEBLES ── */}
+      {d.rubros.muebles && d.muebles_lineas.length > 0 && (
+        <section>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            Muebles — piezas y madera
+          </p>
+          <div className="space-y-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+            {d.muebles_lineas.map((linea, li) => {
+              const totalPt = linea.piezas.reduce(
+                (acc, p) => acc + (p.cantidad * p.espesor * p.ancho * p.largo) / 12,
+                0,
+              );
+              const ptCompra = totalPt * (1 + d.desperdicioPctMuebles / 100);
+              const montoLinea = ptCompra * linea.precioPorPt;
+              return (
+                <div key={linea.id} className="space-y-2">
+                  <p className="font-semibold text-[var(--color-text-primary)]">
+                    Línea {li + 1}{linea.especie_label ? ` · ${linea.especie_label}` : ""}
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-[var(--color-text-secondary)]">
+                    <span>PT neto: <strong className="text-[var(--color-text-primary)]">{totalPt.toFixed(2)}</strong></span>
+                    <span>Desperdicio: <strong className="text-[var(--color-text-primary)]">{d.desperdicioPctMuebles}%</strong></span>
+                    <span>PT compra: <strong className="text-[var(--color-text-primary)]">{ptCompra.toFixed(2)}</strong></span>
+                    <span>S/ por PT: <strong className="text-[var(--color-text-primary)]">{formatPen(linea.precioPorPt)}</strong></span>
+                    <span className="col-span-2">Subtotal línea: <strong className="text-[var(--color-text-primary)]">{formatPen(montoLinea)}</strong></span>
+                  </div>
+                  {linea.piezas.length > 0 && (
+                    <div className="rounded-lg border border-[var(--color-border)] overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead className="bg-[var(--color-primary-soft)]/30">
+                          <tr>
+                            <th className="px-2 py-1 text-left font-semibold">Pieza</th>
+                            <th className="px-2 py-1 text-center font-semibold">Cant.</th>
+                            <th className="px-2 py-1 text-center font-semibold">Esp.</th>
+                            <th className="px-2 py-1 text-center font-semibold">Ancho</th>
+                            <th className="px-2 py-1 text-center font-semibold">Largo</th>
+                            <th className="px-2 py-1 text-right font-semibold">PT</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {linea.piezas.map((p, pi) => {
+                            const pt = (p.cantidad * p.espesor * p.ancho * p.largo) / 12;
+                            return (
+                              <tr key={p.id} className={pi % 2 === 0 ? "" : "bg-[var(--color-primary-soft)]/10"}>
+                                <td className="px-2 py-1">{p.descripcion || `Pieza ${pi + 1}`}</td>
+                                <td className="px-2 py-1 text-center">{p.cantidad}</td>
+                                <td className="px-2 py-1 text-center">{p.espesor}"</td>
+                                <td className="px-2 py-1 text-center">{p.ancho}"</td>
+                                <td className="px-2 py-1 text-center">{p.largo}'</td>
+                                <td className="px-2 py-1 text-right font-semibold">{pt.toFixed(2)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {d.costoAcabadoSoles > 0 && (
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                Acabado: <strong className="text-[var(--color-text-primary)]">{formatPen(d.costoAcabadoSoles)}</strong>
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ── ASERRADERO ── */}
+      {d.rubros.aserradero && d.aserradero && (
+        <section>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            Aserradero / Mano de obra
+          </p>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-1 text-xs">
+            <p>Modo: <strong>{d.aserradero.modo === "hora" ? "Por tiempo" : "Monto fijo"}</strong></p>
+            {d.aserradero.modo === "hora" ? (
+              <>
+                <p>S/ por hora: <strong>{formatPen(d.aserradero.precioHora)}</strong></p>
+                <p>Horas: <strong>{d.aserradero.horas}</strong></p>
+                <p>Total: <strong>{formatPen(d.aserradero.precioHora * d.aserradero.horas)}</strong></p>
+              </>
+            ) : (
+              <p>Monto acordado: <strong>{formatPen(d.aserradero.montoTotalFijo)}</strong></p>
+            )}
+            {d.aserradero.descripcion && (
+              <p className="pt-1 text-[var(--color-text-secondary)]">{d.aserradero.descripcion}</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ── ALQUILER ── */}
+      {d.rubros.alquiler && d.alquiler && (
+        <section>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            Alquiler de maquinaria
+          </p>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-1 text-xs">
+            <p>Equipo: <strong>{d.alquiler.nombre_maquinaria || "—"}</strong></p>
+            <p>Tarifa: <strong>{formatPen(d.alquiler.tarifa)} / {d.alquiler.tarifaUnidad === "hora" ? "hora" : "día"}</strong></p>
+            <p>Tiempo: <strong>{d.alquiler.unidades_tiempo} {d.alquiler.tarifaUnidad === "hora" ? "h" : "día(s)"}</strong></p>
+            <p>Subtotal: <strong>{formatPen(d.alquiler.tarifa * d.alquiler.unidades_tiempo)}</strong></p>
+            {d.alquiler.incluye_garantia_danios && d.alquiler.monto_garantia > 0 && (
+              <p>Garantía: <strong>{formatPen(d.alquiler.monto_garantia)}</strong></p>
+            )}
+            {d.alquiler.notas && (
+              <p className="pt-1 text-[var(--color-text-secondary)]">{d.alquiler.notas}</p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ── CONDICIONES DE PAGO (desde notas) ── */}
+      {notasPago.length > 0 && (
+        <section>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            Condiciones de pago
+          </p>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-3 space-y-1">
+            {notasPago.map((l, i) => (
+              <p key={i} className="text-xs font-medium text-[var(--color-text-primary)]">{l}</p>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── DESCRIPCIÓN PARA EL CLIENTE ── */}
+      {(d as { descripcion_cliente?: string }).descripcion_cliente?.trim() && (
+        <section>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            Descripción para el cliente
+          </p>
+          <p className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-xs text-[var(--color-text-primary)]">
+            {(d as { descripcion_cliente?: string }).descripcion_cliente}
+          </p>
+        </section>
+      )}
+
+      {/* ── NOTAS ADICIONALES ── */}
+      {notasCliente.length > 0 && (
+        <section>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+            Notas adicionales
+          </p>
+          <ul className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 space-y-1 list-disc list-inside">
+            {notasCliente.map((n, i) => (
+              <li key={i} className="text-xs text-[var(--color-text-primary)]">{n}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
 
 export function CotizacionMasterDetail({ cotizaciones }: { cotizaciones: Cotizacion[] }) {
   const searchParams = useSearchParams();
@@ -59,7 +293,7 @@ export function CotizacionMasterDetail({ cotizaciones }: { cotizaciones: Cotizac
                 <TD className="font-mono text-xs">{row.correlativo ?? row.id.slice(0, 8)}</TD>
                 <TD>{formatDate(row.fecha)}</TD>
                 <TD>{row.cliente}</TD>
-                <TD>{row.estado_flujo}</TD>
+                <TD><EstadoBadge estado={row.estado_flujo} /></TD>
                 <TD className="text-right font-semibold">{formatPen(Number(row.total))}</TD>
               </TRow>
             ))}
@@ -80,24 +314,22 @@ export function CotizacionMasterDetail({ cotizaciones }: { cotizaciones: Cotizac
       >
         {selected ? (
           <div className="space-y-4">
-            <DetailField label="Cliente" value={selected.cliente} />
-            <DetailField label="Fecha" value={formatDate(selected.fecha)} />
-            <DetailField label="Estado" value={selected.estado_flujo} />
-            <DetailField label="Tipo cliente" value={selected.tipo_cliente} />
-            <DetailField label="Total" value={formatPen(Number(selected.total))} />
-            <DetailField label="Creada" value={formatDate(selected.created_at)} />
-            <section>
-              <h3 className="text-sm font-semibold">Items y detalle</h3>
-              <pre className="mt-2 max-h-64 overflow-auto rounded-lg border border-[var(--color-border)] bg-[var(--bg-surface)] p-3 text-xs">
-                {JSON.stringify(selected.detalle, null, 2)}
-              </pre>
-            </section>
-            <section>
-              <h3 className="text-sm font-semibold">Historial de cambios</h3>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                Creada el {formatDate(selected.created_at)}. El estado actual es {selected.estado_flujo}.
-              </p>
-            </section>
+            {/* Datos principales */}
+            <div className="grid grid-cols-2 gap-3">
+              <DetailField label="Cliente" value={selected.cliente} />
+              <DetailField label="Fecha" value={formatDate(selected.fecha)} />
+              <DetailField label="Tipo cliente" value={selected.tipo_cliente === "empresa" ? "Empresa" : "Persona natural"} />
+              <DetailField label="Total" value={formatPen(Number(selected.total))} />
+              <div className="col-span-2 space-y-1">
+                <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Estado</p>
+                <EstadoBadge estado={selected.estado_flujo} />
+              </div>
+              <DetailField label="Creada" value={formatDate(selected.created_at)} />
+            </div>
+
+            {/* Detalle visual legible */}
+            <DetalleVisual detalle={selected.detalle} />
+
             {editing ? (
               <Link href={`/cotizacion?editar=${selected.id}`} className="inline-flex">
                 Abrir formulario de edicion
