@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { IconX } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -27,7 +28,11 @@ export function DetailDrawer({
   onEdit,
   children,
 }: DetailDrawerProps) {
-  const asideRef = useRef<HTMLElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -42,19 +47,18 @@ export function DetailDrawer({
     };
   }, [onClose, open]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <>
-      {/* Backdrop — capa separada que no comparte stacking context con el aside */}
+      {/* Backdrop */}
       <div
         className="fixed inset-0 z-[199] bg-black/50"
         onClick={onClose}
         aria-hidden="true"
       />
-      {/* Drawer — z mayor que el backdrop, completamente aislado */}
+      {/* Drawer */}
       <aside
-        ref={asideRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="detail-drawer-title"
@@ -100,7 +104,8 @@ export function DetailDrawer({
           ) : null}
         </footer>
       </aside>
-    </>
+    </>,
+    document.body,
   );
 }
 
