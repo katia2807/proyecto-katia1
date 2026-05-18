@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { IconX } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,8 @@ export function DetailDrawer({
   onEdit,
   children,
 }: DetailDrawerProps) {
+  const asideRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -43,22 +45,24 @@ export function DetailDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[200]" style={{ isolation: "isolate" }}>
+    <>
+      {/* Backdrop — capa separada que no comparte stacking context con el aside */}
       <div
-        aria-label="Cerrar detalle"
-        className="absolute inset-0 bg-black/55 cursor-pointer"
+        className="fixed inset-0 z-[199] bg-black/50"
         onClick={onClose}
+        aria-hidden="true"
       />
+      {/* Drawer — z mayor que el backdrop, completamente aislado */}
       <aside
+        ref={asideRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="detail-drawer-title"
         className={cn(
-          "absolute right-0 top-0 flex h-full w-full flex-col border-l border-[var(--color-border)] bg-[var(--bg-card)] shadow-2xl pointer-events-auto",
-          "md:w-[680px] lg:w-[780px] translate-x-0 will-change-transform",
+          "fixed right-0 top-0 z-[200] flex h-full w-full flex-col",
+          "border-l border-[var(--color-border)] bg-[var(--bg-card)] shadow-2xl",
+          "md:w-[680px] lg:w-[780px]",
         )}
-        onMouseEnter={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-[var(--color-border)] p-5">
           <div className="min-w-0">
@@ -96,7 +100,7 @@ export function DetailDrawer({
           ) : null}
         </footer>
       </aside>
-    </div>
+    </>
   );
 }
 
