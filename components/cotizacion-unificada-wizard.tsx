@@ -366,6 +366,7 @@ export function CotizacionUnificadaWizard({
   const [pagoModalidadUI, setPagoModalidadUI] = useState<"" | "contado" | "adelanto" | "credito">("");
   const [plazoDiasUI, setPlazoDiasUI] = useState("15");
   const [plazoUnidadUI, setPlazoUnidadUI] = useState<"dias" | "meses">("dias");
+  const [montoAdelantoUI, setMontoAdelantoUI] = useState("");
   const [asrUnidadEspesorUI, setAsrUnidadEspesorUI] = useState<"" | "mm" | "cm" | "m" | "in" | "ft">("cm");
   const [asrUnidadAnchoUI, setAsrUnidadAnchoUI] = useState<"" | "mm" | "cm" | "m" | "in" | "ft">("cm");
   const [asrUnidadLargoUI, setAsrUnidadLargoUI] = useState<"" | "mm" | "cm" | "m" | "in" | "ft">("cm");
@@ -680,10 +681,6 @@ export function CotizacionUnificadaWizard({
       return { ...d, muebles_lineas: lineas };
     });
     setSelectedPiezaIndexUI(nextSelected);
-    // Limpiar campos de la calculadora después de agregar la pieza
-    setMedidaEspesorUI("");
-    setMedidaAnchoUI("");
-    setMedidaLargoUI("");
   }, [conversionMedidasUI.ancIn, conversionMedidasUI.espIn, conversionMedidasUI.larFt, selectedPiezaIndexSafe, selectedTipoMuebleLabel]);
 
   const removeSelectedPieza = useCallback(() => {
@@ -1629,19 +1626,6 @@ export function CotizacionUnificadaWizard({
                 Conversión: Espesor {conversionMedidasUI.espIn.toFixed(2)} in · Ancho {conversionMedidasUI.ancIn.toFixed(2)} in · Largo{" "}
                 {conversionMedidasUI.larFt.toFixed(2)} ft · PT ref: <strong>{conversionMedidasUI.pt.toFixed(2)}</strong>
               </p>
-              {/* PT acumulativo de todas las piezas guardadas */}
-              {piezasMuebleActual.length > 0 && (
-                <p className="text-xs font-semibold text-[var(--color-accent)]">
-                  PT acumulado (todas las piezas):{" "}
-                  <strong>
-                    {piezasMuebleActual
-                      .reduce((acc, p) => acc + (p.cantidad * p.espesor * p.ancho * p.largo) / 12, 0)
-                      .toFixed(2)}{" "}
-                    PT
-                  </strong>
-                  {" "}&nbsp;·&nbsp;{piezasMuebleActual.length} pieza{piezasMuebleActual.length !== 1 ? "s" : ""}
-                </p>
-              )}
               <p className="text-xs text-[var(--color-text-secondary)]">
                 Cada unidad se convierte automáticamente a pulgadas/pies para el cálculo.
               </p>
@@ -1779,6 +1763,37 @@ export function CotizacionUnificadaWizard({
                     <option value="dias">Días</option>
                     <option value="meses">Meses</option>
                   </select>
+                </div>
+              ) : null}
+              {pagoModalidadUI === "adelanto" ? (
+                <div className="space-y-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-3">
+                  <label className="block space-y-1">
+                    <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                      Monto de adelanto que deja el cliente (S/)
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      className={`${inputClass} h-11`}
+                      value={montoAdelantoUI}
+                      onChange={(e) => {
+                        setMontoAdelantoUI(e.target.value);
+                        setDetalle((d) => ({ ...d, monto_adelanto: Number(e.target.value) || 0 }));
+                      }}
+                      placeholder="Ej: 500.00"
+                    />
+                  </label>
+                  {montoAdelantoUI && Number(montoAdelantoUI) > 0 ? (
+                    <p className="text-xs font-semibold text-[var(--color-accent)]">
+                      Saldo pendiente:{" "}
+                      <strong>
+                        {formatPen(Math.max(0, totalGralSafe - (Number(montoAdelantoUI) || 0)))}
+                      </strong>
+                      {" "}de{" "}
+                      <strong>{formatPen(totalGralSafe)}</strong>
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -2514,7 +2529,25 @@ export function CotizacionUnificadaWizard({
               tipoCliente={tipoCliente}
               documentoCliente={documento.trim() || null}
               lineas={lineasFormalSafe}
-              notasGenerales={detalle.notas_generales}
+              notasGenerales={(() => {
+                const base = detalle.notas_generales;
+                if (pagoModalidadUI === "adelanto" && montoAdelantoUI && Number(montoAdelantoUI) > 0) {
+                  const adelanto = Number(montoAdelantoUI);
+                  const saldo = Math.max(0, totalGralSafe - adelanto);
+                  const lineasPago = [
+                    `Modalidad: Adelanto`,
+                    `Monto adelantado: S/ ${adelanto.toFixed(2)}`,
+                    `Saldo pendiente: S/ ${saldo.toFixed(2)}`,
+                    ...(plazoDiasUI ? [`Plazo para saldo: ${plazoDiasUI} ${plazoUnidadUI}`] : []),
+                  ].join("\n");
+                  return base ? `${base}\n${lineasPago}` : lineasPago;
+                }
+                if (pagoModalidadUI === "credito" && plazoDiasUI) {
+                  const lineaCredito = `Modalidad: Crédito · Plazo ${plazoDiasUI} ${plazoUnidadUI}`;
+                  return base ? `${base}\n${lineaCredito}` : lineaCredito;
+                }
+                return base;
+              })()}
               total={totalGral}
               empresa={empresa}
               embedded
