@@ -1606,11 +1606,29 @@ export function CotizacionUnificadaWizard({
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {(piezasMuebleActual.length > 0 ? piezasMuebleActual : [emptyPieza()]).map((_, idx) => (
+                  {(piezasMuebleActual.length > 0 ? piezasMuebleActual : [emptyPieza()]).map((pieza, idx) => (
                     <button
                       key={`pieza-pos-${idx}`}
                       type="button"
-                      onClick={() => setSelectedPiezaIndexUI(idx)}
+                      onClick={() => {
+                        setSelectedPiezaIndexUI(idx);
+                        // Convertir dimensiones de la pieza (guardadas en pulgadas/pies) a la unidad actual de la UI
+                        const espIn = pieza.espesor; // guardado en inches
+                        const ancIn = pieza.ancho;   // guardado en inches
+                        const larFt = pieza.largo;   // guardado en feet
+                        // Convertir a la unidad seleccionada en la UI
+                        const toUI = (valIn: number, unit: string, isFt?: boolean) => {
+                          const base = isFt ? valIn * 12 : valIn; // base en inches
+                          if (unit === "mm") return (isFt ? valIn * 304.8 : valIn * 25.4).toFixed(2);
+                          if (unit === "cm") return (isFt ? valIn * 30.48 : valIn * 2.54).toFixed(2);
+                          if (unit === "m") return (isFt ? valIn * 0.3048 : valIn * 0.0254).toFixed(4);
+                          if (unit === "ft") return (isFt ? valIn : valIn / 12).toFixed(3);
+                          return (isFt ? valIn * 12 : valIn).toFixed(2); // in
+                        };
+                        setMedidaEspesorUI(toUI(espIn, unidadEspesorUI));
+                        setMedidaAnchoUI(toUI(ancIn, unidadAnchoUI));
+                        setMedidaLargoUI(toUI(larFt, unidadLargoUI, true));
+                      }}
                       className={`rounded-md border px-2 py-1 text-xs font-semibold ${
                         idx === selectedPiezaIndexSafe
                           ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)]"
