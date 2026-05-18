@@ -43,11 +43,10 @@ export function DetailDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[200]">
-      <button
-        type="button"
+    <div className="fixed inset-0 z-[200]" style={{ isolation: "isolate" }}>
+      <div
         aria-label="Cerrar detalle"
-        className="absolute inset-0 bg-black/55"
+        className="absolute inset-0 bg-black/55 cursor-pointer"
         onClick={onClose}
       />
       <aside
@@ -55,9 +54,11 @@ export function DetailDrawer({
         aria-modal="true"
         aria-labelledby="detail-drawer-title"
         className={cn(
-          "absolute right-0 top-0 flex h-full w-full flex-col border-l border-[var(--color-border)] bg-[var(--bg-card)] shadow-2xl",
-          "md:w-[680px] lg:w-[780px]",
+          "absolute right-0 top-0 flex h-full w-full flex-col border-l border-[var(--color-border)] bg-[var(--bg-card)] shadow-2xl pointer-events-auto",
+          "md:w-[680px] lg:w-[780px] translate-x-0 will-change-transform",
         )}
+        onMouseEnter={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-[var(--color-border)] p-5">
           <div className="min-w-0">
