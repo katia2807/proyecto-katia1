@@ -63,7 +63,7 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
             placeholder="ABC-123"
             className="md:col-span-2"
           />
-          <input type="hidden" name="return_to" value="/ventas" />
+          <input type="hidden" name="return_to" value="/ventas/clientes?tab=base_datos" />
           <div className="md:col-span-2">
             <Button>Guardar chofer</Button>
           </div>

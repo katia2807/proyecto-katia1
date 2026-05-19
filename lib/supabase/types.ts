@@ -1043,7 +1043,7 @@ export type Database = {
           correlativo: string | null;
           tipo_cliente: "natural" | "empresa";
           total: number;
-          estado_flujo: "pendiente" | "lista_produccion" | "en_produccion" | "cobrada";
+          estado_flujo: "pendiente" | "lista_produccion" | "en_produccion" | "terminado" | "entregado" | "cobrada";
           detalle: Json;
           created_at: string;
         };
@@ -1055,7 +1055,7 @@ export type Database = {
           correlativo?: string | null;
           tipo_cliente: "natural" | "empresa";
           total?: number;
-          estado_flujo?: "pendiente" | "lista_produccion" | "en_produccion" | "cobrada";
+          estado_flujo?: "pendiente" | "lista_produccion" | "en_produccion" | "terminado" | "entregado" | "cobrada";
           detalle?: Json;
           created_at?: string;
         };
@@ -1064,7 +1064,7 @@ export type Database = {
           correlativo?: string | null;
           tipo_cliente?: "natural" | "empresa";
           total?: number;
-          estado_flujo?: "pendiente" | "lista_produccion" | "en_produccion" | "cobrada";
+          estado_flujo?: "pendiente" | "lista_produccion" | "en_produccion" | "terminado" | "entregado" | "cobrada";
           detalle?: Json;
         };
       };

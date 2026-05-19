@@ -503,7 +503,7 @@ export function CotizacionUnificadaWizard({
   const [asrMedidaLargoUI, setAsrMedidaLargoUI] = useState("");
   const [filterText, setFilterText] = useState("");
   const [filterEstado, setFilterEstado] = useState<
-    "todos" | "pendiente" | "lista_produccion" | "produccion" | "cobrada"
+    "todos" | "pendiente" | "lista_produccion" | "produccion" | "terminado" | "entregado" | "cobrada"
   >("todos");
   const [filterFechaDesde, setFilterFechaDesde] = useState("");
   const [filterFechaHasta, setFilterFechaHasta] = useState("");
@@ -3027,6 +3027,8 @@ export function CotizacionUnificadaWizard({
                     | "pendiente"
                     | "lista_produccion"
                     | "produccion"
+                    | "terminado"
+                    | "entregado"
                     | "cobrada",
                 )
               }
@@ -3034,7 +3036,9 @@ export function CotizacionUnificadaWizard({
               <option value="todos">Todos</option>
               <option value="pendiente">Pendiente</option>
               <option value="lista_produccion">Lista producción</option>
-              <option value="produccion">Producción</option>
+              <option value="produccion">En producción</option>
+              <option value="terminado">Terminado</option>
+              <option value="entregado">Entregado</option>
               <option value="cobrada">Cobrada</option>
             </select>
           </label>
