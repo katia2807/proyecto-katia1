@@ -782,27 +782,26 @@ export function CotizacionUnificadaWizard({
   );
 
   const addPiezaDesdeDimensiones = useCallback(() => {
-    let nextSelected = selectedPiezaIndexSafe;
+    const insertAt = piezasMuebleActual.length === 0 ? 0 : Math.min(Math.max(0, selectedPiezaIndexSafe), piezasMuebleActual.length - 1) + 1;
+
     setDetalle((d) => {
       const lineas = d.muebles_lineas.length > 0 ? [...d.muebles_lineas] : [emptyLineaMadera()];
       const first = lineas[0];
       const piezas = first.piezas.length > 0 ? [...first.piezas] : [emptyPieza()];
-      const insertAt = piezas.length === 0 ? 0 : Math.min(Math.max(0, selectedPiezaIndexSafe), piezas.length - 1) + 1;
       const nueva = {
         ...emptyPieza(),
         descripcion: selectedTipoMuebleLabel !== "Mueble" ? selectedTipoMuebleLabel : "Pieza",
       };
       piezas.splice(insertAt, 0, nueva);
       lineas[0] = { ...first, piezas };
-      nextSelected = insertAt;
       return { ...d, muebles_lineas: lineas };
     });
     // Limpiar campos UI para que la nueva pieza inicie desde cero
     setMedidaEspesorUI("");
     setMedidaAnchoUI("");
     setMedidaLargoUI("");
-    setSelectedPiezaIndexUI(nextSelected);
-  }, [selectedPiezaIndexSafe, selectedTipoMuebleLabel]);
+    setSelectedPiezaIndexUI(insertAt);
+  }, [piezasMuebleActual.length, selectedPiezaIndexSafe, selectedTipoMuebleLabel]);
 
   const removeSelectedPieza = useCallback(() => {
     // Calcular sincrónicamente desde el estado actual (acción de usuario, no concurrente)
