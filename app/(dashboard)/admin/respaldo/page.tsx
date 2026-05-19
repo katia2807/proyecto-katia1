@@ -84,30 +84,6 @@ export default async function RespaldoPage() {
           </div>
         </Card>
 
-        <Card className="border-[var(--katia-danger)]/50">
-          <CardTitle className="text-[var(--katia-danger)]">Resetear datos para entrega limpia</CardTitle>
-          <CardDescription className="leading-relaxed">
-            Borra todos los datos operativos (ventas, caja, inventario, clientes, cotizaciones) de esta organización
-            y deja el sistema limpio para entregarlo al cliente. <strong>No borra</strong> usuarios, configuración de empresa
-            ni estructura de base de datos.
-          </CardDescription>
-          <details className="mt-4">
-            <summary className="cursor-pointer text-sm font-semibold text-[var(--katia-danger)]">
-              Abrir opciones de reset (solo owner_admin)
-            </summary>
-            <div className="mt-4 space-y-4">
-              <div className="rounded-[var(--katia-radius-md)] border border-[var(--katia-danger)]/30 bg-[var(--katia-danger)]/5 px-4 py-3 text-sm text-[var(--katia-danger)]">
-                ⚠ Esta acción es irreversible. Asegúrate de tener un respaldo antes de continuar.
-              </div>
-              <p className="text-xs text-[var(--katia-text-secondary)]">
-                Usa las RPC <code>reset_datos_operativos</code> y <code>seed_datos_bienvenida</code> desde el panel de
-                Supabase o desde la API de administración de tu proyecto para ejecutar el reset controlado.
-                La migración <code>20260520_001_reset_entrega_limpia.sql</code> ya las tiene definidas.
-              </p>
-            </div>
-          </details>
-        </Card>
-
         <Card>
           <CardTitle>Panel de Supabase</CardTitle>
           <CardDescription className="leading-relaxed">
