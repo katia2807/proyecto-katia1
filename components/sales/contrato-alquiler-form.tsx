@@ -27,6 +27,14 @@ const tarifas = [
   { value: "dia", label: "Por día" },
 ] as const;
 
+/** Etiqueta dinámica según la unidad de tarifa seleccionada */
+function labelCantidad(tarifaUnidad: string): string {
+  if (tarifaUnidad === "hora_maquina") return "Cantidad de horas";
+  if (tarifaUnidad === "m3") return "Cantidad de m³";
+  if (tarifaUnidad === "dia") return "Cantidad de días";
+  return "Cantidad de unidades";
+}
+
 export function ContratoAlquilerForm({
   clientes,
   mockData = false,
@@ -41,9 +49,8 @@ export function ContratoAlquilerForm({
   );
 
   const montoTotal = useMemo(() => {
-    if (tarifaUnidad === "dia") return tarifa * dias;
     return tarifa * dias;
-  }, [tarifa, dias, tarifaUnidad]);
+  }, [tarifa, dias]);
 
   const deposito30 = useMemo(() => Number((montoTotal * 0.3).toFixed(2)), [montoTotal]);
 
@@ -111,7 +118,7 @@ export function ContratoAlquilerForm({
           </SelectField>
           <Field
             name="tarifa"
-            label="Tarifa (S/)"
+            label={`Tarifa (S/ por ${tarifaUnidad === "hora_maquina" ? "hora" : tarifaUnidad === "m3" ? "m³" : "día"})`}
             type="number"
             min="0"
             step="0.01"
@@ -121,7 +128,7 @@ export function ContratoAlquilerForm({
           />
           <Field
             name="dias_alquiler"
-            label={tarifaUnidad === "dia" ? "Días" : "Cantidad de unidades"}
+            label={labelCantidad(tarifaUnidad)}
             type="number"
             min="1"
             step="1"
