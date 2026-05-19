@@ -208,6 +208,26 @@ function toFeet(value: number, unit: "" | "mm" | "cm" | "m" | "in" | "ft") {
   return value;
 }
 
+/** Convierte pulgadas (valor almacenado) a la unidad de UI elegida */
+function inchesToUI(valueIn: number, unit: "" | "mm" | "cm" | "m" | "in" | "ft") {
+  if (!Number.isFinite(valueIn) || valueIn <= 0) return "";
+  if (unit === "mm") return String(round2(valueIn * 25.4));
+  if (unit === "cm") return String(round2(valueIn * 2.54));
+  if (unit === "m") return String(round2(valueIn / 39.37007874));
+  if (unit === "ft") return String(round2(valueIn / 12));
+  return String(round2(valueIn));
+}
+
+/** Convierte pies (valor almacenado) a la unidad de UI elegida */
+function feetToUI(valueFt: number, unit: "" | "mm" | "cm" | "m" | "in" | "ft") {
+  if (!Number.isFinite(valueFt) || valueFt <= 0) return "";
+  if (unit === "mm") return String(round2(valueFt * 304.8));
+  if (unit === "cm") return String(round2(valueFt * 30.48));
+  if (unit === "m") return String(round2(valueFt / 3.280839895));
+  if (unit === "in") return String(round2(valueFt * 12));
+  return String(round2(valueFt));
+}
+
 function isWoodCategory(categoria: string | null | undefined) {
   const c = (categoria ?? "").trim().toLowerCase();
   return c === "madera" || c.includes("madera");
@@ -311,6 +331,114 @@ function loadDraftFromStorage(): CotizacionDraft | null {
     return null;
   }
 }
+
+// ─── Componente auxiliar: nuevo cliente rápido dentro del wizard ─────────────
+function NuevoClienteRapidoInline({
+  onCreated,
+}: {
+  onCreated: (nombre: string, documento: string, telefono: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [nombre, setNombre] = useState("");
+  const [documento, setDocumento] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--color-accent)] transition hover:bg-[var(--color-accent)] hover:text-[var(--color-on-accent)]"
+      >
+        + Nuevo cliente rápido
+      </button>
+    );
+  }
+
+  async function handleSave() {
+    if (!nombre.trim()) { setErr("El nombre es obligatorio."); return; }
+    setLoading(true);
+    setErr("");
+    try {
+      const res = await createClienteCotizacionRapida({
+        nombre: nombre.trim(),
+        documento: documento.trim(),
+        telefono: telefono.trim(),
+        direccion: "",
+        tipoPersona: "natural",
+      });
+      if (!res.ok) { setErr(res.error); return; }
+      onCreated(nombre.trim(), documento.trim(), telefono.trim());
+      setNombre(""); setDocumento(""); setTelefono("");
+      setOpen(false);
+    } catch {
+      setErr("Error al crear el cliente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="w-full rounded-2xl border border-[var(--color-accent)]/40 bg-[var(--color-primary-soft)]/30 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-sm font-semibold text-[var(--color-text-primary)]">Agregar nuevo cliente</p>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setErr(""); }}
+          className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+        >
+          Cancelar
+        </button>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <label className="space-y-1 sm:col-span-3">
+          <span className="text-xs font-medium text-[var(--color-text-secondary)]">Nombre *</span>
+          <input
+            className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Ej: María Quispe"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-xs font-medium text-[var(--color-text-secondary)]">DNI / Documento</span>
+          <input
+            className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+            value={documento}
+            onChange={(e) => setDocumento(e.target.value)}
+            placeholder="DNI"
+            inputMode="numeric"
+            maxLength={11}
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="text-xs font-medium text-[var(--color-text-secondary)]">Teléfono</span>
+          <input
+            className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+            value={telefono}
+            onChange={(e) => setTelefono(e.target.value)}
+            placeholder="999 999 999"
+          />
+        </label>
+        <div className="flex items-end">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={handleSave}
+            className="h-10 w-full rounded-xl bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-on-accent)] transition hover:brightness-110 disabled:opacity-50"
+          >
+            {loading ? "Guardando…" : "Guardar cliente"}
+          </button>
+        </div>
+      </div>
+      {err ? <p className="mt-2 text-xs text-[var(--color-danger)]">{err}</p> : null}
+      <p className="mt-2 text-[11px] text-[var(--color-text-secondary)]">El cliente se registra en la base de datos. Puedes completar más datos luego en la sección Clientes.</p>
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function CotizacionUnificadaWizard({
   canSave,
@@ -615,52 +743,50 @@ export function CotizacionUnificadaWizard({
     }
   }, [clienteId, clientesFiltrados]);
 
-  useEffect(() => {
-    if (!(tipoCotizacionPreset === "muebles" || tipoCotizacionPreset === "general")) return;
-    const precioPt = Number(precioVentaPtUI) || 0;
-    const selectedMadera = effectiveProductos.find((p) => p.id === tipoMaderaUI) ?? null;
-    const timer = window.setTimeout(() => {
+  /**
+   * Carga los valores de una pieza (almacenados en in/ft) a los campos UI
+   * respetando la unidad de UI actual. Se llama al seleccionar una pieza existente.
+   */
+  const loadPiezaToUI = useCallback(
+    (pieza: MuebleLineaPieza) => {
+      setMedidaEspesorUI(inchesToUI(pieza.espesor, unidadEspesorUI));
+      setMedidaAnchoUI(inchesToUI(pieza.ancho, unidadAnchoUI));
+      setMedidaLargoUI(feetToUI(pieza.largo, unidadLargoUI));
+    },
+    [unidadAnchoUI, unidadEspesorUI, unidadLargoUI],
+  );
+
+  /**
+   * Actualiza solo la pieza actualmente seleccionada en detalle con
+   * los valores convertidos de los campos UI. Se llama inline en onChange
+   * de cada campo de medida.
+   */
+  const syncCurrentPiezaToDetalle = useCallback(
+    (espIn: number, ancIn: number, larFt: number) => {
       setDetalle((d) => {
+        if (!(d.rubros.muebles)) return d;
         const lineas = d.muebles_lineas.length > 0 ? [...d.muebles_lineas] : [emptyLineaMadera()];
         const first = lineas[0];
         const piezas = first.piezas.length > 0 ? [...first.piezas] : [emptyPieza()];
-        const idx = Math.min(Math.max(0, selectedPiezaIndexSafe), Math.max(0, piezas.length - 1));
+        const idx = Math.min(Math.max(0, selectedPiezaIndexUI), Math.max(0, piezas.length - 1));
         const piezaBase = piezas[idx] ?? emptyPieza();
         piezas[idx] = {
           ...piezaBase,
-          descripcion: selectedTipoMuebleLabel !== "Mueble" ? selectedTipoMuebleLabel : "Pieza",
-          cantidad: 1,
-          espesor: round2(conversionMedidasUI.espIn),
-          ancho: round2(conversionMedidasUI.ancIn),
-          largo: round2(conversionMedidasUI.larFt),
+          espesor: round2(espIn),
+          ancho: round2(ancIn),
+          largo: round2(larFt),
         };
-        lineas[0] = {
-          ...first,
-          inventario_producto_id: selectedMadera?.id ?? first.inventario_producto_id,
-          especie_label: selectedMadera?.nombre ?? first.especie_label,
-          precioPorPt: precioPt,
-          piezas,
-        };
+        lineas[0] = { ...first, piezas };
         return { ...d, muebles_lineas: lineas };
       });
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [
-    conversionMedidasUI.ancIn,
-    conversionMedidasUI.espIn,
-    conversionMedidasUI.larFt,
-    precioVentaPtUI,
-    effectiveProductos,
-    selectedTipoMuebleLabel,
-    selectedPiezaIndexSafe,
-    tipoCotizacionPreset,
-    tipoMaderaUI,
-    unidadAnchoUI,
-    unidadEspesorUI,
-    unidadLargoUI,
-  ]);
+    },
+    [selectedPiezaIndexUI],
+  );
 
   const addPiezaDesdeDimensiones = useCallback(() => {
+    const espIn = toInches(Number(medidaEspesorUI) || 0, unidadEspesorUI);
+    const ancIn = toInches(Number(medidaAnchoUI) || 0, unidadAnchoUI);
+    const larFt = toFeet(Number(medidaLargoUI) || 0, unidadLargoUI);
     let nextSelected = selectedPiezaIndexSafe;
     setDetalle((d) => {
       const lineas = d.muebles_lineas.length > 0 ? [...d.muebles_lineas] : [emptyLineaMadera()];
@@ -671,37 +797,64 @@ export function CotizacionUnificadaWizard({
         ...emptyPieza(),
         descripcion: selectedTipoMuebleLabel !== "Mueble" ? selectedTipoMuebleLabel : "Pieza",
         cantidad: 1,
-        espesor: round2(conversionMedidasUI.espIn),
-        ancho: round2(conversionMedidasUI.ancIn),
-        largo: round2(conversionMedidasUI.larFt),
+        espesor: round2(espIn),
+        ancho: round2(ancIn),
+        largo: round2(larFt),
       };
       piezas.splice(insertAt, 0, nueva);
       lineas[0] = { ...first, piezas };
       nextSelected = insertAt;
       return { ...d, muebles_lineas: lineas };
     });
+    // Limpiar campos UI para que la nueva pieza inicie desde cero
+    setMedidaEspesorUI("");
+    setMedidaAnchoUI("");
+    setMedidaLargoUI("");
     setSelectedPiezaIndexUI(nextSelected);
-  }, [conversionMedidasUI.ancIn, conversionMedidasUI.espIn, conversionMedidasUI.larFt, selectedPiezaIndexSafe, selectedTipoMuebleLabel]);
+  }, [medidaAnchoUI, medidaEspesorUI, medidaLargoUI, selectedPiezaIndexSafe, selectedTipoMuebleLabel, unidadAnchoUI, unidadEspesorUI, unidadLargoUI]);
 
   const removeSelectedPieza = useCallback(() => {
-    let nextSelected = 0;
+    // Calcular sincrónicamente desde el estado actual (acción de usuario, no concurrente)
+    const currentPiezas = detalle.muebles_lineas[0]?.piezas ?? [];
+    const idx = Math.min(Math.max(0, selectedPiezaIndexSafe), Math.max(0, currentPiezas.length - 1));
+
+    if (currentPiezas.length <= 1) {
+      // Solo queda una pieza → limpiar campos y resetear
+      const empty = emptyPieza();
+      setDetalle((d) => {
+        const lineas = d.muebles_lineas.length > 0 ? [...d.muebles_lineas] : [emptyLineaMadera()];
+        const first = lineas[0];
+        lineas[0] = { ...first, piezas: [empty] };
+        return { ...d, muebles_lineas: lineas };
+      });
+      setSelectedPiezaIndexUI(0);
+      setMedidaEspesorUI("");
+      setMedidaAnchoUI("");
+      setMedidaLargoUI("");
+      return;
+    }
+
+    const nextSelected = Math.max(0, idx - 1);
+    const piezasSinEliminada = currentPiezas.filter((_, i) => i !== idx);
+    const nextPieza = piezasSinEliminada[nextSelected] ?? null;
+
     setDetalle((d) => {
       const lineas = d.muebles_lineas.length > 0 ? [...d.muebles_lineas] : [emptyLineaMadera()];
       const first = lineas[0];
-      const piezas = first.piezas.length > 0 ? [...first.piezas] : [emptyPieza()];
-      const idx = Math.min(Math.max(0, selectedPiezaIndexSafe), piezas.length - 1);
-      if (piezas.length <= 1) {
-        lineas[0] = { ...first, piezas: [emptyPieza()] };
-        nextSelected = 0;
-        return { ...d, muebles_lineas: lineas };
-      }
+      const piezas = [...(first.piezas.length > 0 ? first.piezas : [emptyPieza()])];
       piezas.splice(idx, 1);
       lineas[0] = { ...first, piezas };
-      nextSelected = Math.max(0, idx - 1);
       return { ...d, muebles_lineas: lineas };
     });
+
     setSelectedPiezaIndexUI(nextSelected);
-  }, [selectedPiezaIndexSafe]);
+    // Cargar dimensiones de la pieza que queda seleccionada
+    if (nextPieza) {
+      setMedidaEspesorUI(inchesToUI(nextPieza.espesor, unidadEspesorUI));
+      setMedidaAnchoUI(inchesToUI(nextPieza.ancho, unidadAnchoUI));
+      setMedidaLargoUI(feetToUI(nextPieza.largo, unidadLargoUI));
+    }
+  }, [detalle.muebles_lineas, selectedPiezaIndexSafe, unidadAnchoUI, unidadEspesorUI, unidadLargoUI]);
 
   const applyMuebleTemplate = useCallback(
     (templateId: string) => {
@@ -1242,6 +1395,27 @@ export function CotizacionUnificadaWizard({
     else if (d.rubros.aserradero) setTipoCotizacionPreset("aserradero");
     else if (d.rubros.alquiler) setTipoCotizacionPreset("alquiler");
     else setTipoCotizacionPreset("muebles");
+    // Restaurar campos UI de dimensiones desde la primera pieza guardada
+    if (d.rubros.muebles && d.muebles_lineas.length > 0) {
+      const primeraLinea = d.muebles_lineas[0];
+      const primeraPieza = primeraLinea.piezas[0];
+      if (primeraPieza) {
+        // Usamos cm como unidad por defecto al cargar (los valores están en in/ft)
+        setUnidadEspesorUI("cm");
+        setUnidadAnchoUI("cm");
+        setUnidadLargoUI("cm");
+        setMedidaEspesorUI(inchesToUI(primeraPieza.espesor, "cm"));
+        setMedidaAnchoUI(inchesToUI(primeraPieza.ancho, "cm"));
+        setMedidaLargoUI(feetToUI(primeraPieza.largo, "cm"));
+      }
+      if (primeraLinea.precioPorPt > 0) {
+        setPrecioVentaPtUI(String(primeraLinea.precioPorPt));
+      }
+      if (primeraLinea.inventario_producto_id) {
+        setTipoMaderaUI(primeraLinea.inventario_producto_id);
+      }
+    }
+    setSelectedPiezaIndexUI(0);
     setStepIndex(0);
     setMaxStep(30);
     setError("");
@@ -1397,6 +1571,15 @@ export function CotizacionUnificadaWizard({
       {currentStepId === "cliente" ? (
         <Card className={`${panelClass} space-y-5 border-none`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
+            <p className="text-xs text-[var(--color-text-secondary)]">¿Cliente nuevo?</p>
+            <NuevoClienteRapidoInline
+              onCreated={(nombre, documento, telefono) => {
+                setNombreCliente(nombre);
+                setDocumento(documento);
+                setTelefono(telefono);
+                setClienteId(null); // aún no tiene ID en DB hasta guardar
+              }}
+            />
           </div>
           <CardTitle className="text-center text-2xl font-extrabold">Datos del cliente</CardTitle>
           <div className="grid gap-3 md:grid-cols-2">
@@ -1546,11 +1729,47 @@ export function CotizacionUnificadaWizard({
               <div className="grid grid-cols-3 gap-2 pt-1">
                 {(
                   [
-                    ["Espesor", unidadEspesorUI, setUnidadEspesorUI, medidaEspesorUI, setMedidaEspesorUI],
-                    ["Ancho", unidadAnchoUI, setUnidadAnchoUI, medidaAnchoUI, setMedidaAnchoUI],
-                    ["Largo", unidadLargoUI, setUnidadLargoUI, medidaLargoUI, setMedidaLargoUI],
+                    {
+                      label: "Espesor",
+                      unidad: unidadEspesorUI,
+                      setUnidad: setUnidadEspesorUI,
+                      medida: medidaEspesorUI,
+                      setMedida: (v: string) => {
+                        setMedidaEspesorUI(v);
+                        const espIn = toInches(Number(v) || 0, unidadEspesorUI);
+                        const ancIn = toInches(Number(medidaAnchoUI) || 0, unidadAnchoUI);
+                        const larFt = toFeet(Number(medidaLargoUI) || 0, unidadLargoUI);
+                        syncCurrentPiezaToDetalle(espIn, ancIn, larFt);
+                      },
+                    },
+                    {
+                      label: "Ancho",
+                      unidad: unidadAnchoUI,
+                      setUnidad: setUnidadAnchoUI,
+                      medida: medidaAnchoUI,
+                      setMedida: (v: string) => {
+                        setMedidaAnchoUI(v);
+                        const espIn = toInches(Number(medidaEspesorUI) || 0, unidadEspesorUI);
+                        const ancIn = toInches(Number(v) || 0, unidadAnchoUI);
+                        const larFt = toFeet(Number(medidaLargoUI) || 0, unidadLargoUI);
+                        syncCurrentPiezaToDetalle(espIn, ancIn, larFt);
+                      },
+                    },
+                    {
+                      label: "Largo",
+                      unidad: unidadLargoUI,
+                      setUnidad: setUnidadLargoUI,
+                      medida: medidaLargoUI,
+                      setMedida: (v: string) => {
+                        setMedidaLargoUI(v);
+                        const espIn = toInches(Number(medidaEspesorUI) || 0, unidadEspesorUI);
+                        const ancIn = toInches(Number(medidaAnchoUI) || 0, unidadAnchoUI);
+                        const larFt = toFeet(Number(v) || 0, unidadLargoUI);
+                        syncCurrentPiezaToDetalle(espIn, ancIn, larFt);
+                      },
+                    },
                   ] as const
-                ).map(([label, unidad, setUnidad, medida, setMedida]) => (
+                ).map(({ label, unidad, setUnidad, medida, setMedida }) => (
                   <div key={label} className="space-y-1">
                     <div className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] py-2 text-center text-sm font-extrabold text-[var(--color-text-primary)]">
                       {label}
@@ -1558,7 +1777,24 @@ export function CotizacionUnificadaWizard({
                     <select
                       className={inputClass + " h-10"}
                       value={unidad}
-                      onChange={(e) => setUnidad(e.target.value as "" | "mm" | "cm" | "m" | "in" | "ft")}
+                      onChange={(e) => {
+                        const newUnit = e.target.value as "" | "mm" | "cm" | "m" | "in" | "ft";
+                        // Al cambiar unidad, recalcular el valor de texto en la nueva unidad
+                        // pero mantener el valor almacenado (en in/ft) igual.
+                        if (label === "Espesor") {
+                          const valIn = toInches(Number(medidaEspesorUI) || 0, unidadEspesorUI);
+                          setUnidadEspesorUI(newUnit);
+                          setMedidaEspesorUI(inchesToUI(valIn, newUnit));
+                        } else if (label === "Ancho") {
+                          const valIn = toInches(Number(medidaAnchoUI) || 0, unidadAnchoUI);
+                          setUnidadAnchoUI(newUnit);
+                          setMedidaAnchoUI(inchesToUI(valIn, newUnit));
+                        } else {
+                          const valFt = toFeet(Number(medidaLargoUI) || 0, unidadLargoUI);
+                          setUnidadLargoUI(newUnit);
+                          setMedidaLargoUI(feetToUI(valFt, newUnit));
+                        }
+                      }}
                       aria-label={`Unidad ${label}`}
                     >
                       <option value="mm">mm</option>
@@ -1614,8 +1850,8 @@ export function CotizacionUnificadaWizard({
                       type="button"
                       onClick={() => {
                         setSelectedPiezaIndexUI(idx);
-                        // Al cambiar de pieza los campos se mantienen
-                        // Solo se limpian al presionar + Agregar
+                        // Al seleccionar una pieza, cargar sus valores al UI
+                        loadPiezaToUI(pieza);
                       }}
                       className={`rounded-md border px-2 py-1 text-xs font-semibold ${
                         idx === selectedPiezaIndexSafe
@@ -2116,7 +2352,18 @@ export function CotizacionUnificadaWizard({
                   min={0}
                   className={`${inputClass} mt-3 h-11 text-center`}
                   value={precioVentaPtUI}
-                  onChange={(e) => setPrecioVentaPtUI(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPrecioVentaPtUI(val);
+                    const precioPt = Number(val) || 0;
+                    // Persistir precioPorPt en la primera línea de madera
+                    setDetalle((d) => {
+                      if (!d.rubros.muebles || d.muebles_lineas.length === 0) return d;
+                      const lineas = [...d.muebles_lineas];
+                      lineas[0] = { ...lineas[0], precioPorPt: precioPt };
+                      return { ...d, muebles_lineas: lineas };
+                    });
+                  }}
                   placeholder="S/ por pie"
                 />
                 <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
