@@ -466,7 +466,12 @@ export function CotizacionUnificadaWizard({
   const [direccion, setDireccion] = useState("");
   const [clienteId, setClienteId] = useState<string | null>(null);
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
-  const [detalle, setDetalle] = useState<CotizacionDetalleV1>(() => defaultCotizacionDetalleV1());
+  const [detalle, setDetalle] = useState<CotizacionDetalleV1>(() => {
+    const d = defaultCotizacionDetalleV1();
+    d.rubros.muebles = true;
+    d.muebles_lineas = [emptyLineaMadera()];
+    return d;
+  });
   const [guardadaId, setGuardadaId] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [maxStep, setMaxStep] = useState(0);
@@ -1036,6 +1041,12 @@ export function CotizacionUnificadaWizard({
     setDireccion("");
     setTipoCliente("natural");
     setTipoCotizacionPreset("muebles");
+    setDetalle(() => {
+      const d = defaultCotizacionDetalleV1();
+      d.rubros.muebles = true;
+      d.muebles_lineas = [emptyLineaMadera()];
+      return d;
+    });
     setUnidadEspesorUI("cm");
     setUnidadAnchoUI("cm");
     setUnidadLargoUI("cm");
