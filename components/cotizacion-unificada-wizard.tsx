@@ -762,7 +762,7 @@ export function CotizacionUnificadaWizard({
    * de cada campo de medida.
    */
   const syncCurrentPiezaToDetalle = useCallback(
-    (espIn: number, ancIn: number, larFt: number) => {
+    (updates: Partial<{ espesor: number; ancho: number; largo: number }>) => {
       setDetalle((d) => {
         if (!(d.rubros.muebles)) return d;
         const lineas = d.muebles_lineas.length > 0 ? [...d.muebles_lineas] : [emptyLineaMadera()];
@@ -772,9 +772,7 @@ export function CotizacionUnificadaWizard({
         const piezaBase = piezas[idx] ?? emptyPieza();
         piezas[idx] = {
           ...piezaBase,
-          espesor: round2(espIn),
-          ancho: round2(ancIn),
-          largo: round2(larFt),
+          ...updates,
         };
         lineas[0] = { ...first, piezas };
         return { ...d, muebles_lineas: lineas };
@@ -1730,9 +1728,7 @@ export function CotizacionUnificadaWizard({
                       setMedida: (v: string) => {
                         setMedidaEspesorUI(v);
                         const espIn = toInches(Number(v) || 0, unidadEspesorUI);
-                        const ancIn = toInches(Number(medidaAnchoUI) || 0, unidadAnchoUI);
-                        const larFt = toFeet(Number(medidaLargoUI) || 0, unidadLargoUI);
-                        syncCurrentPiezaToDetalle(espIn, ancIn, larFt);
+                        syncCurrentPiezaToDetalle({ espesor: round2(espIn) });
                       },
                     },
                     {
@@ -1742,10 +1738,8 @@ export function CotizacionUnificadaWizard({
                       medida: medidaAnchoUI,
                       setMedida: (v: string) => {
                         setMedidaAnchoUI(v);
-                        const espIn = toInches(Number(medidaEspesorUI) || 0, unidadEspesorUI);
                         const ancIn = toInches(Number(v) || 0, unidadAnchoUI);
-                        const larFt = toFeet(Number(medidaLargoUI) || 0, unidadLargoUI);
-                        syncCurrentPiezaToDetalle(espIn, ancIn, larFt);
+                        syncCurrentPiezaToDetalle({ ancho: round2(ancIn) });
                       },
                     },
                     {
@@ -1755,10 +1749,8 @@ export function CotizacionUnificadaWizard({
                       medida: medidaLargoUI,
                       setMedida: (v: string) => {
                         setMedidaLargoUI(v);
-                        const espIn = toInches(Number(medidaEspesorUI) || 0, unidadEspesorUI);
-                        const ancIn = toInches(Number(medidaAnchoUI) || 0, unidadAnchoUI);
                         const larFt = toFeet(Number(v) || 0, unidadLargoUI);
-                        syncCurrentPiezaToDetalle(espIn, ancIn, larFt);
+                        syncCurrentPiezaToDetalle({ largo: round2(larFt) });
                       },
                     },
                   ] as const
