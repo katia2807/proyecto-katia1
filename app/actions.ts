@@ -1272,7 +1272,7 @@ export async function deleteCotizacionUnificada(
     if (!hasSupabaseEnv()) {
       const ok = demoDeleteCotizacionUnificada(id);
       if (!ok) {
-        return { ok: false, error: "Solo se pueden eliminar cotizaciones en estado pendiente." };
+        return { ok: false, error: "No se pueden eliminar cotizaciones ya cobradas." };
       }
       revalidatePath("/cotizacion");
       return { ok: true };
@@ -1284,8 +1284,8 @@ export async function deleteCotizacionUnificada(
       .eq("id", id)
       .eq("organization_id", DEFAULT_ORG_ID)
       .maybeSingle();
-    if (!row || row.estado_flujo !== "pendiente") {
-      return { ok: false, error: "Solo se pueden eliminar cotizaciones en estado pendiente." };
+    if (!row || row.estado_flujo === "cobrada") {
+      return { ok: false, error: "No se pueden eliminar cotizaciones ya cobradas." };
     }
     const { error } = await supabase
       .from("cotizaciones_unificadas")
@@ -1299,6 +1299,37 @@ export async function deleteCotizacionUnificada(
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
+  }
+}
+
+export async function cambiarEstadoCotizacionUnificada(
+  id: string,
+  nuevoEstado: "pendiente" | "lista_produccion" | "en_produccion" | "terminado" | "entregado" | "cobrada" | "inactivo" | "deudor",
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireMutationAccess(ventasRoles);
+    if (!hasSupabaseEnv()) {
+      const row = demoGetCotizacionUnificada(id);
+      if (!row) {
+        return { ok: false, error: "Cotización no encontrada." };
+      }
+      demoUpdateCotizacionUnificada(id, { estado_flujo: nuevoEstado });
+      revalidatePath("/cotizacion");
+      return { ok: true };
+    }
+    const supabase = getSupabaseServerClient();
+    const { error } = await supabase
+      .from("cotizaciones_unificadas")
+      .update({ estado_flujo: nuevoEstado as any })
+      .eq("id", id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+    revalidatePath("/cotizacion");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Ocurrió un problema, intenta de nuevo." };
   }
 }
 

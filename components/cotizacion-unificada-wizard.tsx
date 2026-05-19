@@ -9,6 +9,7 @@ import {
   pasarCotizacionAProduccion,
   registrarCobroCotizacionUnificada,
   saveCotizacionUnificada,
+  cambiarEstadoCotizacionUnificada,
 } from "@/app/actions";
 import {
   computeEconomiaInterna,
@@ -508,7 +509,15 @@ export function CotizacionUnificadaWizard({
   const [asrMedidaLargoUI, setAsrMedidaLargoUI] = useState("");
   const [filterText, setFilterText] = useState("");
   const [filterEstado, setFilterEstado] = useState<
-    "todos" | "pendiente" | "lista_produccion" | "produccion" | "terminado" | "entregado" | "cobrada"
+    | "todos"
+    | "pendiente"
+    | "lista_produccion"
+    | "produccion"
+    | "terminado"
+    | "entregado"
+    | "cobrada"
+    | "inactivo"
+    | "deudor"
   >("todos");
   const [filterFechaDesde, setFilterFechaDesde] = useState("");
   const [filterFechaHasta, setFilterFechaHasta] = useState("");
@@ -3024,7 +3033,9 @@ export function CotizacionUnificadaWizard({
                     | "produccion"
                     | "terminado"
                     | "entregado"
-                    | "cobrada",
+                    | "cobrada"
+                    | "inactivo"
+                    | "deudor",
                 )
               }
             >
@@ -3035,6 +3046,8 @@ export function CotizacionUnificadaWizard({
               <option value="terminado">Terminado</option>
               <option value="entregado">Entregado</option>
               <option value="cobrada">Cobrada</option>
+              <option value="inactivo">Inactivo</option>
+              <option value="deudor">Deudor (Mora)</option>
             </select>
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -3072,23 +3085,62 @@ export function CotizacionUnificadaWizard({
           <tbody>
             {cotizacionesFiltradas.map((c) => (
               <tr key={c.id} className="border-t border-[var(--color-border)]">
-                <td className="px-3 py-2">{c.correlativo ?? c.id.slice(0, 8)}</td>
+                <td className="px-3 py-2 font-mono text-xs">{c.correlativo ?? c.id.slice(0, 8)}</td>
                 <td className="px-3 py-2">{clientesById.get(c.cliente_id)?.nombre ?? "—"}</td>
                 <td className="px-3 py-2">{c.fecha}</td>
                 <td className="px-3 py-2 text-right font-semibold">{formatPen(c.total)}</td>
-                <td className="px-3 py-2">{c.estado_flujo}</td>
                 <td className="px-3 py-2">
-                  <div className="flex flex-wrap gap-1">
+                  <select
+                    value={c.estado_flujo}
+                    onChange={async (e) => {
+                      const nuevo = e.target.value as any;
+                      if (!confirm(`¿Cambiar el estado de la cotización a "${nuevo}"?`)) return;
+                      const r = await cambiarEstadoCotizacionUnificada(c.id, nuevo);
+                      if (!r.ok) alert(r.error);
+                      else window.location.reload();
+                    }}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold border-none cursor-pointer focus:ring-2 focus:ring-[var(--color-accent)] ${
+                      c.estado_flujo === "pendiente"
+                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
+                        : c.estado_flujo === "lista_produccion"
+                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                        : c.estado_flujo === "en_produccion"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+                        : c.estado_flujo === "cobrada"
+                        ? "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300"
+                        : c.estado_flujo === "terminado"
+                        ? "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300"
+                        : c.estado_flujo === "entregado"
+                        ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300"
+                        : c.estado_flujo === "inactivo"
+                        ? "bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-300"
+                        : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                    }`}
+                  >
+                    <option value="pendiente">Pendiente</option>
+                    <option value="lista_produccion">Lista producción</option>
+                    <option value="en_produccion">En producción</option>
+                    <option value="terminado">Terminado</option>
+                    <option value="entregado">Entregado</option>
+                    <option value="cobrada">Cobrada</option>
+                    <option value="inactivo">Inactivo</option>
+                    <option value="deudor">Deudor (Mora)</option>
+                  </select>
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {c.estado_flujo !== "cobrada" ? (
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                        onClick={() => loadCotizacion(c)}
+                      >
+                        Editar
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      className="text-xs font-semibold text-[var(--color-accent)]"
-                      onClick={() => loadCotizacion(c)}
-                    >
-                      Cargar
-                    </button>
-                    <button
-                      type="button"
-                      className="text-xs font-semibold"
+                      className="text-xs font-semibold hover:underline"
                       onClick={() => window.open(`/cotizacion/unificada/${c.id}/pdf`, "_blank")}
                     >
                       PDF
@@ -3097,7 +3149,7 @@ export function CotizacionUnificadaWizard({
                     canSave ? (
                       <button
                         type="button"
-                        className="text-xs font-semibold text-teal-700 dark:text-teal-400"
+                        className="text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline"
                         onClick={async () => {
                           if (
                             !confirm(
@@ -3114,12 +3166,12 @@ export function CotizacionUnificadaWizard({
                         Cobrar
                       </button>
                     ) : null}
-                    {c.estado_flujo === "pendiente" && canSave ? (
+                    {c.estado_flujo !== "cobrada" && canSave ? (
                       <button
                         type="button"
-                        className="text-xs font-semibold text-red-600"
+                        className="text-xs font-semibold text-red-600 hover:underline"
                         onClick={async () => {
-                          if (!confirm("¿Eliminar esta cotización pendiente?")) return;
+                          if (!confirm(`¿Eliminar esta cotización (${c.correlativo ?? c.id.slice(0, 8)})?`)) return;
                           const r = await deleteCotizacionUnificada(c.id);
                           if (!r.ok) setError(r.error);
                           else window.location.reload();

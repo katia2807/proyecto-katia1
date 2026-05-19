@@ -27,12 +27,20 @@ function EstadoBadge({ estado }: { estado: string }) {
     lista_produccion: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
     en_produccion: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
     cobrada: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300",
+    terminado: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
+    entregado: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
+    inactivo: "bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-300",
+    deudor: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
   };
   const labels: Record<string, string> = {
     pendiente: "Pendiente",
     lista_produccion: "Lista para producción",
     en_produccion: "En producción",
     cobrada: "Cobrada",
+    terminado: "Terminado",
+    entregado: "Entregado",
+    inactivo: "Inactivo",
+    deudor: "Deudor (Mora)",
   };
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${colores[estado] ?? "bg-gray-100 text-gray-700"}`}>

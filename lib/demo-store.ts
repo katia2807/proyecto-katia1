@@ -148,7 +148,7 @@ export type CotizacionUnificadaRow = {
   correlativo: string | null;
   tipo_cliente: "natural" | "empresa";
   total: number;
-  estado_flujo: "pendiente" | "lista_produccion" | "en_produccion" | "cobrada";
+  estado_flujo: "pendiente" | "lista_produccion" | "en_produccion" | "terminado" | "entregado" | "cobrada" | "inactivo" | "deudor";
   detalle: Record<string, unknown>;
   created_at: string;
 };
@@ -1584,7 +1584,13 @@ function normalizeCotizacionUnificada(raw: unknown): CotizacionUnificadaRow {
     tipo_cliente: r.tipo_cliente === "empresa" ? "empresa" : "natural",
     total: Number(r.total ?? 0),
     estado_flujo:
-      ef === "lista_produccion" || ef === "en_produccion" || ef === "cobrada"
+      ef === "lista_produccion" ||
+      ef === "en_produccion" ||
+      ef === "terminado" ||
+      ef === "entregado" ||
+      ef === "cobrada" ||
+      ef === "inactivo" ||
+      ef === "deudor"
         ? ef
         : "pendiente",
     detalle: r.detalle && typeof r.detalle === "object" ? (r.detalle as Record<string, unknown>) : {},
@@ -1888,7 +1894,7 @@ export function demoDeleteCotizacionUnificada(id: string) {
   const idx = store.cotizacionesUnificadas.findIndex((c) => c.id === id);
   if (idx === -1) return false;
   const row = store.cotizacionesUnificadas[idx];
-  if (row.estado_flujo !== "pendiente") return false;
+  if (row.estado_flujo === "cobrada") return false;
   store.cotizacionesUnificadas.splice(idx, 1);
   persistStore();
   return true;
