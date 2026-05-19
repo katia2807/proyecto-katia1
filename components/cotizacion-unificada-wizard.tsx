@@ -173,9 +173,9 @@ function emptyPieza(): MuebleLineaPieza {
   return {
     id: newId(),
     cantidad: 1,
-    espesor: 2,
-    ancho: 6,
-    largo: 8,
+    espesor: 0,
+    ancho: 0,
+    largo: 0,
     descripcion: "Pieza",
   };
 }
@@ -784,9 +784,6 @@ export function CotizacionUnificadaWizard({
   );
 
   const addPiezaDesdeDimensiones = useCallback(() => {
-    const espIn = toInches(Number(medidaEspesorUI) || 0, unidadEspesorUI);
-    const ancIn = toInches(Number(medidaAnchoUI) || 0, unidadAnchoUI);
-    const larFt = toFeet(Number(medidaLargoUI) || 0, unidadLargoUI);
     let nextSelected = selectedPiezaIndexSafe;
     setDetalle((d) => {
       const lineas = d.muebles_lineas.length > 0 ? [...d.muebles_lineas] : [emptyLineaMadera()];
@@ -796,10 +793,6 @@ export function CotizacionUnificadaWizard({
       const nueva = {
         ...emptyPieza(),
         descripcion: selectedTipoMuebleLabel !== "Mueble" ? selectedTipoMuebleLabel : "Pieza",
-        cantidad: 1,
-        espesor: round2(espIn),
-        ancho: round2(ancIn),
-        largo: round2(larFt),
       };
       piezas.splice(insertAt, 0, nueva);
       lineas[0] = { ...first, piezas };
@@ -811,7 +804,7 @@ export function CotizacionUnificadaWizard({
     setMedidaAnchoUI("");
     setMedidaLargoUI("");
     setSelectedPiezaIndexUI(nextSelected);
-  }, [medidaAnchoUI, medidaEspesorUI, medidaLargoUI, selectedPiezaIndexSafe, selectedTipoMuebleLabel, unidadAnchoUI, unidadEspesorUI, unidadLargoUI]);
+  }, [selectedPiezaIndexSafe, selectedTipoMuebleLabel]);
 
   const removeSelectedPieza = useCallback(() => {
     // Calcular sincrónicamente desde el estado actual (acción de usuario, no concurrente)
