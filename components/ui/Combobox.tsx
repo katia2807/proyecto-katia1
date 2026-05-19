@@ -37,10 +37,14 @@ export function Combobox({
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [highlight, setHighlight] = useState(0);
+  // Track if user is actively typing (to filter) vs just browsing
+  const [isTyping, setIsTyping] = useState(false);
 
   const selected = useMemo(() => options.find((o) => o.value === value), [options, value]);
 
   const filtered = useMemo(() => {
+    // Only filter when user is actively typing, otherwise show all
+    if (!isTyping) return options;
     const q = inputValue.trim().toLowerCase();
     if (!q) return options;
     return options.filter((o) => {
@@ -48,7 +52,7 @@ export function Combobox({
       const sub = (o.sublabel ?? "").toLowerCase();
       return label.includes(q) || sub.includes(q);
     });
-  }, [options, inputValue]);
+  }, [options, inputValue, isTyping]);
 
   const clampedHighlight = filtered.length === 0 ? 0 : Math.min(highlight, filtered.length - 1);
 
@@ -57,6 +61,7 @@ export function Combobox({
       const opt = options.find((o) => o.value === next);
       onChange(next);
       setInputValue(opt?.label ?? "");
+      setIsTyping(false);
       setOpen(false);
       setHighlight(0);
     },
@@ -65,6 +70,7 @@ export function Combobox({
 
   const closeAndRevertInput = useCallback(() => {
     setOpen(false);
+    setIsTyping(false);
     const sel = options.find((o) => o.value === value);
     setInputValue(sel?.label ?? "");
   }, [options, value]);
@@ -74,6 +80,7 @@ export function Combobox({
     function handleMouseDown(e: MouseEvent) {
       if (containerRef.current?.contains(e.target as Node)) return;
       setOpen(false);
+      setIsTyping(false);
       const sel = options.find((o) => o.value === value);
       setInputValue(sel?.label ?? "");
     }
@@ -127,9 +134,11 @@ export function Combobox({
         }
         placeholder={placeholder}
         className={controlClass}
-        value={open ? inputValue : selectedLabel}
+        value={open && isTyping ? inputValue : selectedLabel}
         onChange={(e) => {
+          // User is actively typing — filter results
           setInputValue(e.target.value);
+          setIsTyping(true);
           setHighlight(0);
           setOpen(true);
           if (value) {
@@ -137,8 +146,14 @@ export function Combobox({
           }
         }}
         onFocus={() => {
+          // Just open the dropdown, don't clear or change the display value
+          setIsTyping(false);
           setOpen(true);
-          setInputValue((prev) => (selected ? (selected.label ?? "") : prev));
+        }}
+        onClick={() => {
+          // Click always opens dropdown without clearing
+          setIsTyping(false);
+          setOpen(true);
         }}
         onKeyDown={onKeyDown}
       />

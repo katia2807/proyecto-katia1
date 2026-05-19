@@ -1614,10 +1614,8 @@ export function CotizacionUnificadaWizard({
                       type="button"
                       onClick={() => {
                         setSelectedPiezaIndexUI(idx);
-                        // Limpiar calculadora al cambiar de pieza — cada pieza es independiente
-                        setMedidaEspesorUI("");
-                        setMedidaAnchoUI("");
-                        setMedidaLargoUI("");
+                        // Al cambiar de pieza los campos se mantienen
+                        // Solo se limpian al presionar + Agregar
                       }}
                       className={`rounded-md border px-2 py-1 text-xs font-semibold ${
                         idx === selectedPiezaIndexSafe

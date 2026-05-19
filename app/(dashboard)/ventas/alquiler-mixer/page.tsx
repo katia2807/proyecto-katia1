@@ -104,7 +104,7 @@ export default async function AlquilerMixerPage() {
                 <TH className="text-right">Monto</TH>
                 <TH className="text-right">Depósito</TH>
                 <TH className="text-right">Penalidad</TH>
-                <TH className="text-right">PDF</TH>
+                <TH className="text-right">Acciones</TH>
               </TRow>
             </THead>
             <tbody>
@@ -129,20 +129,30 @@ export default async function AlquilerMixerPage() {
                     {formatPen(Number(c.penalidad ?? 0))}
                   </TD>
                   <TD className="text-right">
-                    <Link
-                      href={`/ventas/alquiler-mixer/${c.id}/pdf`}
-                      target="_blank"
-                      className="text-xs font-semibold text-[var(--color-accent)] underline"
-                    >
-                      Imprimir
-                    </Link>
+                    <div className="flex items-center justify-end gap-2">
+                      <Link
+                        href={`/ventas/alquiler-mixer/${c.id}/pdf`}
+                        target="_blank"
+                        className="text-xs font-semibold text-[var(--color-accent)] underline"
+                      >
+                        Imprimir
+                      </Link>
+                      {canMutate && c.estado === "abierto" ? (
+                        <Link
+                          href={`/ventas/alquiler-mixer/${c.id}/editar`}
+                          className="text-xs font-semibold text-[var(--color-text-secondary)] underline hover:text-[var(--color-text-primary)]"
+                        >
+                          Editar
+                        </Link>
+                      ) : null}
+                    </div>
                   </TD>
                 </TRow>
               ))}
               {contratos.length === 0 ? (
                 <TRow>
                   <TD colSpan={9} className="text-center text-[var(--color-text-secondary)]">
-                    Aún no hay contratos. Crea uno con “Nuevo contrato”.
+                    Aún no hay contratos. Crea uno con "Nuevo contrato".
                   </TD>
                 </TRow>
               ) : null}
