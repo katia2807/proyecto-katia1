@@ -870,41 +870,6 @@ export async function getMueblesCatalogoRows(includeInactive = false) {
     return data ?? [];
   }, []);
 
-  // 3. Auto-provision missing furniture catalog items and sync stock in database
-  for (const p of furnitureProducts) {
-    // ✅ Match SOLO por id — evita falsos negativos por diferencias de texto
-    const match = fetched.find((m) => m.id === p.id);
-
-    if (!match) {
-      await safeQuery(async () => {
-        // ✅ upsert en vez de insert — si ya existe por id no crea duplicado
-        await supabase.from("muebles_catalogo").upsert(
-          {
-            id: p.id,
-            organization_id: p.organization_id || DEFAULT_ORG_ID,
-            codigo: p.codigo,
-            nombre: p.nombre,
-            descripcion: "Producto importado del inventario",
-            precio_lista: 0,
-            foto_url: null,
-            stock_disponible: p.stock_actual,
-            activo: p.activo,
-            created_at: p.created_at,
-          },
-          { onConflict: "id", ignoreDuplicates: true }
-        );
-      }, null);
-    } else if (match.stock_disponible !== p.stock_actual) {
-      await safeQuery(async () => {
-        await supabase
-          .from("muebles_catalogo")
-          .update({ stock_disponible: p.stock_actual })
-          .eq("id", match.id)
-          .eq("organization_id", DEFAULT_ORG_ID); // ✅ seguridad extra
-      }, null);
-    }
-  }
-
   // 4. Return final, fully synced catalog items
   return safeQuery(async () => {
     let query = supabase
