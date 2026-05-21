@@ -2261,16 +2261,18 @@ export function demoCreateSueldo(input: Omit<SueldoRow, "id" | "created_at">) {
 }
 
 export function demoCreateInventarioProducto(
-  input: Omit<InventarioProductoRow, "id" | "created_at" | "stock_actual" | "activo">,
+  input: Omit<InventarioProductoRow, "id" | "created_at" | "stock_actual" | "activo"> & { id?: string },
 ) {
+  const newId = input.id || randomUUID();
   store.inventarioProductos.unshift({
-    id: randomUUID(),
     created_at: nowIso(),
     stock_actual: 0,
     activo: true,
     ...input,
+    id: newId,
   });
   persistStore();
+  return newId;
 }
 
 export function demoUpdateInventarioProducto(

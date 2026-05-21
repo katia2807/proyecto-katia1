@@ -49,7 +49,7 @@ function RegistroFormBody({
   }, [state, showToast, onCloseAndReset]);
 
   const categoriaOptions = useMemo(() => {
-    const src = mockData ? MOCK_CATEGORIAS_REGISTRO : categorias;
+    const src = (mockData && categorias.length === 0) ? MOCK_CATEGORIAS_REGISTRO : categorias;
     return src.map((c) => ({
       value: c.id,
       label: c.nombre,

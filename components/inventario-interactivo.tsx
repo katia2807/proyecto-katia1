@@ -634,8 +634,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-[var(--color-text-primary)]">{row.nombre}</p>
                   <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-                    {row.codigo} · {row.categoria} · {row.unidad} · Mín. {row.stock_minimo} · Stock {row.stock_actual} · S/{" "}
-                    {Number(row.valor_stock ?? 0).toFixed(2)}
+                    {row.codigo} · {row.categoria} · {row.unidad} · Mín. {row.stock_minimo} · Costo unit. promedio: S/ {Number(row.costo_unitario_promedio ?? 0).toFixed(2)} · Stock {row.stock_actual} · Valor: S/ {Number(row.valor_stock ?? 0).toFixed(2)}
                     {Number(row.costo_unitario_promedio ?? 0) === 0 && Number(row.stock_actual) > 0 ? (
                       <span className="ml-1 text-[var(--color-text-secondary)] opacity-70">(sin costo registrado)</span>
                     ) : null}

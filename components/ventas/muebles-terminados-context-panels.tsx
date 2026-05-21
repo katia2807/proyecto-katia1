@@ -169,21 +169,20 @@ export function MueblesTerminadosContextPanels({
   );
 
   const muebleOptions = useMemo(() => {
-    const src: MuebleOpt[] = mockData
+    const src: MuebleOpt[] = (mockData && muebles.length === 0)
       ? [...MOCK_MUEBLES_CATALOGO_VENTA].map((m) => ({
-          id: m.id,
-          codigo: m.codigo,
-          nombre: m.nombre,
-          precio_lista: m.precio_lista,
-          stock_disponible: m.stock_disponible,
-        }))
+        id: m.id,
+        codigo: m.codigo,
+        nombre: m.nombre,
+        precio_lista: m.precio_lista,
+        stock_disponible: m.stock_disponible,
+      }))
       : muebles;
     return src.map((m) => ({
       value: m.id,
       label: `${m.codigo} — ${m.nombre}`,
-      sublabel: `${formatPen(Number(m.precio_lista))}${
-        Number(m.stock_disponible) <= 0 ? " · sin stock" : ""
-      }`,
+      sublabel: `${formatPen(Number(m.precio_lista))}${Number(m.stock_disponible) <= 0 ? " · sin stock" : ""
+        }`,
     }));
   }, [mockData, muebles]);
 
@@ -233,11 +232,10 @@ export function MueblesTerminadosContextPanels({
                   key={opt.value}
                   type="button"
                   onClick={() => setTipoComprobante(opt.value)}
-                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                    tipoComprobante === opt.value
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${tipoComprobante === opt.value
                       ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
                       : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)]"
-                  }`}
+                    }`}
                 >
                   {opt.label}
                 </button>

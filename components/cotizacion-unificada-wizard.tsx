@@ -85,7 +85,7 @@ const WIZARD_TEMPLATES_EVENT = "katia:cotizacion-templates-changed";
 const WIZARD_DRAFT_EVENT = "katia:cotizacion-draft-changed";
 
 function subscribeWizardTemplates(onStoreChange: () => void) {
-  if (typeof window === "undefined") return () => {};
+  if (typeof window === "undefined") return () => { };
   const handler = () => onStoreChange();
   window.addEventListener("storage", handler);
   window.addEventListener(WIZARD_TEMPLATES_EVENT, handler);
@@ -100,7 +100,7 @@ function emitWizardTemplatesChanged() {
 }
 
 function subscribeWizardDraft(onStoreChange: () => void) {
-  if (typeof window === "undefined") return () => {};
+  if (typeof window === "undefined") return () => { };
   const handler = () => onStoreChange();
   window.addEventListener("storage", handler);
   window.addEventListener(WIZARD_DRAFT_EVENT, handler);
@@ -452,11 +452,11 @@ export function CotizacionUnificadaWizard({
   mockData = false,
 }: CotizacionUnificadaWizardProps) {
   const effectiveClientes = useMemo(
-    () => (mockData ? mockClientesAsRows(DEFAULT_ORG_ID) : clientes),
+    () => ((mockData && clientes.length === 0) ? mockClientesAsRows(DEFAULT_ORG_ID) : clientes),
     [mockData, clientes],
   );
   const effectiveProductos = useMemo(
-    () => (mockData ? MOCK_INVENTARIO_PRODUCTOS : productos),
+    () => ((mockData && productos.length === 0) ? MOCK_INVENTARIO_PRODUCTOS : productos),
     [mockData, productos],
   );
   const router = useRouter();
@@ -552,14 +552,14 @@ export function CotizacionUnificadaWizard({
     () =>
       Boolean(
         tipoMuebleVista ||
-          medidaEspesorUI ||
-          medidaAnchoUI ||
-          medidaLargoUI ||
-          tipoMaderaUI ||
-          precioVentaPtUI ||
-          acabadoUI ||
-          costoAcabadoSolesUI !== "0" ||
-          pagoModalidadUI,
+        medidaEspesorUI ||
+        medidaAnchoUI ||
+        medidaLargoUI ||
+        tipoMaderaUI ||
+        precioVentaPtUI ||
+        acabadoUI ||
+        costoAcabadoSolesUI !== "0" ||
+        pagoModalidadUI,
       ),
     [
       acabadoUI,
@@ -582,10 +582,10 @@ export function CotizacionUnificadaWizard({
           preset === "general"
             ? { muebles: true, aserradero: true, alquiler: true }
             : {
-                muebles: preset === "muebles",
-                aserradero: preset === "aserradero",
-                alquiler: preset === "alquiler",
-              };
+              muebles: preset === "muebles",
+              aserradero: preset === "aserradero",
+              alquiler: preset === "alquiler",
+            };
         return {
           ...d,
           rubros,
@@ -651,7 +651,7 @@ export function CotizacionUnificadaWizard({
     return Math.min(Math.max(0, selectedPiezaIndexUI), piezasMuebleActual.length - 1);
   }, [piezasMuebleActual.length, selectedPiezaIndexUI]);
   const muebleOptions = useMemo(() => {
-    if (mockData) {
+    if (mockData && mueblesCatalogo.length === 0) {
       return MOCK_MUEBLES_CATALOGO_VENTA.map((m) => ({
         id: m.id,
         nombre: `${m.codigo} — ${m.nombre}`,
@@ -1171,8 +1171,8 @@ export function CotizacionUnificadaWizard({
   );
   const puedeRegistrarCobro = Boolean(
     guardadaRow &&
-      (guardadaRow.estado_flujo === "lista_produccion" ||
-        guardadaRow.estado_flujo === "en_produccion"),
+    (guardadaRow.estado_flujo === "lista_produccion" ||
+      guardadaRow.estado_flujo === "en_produccion"),
   );
   const stepLabels: Record<string, string> = useMemo(
     () => ({
@@ -1530,13 +1530,12 @@ export function CotizacionUnificadaWizard({
               type="button"
               disabled={idx > maxStep}
               onClick={() => goStep(idx)}
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                idx === effectiveStepIndex
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${idx === effectiveStepIndex
                   ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)]"
                   : idx <= maxStep
                     ? "border-[var(--color-border)] bg-[var(--color-primary-soft)] text-[var(--color-text-primary)]"
                     : "border-[var(--color-border)] text-[var(--color-text-secondary)] opacity-50"
-              }`}
+                }`}
             >
               {idx + 1}. {stepLabels[sid] ?? sid}
             </button>
@@ -1550,22 +1549,20 @@ export function CotizacionUnificadaWizard({
             <button
               type="button"
               onClick={() => setTipoCliente("natural")}
-              className={`rounded-3xl border px-4 py-6 text-xl font-bold text-[var(--color-text-primary)] ${
-                tipoCliente === "natural"
+              className={`rounded-3xl border px-4 py-6 text-xl font-bold text-[var(--color-text-primary)] ${tipoCliente === "natural"
                   ? "border-[var(--color-accent)] bg-[var(--color-primary-soft)]"
                   : "border-[var(--color-border)] bg-[var(--color-surface)]"
-              }`}
+                }`}
             >
               Persona natural
             </button>
             <button
               type="button"
               onClick={() => setTipoCliente("empresa")}
-              className={`rounded-3xl border px-4 py-6 text-xl font-bold text-[var(--color-text-primary)] ${
-                tipoCliente === "empresa"
+              className={`rounded-3xl border px-4 py-6 text-xl font-bold text-[var(--color-text-primary)] ${tipoCliente === "empresa"
                   ? "border-[var(--color-accent)] bg-[var(--color-primary-soft)]"
                   : "border-[var(--color-border)] bg-[var(--color-surface)]"
-              }`}
+                }`}
             >
               Empresa
             </button>
@@ -1734,249 +1731,248 @@ export function CotizacionUnificadaWizard({
 
           <div className="grid gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 md:grid-cols-2">
             {tipoCotizacionPreset === "muebles" || tipoCotizacionPreset === "general" ? (
-            <div className="space-y-2">
-              <span className="inline-flex rounded-md bg-[var(--color-primary-soft)] px-4 py-2 text-sm font-bold text-[var(--color-text-primary)]">Dimensiones</span>
-              <div className="grid grid-cols-3 gap-2 pt-1">
-                {(
-                  [
-                    {
-                      label: "Espesor",
-                      unidad: unidadEspesorUI,
-                      setUnidad: setUnidadEspesorUI,
-                      medida: medidaEspesorUI,
-                      setMedida: (v: string) => {
-                        setMedidaEspesorUI(v);
-                        const espIn = toInches(Number(v) || 0, unidadEspesorUI);
-                        syncCurrentPiezaToDetalle({ espesor: round2(espIn) });
+              <div className="space-y-2">
+                <span className="inline-flex rounded-md bg-[var(--color-primary-soft)] px-4 py-2 text-sm font-bold text-[var(--color-text-primary)]">Dimensiones</span>
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  {(
+                    [
+                      {
+                        label: "Espesor",
+                        unidad: unidadEspesorUI,
+                        setUnidad: setUnidadEspesorUI,
+                        medida: medidaEspesorUI,
+                        setMedida: (v: string) => {
+                          setMedidaEspesorUI(v);
+                          const espIn = toInches(Number(v) || 0, unidadEspesorUI);
+                          syncCurrentPiezaToDetalle({ espesor: round2(espIn) });
+                        },
                       },
-                    },
-                    {
-                      label: "Ancho",
-                      unidad: unidadAnchoUI,
-                      setUnidad: setUnidadAnchoUI,
-                      medida: medidaAnchoUI,
-                      setMedida: (v: string) => {
-                        setMedidaAnchoUI(v);
-                        const ancIn = toInches(Number(v) || 0, unidadAnchoUI);
-                        syncCurrentPiezaToDetalle({ ancho: round2(ancIn) });
+                      {
+                        label: "Ancho",
+                        unidad: unidadAnchoUI,
+                        setUnidad: setUnidadAnchoUI,
+                        medida: medidaAnchoUI,
+                        setMedida: (v: string) => {
+                          setMedidaAnchoUI(v);
+                          const ancIn = toInches(Number(v) || 0, unidadAnchoUI);
+                          syncCurrentPiezaToDetalle({ ancho: round2(ancIn) });
+                        },
                       },
-                    },
-                    {
-                      label: "Largo",
-                      unidad: unidadLargoUI,
-                      setUnidad: setUnidadLargoUI,
-                      medida: medidaLargoUI,
-                      setMedida: (v: string) => {
-                        setMedidaLargoUI(v);
-                        const larFt = toFeet(Number(v) || 0, unidadLargoUI);
-                        syncCurrentPiezaToDetalle({ largo: round2(larFt) });
+                      {
+                        label: "Largo",
+                        unidad: unidadLargoUI,
+                        setUnidad: setUnidadLargoUI,
+                        medida: medidaLargoUI,
+                        setMedida: (v: string) => {
+                          setMedidaLargoUI(v);
+                          const larFt = toFeet(Number(v) || 0, unidadLargoUI);
+                          syncCurrentPiezaToDetalle({ largo: round2(larFt) });
+                        },
                       },
-                    },
-                  ] as const
-                ).map(({ label, unidad, setUnidad, medida, setMedida }) => (
-                  <div key={label} className="space-y-1">
-                    <div className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] py-2 text-center text-sm font-extrabold text-[var(--color-text-primary)]">
-                      {label}
+                    ] as const
+                  ).map(({ label, unidad, setUnidad, medida, setMedida }) => (
+                    <div key={label} className="space-y-1">
+                      <div className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] py-2 text-center text-sm font-extrabold text-[var(--color-text-primary)]">
+                        {label}
+                      </div>
+                      <select
+                        className={inputClass + " h-10"}
+                        value={unidad}
+                        onChange={(e) => {
+                          const newUnit = e.target.value as "" | "mm" | "cm" | "m" | "in" | "ft";
+                          // Al cambiar unidad, recalcular el valor de texto en la nueva unidad
+                          // pero mantener el valor almacenado (en in/ft) igual.
+                          if (label === "Espesor") {
+                            const valIn = toInches(Number(medidaEspesorUI) || 0, unidadEspesorUI);
+                            setUnidadEspesorUI(newUnit);
+                            setMedidaEspesorUI(inchesToUI(valIn, newUnit));
+                          } else if (label === "Ancho") {
+                            const valIn = toInches(Number(medidaAnchoUI) || 0, unidadAnchoUI);
+                            setUnidadAnchoUI(newUnit);
+                            setMedidaAnchoUI(inchesToUI(valIn, newUnit));
+                          } else {
+                            const valFt = toFeet(Number(medidaLargoUI) || 0, unidadLargoUI);
+                            setUnidadLargoUI(newUnit);
+                            setMedidaLargoUI(feetToUI(valFt, newUnit));
+                          }
+                        }}
+                        aria-label={`Unidad ${label}`}
+                      >
+                        <option value="mm">mm</option>
+                        <option value="cm">cm</option>
+                        <option value="m">m</option>
+                        <option value="in">in</option>
+                        <option value="ft">ft</option>
+                      </select>
+                      <input
+                        type="number"
+                        className={`${inputClass} h-10 rounded-sm`}
+                        value={medida}
+                        onChange={(e) => setMedida(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addPiezaDesdeDimensiones();
+                          }
+                        }}
+                        placeholder={unidad ? String(unidad).toUpperCase() : "Unidad"}
+                      />
                     </div>
-                    <select
-                      className={inputClass + " h-10"}
-                      value={unidad}
-                      onChange={(e) => {
-                        const newUnit = e.target.value as "" | "mm" | "cm" | "m" | "in" | "ft";
-                        // Al cambiar unidad, recalcular el valor de texto en la nueva unidad
-                        // pero mantener el valor almacenado (en in/ft) igual.
-                        if (label === "Espesor") {
-                          const valIn = toInches(Number(medidaEspesorUI) || 0, unidadEspesorUI);
-                          setUnidadEspesorUI(newUnit);
-                          setMedidaEspesorUI(inchesToUI(valIn, newUnit));
-                        } else if (label === "Ancho") {
-                          const valIn = toInches(Number(medidaAnchoUI) || 0, unidadAnchoUI);
-                          setUnidadAnchoUI(newUnit);
-                          setMedidaAnchoUI(inchesToUI(valIn, newUnit));
-                        } else {
-                          const valFt = toFeet(Number(medidaLargoUI) || 0, unidadLargoUI);
-                          setUnidadLargoUI(newUnit);
-                          setMedidaLargoUI(feetToUI(valFt, newUnit));
-                        }
-                      }}
-                      aria-label={`Unidad ${label}`}
-                    >
-                      <option value="mm">mm</option>
-                      <option value="cm">cm</option>
-                      <option value="m">m</option>
-                      <option value="in">in</option>
-                      <option value="ft">ft</option>
-                    </select>
-                    <input
-                      type="number"
-                      className={`${inputClass} h-10 rounded-sm`}
-                      value={medida}
-                      onChange={(e) => setMedida(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addPiezaDesdeDimensiones();
-                        }
-                      }}
-                      placeholder={unidad ? String(unidad).toUpperCase() : "Unidad"}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-2">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold text-[var(--color-text-secondary)]">
-                    Muebles personalizados ({piezasMuebleActual.length || 1}) · Enter = agregar siguiente
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="rounded-md border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
-                      onClick={removeSelectedPieza}
-                    >
-                      Eliminar seleccionada
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-md border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
-                      onClick={addPiezaDesdeDimensiones}
-                    >
-                      + Agregar
-                    </button>
-                  </div>
+                  ))}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {(piezasMuebleActual.length > 0 ? piezasMuebleActual : [emptyPieza()]).map((pieza, idx) => {
-                    const ptPieza = (pieza.cantidad * pieza.espesor * pieza.ancho * pieza.largo) / 12;
-                    return (
-                    <button
-                      key={`pieza-pos-${idx}`}
-                      type="button"
-                      onClick={() => {
-                        setSelectedPiezaIndexUI(idx);
-                        // Al seleccionar una pieza, cargar sus valores al UI
-                        loadPiezaToUI(pieza);
-                      }}
-                      className={`rounded-md border px-2 py-1 text-xs font-semibold ${
-                        idx === selectedPiezaIndexSafe
-                          ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                          : "border-[var(--color-border)] bg-[var(--color-surface)]"
-                      }`}
-                    >
-                      <span>Pieza {idx + 1}</span>
-                      <span className="ml-1 opacity-75 text-[10px]">{ptPieza.toFixed(2)} PT</span>
-                    </button>
-                  );
-                  })}
-                </div>
-              </div>
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                Conversión: Espesor {conversionMedidasUI.espIn.toFixed(2)} in · Ancho {conversionMedidasUI.ancIn.toFixed(2)} in · Largo{" "}
-                {conversionMedidasUI.larFt.toFixed(2)} ft · PT ref: <strong>{conversionMedidasUI.pt.toFixed(2)}</strong>
-              </p>
-              {/* PT acumulado todas las piezas */}
-              {piezasMuebleActual.length > 0 && (
-                <div className="rounded-lg border border-[var(--color-accent)]/30 bg-[var(--color-primary-soft)]/20 p-2 space-y-1">
-                  <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                    {piezasMuebleActual.map((p, i) => {
-                      const pt = (p.cantidad * p.espesor * p.ancho * p.largo) / 12;
+                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-2">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                      Muebles personalizados ({piezasMuebleActual.length || 1}) · Enter = agregar siguiente
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded-md border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
+                        onClick={removeSelectedPieza}
+                      >
+                        Eliminar seleccionada
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
+                        onClick={addPiezaDesdeDimensiones}
+                      >
+                        + Agregar
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(piezasMuebleActual.length > 0 ? piezasMuebleActual : [emptyPieza()]).map((pieza, idx) => {
+                      const ptPieza = (pieza.cantidad * pieza.espesor * pieza.ancho * pieza.largo) / 12;
                       return (
-                        <span key={i} className="text-[11px] text-[var(--color-text-secondary)]">
-                          P{i + 1}: <strong className="text-[var(--color-text-primary)]">{pt.toFixed(2)}</strong>
-                        </span>
+                        <button
+                          key={`pieza-pos-${idx}`}
+                          type="button"
+                          onClick={() => {
+                            setSelectedPiezaIndexUI(idx);
+                            // Al seleccionar una pieza, cargar sus valores al UI
+                            loadPiezaToUI(pieza);
+                          }}
+                          className={`rounded-md border px-2 py-1 text-xs font-semibold ${idx === selectedPiezaIndexSafe
+                              ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                              : "border-[var(--color-border)] bg-[var(--color-surface)]"
+                            }`}
+                        >
+                          <span>Pieza {idx + 1}</span>
+                          <span className="ml-1 opacity-75 text-[10px]">{ptPieza.toFixed(2)} PT</span>
+                        </button>
                       );
                     })}
                   </div>
-                  <p className="text-xs font-bold text-[var(--color-accent)]">
-                    PT TOTAL ({piezasMuebleActual.length} pieza{piezasMuebleActual.length !== 1 ? "s" : ""}):{" "}
-                    <strong>
-                      {piezasMuebleActual.reduce((acc, p) => acc + (p.cantidad * p.espesor * p.ancho * p.largo) / 12, 0).toFixed(2)} PT
-                    </strong>
-                  </p>
                 </div>
-              )}
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                Cada unidad se convierte automáticamente a pulgadas/pies para el cálculo.
-              </p>
-            </div>
-            ) : null}
-
-            {tipoCotizacionPreset === "muebles" || tipoCotizacionPreset === "general" ? (
-            <div className="space-y-2">
-              <span className="inline-flex rounded-md bg-[var(--color-primary-soft)] px-4 py-2 text-sm font-bold text-[var(--color-text-primary)]">Tipo de madera</span>
-              <Combobox
-                options={maderaComboboxOptions}
-                value={tipoMaderaUI}
-                onChange={(selectedId) => {
-                  setTipoMaderaUI(selectedId);
-                  if (!selectedId) return;
-                  const picked = effectiveProductos.find((p) => p.id === selectedId);
-                  if (!picked) return;
-                  if (detalle.muebles_lineas.length === 0) return;
-                  setDetalle((d) => {
-                    const first = d.muebles_lineas[0];
-                    const nextFirst = {
-                      ...first,
-                      inventario_producto_id: picked.id,
-                      especie_label: picked.nombre ?? first.especie_label,
-                    };
-                    return { ...d, muebles_lineas: [nextFirst, ...d.muebles_lineas.slice(1)] };
-                  });
-                }}
-                placeholder="Buscar madera…"
-                inputAriaLabel="Tipo de madera desde inventario"
-              />
-              {tipoMaderaUI ? (
                 <p className="text-xs text-[var(--color-text-secondary)]">
-                  Selección tomada desde inventario para la cotización.
+                  Conversión: Espesor {conversionMedidasUI.espIn.toFixed(2)} in · Ancho {conversionMedidasUI.ancIn.toFixed(2)} in · Largo{" "}
+                  {conversionMedidasUI.larFt.toFixed(2)} ft · PT ref: <strong>{conversionMedidasUI.pt.toFixed(2)}</strong>
                 </p>
-              ) : effectiveProductos.some((p) => (p.stock_actual ?? 0) > 0 && isWoodCategory(p.categoria)) ? (
-                <p className="text-xs text-[var(--color-text-secondary)]">Solo se listan materiales de categoría madera con stock.</p>
-              ) : null}
-            </div>
+                {/* PT acumulado todas las piezas */}
+                {piezasMuebleActual.length > 0 && (
+                  <div className="rounded-lg border border-[var(--color-accent)]/30 bg-[var(--color-primary-soft)]/20 p-2 space-y-1">
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                      {piezasMuebleActual.map((p, i) => {
+                        const pt = (p.cantidad * p.espesor * p.ancho * p.largo) / 12;
+                        return (
+                          <span key={i} className="text-[11px] text-[var(--color-text-secondary)]">
+                            P{i + 1}: <strong className="text-[var(--color-text-primary)]">{pt.toFixed(2)}</strong>
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs font-bold text-[var(--color-accent)]">
+                      PT TOTAL ({piezasMuebleActual.length} pieza{piezasMuebleActual.length !== 1 ? "s" : ""}):{" "}
+                      <strong>
+                        {piezasMuebleActual.reduce((acc, p) => acc + (p.cantidad * p.espesor * p.ancho * p.largo) / 12, 0).toFixed(2)} PT
+                      </strong>
+                    </p>
+                  </div>
+                )}
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  Cada unidad se convierte automáticamente a pulgadas/pies para el cálculo.
+                </p>
+              </div>
             ) : null}
 
             {tipoCotizacionPreset === "muebles" || tipoCotizacionPreset === "general" ? (
-            <div className="space-y-2">
-              <span className="inline-flex rounded-md bg-[var(--color-primary-soft)] px-4 py-2 text-sm font-bold text-[var(--color-text-primary)]">Tipo de acabado</span>
-              <div className="flex items-end gap-2">
-                <select
-                  className={`${inputClass} h-11 flex-1`}
-                  value={acabadoUI}
-                  onChange={(e) => setAcabadoUI(e.target.value)}
-                >
-                  <option value="">Desplegable Acabado</option>
-                  <option value="colores">Colores</option>
-                  <option value="laca">Laca</option>
-                  <option value="barniz">Barniz</option>
-                  <option value="sin_acabado">Sin acabado</option>
-                  <option value="otro">Otros</option>
-                </select>
-                <label className="space-y-1 pb-0.5">
-                  <span className="block text-[11px] font-bold text-[var(--color-text-secondary)]">Costo (S/)</span>
-                  <input
-                    type="number"
-                    min={0}
-                    className={`${inputClass} h-11 w-[150px] text-center`}
-                    value={costoAcabadoSolesUI}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      setCostoAcabadoSolesUI(raw);
-                      setDetalle((d) => ({ ...d, costoAcabadoSoles: Number(raw) || 0 }));
-                    }}
-                    placeholder="0"
-                  />
-                </label>
-              </div>
-              {acabadoUI === "otro" ? (
-                <input
-                  className={`${inputClass} h-11`}
-                  value={acabadoOtroUI}
-                  onChange={(e) => setAcabadoOtroUI(e.target.value)}
-                  placeholder="Especificar tipo de acabado"
+              <div className="space-y-2">
+                <span className="inline-flex rounded-md bg-[var(--color-primary-soft)] px-4 py-2 text-sm font-bold text-[var(--color-text-primary)]">Tipo de madera</span>
+                <Combobox
+                  options={maderaComboboxOptions}
+                  value={tipoMaderaUI}
+                  onChange={(selectedId) => {
+                    setTipoMaderaUI(selectedId);
+                    if (!selectedId) return;
+                    const picked = effectiveProductos.find((p) => p.id === selectedId);
+                    if (!picked) return;
+                    if (detalle.muebles_lineas.length === 0) return;
+                    setDetalle((d) => {
+                      const first = d.muebles_lineas[0];
+                      const nextFirst = {
+                        ...first,
+                        inventario_producto_id: picked.id,
+                        especie_label: picked.nombre ?? first.especie_label,
+                      };
+                      return { ...d, muebles_lineas: [nextFirst, ...d.muebles_lineas.slice(1)] };
+                    });
+                  }}
+                  placeholder="Buscar madera…"
+                  inputAriaLabel="Tipo de madera desde inventario"
                 />
-              ) : null}
-            </div>
+                {tipoMaderaUI ? (
+                  <p className="text-xs text-[var(--color-text-secondary)]">
+                    Selección tomada desde inventario para la cotización.
+                  </p>
+                ) : effectiveProductos.some((p) => (p.stock_actual ?? 0) > 0 && isWoodCategory(p.categoria)) ? (
+                  <p className="text-xs text-[var(--color-text-secondary)]">Solo se listan materiales de categoría madera con stock.</p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {tipoCotizacionPreset === "muebles" || tipoCotizacionPreset === "general" ? (
+              <div className="space-y-2">
+                <span className="inline-flex rounded-md bg-[var(--color-primary-soft)] px-4 py-2 text-sm font-bold text-[var(--color-text-primary)]">Tipo de acabado</span>
+                <div className="flex items-end gap-2">
+                  <select
+                    className={`${inputClass} h-11 flex-1`}
+                    value={acabadoUI}
+                    onChange={(e) => setAcabadoUI(e.target.value)}
+                  >
+                    <option value="">Desplegable Acabado</option>
+                    <option value="colores">Colores</option>
+                    <option value="laca">Laca</option>
+                    <option value="barniz">Barniz</option>
+                    <option value="sin_acabado">Sin acabado</option>
+                    <option value="otro">Otros</option>
+                  </select>
+                  <label className="space-y-1 pb-0.5">
+                    <span className="block text-[11px] font-bold text-[var(--color-text-secondary)]">Costo (S/)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className={`${inputClass} h-11 w-[150px] text-center`}
+                      value={costoAcabadoSolesUI}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setCostoAcabadoSolesUI(raw);
+                        setDetalle((d) => ({ ...d, costoAcabadoSoles: Number(raw) || 0 }));
+                      }}
+                      placeholder="0"
+                    />
+                  </label>
+                </div>
+                {acabadoUI === "otro" ? (
+                  <input
+                    className={`${inputClass} h-11`}
+                    value={acabadoOtroUI}
+                    onChange={(e) => setAcabadoOtroUI(e.target.value)}
+                    placeholder="Especificar tipo de acabado"
+                  />
+                ) : null}
+              </div>
             ) : null}
 
             <div className="space-y-2">
@@ -2482,9 +2478,8 @@ export function CotizacionUnificadaWizard({
           <div className="flex gap-3">
             <button
               type="button"
-              className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-                detalle.aserradero.modo === "hora" ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]" : "border"
-              }`}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold ${detalle.aserradero.modo === "hora" ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]" : "border"
+                }`}
               onClick={() =>
                 setDetalle((d) =>
                   d.aserradero
@@ -2497,9 +2492,8 @@ export function CotizacionUnificadaWizard({
             </button>
             <button
               type="button"
-              className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-                detalle.aserradero.modo === "total" ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]" : "border"
-              }`}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold ${detalle.aserradero.modo === "total" ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]" : "border"
+                }`}
               onClick={() =>
                 setDetalle((d) =>
                   d.aserradero
@@ -2523,9 +2517,9 @@ export function CotizacionUnificadaWizard({
                     setDetalle((d) =>
                       d.aserradero
                         ? {
-                            ...d,
-                            aserradero: { ...d.aserradero, precioHora: Number(e.target.value) || 0 },
-                          }
+                          ...d,
+                          aserradero: { ...d.aserradero, precioHora: Number(e.target.value) || 0 },
+                        }
                         : d,
                     )
                   }
@@ -2541,9 +2535,9 @@ export function CotizacionUnificadaWizard({
                     setDetalle((d) =>
                       d.aserradero
                         ? {
-                            ...d,
-                            aserradero: { ...d.aserradero, horas: Number(e.target.value) || 0 },
-                          }
+                          ...d,
+                          aserradero: { ...d.aserradero, horas: Number(e.target.value) || 0 },
+                        }
                         : d,
                     )
                   }
@@ -2567,12 +2561,12 @@ export function CotizacionUnificadaWizard({
                   setDetalle((d) =>
                     d.aserradero
                       ? {
-                          ...d,
-                          aserradero: {
-                            ...d.aserradero,
-                            montoTotalFijo: Number(e.target.value) || 0,
-                          },
-                        }
+                        ...d,
+                        aserradero: {
+                          ...d.aserradero,
+                          montoTotalFijo: Number(e.target.value) || 0,
+                        },
+                      }
                       : d,
                   )
                 }
@@ -2619,13 +2613,13 @@ export function CotizacionUnificadaWizard({
                   setDetalle((d) =>
                     d.alquiler
                       ? {
-                          ...d,
-                          alquiler: {
-                            ...d.alquiler,
-                            inventario_producto_id: pid,
-                            nombre_maquinaria: p?.nombre ?? d.alquiler.nombre_maquinaria,
-                          },
-                        }
+                        ...d,
+                        alquiler: {
+                          ...d.alquiler,
+                          inventario_producto_id: pid,
+                          nombre_maquinaria: p?.nombre ?? d.alquiler.nombre_maquinaria,
+                        },
+                      }
                       : d,
                   );
                 }}
@@ -2656,12 +2650,12 @@ export function CotizacionUnificadaWizard({
                   setDetalle((d) =>
                     d.alquiler
                       ? {
-                          ...d,
-                          alquiler: {
-                            ...d.alquiler,
-                            tarifaUnidad: e.target.value as "hora" | "dia",
-                          },
-                        }
+                        ...d,
+                        alquiler: {
+                          ...d.alquiler,
+                          tarifaUnidad: e.target.value as "hora" | "dia",
+                        },
+                      }
                       : d,
                   )
                 }
@@ -2680,12 +2674,12 @@ export function CotizacionUnificadaWizard({
                   setDetalle((d) =>
                     d.alquiler
                       ? {
-                          ...d,
-                          alquiler: {
-                            ...d.alquiler,
-                            tarifa: Number(e.target.value) || 0,
-                          },
-                        }
+                        ...d,
+                        alquiler: {
+                          ...d.alquiler,
+                          tarifa: Number(e.target.value) || 0,
+                        },
+                      }
                       : d,
                   )
                 }
@@ -2701,12 +2695,12 @@ export function CotizacionUnificadaWizard({
                   setDetalle((d) =>
                     d.alquiler
                       ? {
-                          ...d,
-                          alquiler: {
-                            ...d.alquiler,
-                            unidades_tiempo: Number(e.target.value) || 0,
-                          },
-                        }
+                        ...d,
+                        alquiler: {
+                          ...d.alquiler,
+                          unidades_tiempo: Number(e.target.value) || 0,
+                        },
+                      }
                       : d,
                   )
                 }
@@ -2720,12 +2714,12 @@ export function CotizacionUnificadaWizard({
                   setDetalle((d) =>
                     d.alquiler
                       ? {
-                          ...d,
-                          alquiler: {
-                            ...d.alquiler,
-                            incluye_garantia_danios: e.target.checked,
-                          },
-                        }
+                        ...d,
+                        alquiler: {
+                          ...d.alquiler,
+                          incluye_garantia_danios: e.target.checked,
+                        },
+                      }
                       : d,
                   )
                 }
@@ -2743,12 +2737,12 @@ export function CotizacionUnificadaWizard({
                     setDetalle((d) =>
                       d.alquiler
                         ? {
-                            ...d,
-                            alquiler: {
-                              ...d.alquiler,
-                              monto_garantia: Number(e.target.value) || 0,
-                            },
-                          }
+                          ...d,
+                          alquiler: {
+                            ...d.alquiler,
+                            monto_garantia: Number(e.target.value) || 0,
+                          },
+                        }
                         : d,
                     )
                   }
@@ -2849,11 +2843,10 @@ export function CotizacionUnificadaWizard({
                 <dd className="font-semibold tabular-nums">{formatPen(economiaInterna.precioTotal)}</dd>
               </div>
               <div
-                className={`flex justify-between gap-3 rounded-lg px-3 py-2 sm:col-span-2 ${
-                  economiaInterna.gananciaEstimada < 0
+                className={`flex justify-between gap-3 rounded-lg px-3 py-2 sm:col-span-2 ${economiaInterna.gananciaEstimada < 0
                     ? "bg-red-500/15 font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300"
                     : "bg-[var(--color-primary-soft)]/20"
-                }`}
+                  }`}
               >
                 <dt className={economiaInterna.gananciaEstimada < 0 ? "" : "text-[var(--color-text-secondary)]"}>
                   Ganancia estimada
@@ -2861,11 +2854,10 @@ export function CotizacionUnificadaWizard({
                 <dd className="tabular-nums">{formatPen(economiaInterna.gananciaEstimada)}</dd>
               </div>
               <div
-                className={`flex justify-between gap-3 rounded-lg px-3 py-2 sm:col-span-2 ${
-                  (economiaInterna.margenPct ?? 0) < 0
+                className={`flex justify-between gap-3 rounded-lg px-3 py-2 sm:col-span-2 ${(economiaInterna.margenPct ?? 0) < 0
                     ? "bg-red-500/15 font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300"
                     : "bg-[var(--color-primary-soft)]/20"
-                }`}
+                  }`}
               >
                 <dt className={(economiaInterna.margenPct ?? 0) < 0 ? "" : "text-[var(--color-text-secondary)]"}>
                   Margen %
@@ -3028,15 +3020,15 @@ export function CotizacionUnificadaWizard({
               onChange={(e) =>
                 setFilterEstado(
                   e.target.value as
-                    | "todos"
-                    | "pendiente"
-                    | "lista_produccion"
-                    | "produccion"
-                    | "terminado"
-                    | "entregado"
-                    | "cobrada"
-                    | "inactivo"
-                    | "deudor",
+                  | "todos"
+                  | "pendiente"
+                  | "lista_produccion"
+                  | "produccion"
+                  | "terminado"
+                  | "entregado"
+                  | "cobrada"
+                  | "inactivo"
+                  | "deudor",
                 )
               }
             >
@@ -3100,23 +3092,22 @@ export function CotizacionUnificadaWizard({
                       if (!r.ok) alert(r.error);
                       else window.location.reload();
                     }}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold border-none cursor-pointer focus:ring-2 focus:ring-[var(--color-accent)] ${
-                      c.estado_flujo === "pendiente"
+                    className={`rounded-full px-3 py-1 text-xs font-semibold border-none cursor-pointer focus:ring-2 focus:ring-[var(--color-accent)] ${c.estado_flujo === "pendiente"
                         ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300"
                         : c.estado_flujo === "lista_produccion"
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-                        : c.estado_flujo === "en_produccion"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
-                        : c.estado_flujo === "cobrada"
-                        ? "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300"
-                        : c.estado_flujo === "terminado"
-                        ? "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300"
-                        : c.estado_flujo === "entregado"
-                        ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300"
-                        : c.estado_flujo === "inactivo"
-                        ? "bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-300"
-                        : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
-                    }`}
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                          : c.estado_flujo === "en_produccion"
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
+                            : c.estado_flujo === "cobrada"
+                              ? "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300"
+                              : c.estado_flujo === "terminado"
+                                ? "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300"
+                                : c.estado_flujo === "entregado"
+                                  ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300"
+                                  : c.estado_flujo === "inactivo"
+                                    ? "bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-300"
+                                    : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                      }`}
                   >
                     <option value="pendiente">Pendiente</option>
                     <option value="lista_produccion">Lista producción</option>
@@ -3147,7 +3138,7 @@ export function CotizacionUnificadaWizard({
                       PDF
                     </button>
                     {(c.estado_flujo === "lista_produccion" || c.estado_flujo === "en_produccion") &&
-                    canSave ? (
+                      canSave ? (
                       <button
                         type="button"
                         className="text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline"

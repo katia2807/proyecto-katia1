@@ -50,7 +50,7 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <MetricCard
           label="Productos activos"
           value={String(inventarioData.indicadores.totalProductosActivos)}
@@ -60,11 +60,6 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
           label="Con stock bajo"
           value={String(inventarioData.indicadores.productosConStockBajo)}
           hint="Revisar y reponer para evitar quiebres."
-        />
-        <MetricCard
-          label="Valorizacion total"
-          value={`S/ ${inventarioData.indicadores.valorInventario.toFixed(2)}`}
-          hint="Stock actual valorizado con costo promedio."
         />
         <MetricCard
           label="Movimientos del mes"

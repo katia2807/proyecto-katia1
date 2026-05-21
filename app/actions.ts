@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import { requireAuthContext } from "@/lib/auth";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
 import {
@@ -2218,8 +2219,17 @@ export async function createInventarioProducto(formData: FormData) {
     throw new Error("Datos de producto inválidos.");
   }
 
+  // Parse new optional fields
+  const stockInicialRaw = formData.get("stock_inicial");
+  const costoUnitarioRaw = formData.get("costo_unitario");
+  const stockInicial = stockInicialRaw ? Number(stockInicialRaw) : 0;
+  const costoUnitario = costoUnitarioRaw ? Number(costoUnitarioRaw) : 0;
+
+  const productoId = randomUUID();
+
   if (!hasSupabaseEnv()) {
     demoCreateInventarioProducto({
+      id: productoId,
       organization_id: DEFAULT_ORG_ID,
       codigo: parsed.data.codigo,
       nombre: parsed.data.nombre,
@@ -2227,9 +2237,22 @@ export async function createInventarioProducto(formData: FormData) {
       unidad: parsed.data.unidad,
       stock_minimo: parsed.data.stockMinimo,
     });
+
+    if (stockInicial > 0) {
+      demoCreateInventarioMovimiento({
+        organization_id: DEFAULT_ORG_ID,
+        producto_id: productoId,
+        fecha: new Date().toISOString().split("T")[0],
+        tipo: "entrada_compra",
+        cantidad: stockInicial,
+        costo_unitario: costoUnitario > 0 ? costoUnitario : null,
+        referencia: "Carga inicial de inventario",
+      });
+    }
   } else {
     const supabase = getSupabaseServerClient();
     const { error } = await supabase.from("inventario_productos").insert({
+      id: productoId,
       organization_id: DEFAULT_ORG_ID,
       codigo: parsed.data.codigo,
       nombre: parsed.data.nombre,
@@ -2241,6 +2264,21 @@ export async function createInventarioProducto(formData: FormData) {
     });
     if (error) {
       throw new Error(error.message);
+    }
+
+    if (stockInicial > 0) {
+      const { error: movError } = await supabase.from("inventario_movimientos").insert({
+        organization_id: DEFAULT_ORG_ID,
+        producto_id: productoId,
+        fecha: new Date().toISOString().split("T")[0],
+        tipo: "entrada_compra",
+        cantidad: stockInicial,
+        costo_unitario: costoUnitario > 0 ? costoUnitario : null,
+        referencia: "Carga inicial de inventario",
+      });
+      if (movError) {
+        throw new Error(movError.message);
+      }
     }
   }
   revalidatePath("/inventario");

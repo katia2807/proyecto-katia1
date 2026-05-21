@@ -41,7 +41,7 @@ export function ClienteCombobox({
   inputAriaLabel = "Buscar cliente",
   label,
 }: ClienteComboboxProps) {
-  const source = mockData ? MOCK_CLIENTES_COMPLETO : clientes;
+  const source = (mockData && clientes.length === 0) ? MOCK_CLIENTES_COMPLETO : clientes;
 
   const options: ComboboxOption[] = useMemo(
     () =>

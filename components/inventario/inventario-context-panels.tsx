@@ -43,6 +43,15 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
   const searchParams = useSearchParams();
   const [productoMovId, setProductoMovId] = useState("");
   const [productoCompraId, setProductoCompraId] = useState("");
+
+  const [stockInicial, setStockInicial] = useState("");
+  const [costoUnitario, setCostoUnitario] = useState("");
+  const costoTotalActual = useMemo(() => {
+    const qty = parseFloat(stockInicial);
+    const unit = parseFloat(costoUnitario);
+    if (isNaN(qty) || isNaN(unit)) return 0;
+    return qty * unit;
+  }, [stockInicial, costoUnitario]);
   
   const [openCompra, setOpenCompra] = useState(quick === "compra");
   const [compraFormKey, setCompraFormKey] = useState(0);
@@ -126,6 +135,8 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
       setOpenProducto(false);
       setProductoFormKey((k) => k + 1);
       setSelectedCategoria("");
+      setStockInicial("");
+      setCostoUnitario("");
     } else if (productoState.error) {
       showToast({ variant: "error", message: productoState.error });
     }
@@ -299,6 +310,8 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
           if (!next) {
             setProductoFormKey((k) => k + 1);
             setSelectedCategoria("");
+            setStockInicial("");
+            setCostoUnitario("");
           }
         }}
         replacePathOnClose="/inventario"
@@ -392,6 +405,32 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
             required
             className="md:col-span-2"
           />
+          <Field
+            name="stock_inicial"
+            label="Stock inicial (opcional)"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0"
+            value={stockInicial}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStockInicial(e.target.value)}
+          />
+          <Field
+            name="costo_unitario"
+            label="Costo por unidad (S/) (opcional)"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0.00"
+            value={costoUnitario}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCostoUnitario(e.target.value)}
+          />
+          <div className="md:col-span-2 flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+            <span>Costo total actual (autocalculado)</span>
+            <div className="h-10 flex items-center rounded-[var(--radius-md)] border border-[rgba(255,255,255,0.1)] bg-[var(--bg-primary)] px-3 text-sm font-semibold text-[var(--color-accent)] opacity-80 shadow-[var(--shadow-soft)]">
+              S/ {costoTotalActual.toFixed(2)}
+            </div>
+          </div>
           <input type="hidden" name="return_to" value="/inventario" />
           <input type="hidden" name="next_quick" value="movimiento" />
           <div className="md:col-span-2 flex gap-2">
