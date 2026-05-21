@@ -87,15 +87,6 @@ async function getMuebleNombre(id: string): Promise<string | null> {
   return data ? `${data.codigo} — ${data.nombre}` : null;
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const containerCls = "mx-auto max-w-[680px] p-8 font-sans text-[13px] text-slate-900";
-const sectionCls = "mt-6 rounded-xl border border-slate-200 p-4";
-const labelCls = "text-[10px] font-semibold uppercase tracking-wide text-slate-400";
-const valueCls = "mt-0.5 text-sm font-medium text-slate-800";
-const thCls = "border-b border-slate-200 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 text-left";
-const tdCls = "py-2 text-sm text-slate-800";
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function ComprobantePage({ params }: { params: Promise<Params> }) {
@@ -187,149 +178,137 @@ export default async function ComprobantePage({ params }: { params: Promise<Para
     ];
   }
 
-  const igv  = totalSoles * 0.18;
-  const base = totalSoles - igv;
-
   return (
     <>
-      {/* Print CSS */}
+      {/* Print + theme CSS */}
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { background: white !important; }
+          body { background: white !important; color: #0f172a !important; }
           @page { margin: 14mm; }
+          .voucher-card { background: white !important; color: #0f172a !important; }
+          .voucher-section { border-color: #e2e8f0 !important; }
+          .voucher-label { color: #64748b !important; }
+          .voucher-value { color: #1e293b !important; }
+          .voucher-th { color: #64748b !important; border-color: #e2e8f0 !important; }
+          .voucher-td { color: #1e293b !important; }
+          .voucher-total-line { border-color: #334155 !important; color: #0f172a !important; }
         }
-        body { background: #f1f5f9; }
+        body { background: var(--color-bg, #f1f5f9); }
       `}</style>
 
       {/* Toolbar */}
-      <div className="no-print sticky top-0 z-50 flex items-center justify-between gap-4 bg-slate-800 px-6 py-3 shadow">
-        <a href="javascript:history.back()" className="text-sm text-slate-300 hover:text-white">
+      <div className="no-print sticky top-0 z-50 flex items-center justify-between gap-4 bg-[var(--color-surface,#1e293b)] border-b border-[var(--color-border,#334155)] px-6 py-3 shadow">
+        <a href="javascript:history.back()" className="text-sm text-[var(--color-text-secondary,#94a3b8)] hover:text-[var(--color-text-primary,#f8fafc)] transition-colors">
           ← Volver
         </a>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400">Comprobante #{correlativo}</span>
+          <span className="text-xs text-[var(--color-text-secondary,#94a3b8)]">Comprobante #{correlativo}</span>
           <PrintButton />
         </div>
       </div>
 
       {/* Voucher */}
-      <div className={containerCls}>
-        {/* Header */}
-        <div className="flex items-start justify-between gap-6">
-          <div className="flex-1">
-            {empresa.logo_url ? (
-              <Image
-                src={empresa.logo_url}
-                alt={empresa.nombre}
-                width={140}
-                height={56}
-                className="mb-2 object-contain"
-                unoptimized
-              />
-            ) : null}
-            <p className="text-base font-bold uppercase tracking-wide text-slate-800">{empresa.nombre}</p>
-            <p className="text-[11px] text-slate-500">RUC: {empresa.ruc}</p>
-            {empresa.direccion ? <p className="text-[11px] text-slate-500">{empresa.direccion}</p> : null}
-            {empresa.telefono ? <p className="text-[11px] text-slate-500">Tel: {empresa.telefono}</p> : null}
-          </div>
+      <div className="mx-auto max-w-[680px] p-8 font-sans text-[13px]">
+        <div className="voucher-card rounded-2xl bg-[var(--color-card,#ffffff)] text-[var(--color-text-primary,#0f172a)] shadow-lg ring-1 ring-[var(--color-border,#e2e8f0)] p-8">
 
-          {/* Voucher box */}
-          <div className="rounded-xl border-2 border-slate-700 px-5 py-3 text-center">
-            <div className="no-print mb-2 flex gap-2">
-              <span className="rounded bg-slate-700 px-2 py-0.5 text-xs font-semibold text-white">BOLETA</span>
-              <span className="rounded border border-slate-300 px-2 py-0.5 text-xs font-semibold text-slate-600">FACTURA</span>
+          {/* Header */}
+          <div className="flex items-start justify-between gap-6">
+            <div className="flex-1">
+              {empresa.logo_url ? (
+                <Image
+                  src={empresa.logo_url}
+                  alt={empresa.nombre}
+                  width={140}
+                  height={56}
+                  className="mb-2 object-contain"
+                  unoptimized
+                />
+              ) : null}
+              <p className="text-base font-bold uppercase tracking-wide text-[var(--color-text-primary,#0f172a)]">{empresa.nombre}</p>
+              <p className="text-[11px] text-[var(--color-text-secondary,#64748b)]">RUC: {empresa.ruc}</p>
+              {empresa.direccion ? <p className="text-[11px] text-[var(--color-text-secondary,#64748b)]">{empresa.direccion}</p> : null}
+              {empresa.telefono ? <p className="text-[11px] text-[var(--color-text-secondary,#64748b)]">Tel: {empresa.telefono}</p> : null}
             </div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">COMPROBANTE DE VENTA</p>
-            <p className="mt-1 text-lg font-bold text-slate-800">#{correlativo}</p>
-            <p className="mt-0.5 text-xs text-slate-500">{fechaVenta}</p>
-          </div>
-        </div>
 
-        {/* Client */}
-        <div className={sectionCls}>
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">Datos del cliente</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className={labelCls}>Nombre / Razón social</p>
-              <p className={valueCls}>{clienteNombre}</p>
-            </div>
-            <div>
-              <p className={labelCls}>DNI / RUC</p>
-              <p className={valueCls}>{clienteDoc}</p>
+            {/* Voucher box */}
+            <div className="rounded-xl border-2 border-[var(--color-border,#334155)] px-5 py-3 text-center">
+              <div className="no-print mb-2 flex gap-2">
+                <span className="rounded bg-[var(--color-accent,#3b82f6)] px-2 py-0.5 text-xs font-semibold text-white">BOLETA</span>
+                <span className="rounded border border-[var(--color-border,#e2e8f0)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary,#64748b)]">FACTURA</span>
+              </div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-secondary,#64748b)]">COMPROBANTE DE VENTA</p>
+              <p className="mt-1 text-lg font-bold text-[var(--color-text-primary,#0f172a)]">#{correlativo}</p>
+              <p className="mt-0.5 text-xs text-[var(--color-text-secondary,#64748b)]">{fechaVenta}</p>
             </div>
           </div>
-        </div>
 
-        {/* Items */}
-        <div className={sectionCls}>
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">Detalle</p>
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className={`${thCls} w-1/2`}>Descripción</th>
-                <th className={`${thCls} text-right`}>Cant.</th>
-                <th className={`${thCls} text-right`}>Precio unit.</th>
-                <th className={`${thCls} text-right`}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, i) => (
-                <tr key={i} className={i % 2 === 0 ? "bg-slate-50" : ""}>
-                  <td className={tdCls}>{item.desc}</td>
-                  <td className={`${tdCls} text-right`}>{item.qty}</td>
-                  <td className={`${tdCls} text-right`}>{item.unitario}</td>
-                  <td className={`${tdCls} text-right font-semibold`}>{item.total}</td>
+          {/* Client */}
+          <div className="voucher-section mt-6 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4">
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Datos del cliente</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="voucher-label text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#94a3b8)]">Nombre / Razón social</p>
+                <p className="voucher-value mt-0.5 text-sm font-medium text-[var(--color-text-primary,#1e293b)]">{clienteNombre}</p>
+              </div>
+              <div>
+                <p className="voucher-label text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#94a3b8)]">DNI / RUC</p>
+                <p className="voucher-value mt-0.5 text-sm font-medium text-[var(--color-text-primary,#1e293b)]">{clienteDoc}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Items */}
+          <div className="voucher-section mt-4 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4">
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Detalle</p>
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className="voucher-th w-1/2 border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-left">Descripción</th>
+                  <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Cant.</th>
+                  <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Precio unit.</th>
+                  <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {items.map((item, i) => (
+                  <tr key={i} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
+                    <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)]">{item.desc}</td>
+                    <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{item.qty}</td>
+                    <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{item.unitario}</td>
+                    <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right font-semibold">{item.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        {/* Totals */}
-        <div className="mt-4 flex justify-end">
-          <div className="w-64 space-y-1">
-            <div className="flex justify-between text-sm text-slate-600">
-              <span>Valor de venta</span>
-              <span>{formatPen(base)}</span>
-            </div>
-            <div className="flex justify-between text-sm text-slate-600">
-              <span>IGV (18%)</span>
-              <span>{formatPen(igv)}</span>
-            </div>
-            <div className="mt-1 flex justify-between border-t border-slate-700 pt-1.5 text-base font-bold text-slate-900">
-              <span>TOTAL</span>
-              <span>{formatPen(totalSoles)}</span>
+          {/* Total */}
+          <div className="mt-4 flex justify-end">
+            <div className="w-64">
+              <div className="voucher-total-line flex justify-between border-t border-[var(--color-border,#334155)] pt-2 text-base font-bold text-[var(--color-text-primary,#0f172a)]">
+                <span>TOTAL</span>
+                <span>{formatPen(totalSoles)}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Payment + delivery */}
-        <div className={`${sectionCls} grid grid-cols-3 gap-4`}>
-          <div>
-            <p className={labelCls}>Modalidad de pago</p>
-            <p className={`${valueCls} capitalize`}>{modalidad}</p>
+          {/* Payment + delivery */}
+          <div className="voucher-section mt-4 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4 grid grid-cols-3 gap-4">
+            <div>
+              <p className="voucher-label text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#94a3b8)]">Modalidad de pago</p>
+              <p className="voucher-value mt-0.5 text-sm font-medium text-[var(--color-text-primary,#1e293b)] capitalize">{modalidad}</p>
+            </div>
+            <div>
+              <p className="voucher-label text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#94a3b8)]">Método de pago</p>
+              <p className="voucher-value mt-0.5 text-sm font-medium text-[var(--color-text-primary,#1e293b)] capitalize">{metodo}</p>
+            </div>
+            <div>
+              <p className="voucher-label text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#94a3b8)]">Entrega</p>
+              <p className="voucher-value mt-0.5 text-sm font-medium text-[var(--color-text-primary,#1e293b)] capitalize">{entrega}</p>
+            </div>
           </div>
-          <div>
-            <p className={labelCls}>Método de pago</p>
-            <p className={`${valueCls} capitalize`}>{metodo}</p>
-          </div>
-          <div>
-            <p className={labelCls}>Entrega</p>
-            <p className={`${valueCls} capitalize`}>{entrega}</p>
-          </div>
-        </div>
 
-        {/* Footer */}
-        <div className="mt-8 flex items-end justify-between gap-4 border-t border-slate-200 pt-6">
-          <p className="text-[10px] text-slate-400">
-            Documento generado por Katia Suite · {empresa.nombre}
-          </p>
-          <div className="text-center">
-            <div className="mb-1 h-px w-48 bg-slate-400" />
-            <p className="text-[11px] text-slate-500">{empresa.firmante}</p>
-            <p className="text-[10px] text-slate-400">Firma autorizada</p>
-          </div>
         </div>
       </div>
     </>

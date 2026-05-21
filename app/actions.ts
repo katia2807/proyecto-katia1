@@ -2288,6 +2288,46 @@ export async function createInventarioMovimiento(formData: FormData) {
   maybeRedirectToQuickStep(formData);
 }
 
+export async function submitCreateInventarioProductoForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createInventarioProducto(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Producto creado con éxito.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo crear el producto.",
+      message: null,
+    };
+  }
+}
+
+export async function submitCreateInventarioMovimientoForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createInventarioMovimiento(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Movimiento de inventario registrado con éxito.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo registrar el movimiento.",
+      message: null,
+    };
+  }
+}
+
 export async function createInventarioCompraRapida(formData: FormData) {
   const actor = await requireMutationAccess(writerRoles);
   const parsed = inventarioCompraRapidaSchema.safeParse({
@@ -3066,6 +3106,26 @@ export async function createVentaMuebleTerminado(formData: FormData) {
   revalidatePath("/caja");
 }
 
+export async function submitCreateVentaMuebleTerminadoForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createVentaMuebleTerminado(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Venta de mueble registrada correctamente.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo registrar la venta.",
+      message: null,
+    };
+  }
+}
+
 export async function marcarEntregaMueble(formData: FormData) {
   const actor = await requireMutationAccess(ventasRoles);
   const id = String(formData.get("id") ?? "");
@@ -3436,6 +3496,23 @@ export async function createVentaMaderaCortada(formData: FormData) {
   revalidatePath("/caja");
 }
 
+/** Wrapper con MutationFormState para useActionState (cierre automático del modal). */
+export async function submitCreateVentaMaderaCortadaForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createVentaMaderaCortada(formData);
+    return { success: true, error: null, message: "Venta registrada correctamente." };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo registrar la venta.",
+      message: null,
+    };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Sub-flujo 4: Alquiler Bomba Mixer (contrato extendido)
 // ---------------------------------------------------------------------------
@@ -3773,6 +3850,26 @@ export async function createServicioAserradero(formData: FormData) {
   revalidatePath("/ventas");
   revalidatePath("/ventas/aserradero-servicios");
   revalidatePath("/caja");
+}
+
+export async function submitCreateServicioAserraderoForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createServicioAserradero(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Servicio de aserradero registrado correctamente.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo registrar el servicio.",
+      message: null,
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -4145,3 +4242,64 @@ export async function forzarEliminarClienteCompleto(formData: FormData) {
   revalidatePath("/gerencial");
   redirect("/gerencial?mensaje=" + encodeURIComponent("Cliente y todos sus registros eliminados correctamente."));
 }
+
+export async function submitCreateClienteForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createCliente(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Cliente registrado con éxito.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo registrar el cliente.",
+      message: null,
+    };
+  }
+}
+
+export async function submitCreateProveedorForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createProveedor(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Proveedor registrado con éxito.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo registrar el proveedor.",
+      message: null,
+    };
+  }
+}
+
+export async function submitCreateChoferForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createChofer(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Chofer registrado con éxito.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo registrar el chofer.",
+      message: null,
+    };
+  }
+}
+

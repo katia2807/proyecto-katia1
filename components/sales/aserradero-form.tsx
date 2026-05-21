@@ -1,12 +1,15 @@
 "use client";
 
-import { createServicioAserradero } from "@/app/actions";
-import { useMemo, useState } from "react";
+import { submitCreateServicioAserraderoForm } from "@/app/actions";
+import { useMemo, useState, useActionState, useEffect } from "react";
 import { CubicajeInput } from "@/components/sales/cubicaje-input";
 import { MargenIndicator } from "@/components/sales/margen-indicator";
+import { NuevoClienteInlinePanel } from "@/components/sales/nuevo-cliente-inline-panel";
 import { Button } from "@/components/ui/button";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field } from "@/components/ui/field";
+import { useToast } from "@/components/ui/toast";
+import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { liteClientesToCompleto } from "@/lib/combobox-mocks";
 import { formatPen } from "@/lib/utils";
 
@@ -25,6 +28,7 @@ type AserraderoFormProps = {
   defaultCostoPorPieCubico?: number;
   /** Lista mock para ClienteCombobox sin Supabase. */
   mockData?: boolean;
+  onSuccess?: () => void;
 };
 
 const PIE_TABLAR_A_PIE_CUBICO = 1 / 12;
@@ -39,11 +43,27 @@ export function AserraderoForm({
   serviciosEspeciales,
   defaultCostoPorPieCubico = 0.5,
   mockData = false,
+  onSuccess,
 }: AserraderoFormProps) {
+  const { showToast } = useToast();
   const hoy = new Date().toISOString().slice(0, 10);
   const [clienteId, setClienteId] = useState("");
+  const [clientesLocales, setClientesLocales] = useState<{ id: string; nombre: string }[]>([]);
+  const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
   const [costoPorPieCubico, setCostoPorPieCubico] = useState(defaultCostoPorPieCubico);
   const [piezasJson, setPiezasJson] = useState<string>(DEFAULT_LINEAS_CUBICAJE_JSON);
+
+  const [state, formAction] = useActionState(submitCreateServicioAserraderoForm, mutationFormInitialState);
+
+  useEffect(() => {
+    if (state.success && state.message) {
+      showToast({ variant: "success", message: state.message });
+      onSuccess?.();
+    } else if (state.error) {
+      showToast({ variant: "error", message: state.error });
+    }
+  }, [state, showToast, onSuccess]);
+
   const [seleccionados, setSeleccionados] = useState<Record<string, { activo: boolean; cantidad: number; tarifa: number }>>(
     Object.fromEntries(
       serviciosEspeciales.map((s) => [s.id, { activo: false, cantidad: 1, tarifa: s.tarifa_por_pieza }]),
@@ -79,7 +99,14 @@ export function AserraderoForm({
   const precioCobrado = costoCubicaje + totalServiciosEspeciales;
   const utilidad = precioCobrado - costoCubicaje;
 
-  const clientesCombo = useMemo(() => liteClientesToCompleto(clientes), [clientes]);
+  const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
+  const clientesCombo = useMemo(() => liteClientesToCompleto(todosLosClientes), [todosLosClientes]);
+
+  function handleClienteCreado(id: string, nombre: string) {
+    setClientesLocales((prev) => [...prev, { id, nombre }]);
+    setClienteId(id);
+    setModoCliente("buscar");
+  }
 
   const lineasPayload = useMemo(
     () =>
@@ -101,7 +128,7 @@ export function AserraderoForm({
 
   return (
     <form
-      action={createServicioAserradero}
+      action={formAction}
       className="space-y-4"
       onChange={(e) => {
         const target = e.target as unknown as HTMLInputElement;
@@ -111,16 +138,47 @@ export function AserraderoForm({
       }}
     >
       <div className="grid gap-3 md:grid-cols-2">
-        <ClienteCombobox
-          mockData={mockData}
-          clientes={clientesCombo}
-          value={clienteId}
-          onChange={setClienteId}
-          hiddenInputName="cliente_id"
-          label="Cliente"
-          placeholder="Buscar cliente…"
-          inputAriaLabel="Cliente para servicio de aserradero"
-        />
+        {/* ── CLIENTE ── */}
+        <div className="space-y-2">
+          {modoCliente === "buscar" ? (
+            <>
+              <ClienteCombobox
+                mockData={mockData}
+                clientes={clientesCombo}
+                value={clienteId}
+                onChange={setClienteId}
+                hiddenInputName="cliente_id"
+                label="Cliente"
+                placeholder="Buscar cliente…"
+                inputAriaLabel="Cliente para servicio de aserradero"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModoCliente("nuevo")}
+                  className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                >
+                  + Nuevo cliente
+                </button>
+                <span className="text-xs text-[var(--color-text-secondary)]">·</span>
+                <button
+                  type="button"
+                  onClick={() => setModoCliente("temporal")}
+                  className="text-xs font-semibold text-[var(--color-text-secondary)] hover:underline"
+                >
+                  + Cliente temporal
+                </button>
+              </div>
+            </>
+          ) : (
+            <NuevoClienteInlinePanel
+              temporal={modoCliente === "temporal"}
+              onCreated={handleClienteCreado}
+              onCancel={() => setModoCliente("buscar")}
+            />
+          )}
+        </div>
+
         <Field name="fecha" type="date" label="Fecha" defaultValue={hoy} required />
       </div>
 

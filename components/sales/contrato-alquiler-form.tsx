@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 /** Firma que admite `<form action>` con `useActionState` (React tipa la acción enlazada como 1 arg). */
 type FormActionProp = Exclude<ComponentProps<"form">["action"], string | undefined>;
 import { PagoFormFields } from "@/components/sales/pago-form-fields";
+import { NuevoClienteInlinePanel } from "@/components/sales/nuevo-cliente-inline-panel";
 import { Button } from "@/components/ui/button";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field, SelectField } from "@/components/ui/field";
@@ -42,6 +43,8 @@ export function ContratoAlquilerForm({
 }: ContratoAlquilerFormProps) {
   const hoy = new Date().toISOString().slice(0, 10);
   const [clienteId, setClienteId] = useState("");
+  const [clientesLocales, setClientesLocales] = useState<{ id: string; nombre: string; ruc?: string | null }[]>([]);
+  const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
   const [tarifa, setTarifa] = useState(0);
   const [dias, setDias] = useState(1);
   const [tarifaUnidad, setTarifaUnidad] = useState<(typeof tarifas)[number]["value"]>(
@@ -54,21 +57,59 @@ export function ContratoAlquilerForm({
 
   const deposito30 = useMemo(() => Number((montoTotal * 0.3).toFixed(2)), [montoTotal]);
 
-  const clientesCombo = useMemo(() => contratoClientesToCompleto(clientes), [clientes]);
+  const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
+  const clientesCombo = useMemo(() => contratoClientesToCompleto(todosLosClientes), [todosLosClientes]);
+
+  function handleClienteCreado(id: string, nombre: string) {
+    setClientesLocales((prev) => [...prev, { id, nombre }]);
+    setClienteId(id);
+    setModoCliente("buscar");
+  }
 
   return (
     <form action={panelAction} className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
-        <ClienteCombobox
-          mockData={mockData}
-          clientes={clientesCombo}
-          value={clienteId}
-          onChange={setClienteId}
-          hiddenInputName="cliente_id"
-          label="Cliente"
-          placeholder="Buscar cliente…"
-          inputAriaLabel="Cliente para contrato de alquiler"
-        />
+        {/* ── CLIENTE ── */}
+        <div className="space-y-2">
+          {modoCliente === "buscar" ? (
+            <>
+              <ClienteCombobox
+                mockData={mockData}
+                clientes={clientesCombo}
+                value={clienteId}
+                onChange={setClienteId}
+                hiddenInputName="cliente_id"
+                label="Cliente"
+                placeholder="Buscar cliente…"
+                inputAriaLabel="Cliente para contrato de alquiler"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModoCliente("nuevo")}
+                  className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                >
+                  + Nuevo cliente
+                </button>
+                <span className="text-xs text-[var(--color-text-secondary)]">·</span>
+                <button
+                  type="button"
+                  onClick={() => setModoCliente("temporal")}
+                  className="text-xs font-semibold text-[var(--color-text-secondary)] hover:underline"
+                >
+                  + Cliente temporal
+                </button>
+              </div>
+            </>
+          ) : (
+            <NuevoClienteInlinePanel
+              temporal={modoCliente === "temporal"}
+              onCreated={handleClienteCreado}
+              onCancel={() => setModoCliente("buscar")}
+            />
+          )}
+        </div>
+
         <Field name="codigo" label="Código de contrato" placeholder="CT-2026-0001" />
         <Field name="activo" label="Activo / equipo" placeholder="Bomba Mixer" required />
         <Field

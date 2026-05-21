@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  createInventarioMovimiento,
-  createInventarioProducto,
+  submitCreateInventarioProductoForm,
+  submitCreateInventarioMovimientoForm,
   submitInventarioCompraRapidaForm,
 } from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
@@ -43,12 +43,22 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
   const searchParams = useSearchParams();
   const [productoMovId, setProductoMovId] = useState("");
   const [productoCompraId, setProductoCompraId] = useState("");
+  
   const [openCompra, setOpenCompra] = useState(quick === "compra");
   const [compraFormKey, setCompraFormKey] = useState(0);
+  const [compraState, compraFormAction] = useActionState(submitInventarioCompraRapidaForm, mutationFormInitialState);
+
+  const [openProducto, setOpenProducto] = useState(quick === "producto");
+  const [productoFormKey, setProductoFormKey] = useState(0);
+  const [productoState, productoFormAction] = useActionState(submitCreateInventarioProductoForm, mutationFormInitialState);
+
+  const [openMovimiento, setOpenMovimiento] = useState(quick === "movimiento");
+  const [movimientoFormKey, setMovimientoFormKey] = useState(0);
+  const [movimientoState, movimientoFormAction] = useActionState(submitCreateInventarioMovimientoForm, mutationFormInitialState);
+
   const [showCubicaje, setShowCubicaje] = useState(false);
   const [cantidadCubicada, setCantidadCubicada] = useState("");
   const { showToast } = useToast();
-  const [compraState, compraFormAction] = useActionState(submitInventarioCompraRapidaForm, mutationFormInitialState);
 
   // Estado para categorías personalizadas en nuevo producto
   const [categoriasExtra, setCategoriasExtra] = useState<string[]>([]);
@@ -76,19 +86,25 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
   );
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (quick === "compra") setOpenCompra(true);
+    if (quick === "producto") setOpenProducto(true);
+    if (quick === "movimiento") setOpenMovimiento(true);
   }, [quick]);
 
   useEffect(() => {
     const q = searchParams.get("quick");
     const pid = searchParams.get("producto_id")?.trim();
     if (q === "compra") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenCompra(true);
       if (pid && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pid)) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setProductoCompraId(pid);
+      }
+    } else if (q === "producto") {
+      setOpenProducto(true);
+    } else if (q === "movimiento") {
+      setOpenMovimiento(true);
+      if (pid && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pid)) {
+        setProductoMovId(pid);
       }
     }
   }, [searchParams]);
@@ -96,16 +112,35 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
   useEffect(() => {
     if (compraState.success && compraState.message) {
       showToast({ variant: "success", message: compraState.message });
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenCompra(false);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCompraFormKey((k) => k + 1);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProductoCompraId("");
     } else if (compraState.error) {
       showToast({ variant: "error", message: compraState.error });
     }
   }, [compraState, showToast]);
+
+  useEffect(() => {
+    if (productoState.success && productoState.message) {
+      showToast({ variant: "success", message: productoState.message });
+      setOpenProducto(false);
+      setProductoFormKey((k) => k + 1);
+      setSelectedCategoria("");
+    } else if (productoState.error) {
+      showToast({ variant: "error", message: productoState.error });
+    }
+  }, [productoState, showToast]);
+
+  useEffect(() => {
+    if (movimientoState.success && movimientoState.message) {
+      showToast({ variant: "success", message: movimientoState.message });
+      setOpenMovimiento(false);
+      setMovimientoFormKey((k) => k + 1);
+      setProductoMovId("");
+    } else if (movimientoState.error) {
+      showToast({ variant: "error", message: movimientoState.error });
+    }
+  }, [movimientoState, showToast]);
 
   function handleAgregarCategoria() {
     const valor = nuevaCategoriaInput.trim();
@@ -258,10 +293,17 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
         triggerClassName="border border-violet-500/45 bg-violet-500/15 text-violet-50 hover:bg-violet-500/25 hover:brightness-105"
         title="Nuevo producto"
         description="Completa solo lo necesario para registrarlo."
-        openByDefault={quick === "producto"}
+        open={openProducto}
+        onOpenChange={(next) => {
+          setOpenProducto(next);
+          if (!next) {
+            setProductoFormKey((k) => k + 1);
+            setSelectedCategoria("");
+          }
+        }}
         replacePathOnClose="/inventario"
       >
-        <form action={createInventarioProducto} className="grid gap-3 md:grid-cols-2">
+        <form key={productoFormKey} action={productoFormAction} className="grid gap-3 md:grid-cols-2">
           {/* Nombre + código con sugerencia automática */}
           <CodigoProductoPreview />
 
@@ -365,10 +407,17 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
         triggerClassName="border border-sky-500/45 bg-sky-500/15 text-sky-50 hover:bg-sky-500/25 hover:brightness-105"
         title="Movimiento de inventario"
         description="Entrada, salida o ajuste en un panel puntual."
-        openByDefault={quick === "movimiento"}
+        open={openMovimiento}
+        onOpenChange={(next) => {
+          setOpenMovimiento(next);
+          if (!next) {
+            setMovimientoFormKey((k) => k + 1);
+            setProductoMovId("");
+          }
+        }}
         replacePathOnClose="/inventario"
       >
-        <form action={createInventarioMovimiento} className="grid gap-3 md:grid-cols-2">
+        <form key={movimientoFormKey} action={movimientoFormAction} className="grid gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
             <span>Producto</span>
             <Combobox

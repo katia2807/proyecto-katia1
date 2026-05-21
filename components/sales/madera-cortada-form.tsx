@@ -1,15 +1,17 @@
 "use client";
 
-import { createVentaMaderaCortada } from "@/app/actions";
-import { useMemo, useState } from "react";
+import { submitCreateVentaMaderaCortadaForm } from "@/app/actions";
+import { useMemo, useState, useEffect, useActionState } from "react";
 import { EntregaFormFields } from "@/components/sales/entrega-form-fields";
 import { PagoFormFields } from "@/components/sales/pago-form-fields";
+import { NuevoClienteInlinePanel } from "@/components/sales/nuevo-cliente-inline-panel";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/Combobox";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field, SelectField } from "@/components/ui/field";
 import { liteClientesToCompleto, MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
 import { formatPen } from "@/lib/utils";
+import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import type { ZonaEntregaRow } from "@/lib/demo-store";
 
 type Cliente = { id: string; nombre: string };
@@ -28,6 +30,8 @@ type MaderaCortadaFormProps = {
   productos: Producto[];
   zonas?: Pick<ZonaEntregaRow, "id" | "nombre" | "tarifa" | "distancia_km">[];
   mockData?: boolean;
+  /** Callback que se dispara cuando la venta se guardó con éxito (para cerrar el modal). */
+  onSuccess?: () => void;
 };
 
 const tiposCorte = [
@@ -47,9 +51,12 @@ export function MaderaCortadaForm({
   productos,
   zonas = [],
   mockData = false,
+  onSuccess,
 }: MaderaCortadaFormProps) {
   const hoy = new Date().toISOString().slice(0, 10);
   const [clienteId, setClienteId] = useState("");
+  const [clientesLocales, setClientesLocales] = useState<Cliente[]>([]);
+  const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
   const [cantidad, setCantidad] = useState(1);
   const [espesor, setEspesor] = useState(2);
   const [ancho, setAncho] = useState(6);
@@ -59,6 +66,17 @@ export function MaderaCortadaForm({
 
   const totalPt = useMemo(() => calcularPT(cantidad, espesor, ancho, largo), [cantidad, espesor, ancho, largo]);
   const totalSoles = useMemo(() => totalPt * precioPorPt, [totalPt, precioPorPt]);
+
+  // useActionState para detectar éxito y cerrar automáticamente
+  const [state, formAction] = useActionState(submitCreateVentaMaderaCortadaForm, mutationFormInitialState);
+
+  useEffect(() => {
+    if (state?.success && onSuccess) {
+      onSuccess();
+    }
+  }, [state, onSuccess]);
+
+  const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
 
   const effectiveProductos = useMemo((): Producto[] => {
     if (!mockData) return productos;
@@ -71,7 +89,7 @@ export function MaderaCortadaForm({
     }));
   }, [mockData, productos]);
 
-  const clientesCombo = useMemo(() => liteClientesToCompleto(clientes), [clientes]);
+  const clientesCombo = useMemo(() => liteClientesToCompleto(todosLosClientes), [todosLosClientes]);
 
   const productoComboOptions = useMemo(
     () => [
@@ -89,19 +107,56 @@ export function MaderaCortadaForm({
   const sinStock =
     productoSeleccionado && Number(productoSeleccionado.stock_actual) <= 0;
 
+  function handleClienteCreado(id: string, nombre: string) {
+    setClientesLocales((prev) => [...prev, { id, nombre }]);
+    setClienteId(id);
+    setModoCliente("buscar");
+  }
+
   return (
-    <form action={createVentaMaderaCortada} className="space-y-4">
+    <form action={formAction} className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
-        <ClienteCombobox
-          mockData={mockData}
-          clientes={clientesCombo}
-          value={clienteId}
-          onChange={setClienteId}
-          hiddenInputName="cliente_id"
-          label="Cliente"
-          placeholder="Buscar cliente…"
-          inputAriaLabel="Cliente para venta de madera cortada"
-        />
+        {/* ── CLIENTE ── */}
+        <div className="space-y-2">
+          {modoCliente === "buscar" ? (
+            <>
+              <ClienteCombobox
+                mockData={mockData}
+                clientes={clientesCombo}
+                value={clienteId}
+                onChange={setClienteId}
+                hiddenInputName="cliente_id"
+                label="Cliente"
+                placeholder="Buscar cliente…"
+                inputAriaLabel="Cliente para venta de madera cortada"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModoCliente("nuevo")}
+                  className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                >
+                  + Nuevo cliente
+                </button>
+                <span className="text-xs text-[var(--color-text-secondary)]">·</span>
+                <button
+                  type="button"
+                  onClick={() => setModoCliente("temporal")}
+                  className="text-xs font-semibold text-[var(--color-text-secondary)] hover:underline"
+                >
+                  + Cliente temporal
+                </button>
+              </div>
+            </>
+          ) : (
+            <NuevoClienteInlinePanel
+              temporal={modoCliente === "temporal"}
+              onCreated={handleClienteCreado}
+              onCancel={() => setModoCliente("buscar")}
+            />
+          )}
+        </div>
+
         <Field name="fecha" type="date" label="Fecha" defaultValue={hoy} required />
         <SelectField name="tipo_corte" label="Tipo de corte" defaultValue="tabla">
           {tiposCorte.map((t) => (
@@ -209,6 +264,10 @@ export function MaderaCortadaForm({
           <PagoFormFields showAdelantoInput={true} />
         </div>
       </div>
+
+      {state?.error ? (
+        <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-600">{state.error}</p>
+      ) : null}
 
       <Button>Confirmar venta</Button>
     </form>

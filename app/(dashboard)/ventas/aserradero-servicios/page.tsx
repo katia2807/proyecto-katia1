@@ -1,5 +1,4 @@
-import { ContextActionPanel } from "@/components/context-action-panel";
-import { AserraderoForm } from "@/components/sales/aserradero-form";
+import { AserraderoPanel } from "@/components/sales/aserradero-panel";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
@@ -41,17 +40,11 @@ export default async function AserraderoServiciosPage() {
           <CardDescription>Nuevo servicio con cubicaje base y procesos extra.</CardDescription>
         </div>
         {canMutate ? (
-          <ContextActionPanel
-            triggerLabel="Registrar servicio"
-            title="Nuevo servicio de aserradero"
-            description="Cubicaje + servicios especiales con cálculo en vivo de utilidad."
-          >
-            <AserraderoForm
-              clientes={clientes}
-              serviciosEspeciales={tarifas}
-              mockData={comboMock}
-            />
-          </ContextActionPanel>
+          <AserraderoPanel
+            clientes={clientes}
+            serviciosEspeciales={tarifas}
+            mockData={comboMock}
+          />
         ) : (
           <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
             Tu rol es de solo lectura.

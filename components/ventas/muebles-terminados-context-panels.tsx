@@ -1,6 +1,6 @@
 "use client";
 
-import { createVentaMuebleTerminado } from "@/app/actions";
+import { submitCreateVentaMuebleTerminadoForm } from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { EntregaFormFields } from "@/components/sales/entrega-form-fields";
 import { PagoFormFields } from "@/components/sales/pago-form-fields";
@@ -9,12 +9,14 @@ import { Combobox } from "@/components/ui/Combobox";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field, SelectField } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
+import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { liteClientesToCompleto, MOCK_MUEBLES_CATALOGO_VENTA } from "@/lib/combobox-mocks";
 import type { ZonaEntregaRow } from "@/lib/demo-store";
 import { formatPen } from "@/lib/utils";
 import { createCliente } from "@/app/actions";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useActionState, useEffect } from "react";
 
 type ClienteOpt = { id: string; nombre: string };
 type ChoferOpt = { id: string; nombre: string; telefono?: string | null; placa?: string | null };
@@ -130,6 +132,9 @@ export function MueblesTerminadosContextPanels({
   fechaDefault,
   mockData = false,
 }: MueblesTerminadosContextPanelsProps) {
+  const { showToast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [formKey, setFormKey] = useState(0);
   const [clienteVentaId, setClienteVentaId] = useState("");
   const [muebleCatalogoId, setMuebleCatalogoId] = useState("");
   const [tipoComprobante, setTipoComprobante] = useState<TipoComprobante>("nota_venta");
@@ -137,6 +142,26 @@ export function MueblesTerminadosContextPanels({
   // Estado para crear cliente inline
   const [clientesLocales, setClientesLocales] = useState<ClienteOpt[]>([]);
   const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
+
+  const [state, formAction] = useActionState(submitCreateVentaMuebleTerminadoForm, mutationFormInitialState);
+
+  function handleSuccess() {
+    setOpen(false);
+    setFormKey((k) => k + 1);
+    setClienteVentaId("");
+    setMuebleCatalogoId("");
+    setTipoComprobante("nota_venta");
+    setModoCliente("buscar");
+  }
+
+  useEffect(() => {
+    if (state.success && state.message) {
+      showToast({ variant: "success", message: state.message });
+      handleSuccess();
+    } else if (state.error) {
+      showToast({ variant: "error", message: state.error });
+    }
+  }, [state, showToast]);
 
   const clientesCombo = useMemo(
     () => liteClientesToCompleto([...clientes, ...clientesLocales]),
@@ -183,8 +208,13 @@ export function MueblesTerminadosContextPanels({
             → pestaña <strong>Productos</strong> → sección <strong>Catálogo de muebles</strong>.
           </>
         }
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) handleSuccess();
+        }}
       >
-        <form action={createVentaMuebleTerminado} className="space-y-4">
+        <form key={formKey} action={formAction} className="space-y-4">
 
           {/* ── TIPO DE COMPROBANTE ── */}
           <div>

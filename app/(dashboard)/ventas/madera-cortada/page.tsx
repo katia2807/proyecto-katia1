@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { ContextActionPanel } from "@/components/context-action-panel";
-import { MaderaCortadaForm } from "@/components/sales/madera-cortada-form";
+import { MaderaCortadaPanel } from "@/components/sales/madera-cortada-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
@@ -48,19 +47,13 @@ export default async function MaderaCortadaPage() {
           <CardDescription>Venta de madera cortada con cubicaje y entrega.</CardDescription>
         </div>
         {canMutate ? (
-          <ContextActionPanel
-            triggerLabel="Vender madera cortada"
-            title="Nueva venta de madera cortada"
-            description="Cliente, tipo de corte, calculadora PT, entrega y pago."
-          >
-            <MaderaCortadaForm
-              clientes={clientes}
-              choferes={choferes}
-              productos={productosMadera}
-              zonas={zonas}
-              mockData={comboMock}
-            />
-          </ContextActionPanel>
+          <MaderaCortadaPanel
+            clientes={clientes}
+            choferes={choferes}
+            productos={productosMadera}
+            zonas={zonas}
+            mockData={comboMock}
+          />
         ) : (
           <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
             Tu rol es de solo lectura.
