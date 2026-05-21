@@ -329,6 +329,10 @@ const inventarioProductoUpdateSchema = z.object({
   categoria: z.string().min(2),
   unidad: z.string().min(1),
   stockMinimo: z.coerce.number().nonnegative(),
+  stockActual: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : v),
+    z.coerce.number().nonnegative().optional(),
+  ),
 });
 
 const inventarioToggleActivoSchema = z.object({
@@ -2384,6 +2388,7 @@ export async function updateInventarioProducto(formData: FormData) {
     categoria: formData.get("categoria"),
     unidad: formData.get("unidad"),
     stockMinimo: formData.get("stock_minimo"),
+    stockActual: formData.get("stock_actual"),
   });
   if (!parsed.success) throw new Error("Datos de producto inválidos.");
 
@@ -2394,6 +2399,7 @@ export async function updateInventarioProducto(formData: FormData) {
       categoria: parsed.data.categoria,
       unidad: parsed.data.unidad,
       stock_minimo: parsed.data.stockMinimo,
+      ...(parsed.data.stockActual !== undefined ? { stock_actual: parsed.data.stockActual } : {}),
     });
     if (!updated) throw new Error("Producto no encontrado.");
   } else {
@@ -2406,6 +2412,7 @@ export async function updateInventarioProducto(formData: FormData) {
         categoria: parsed.data.categoria,
         unidad: parsed.data.unidad,
         stock_minimo: parsed.data.stockMinimo,
+        ...(parsed.data.stockActual !== undefined ? { stock_actual: parsed.data.stockActual } : {}),
       })
       .eq("id", parsed.data.id)
       .eq("organization_id", DEFAULT_ORG_ID);

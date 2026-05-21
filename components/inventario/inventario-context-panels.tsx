@@ -14,19 +14,32 @@ import { Field, SelectField } from "@/components/ui/field";
 import { MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { IconArrowsLeftRight, IconCirclePlus, IconShoppingCart } from "@tabler/icons-react";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CodigoProductoPreview } from "@/components/inventario/codigo-producto-preview";
 
 type ProductoOpt = { id: string; nombre: string };
+type ProveedorOpt = { id: string; nombre: string };
+
+const CATEGORIAS_BASE = [
+  "Madera",
+  "Tornillería",
+  "Barnices y Químicos",
+  "Muebles",
+  "Servicio",
+  "Herramientas",
+  "Accesorios",
+  "Otro",
+];
 
 type InventarioContextPanelsProps = {
   quick: string;
   productos: ProductoOpt[];
+  proveedores?: ProveedorOpt[];
   mockData?: boolean;
 };
 
-export function InventarioContextPanels({ quick, productos, mockData = false }: InventarioContextPanelsProps) {
+export function InventarioContextPanels({ quick, productos, proveedores = [], mockData = false }: InventarioContextPanelsProps) {
   const searchParams = useSearchParams();
   const [productoMovId, setProductoMovId] = useState("");
   const [productoCompraId, setProductoCompraId] = useState("");
@@ -36,6 +49,17 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
   const [cantidadCubicada, setCantidadCubicada] = useState("");
   const { showToast } = useToast();
   const [compraState, compraFormAction] = useActionState(submitInventarioCompraRapidaForm, mutationFormInitialState);
+
+  // Estado para categorías personalizadas en nuevo producto
+  const [categoriasExtra, setCategoriasExtra] = useState<string[]>([]);
+  const [nuevaCategoriaInput, setNuevaCategoriaInput] = useState("");
+  const [showNuevaCategoria, setShowNuevaCategoria] = useState(false);
+  const [selectedCategoria, setSelectedCategoria] = useState("");
+  const nuevaCategoriaRef = useRef<HTMLInputElement>(null);
+
+  const todasLasCategorias = useMemo(() => {
+    return [...CATEGORIAS_BASE, ...categoriasExtra];
+  }, [categoriasExtra]);
 
   const effectiveProductos = useMemo((): ProductoOpt[] => {
     if (!mockData) return productos;
@@ -82,6 +106,27 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
       showToast({ variant: "error", message: compraState.error });
     }
   }, [compraState, showToast]);
+
+  function handleAgregarCategoria() {
+    const valor = nuevaCategoriaInput.trim();
+    if (!valor) return;
+    if (todasLasCategorias.map((c) => c.toLowerCase()).includes(valor.toLowerCase())) {
+      setSelectedCategoria(valor);
+      setShowNuevaCategoria(false);
+      setNuevaCategoriaInput("");
+      return;
+    }
+    setCategoriasExtra((prev) => [...prev, valor]);
+    setSelectedCategoria(valor);
+    setNuevaCategoriaInput("");
+    setShowNuevaCategoria(false);
+  }
+
+  useEffect(() => {
+    if (showNuevaCategoria && nuevaCategoriaRef.current) {
+      nuevaCategoriaRef.current.focus();
+    }
+  }, [showNuevaCategoria]);
 
   return (
     <>
@@ -170,7 +215,34 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
             min="0"
             step="0.01"
           />
-          <Field name="proveedor" label="Proveedor (opcional)" placeholder="Texto libre" />
+
+          {/* Campo Proveedor como texto + lista de sugerencias (datalist) */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="compra-proveedor-input" className="text-sm font-medium text-[var(--color-text-primary)]">
+              Proveedor (opcional)
+            </label>
+            <input
+              id="compra-proveedor-input"
+              name="proveedor"
+              type="text"
+              list={proveedores.length > 0 ? "compra-proveedores-list" : undefined}
+              placeholder={proveedores.length > 0 ? "Buscar proveedor o escribir nombre…" : "Texto libre"}
+              className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface)_90%,var(--color-surface-2))] px-3 text-sm text-[var(--color-text-primary)] outline-none shadow-[var(--shadow-soft)] focus-visible:border-[var(--color-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+            />
+            {proveedores.length > 0 && (
+              <datalist id="compra-proveedores-list">
+                {proveedores.map((p) => (
+                  <option key={p.id} value={p.nombre} />
+                ))}
+              </datalist>
+            )}
+            {proveedores.length > 0 && (
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                Podés elegir de la lista o escribir un nombre nuevo.
+              </p>
+            )}
+          </div>
+
           <Field name="fecha" type="date" label="Fecha" required />
           <Field className="md:col-span-2" name="nota" label="Nota (opcional)" placeholder="Observación de la compra" />
           <div className="md:col-span-2">
@@ -193,17 +265,68 @@ export function InventarioContextPanels({ quick, productos, mockData = false }: 
           {/* Nombre + código con sugerencia automática */}
           <CodigoProductoPreview />
 
-          <SelectField name="categoria" label="Categoría" required>
-            <option value="">Seleccionar…</option>
-            <option value="Madera">Madera</option>
-            <option value="Tornillería">Tornillería / Ferretería</option>
-            <option value="Barnices y Químicos">Barnices y Químicos</option>
-            <option value="Muebles">Muebles</option>
-            <option value="Servicio">Servicio</option>
-            <option value="Herramientas">Herramientas</option>
-            <option value="Accesorios">Accesorios</option>
-            <option value="Otro">Otro</option>
-          </SelectField>
+          {/* Selector de categoría con botón para agregar nueva */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-[var(--color-text-primary)]">
+              Categoría <span className="text-red-400">*</span>
+            </label>
+            <div className="flex gap-2">
+              <select
+                name="categoria"
+                required
+                value={selectedCategoria}
+                onChange={(e) => setSelectedCategoria(e.target.value)}
+                className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+              >
+                <option value="">Seleccionar…</option>
+                {todasLasCategorias.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                title="Agregar nueva categoría"
+                onClick={() => setShowNuevaCategoria((v) => !v)}
+                className="flex items-center gap-1 rounded-xl border border-violet-500/40 bg-violet-500/15 px-2.5 py-2 text-xs font-semibold text-violet-300 transition hover:bg-violet-500/25"
+              >
+                <span>+ Nueva</span>
+              </button>
+            </div>
+
+            {showNuevaCategoria && (
+              <div className="flex gap-2 items-center mt-1">
+                <input
+                  ref={nuevaCategoriaRef}
+                  type="text"
+                  value={nuevaCategoriaInput}
+                  onChange={(e) => setNuevaCategoriaInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); handleAgregarCategoria(); }
+                    if (e.key === "Escape") { setShowNuevaCategoria(false); setNuevaCategoriaInput(""); }
+                  }}
+                  placeholder="Nombre de la categoría"
+                  className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                />
+                <button
+                  type="button"
+                  onClick={handleAgregarCategoria}
+                  className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/25 transition"
+                >
+                  Agregar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowNuevaCategoria(false); setNuevaCategoriaInput(""); }}
+                  className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-soft)] transition"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+
           <SelectField name="unidad" label="Unidad" required>
             <option value="">Seleccionar…</option>
             <option value="unidad">Unidad</option>

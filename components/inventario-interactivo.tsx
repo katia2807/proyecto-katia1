@@ -618,7 +618,10 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                   <p className="text-sm font-semibold text-[var(--color-text-primary)]">{row.nombre}</p>
                   <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
                     {row.codigo} · {row.categoria} · {row.unidad} · Mín. {row.stock_minimo} · Stock {row.stock_actual} · S/{" "}
-                    {row.valor_stock.toFixed(2)}
+                    {Number(row.valor_stock ?? 0).toFixed(2)}
+                    {Number(row.costo_unitario_promedio ?? 0) === 0 && Number(row.stock_actual) > 0 ? (
+                      <span className="ml-1 text-[var(--color-text-secondary)] opacity-70">(sin costo registrado)</span>
+                    ) : null}
                   </p>
                   <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
                     Estado: {row.activo ? "Activo" : "Inactivo"} · Último mov.:{" "}
@@ -1286,8 +1289,19 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
             <div className="grid gap-2">
               <DetailField label="Stock actual" value={`${selectedProduct.stock_actual} ${selectedProduct.unidad}`} />
               <DetailField label="Stock minimo" value={`${selectedProduct.stock_minimo} ${selectedProduct.unidad}`} />
-              <DetailField label="Valorizacion" value={formatPen(selectedProduct.valor_stock)} />
-              <DetailField label="Proveedor favorito" value="Campo opcional pendiente de ficha" />
+              <DetailField
+                label="Valorización"
+                value={
+                  Number(selectedProduct.costo_unitario_promedio ?? 0) === 0
+                    ? `S/ 0.00 — sin compras con costo`
+                    : formatPen(selectedProduct.valor_stock ?? 0)
+                }
+              />
+              {Number(selectedProduct.costo_unitario_promedio ?? 0) === 0 && (
+                <p className="text-xs text-[var(--color-text-secondary)] italic">
+                  Registrá una compra con costo unitario para calcular la valorización correctamente.
+                </p>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="secondary" onClick={() => openCompraReponer(selectedProduct.id)} disabled={!canMutate}>

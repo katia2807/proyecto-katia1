@@ -58,7 +58,7 @@ export function InventarioProductoEditModal({
 
   const desc =
     product != null
-      ? `Stock ${product.stock_actual} · Valorización S/ ${product.valor_stock.toFixed(2)} · Último mov. ${
+      ? `Stock ${product.stock_actual} · Valorización S/ ${Number(product.valor_stock ?? 0).toFixed(2)} · Último mov. ${
           product.ultimo_movimiento ? formatDate(product.ultimo_movimiento) : "—"
         } · ${product.activo ? "Activo" : "Inactivo"}.`
       : "Seleccioná un producto en la lista.";
@@ -85,17 +85,28 @@ export function InventarioProductoEditModal({
             <Field name="nombre" label="Nombre" defaultValue={product.nombre} required disabled={!canMutate} />
             <Field name="categoria" label="Categoría" defaultValue={product.categoria} required disabled={!canMutate} />
             <Field name="unidad" label="Unidad" defaultValue={product.unidad} required disabled={!canMutate} />
-            <div className="sm:col-span-2">
-              <Field
-                name="stock_minimo"
-                label="Stock mínimo"
-                type="number"
-                min="0"
-                step="0.01"
-                defaultValue={String(product.stock_minimo)}
-                required
-                disabled={!canMutate}
-              />
+            <Field
+              name="stock_minimo"
+              label="Stock mínimo"
+              type="number"
+              min="0"
+              step="0.01"
+              defaultValue={String(product.stock_minimo)}
+              required
+              disabled={!canMutate}
+            />
+            <Field
+              name="stock_actual"
+              label="Stock total actual"
+              type="number"
+              min="0"
+              step="0.01"
+              defaultValue={String(product.stock_actual)}
+              required
+              disabled={!canMutate}
+            />
+            <div className="sm:col-span-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              ⚠️ Modificar el stock directamente <strong>no genera movimiento en el Kardex</strong>. Para trazabilidad completa, usá <em>Ajuste de conteo</em> en la pestaña Alertas.
             </div>
           </form>
           {state.err ? (
