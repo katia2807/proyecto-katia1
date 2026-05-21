@@ -2981,7 +2981,6 @@ export async function deleteMuebleCatalogo(
         .eq("organization_id", DEFAULT_ORG_ID)
         .maybeSingle();
       if (!row) return { ok: false, error: "Mueble no encontrado." };
-      if (row.activo) return { ok: false, error: "Solo se pueden eliminar muebles inactivos." };
       const { error } = await supabase
         .from("muebles_catalogo")
         .delete()

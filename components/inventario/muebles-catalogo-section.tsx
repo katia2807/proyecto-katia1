@@ -238,7 +238,7 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
             <Button type="submit" variant={row.activo ? "danger" : "secondary"} disabled={!canMutate}>
               {row.activo ? "Desactivar" : "Activar"}
             </Button>
-            {!row.activo && canMutate ? (
+            {canMutate ? (
               <Button
                 type="button"
                 variant="danger"

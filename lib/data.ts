@@ -854,6 +854,56 @@ export async function getMueblesCatalogoRows(includeInactive = false) {
     return includeInactive ? rows : rows.filter((r) => r.activo !== false);
   }
   const supabase = getSupabaseServerClient();
+
+  // 1. Fetch inventory products of category "Muebles"
+  const { rows: inventoryProducts } = await loadInventarioProductosRows(true);
+  const furnitureProducts = inventoryProducts.filter((p) => p.categoria === "Muebles");
+
+  // 2. Fetch current catalog to find missing ones
+  const fetched = await safeQuery(async () => {
+    const { data } = await supabase
+      .from("muebles_catalogo")
+      .select("*")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .order("nombre", { ascending: true })
+      .limit(500);
+    return data ?? [];
+  }, []);
+
+  // 3. Auto-provision missing furniture catalog items and sync stock in database
+  for (const p of furnitureProducts) {
+    const match = fetched.find(
+      (m) =>
+        m.id === p.id ||
+        m.codigo.toLowerCase() === p.codigo.toLowerCase() ||
+        m.nombre.toLowerCase() === p.nombre.toLowerCase()
+    );
+    if (!match) {
+      await safeQuery(async () => {
+        await supabase.from("muebles_catalogo").insert({
+          id: p.id,
+          organization_id: p.organization_id || DEFAULT_ORG_ID,
+          codigo: p.codigo,
+          nombre: p.nombre,
+          descripcion: "Producto importado del inventario",
+          precio_lista: 0,
+          foto_url: null,
+          stock_disponible: p.stock_actual,
+          activo: p.activo,
+          created_at: p.created_at,
+        });
+      }, null);
+    } else if (match.stock_disponible !== p.stock_actual) {
+      await safeQuery(async () => {
+        await supabase
+          .from("muebles_catalogo")
+          .update({ stock_disponible: p.stock_actual })
+          .eq("id", match.id);
+      }, null);
+    }
+  }
+
+  // 4. Return final, fully synced catalog items
   return safeQuery(async () => {
     let query = supabase
       .from("muebles_catalogo")

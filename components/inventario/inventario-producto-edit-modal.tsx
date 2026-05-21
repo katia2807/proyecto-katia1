@@ -83,7 +83,8 @@ export function InventarioProductoEditModal({
             <input type="hidden" name="id" value={product.id} />
             <Field name="codigo" label="Código" defaultValue={product.codigo} required disabled={!canMutate} />
             <Field name="nombre" label="Nombre" defaultValue={product.nombre} required disabled={!canMutate} />
-            <Field name="categoria" label="Categoría" defaultValue={product.categoria} required disabled={!canMutate} />
+            <Field name="categoria_disabled" label="Categoría" defaultValue={product.categoria} required disabled={true} />
+            <input type="hidden" name="categoria" value={product.categoria} />
             <Field name="unidad" label="Unidad" defaultValue={product.unidad} required disabled={!canMutate} />
             <Field
               name="stock_minimo"

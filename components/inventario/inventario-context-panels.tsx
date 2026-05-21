@@ -380,6 +380,32 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
                 </button>
               </div>
             )}
+
+            {categoriasExtra.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {categoriasExtra.map((cat) => (
+                  <span
+                    key={cat}
+                    className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2.5 py-0.5 text-xs font-medium text-violet-300 border border-violet-500/20"
+                  >
+                    {cat}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCategoriasExtra((prev) => prev.filter((c) => c !== cat));
+                        if (selectedCategoria === cat) {
+                          setSelectedCategoria("");
+                        }
+                      }}
+                      className="ml-1 text-violet-400 hover:text-violet-250 transition-colors"
+                      title={`Eliminar categoría ${cat}`}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <SelectField name="unidad" label="Unidad" required>

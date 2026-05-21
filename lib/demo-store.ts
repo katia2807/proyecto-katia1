@@ -2440,6 +2440,34 @@ export function demoCreateChofer(
 }
 
 export function demoMueblesCatalogoRows() {
+  // Sync stock and auto-provision missing catalog rows from inventarioProductos!
+  for (const p of store.inventarioProductos) {
+    if (p.categoria === "Muebles") {
+      const match = store.mueblesCatalogo.find(
+        (m) =>
+          m.id === p.id ||
+          m.codigo.toLowerCase() === p.codigo.toLowerCase() ||
+          m.nombre.toLowerCase() === p.nombre.toLowerCase()
+      );
+      if (!match) {
+        store.mueblesCatalogo.push({
+          id: p.id,
+          organization_id: p.organization_id || orgId || "default-org-id",
+          codigo: p.codigo,
+          nombre: p.nombre,
+          descripcion: "Producto importado del inventario",
+          precio_lista: 0,
+          foto_url: null,
+          stock_disponible: p.stock_actual,
+          activo: p.activo,
+          created_at: p.created_at,
+        });
+      } else {
+        match.stock_disponible = p.stock_actual;
+      }
+    }
+  }
+  persistStore();
   return [...store.mueblesCatalogo].sort((a, b) => a.nombre.localeCompare(b.nombre));
 }
 
