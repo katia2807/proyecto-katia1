@@ -63,6 +63,7 @@ function DetalleVisual({ detalle }: { detalle: unknown }) {
   const modalidadLabel: Record<string, string> = {
     contado: "Contado",
     adelanto: "Adelanto",
+    adelanto_saldo: "Adelanto + saldo",
     credito: "Crédito",
   };
 
@@ -262,6 +263,16 @@ function DetalleVisual({ detalle }: { detalle: unknown }) {
   );
 }
 
+// ── FIX: helper robusto para parsear el total que llega de Supabase ──────────
+// Supabase puede devolver el campo `total` como string, number o null.
+// Number() falla con strings vacíos o valores inesperados; parseFloat + fallback
+// garantiza que siempre tengamos un número válido.
+function parseTotalSeguro(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  const n = parseFloat(String(value));
+  return Number.isFinite(n) ? n : 0;
+}
+
 export function CotizacionMasterDetail({ cotizaciones }: { cotizaciones: Cotizacion[] }) {
   const searchParams = useSearchParams();
   const initialId = searchParams.get("cotizacion");
@@ -292,6 +303,7 @@ export function CotizacionMasterDetail({ cotizaciones }: { cotizaciones: Cotizac
               <TH>Fecha</TH>
               <TH>Cliente</TH>
               <TH>Estado</TH>
+              {/* FIX: usamos parseTotalSeguro en lugar de Number() directo */}
               <TH className="text-right">Total</TH>
             </TRow>
           </THead>
@@ -302,7 +314,7 @@ export function CotizacionMasterDetail({ cotizaciones }: { cotizaciones: Cotizac
                 <TD>{formatDate(row.fecha)}</TD>
                 <TD>{row.cliente}</TD>
                 <TD><EstadoBadge estado={row.estado_flujo} /></TD>
-                <TD className="text-right font-semibold">{formatPen(Number(row.total))}</TD>
+                <TD className="text-right font-semibold">{formatPen(parseTotalSeguro(row.total))}</TD>
               </TRow>
             ))}
           </tbody>
@@ -327,7 +339,8 @@ export function CotizacionMasterDetail({ cotizaciones }: { cotizaciones: Cotizac
               <DetailField label="Cliente" value={selected.cliente} />
               <DetailField label="Fecha" value={formatDate(selected.fecha)} />
               <DetailField label="Tipo cliente" value={selected.tipo_cliente === "empresa" ? "Empresa" : "Persona natural"} />
-              <DetailField label="Total" value={formatPen(Number(selected.total))} />
+              {/* FIX: mismo helper para el drawer */}
+              <DetailField label="Total" value={formatPen(parseTotalSeguro(selected.total))} />
               <div className="col-span-2 space-y-1">
                 <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Estado</p>
                 <EstadoBadge estado={selected.estado_flujo} />

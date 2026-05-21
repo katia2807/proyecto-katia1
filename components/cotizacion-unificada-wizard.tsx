@@ -130,7 +130,7 @@ type MuebleTemplate = {
   acabadoOtroUI: string;
   costoAcabadoSolesUI: string;
   pagoMetodoUI: "efectivo" | "transferencia" | "yape" | "billetera_digital" | "otro";
-  pagoModalidadUI: "" | "contado" | "adelanto" | "credito";
+  pagoModalidadUI: "" | "contado" | "adelanto" | "adelanto_saldo" | "credito";
   plazoDiasUI: string;
   plazoUnidadUI: "dias" | "meses";
 };
@@ -157,7 +157,7 @@ type CotizacionDraft = {
   acabadoOtroUI: string;
   costoAcabadoSolesUI: string;
   pagoMetodoUI: "efectivo" | "transferencia" | "yape" | "billetera_digital" | "otro";
-  pagoModalidadUI: "" | "contado" | "adelanto" | "credito";
+  pagoModalidadUI: "" | "contado" | "adelanto" | "adelanto_saldo" | "credito";
   plazoDiasUI: string;
   plazoUnidadUI: "dias" | "meses";
 };
@@ -497,7 +497,7 @@ export function CotizacionUnificadaWizard({
   const [pagoMetodoUI, setPagoMetodoUI] = useState<
     "efectivo" | "transferencia" | "yape" | "billetera_digital" | "otro"
   >("efectivo");
-  const [pagoModalidadUI, setPagoModalidadUI] = useState<"" | "contado" | "adelanto" | "credito">("");
+  const [pagoModalidadUI, setPagoModalidadUI] = useState<"" | "contado" | "adelanto" | "adelanto_saldo" | "credito">("");
   const [plazoDiasUI, setPlazoDiasUI] = useState("15");
   const [plazoUnidadUI, setPlazoUnidadUI] = useState<"dias" | "meses">("dias");
   const [montoAdelantoUI, setMontoAdelantoUI] = useState("");
@@ -2002,16 +2002,17 @@ export function CotizacionUnificadaWizard({
                   className={`${inputClass} h-11`}
                   value={pagoModalidadUI}
                   onChange={(e) =>
-                    setPagoModalidadUI(e.target.value as "" | "contado" | "adelanto" | "credito")
+                    setPagoModalidadUI(e.target.value as "" | "contado" | "adelanto" | "adelanto_saldo" | "credito")
                   }
                 >
                   <option value="">Modalidad</option>
                   <option value="contado">Contado</option>
                   <option value="adelanto">Adelanto</option>
+                  <option value="adelanto_saldo">Adelanto + saldo</option>
                   <option value="credito">Crédito</option>
                 </select>
               </div>
-              {pagoModalidadUI === "credito" || pagoModalidadUI === "adelanto" ? (
+              {pagoModalidadUI === "credito" || pagoModalidadUI === "adelanto" || pagoModalidadUI === "adelanto_saldo" ? (
                 <div className="flex items-center gap-2">
                   <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-bold text-[var(--color-text-primary)]">
                     {plazoDiasUI} {plazoUnidadUI}
@@ -2034,7 +2035,7 @@ export function CotizacionUnificadaWizard({
                   </select>
                 </div>
               ) : null}
-              {pagoModalidadUI === "adelanto" ? (
+              {pagoModalidadUI === "adelanto" || pagoModalidadUI === "adelanto_saldo" ? (
                 <div className="space-y-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-3">
                   <label className="block space-y-1">
                     <span className="text-xs font-semibold text-[var(--color-text-secondary)]">

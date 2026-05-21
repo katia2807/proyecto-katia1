@@ -414,9 +414,21 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
             <p className="text-xs text-[var(--color-text-secondary)]">Unidades acumuladas en productos activos.</p>
           </Card>
           <Card>
-            <CardTitle>Valorización</CardTitle>
+            <CardTitle>Costo del inventario</CardTitle>
             <p className="mt-3 text-3xl font-black">S/ {indicadores.valorInventario.toFixed(2)}</p>
             <p className="text-xs text-[var(--color-text-secondary)]">Calculado con costo promedio de entradas.</p>
+          </Card>
+          <Card>
+            <CardTitle>Ventas del mes</CardTitle>
+            <p className="mt-3 text-3xl font-black">S/ {(() => {
+              const hoy = new Date();
+              const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+              const ventasMes = movimientos
+                .filter(m => m.tipo === 'salida_venta' && m.fecha.startsWith(mesActual))
+                .reduce((sum, m) => sum + (m.cantidad * (m.costo_unitario || 0)), 0);
+              return ventasMes.toFixed(2);
+            })()}</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">Movimientos de salida_venta del mes actual.</p>
           </Card>
           <Card>
             <CardTitle>Rotación promedio</CardTitle>
