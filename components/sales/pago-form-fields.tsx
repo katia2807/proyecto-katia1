@@ -24,7 +24,8 @@ const metodos: { value: MetodoPago; label: string }[] = [
 
 const modalidades: { value: ModalidadPago; label: string }[] = [
   { value: "contado", label: "Contado" },
-  { value: "adelanto", label: "Adelanto + saldo" },
+  { value: "adelanto", label: "Adelanto" },
+  { value: "adelanto_saldo", label: "Adelanto + saldo" },
   { value: "credito", label: "Crédito" },
 ];
 
@@ -70,10 +71,10 @@ export function PagoFormFields({
         ))}
       </SelectField>
 
-      {modalidad === "credito" ? (
+      {(modalidad === "credito" || modalidad === "adelanto_saldo") ? (
         <Field
           name={name("fecha_pago_credito")}
-          label="Fecha límite de pago"
+          label={modalidad === "credito" ? "Fecha límite de pago" : "Fecha límite para saldo"}
           type="date"
           defaultValue={defaultFechaPagoCredito}
           required
@@ -82,7 +83,7 @@ export function PagoFormFields({
         <input type="hidden" name={name("fecha_pago_credito")} value="" />
       )}
 
-      {modalidad === "adelanto" && showAdelantoInput ? (
+      {(modalidad === "adelanto" || modalidad === "adelanto_saldo") && showAdelantoInput ? (
         <Field
           name={name("adelanto")}
           label="Monto adelantado (S/)"
@@ -94,6 +95,20 @@ export function PagoFormFields({
         />
       ) : showAdelantoInput ? (
         <input type="hidden" name={name("adelanto")} value="0" />
+      ) : null}
+
+      {modalidad === "credito" && showAdelantoInput ? (
+        <Field
+          name={name("monto_credito")}
+          label="Monto de crédito (S/)"
+          type="number"
+          min="0"
+          step="0.01"
+          defaultValue="0"
+          required
+        />
+      ) : showAdelantoInput ? (
+        <input type="hidden" name={name("monto_credito")} value="0" />
       ) : null}
     </div>
   );

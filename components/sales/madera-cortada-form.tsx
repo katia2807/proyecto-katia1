@@ -206,7 +206,7 @@ export function MaderaCortadaForm({
           Datos de pago
         </p>
         <div className="mt-2">
-          <PagoFormFields />
+          <PagoFormFields showAdelantoInput={true} />
         </div>
       </div>
 

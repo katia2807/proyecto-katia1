@@ -230,6 +230,8 @@ const ventaMaderaCortadaSchema = z.object({
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("contado"),
   fechaPagoCredito: z.string().optional().or(z.literal("")),
+  adelanto: z.coerce.number().nonnegative().optional().default(0),
+  montoCredito: z.coerce.number().nonnegative().optional().default(0),
   choferId: z.string().uuid().optional().or(z.literal("")),
   tipoEntrega: tipoEntregaEnum.default("envio"),
   direccionEntrega: z.string().optional(),
@@ -3283,6 +3285,8 @@ export async function createVentaMaderaCortada(formData: FormData) {
     metodoPago: formData.get("metodo_pago"),
     modalidadPago: formData.get("modalidad_pago"),
     fechaPagoCredito: formData.get("fecha_pago_credito"),
+    adelanto: formData.get("adelanto"),
+    montoCredito: formData.get("monto_credito"),
     choferId: formData.get("chofer_id"),
     tipoEntrega: formData.get("tipo_entrega"),
     direccionEntrega: formData.get("direccion_entrega"),
@@ -3369,10 +3373,20 @@ export async function createVentaMaderaCortada(formData: FormData) {
       throw new Error(ventaErr?.message ?? "No se pudo registrar la venta.");
     }
 
-    const montoCaja = parsed.data.modalidadPago === "credito" ? 0 : parsed.data.total;
+    const montoCaja = 
+      parsed.data.modalidadPago === "credito" 
+        ? 0 
+        : parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo"
+        ? (parsed.data.adelanto || 0)
+        : parsed.data.total;
     let cajaRegistrado = false;
     if (montoCaja > 0) {
       const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
+      const descripcionBase = `Venta ${parsed.data.totalPt.toFixed(2)} PT (${parsed.data.tipoCorte})`;
+      const descripcionModalidad = 
+        parsed.data.modalidadPago === "adelanto" ? ` - Adelanto: S/ ${(parsed.data.adelanto || 0).toFixed(2)}`
+        : parsed.data.modalidadPago === "adelanto_saldo" ? ` - Adelanto: S/ ${(parsed.data.adelanto || 0).toFixed(2)}`
+        : "";
       const { error: cajaError } = await supabase.from("movimientos_caja").insert({
         organization_id: DEFAULT_ORG_ID,
         fecha: parsed.data.fecha,
@@ -3380,7 +3394,7 @@ export async function createVentaMaderaCortada(formData: FormData) {
         medio: medioCaja,
         categoria: "venta_madera_cortada",
         monto: montoCaja,
-        descripcion: `Venta ${parsed.data.totalPt.toFixed(2)} PT (${parsed.data.tipoCorte})`,
+        descripcion: `${descripcionBase}${descripcionModalidad}`,
         modulo_origen: "ventas_madera_cortada",
         referencia_id: venta.id,
         created_by: actor.userId,
