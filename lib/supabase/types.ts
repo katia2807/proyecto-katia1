@@ -595,7 +595,7 @@ export type Database = {
             | "transferencia"
             | "billetera_digital"
             | "otro";
-          modalidad_pago: "contado" | "adelanto" | "credito";
+          modalidad_pago: "contado" | "adelanto" | "adelanto_saldo" | "credito";
           fecha_pago_credito: string | null;
           chofer_id: string | null;
           tipo_entrega: "puesto_en_obra" | "entrega_local" | "envio";
@@ -621,7 +621,7 @@ export type Database = {
             | "transferencia"
             | "billetera_digital"
             | "otro";
-          modalidad_pago: "contado" | "adelanto" | "credito";
+          modalidad_pago: "contado" | "adelanto" | "adelanto_saldo" | "credito";
           fecha_pago_credito?: string | null;
           chofer_id?: string | null;
           tipo_entrega: "puesto_en_obra" | "entrega_local" | "envio";
@@ -655,7 +655,7 @@ export type Database = {
             | "transferencia"
             | "billetera_digital"
             | "otro";
-          modalidad_pago: "contado" | "adelanto" | "credito";
+          modalidad_pago: "contado" | "adelanto" | "adelanto_saldo" | "credito";
           fecha_pago_credito: string | null;
           correlativo: string | null;
           fecha: string;
@@ -682,7 +682,7 @@ export type Database = {
             | "transferencia"
             | "billetera_digital"
             | "otro";
-          modalidad_pago: "contado" | "adelanto" | "credito";
+          modalidad_pago: "contado" | "adelanto" | "adelanto_saldo" | "credito";
           fecha_pago_credito?: string | null;
           correlativo?: string | null;
           fecha: string;
@@ -730,7 +730,7 @@ export type Database = {
             | "billetera_digital"
             | "otro"
             | null;
-          modalidad_pago: "contado" | "adelanto" | "credito" | null;
+          modalidad_pago: "contado" | "adelanto" | "adelanto_saldo" | "credito" | null;
           fecha_pago_credito: string | null;
         };
         Insert: {
@@ -764,7 +764,7 @@ export type Database = {
             | "billetera_digital"
             | "otro"
             | null;
-          modalidad_pago?: "contado" | "adelanto" | "credito" | null;
+          modalidad_pago?: "contado" | "adelanto" | "adelanto_saldo" | "credito" | null;
           fecha_pago_credito?: string | null;
         };
         Update: {
@@ -792,7 +792,7 @@ export type Database = {
             | "billetera_digital"
             | "otro"
             | null;
-          modalidad_pago?: "contado" | "adelanto" | "credito" | null;
+          modalidad_pago?: "contado" | "adelanto" | "adelanto_saldo" | "credito" | null;
           fecha_pago_credito?: string | null;
         };
       };
