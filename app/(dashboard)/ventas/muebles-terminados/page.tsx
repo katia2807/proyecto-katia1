@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { IconPhoto } from "@tabler/icons-react";
-import { marcarEntregaMueble } from "@/app/actions";
+import { cancelarVentaMueble, marcarEntregaMueble } from "@/app/actions";
+import { CancelarVentaButton } from "@/components/ventas/cancelar-venta-button";
 import { MueblesTerminadosContextPanels } from "@/components/ventas/muebles-terminados-context-panels";
 import { Badge } from "@/components/ui/badge";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
@@ -224,6 +225,20 @@ export default async function MueblesTerminadosPage() {
                               }
                             />
                           </form>
+                        ) : null}
+                        {canMutate && venta.estado_entrega !== "pendiente" ? (
+                          <form action={marcarEntregaMueble} className="inline-flex">
+                            <input type="hidden" name="id" value={venta.id} />
+                            <input type="hidden" name="nuevo_estado" value="pendiente" />
+                            <PendingSubmitButton
+                              variant="secondary"
+                              className="h-8 px-3 text-xs"
+                              idleText="↩ Retroceder"
+                            />
+                          </form>
+                        ) : null}
+                        {canMutate ? (
+                          <CancelarVentaButton ventaId={venta.id} />
                         ) : null}
                       </div>
                     </TD>

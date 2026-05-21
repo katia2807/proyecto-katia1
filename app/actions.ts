@@ -3216,6 +3216,21 @@ export async function marcarEntregaMueble(formData: FormData) {
   revalidatePath("/ventas/muebles-terminados");
 }
 
+export async function cancelarVentaMueble(formData: FormData) {
+  await requireMutationAccess(["owner_admin", "admin" as AppRole]);
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Venta inválida.");
+  if (!hasSupabaseEnv()) {
+    throw new Error("No implementado en demo.");
+  }
+  const supabase = getSupabaseServerClient();
+  const { error } = await supabase.rpc("cancelar_venta_mueble", {
+    p_venta_id: id,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/ventas/muebles-terminados");
+}
+
 // ---------------------------------------------------------------------------
 // Sub-flujo 2: Muebles personalizados (cotizaciones → órdenes)
 // ---------------------------------------------------------------------------
