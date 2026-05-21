@@ -70,6 +70,7 @@ export default async function CotizacionPage() {
         <CardDescription>Haz clic en una fila para abrir detalle, items, cliente, fechas, estado e historial.</CardDescription>
         <div className="mt-3">
           <CotizacionMasterDetail
+            canMutate={canSave}
             cotizaciones={cotizacionesGuardadas.map((row) => ({
               id: row.id,
               cliente: clientes.find((cliente) => cliente.id === row.cliente_id)?.nombre ?? "Cliente",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { DetailDrawer, DetailField } from "@/components/ui/detail-drawer";
@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { formatDate, formatPen } from "@/lib/utils";
 import { parseCotizacionDetalle } from "@/lib/cotizacion-unificada-payload";
+import { cambiarEstadoCotizacion } from "@/app/actions";
 
 type Cotizacion = {
   id: string;
@@ -273,7 +274,13 @@ function parseTotalSeguro(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-export function CotizacionMasterDetail({ cotizaciones }: { cotizaciones: Cotizacion[] }) {
+export function CotizacionMasterDetail({
+  cotizaciones,
+  canMutate,
+}: {
+  cotizaciones: Cotizacion[];
+  canMutate: boolean;
+}) {
   const searchParams = useSearchParams();
   const initialId = searchParams.get("cotizacion");
   const [selectedId, setSelectedId] = useState<string | null>(() =>
@@ -281,6 +288,32 @@ export function CotizacionMasterDetail({ cotizaciones }: { cotizaciones: Cotizac
   );
   const [editing, setEditing] = useState(false);
   const selected = useMemo(() => cotizaciones.find((row) => row.id === selectedId) ?? null, [cotizaciones, selectedId]);
+
+  const [selectedEstado, setSelectedEstado] = useState<string>("pendiente");
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (selected) {
+      setSelectedEstado(selected.estado_flujo);
+    }
+  }, [selected]);
+
+  const handleSaveEstado = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (["entregado", "inactivo"].includes(selectedEstado)) {
+      const labelNuevo = selectedEstado === "entregado" ? "Entregado" : "Inactivo";
+      const ok = window.confirm(`¿Estás seguro de cambiar el estado a "${labelNuevo}"? Esta acción es irreversible.`);
+      if (!ok) return;
+    }
+    const formData = new FormData(e.currentTarget);
+    startTransition(async () => {
+      try {
+        await cambiarEstadoCotizacion(formData);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Error al cambiar el estado");
+      }
+    });
+  };
 
   if (cotizaciones.length === 0) {
     return (
@@ -345,6 +378,41 @@ export function CotizacionMasterDetail({ cotizaciones }: { cotizaciones: Cotizac
                 <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Estado</p>
                 <EstadoBadge estado={selected.estado_flujo} />
               </div>
+
+              {canMutate && (
+                <form
+                  onSubmit={handleSaveEstado}
+                  action={cambiarEstadoCotizacion}
+                  className="col-span-2 mt-2 border-t border-[var(--color-border)] pt-3 space-y-2"
+                >
+                  <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Cambiar estado</p>
+                  <div className="flex items-center gap-2">
+                    <input type="hidden" name="id" value={selected.id} />
+                    <input type="hidden" name="nuevo_estado" value={selectedEstado} />
+                    <select
+                      value={selectedEstado}
+                      onChange={(e) => setSelectedEstado(e.target.value)}
+                      className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm"
+                      disabled={isPending}
+                    >
+                      <option value="pendiente">Pendiente</option>
+                      <option value="lista_produccion">Lista para producción</option>
+                      <option value="en_produccion">En producción</option>
+                      <option value="terminado">Terminado</option>
+                      <option value="entregado">Entregado</option>
+                      <option value="inactivo">Inactivo</option>
+                      <option value="deudor">Deudor (Mora)</option>
+                    </select>
+                    <button
+                      type="submit"
+                      disabled={isPending}
+                      className="rounded-lg bg-[var(--color-primary)] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                    >
+                      {isPending ? "Guardando..." : "Guardar estado"}
+                    </button>
+                  </div>
+                </form>
+              )}
               <DetailField label="Creada" value={formatDate(selected.created_at)} />
             </div>
 

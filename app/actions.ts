@@ -1616,6 +1616,24 @@ export async function registrarCobroCotizacionUnificada(
   }
 }
 
+export async function cambiarEstadoCotizacion(formData: FormData) {
+  await requireMutationAccess(ventasRoles);
+  const id = String(formData.get("id") ?? "");
+  const nuevoEstado = String(formData.get("nuevo_estado") ?? "");
+  const estadosValidos = ["pendiente", "lista_produccion", "en_produccion", "terminado", "entregado", "inactivo", "deudor"];
+  if (!id) throw new Error("Cotización inválida.");
+  if (!estadosValidos.includes(nuevoEstado)) throw new Error("Estado inválido.");
+  if (!hasSupabaseEnv()) throw new Error("No implementado en demo.");
+  const supabase = getSupabaseServerClient();
+  const { error } = await supabase
+    .from("cotizaciones_unificadas")
+    .update({ estado_flujo: nuevoEstado, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("organization_id", DEFAULT_ORG_ID);
+  if (error) throw new Error(error.message);
+  revalidatePath("/cotizacion");
+}
+
 export async function createChofer(formData: FormData) {
   await requireMutationAccess(writerRoles);
   const parsed = choferSchema.safeParse({
