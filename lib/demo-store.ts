@@ -2498,9 +2498,11 @@ export function demoCreateVentaMuebleTerminado(
     correlativo?: string | null;
     /** Si se confirma, dispara ingreso automático en caja por el monto cobrado. */
     confirmaIngreso?: boolean;
+    adelanto?: number;
+    montoCredito?: number;
   },
 ) {
-  const { confirmaIngreso = true, correlativo, ...row } = input;
+  const { confirmaIngreso = true, correlativo, adelanto, montoCredito, ...row } = input;
   const newRow: VentaMuebleTerminadoRow = {
     id: randomUUID(),
     created_at: nowIso(),
@@ -2516,8 +2518,13 @@ export function demoCreateVentaMuebleTerminado(
   }
 
   if (confirmaIngreso) {
-    const monto =
-      newRow.modalidad_pago === "credito" ? 0 : newRow.total;
+    let monto = newRow.total;
+    if (newRow.modalidad_pago === "credito") {
+      monto = 0;
+    } else if (newRow.modalidad_pago === "adelanto" || newRow.modalidad_pago === "adelanto_saldo") {
+      monto = input.adelanto ?? 0;
+    }
+
     if (monto > 0) {
       const medioCaja = mapMetodoPagoToMedio(newRow.metodo_pago);
       demoCreateCaja({

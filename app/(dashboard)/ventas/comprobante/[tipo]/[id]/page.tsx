@@ -210,7 +210,7 @@ export default async function ComprobantePage({ params }: { params: Promise<Para
 
       {/* Voucher */}
       <div className="mx-auto max-w-[680px] p-8 font-sans text-[13px]">
-        <div className="voucher-card rounded-2xl bg-[var(--color-card,#ffffff)] text-[var(--color-text-primary,#0f172a)] shadow-lg ring-1 ring-[var(--color-border,#e2e8f0)] p-8">
+        <div className="voucher-card rounded-2xl bg-[var(--color-surface,#ffffff)] text-[var(--color-text-primary,#0f172a)] shadow-lg ring-1 ring-[var(--color-border,#e2e8f0)] p-8">
 
           {/* Header */}
           <div className="flex items-start justify-between gap-6">

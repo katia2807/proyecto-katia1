@@ -38,7 +38,7 @@ export function PagoFormFields({
   defaultMetodoPago = "efectivo",
   defaultModalidadPago = "contado",
   defaultFechaPagoCredito = "",
-  showAdelantoInput = false,
+  showAdelantoInput = true,
   defaultAdelanto = "0",
 }: PagoFormFieldsProps) {
   const [modalidad, setModalidad] = useState<ModalidadPago>(defaultModalidadPago);

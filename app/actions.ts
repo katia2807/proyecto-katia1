@@ -191,6 +191,8 @@ const ventaMuebleTerminadoSchema = z.object({
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("contado"),
   fechaPagoCredito: z.string().optional().or(z.literal("")),
+  adelanto: z.coerce.number().nonnegative().optional().default(0),
+  montoCredito: z.coerce.number().nonnegative().optional().default(0),
 });
 
 const ventaPdfSchema = z.object({
@@ -255,6 +257,8 @@ const contratoAlquilerSchema = z.object({
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("adelanto"),
   fechaPagoCredito: z.string().optional().or(z.literal("")),
+  adelanto: z.coerce.number().nonnegative().optional().default(0),
+  montoCredito: z.coerce.number().nonnegative().optional().default(0),
 });
 
 const cerrarContratoSchema = z.object({
@@ -2972,6 +2976,8 @@ export async function createVentaMuebleTerminado(formData: FormData) {
     metodoPago: formData.get("metodo_pago"),
     modalidadPago: formData.get("modalidad_pago"),
     fechaPagoCredito: formData.get("fecha_pago_credito"),
+    adelanto: formData.get("adelanto"),
+    montoCredito: formData.get("monto_credito"),
   });
   if (!parsed.success) {
     throw new Error("Datos de venta de mueble inválidos.");
@@ -2994,6 +3000,8 @@ export async function createVentaMuebleTerminado(formData: FormData) {
       metodo_pago: parsed.data.metodoPago,
       modalidad_pago: parsed.data.modalidadPago,
       fecha_pago_credito: parsed.data.fechaPagoCredito || null,
+      adelanto: parsed.data.adelanto,
+      montoCredito: parsed.data.montoCredito,
       fecha: parsed.data.fecha,
       correlativo: await nextCorrelativo("venta_mueble"),
     });
@@ -3073,7 +3081,13 @@ export async function createVentaMuebleTerminado(formData: FormData) {
       throw new Error("El stock cambió mientras procesabas la venta; intenta de nuevo.");
     }
 
-    const montoCaja = parsed.data.modalidadPago === "credito" ? 0 : total;
+    let montoCaja = total;
+    if (parsed.data.modalidadPago === "credito") {
+      montoCaja = 0;
+    } else if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
+      montoCaja = parsed.data.adelanto ?? 0;
+    }
+
     if (montoCaja > 0) {
       const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
       const { error: cajaError } = await supabase.from("movimientos_caja").insert({
@@ -3535,10 +3549,23 @@ export async function createContratoAlquiler(formData: FormData) {
     metodoPago: formData.get("metodo_pago"),
     modalidadPago: formData.get("modalidad_pago"),
     fechaPagoCredito: formData.get("fecha_pago_credito"),
+    adelanto: formData.get("adelanto"),
+    montoCredito: formData.get("monto_credito"),
   });
   if (!parsed.success) {
     throw new Error("Datos de contrato inválidos.");
   }
+
+  // Calculate deposito30 dynamically
+  let deposito30 = Number((parsed.data.montoTotal * 0.3).toFixed(2));
+  if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
+    if (parsed.data.adelanto !== undefined && parsed.data.adelanto > 0) {
+      deposito30 = parsed.data.adelanto;
+    }
+  } else if (parsed.data.modalidadPago === "credito") {
+    deposito30 = 0;
+  }
+
   if (!hasSupabaseEnv()) {
     const codigo = parsed.data.codigo || (await nextCorrelativo("contrato_alquiler"));
     demoCreateContratoAlquiler({
@@ -3551,6 +3578,7 @@ export async function createContratoAlquiler(formData: FormData) {
       tarifa_unidad: parsed.data.tarifaUnidad,
       tarifa: parsed.data.tarifa,
       monto_total: parsed.data.montoTotal,
+      deposito_30: deposito30,
       codigo,
       representante: parsed.data.representante || null,
       ruc_empresa: parsed.data.rucEmpresa || null,
@@ -3563,7 +3591,6 @@ export async function createContratoAlquiler(formData: FormData) {
     const supabase = getSupabaseServerClient();
     const codigo = parsed.data.codigo?.trim() || (await nextCorrelativo("contrato_alquiler"));
     const montoTotal = parsed.data.montoTotal;
-    const deposito30 = Number((montoTotal * 0.3).toFixed(2));
     const fechaCredito =
       parsed.data.modalidadPago === "credito" && parsed.data.fechaPagoCredito
         ? parsed.data.fechaPagoCredito
@@ -3612,7 +3639,7 @@ export async function createContratoAlquiler(formData: FormData) {
         medio: medioCaja,
         categoria: "alquiler_bomba_mixer",
         monto: deposito30,
-        descripcion: `Depósito 30% contrato ${codigo}`,
+        descripcion: `Depósito contrato ${codigo}`,
         modulo_origen: "ventas_alquiler",
         referencia_id: contrato.id,
         created_by: actor.userId,
