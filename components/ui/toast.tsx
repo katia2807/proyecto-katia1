@@ -48,8 +48,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const showToast = useCallback(
     ({ message, variant }: { message: string; variant: ToastVariant }) => {
+      let finalMessage = message;
+      if (variant === "error") {
+        const lowerMsg = (message ?? "").toLowerCase();
+        if (
+          lowerMsg.includes("supabase") ||
+          lowerMsg.includes("relation") ||
+          lowerMsg.includes("constraint") ||
+          lowerMsg.includes("null")
+        ) {
+          finalMessage = "Ocurrió un error técnico. Por favor intenta de nuevo o contacta al administrador.";
+        }
+      }
       const id = Date.now() + Math.random();
-      setToasts((prev) => [...prev.slice(-2), { id, message, variant }]);
+      setToasts((prev) => [...prev.slice(-2), { id, message: finalMessage, variant }]);
       const tid = setTimeout(() => remove(id), DISMISS_MS);
       timers.current.set(id, tid);
     },

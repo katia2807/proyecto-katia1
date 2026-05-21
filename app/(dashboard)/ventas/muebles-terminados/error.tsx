@@ -10,13 +10,13 @@ type ErrorProps = {
   reset: () => void;
 };
 
-export default function ErrorPage({ error, reset }: ErrorProps) {
+export default function MueblesTerminadosErrorPage({ error, reset }: ErrorProps) {
   useEffect(() => {
-    console.error("Error capturado por el Boundary raíz:", error);
+    console.error("Error capturado por el Boundary de Muebles Terminados:", error);
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--katia-bg-base)] p-4">
+    <div className="flex min-h-[50vh] items-center justify-center p-4">
       <Card variant="glass" className="w-full max-w-md space-y-6 text-center">
         <div className="space-y-2">
           <div className="flex justify-center text-red-500">
@@ -26,7 +26,7 @@ export default function ErrorPage({ error, reset }: ErrorProps) {
             Algo salió mal
           </CardTitle>
           <CardDescription className="text-sm text-[var(--katia-text-secondary)]">
-            Ocurrió un error inesperado. Por favor intenta de nuevo o contacta al administrador si el problema persiste.
+            Ocurrió un error en la sección de muebles terminados. Por favor intenta de nuevo.
           </CardDescription>
         </div>
 

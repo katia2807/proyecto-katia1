@@ -10,13 +10,13 @@ type ErrorProps = {
   reset: () => void;
 };
 
-export default function ErrorPage({ error, reset }: ErrorProps) {
+export default function DashboardErrorPage({ error, reset }: ErrorProps) {
   useEffect(() => {
-    console.error("Error capturado por el Boundary raíz:", error);
+    console.error("Error capturado por el Boundary del Dashboard:", error);
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--katia-bg-base)] p-4">
+    <div className="flex min-h-[60vh] items-center justify-center p-4">
       <Card variant="glass" className="w-full max-w-md space-y-6 text-center">
         <div className="space-y-2">
           <div className="flex justify-center text-red-500">
