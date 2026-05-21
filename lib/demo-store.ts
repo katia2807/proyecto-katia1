@@ -9,7 +9,7 @@ export type MetodoPago =
   | "billetera_digital"
   | "otro";
 
-export type ModalidadPago = "contado" | "adelanto" | "credito";
+export type ModalidadPago = "contado" | "adelanto" | "adelanto_saldo" | "credito";
 
 export type TipoEntrega = "puesto_en_obra" | "entrega_local" | "envio";
 

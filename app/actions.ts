@@ -165,7 +165,7 @@ const metodoPagoEnum = z.enum([
   "billetera_digital",
   "otro",
 ]);
-const modalidadPagoEnum = z.enum(["contado", "adelanto", "credito"]);
+const modalidadPagoEnum = z.enum(["contado", "adelanto", "adelanto_saldo", "credito"]);
 const tipoEntregaEnum = z.enum(["puesto_en_obra", "entrega_local", "envio"]);
 const estadoEntregaEnum = z.enum(["pendiente", "en_proceso", "entregado"]);
 
