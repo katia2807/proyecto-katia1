@@ -2284,7 +2284,7 @@ export function demoCreateInventarioProducto(
 export function demoUpdateInventarioProducto(
   id: string,
   patch: Partial<
-    Pick<InventarioProductoRow, "codigo" | "nombre" | "categoria" | "unidad" | "stock_minimo" | "activo" | "stock_actual">
+    Pick<InventarioProductoRow, "codigo" | "nombre" | "categoria" | "unidad" | "stock_minimo" | "activo" | "stock_actual" | "foto_url">
   >,
 ) {
   const row = store.inventarioProductos.find((p) => p.id === id);

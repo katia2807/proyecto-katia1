@@ -2,6 +2,7 @@
 
 import { updateInventarioProducto } from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
+import { FotoUpload } from "@/components/sales/foto-upload";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { useRouter } from "next/navigation";
@@ -18,6 +19,7 @@ type ProductoEnriched = {
   stock_minimo: number;
   valor_stock: number;
   ultimo_movimiento: string | null;
+  foto_url: string | null;
 };
 
 type SaveState = { ok: boolean; err: string | null };
@@ -106,6 +108,15 @@ export function InventarioProductoEditModal({
               required
               disabled={!canMutate}
             />
+            <div className="sm:col-span-2">
+              <FotoUpload
+                bucket="muebles"
+                name="foto_url"
+                label={product.categoria === "Muebles" ? "Foto del mueble (Muy sugerido)" : "Foto del producto (Opcional)"}
+                defaultUrl={product.foto_url ?? ""}
+                disabled={!canMutate}
+              />
+            </div>
             <div className="sm:col-span-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
               ⚠️ Modificar el stock directamente <strong>no genera movimiento en el Kardex</strong>. Para trazabilidad completa, usá <em>Ajuste de conteo</em> en la pestaña Alertas.
             </div>

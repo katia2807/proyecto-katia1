@@ -330,6 +330,10 @@ function FotoUploadWithPreview({
   const [estado, setEstado] = useState<"idle" | "subiendo" | "ok" | "error">("idle");
   const [mensaje, setMensaje] = useState<string>("");
 
+  useEffect(() => {
+    setUrl(defaultUrl);
+  }, [defaultUrl]);
+
   async function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;

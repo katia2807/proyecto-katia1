@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type FotoUploadProps = {
   /** Bucket destino dentro de data/uploads/. */
@@ -12,16 +12,21 @@ type FotoUploadProps = {
   label: string;
   /** URL inicial cuando se está editando un recurso existente. */
   defaultUrl?: string;
+  disabled?: boolean;
 };
 
 /**
  * Sube un archivo (imagen/PDF) a `/api/uploads`, muestra un preview y mantiene
  * la URL resultante en un input hidden listo para enviarse al server action.
  */
-export function FotoUpload({ bucket, name, label, defaultUrl = "" }: FotoUploadProps) {
+export function FotoUpload({ bucket, name, label, defaultUrl = "", disabled = false }: FotoUploadProps) {
   const [url, setUrl] = useState(defaultUrl);
   const [estado, setEstado] = useState<"idle" | "subiendo" | "ok" | "error">("idle");
   const [mensaje, setMensaje] = useState<string>("");
+
+  useEffect(() => {
+    setUrl(defaultUrl);
+  }, [defaultUrl]);
 
   async function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -60,7 +65,8 @@ export function FotoUpload({ bucket, name, label, defaultUrl = "" }: FotoUploadP
           type="file"
           accept="image/*,application/pdf"
           onChange={handleChange}
-          className="block w-full text-sm text-[var(--color-text-primary)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--color-accent)] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[var(--color-on-accent)]"
+          disabled={disabled}
+          className="block w-full text-sm text-[var(--color-text-primary)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--color-accent)] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[var(--color-on-accent)] disabled:opacity-50 disabled:pointer-events-none"
         />
       </label>
       <input type="hidden" name={name} value={url} />
