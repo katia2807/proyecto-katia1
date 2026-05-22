@@ -53,6 +53,7 @@ import {
   demoToggleSecurityControl,
   demoUpdateInventarioProducto,
   demoUpdateCotizacionUnificada,
+  demoUpdateServicioEspecialTarifa,
 } from "@/lib/demo-store";
 import { totalGeneralDetalle } from "@/lib/cotizacion-calculos";
 import {
@@ -4579,5 +4580,50 @@ export async function submitCreateChoferForm(
       message: null,
     };
   }
+}
+
+const servicioEspecialTarifaUpdateSchema = z.object({
+  id: z.string().uuid(),
+  nombre: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
+  tarifaPorPieza: z.coerce.number().nonnegative("La tarifa debe ser mayor o igual a 0"),
+});
+
+export async function updateServicioEspecialTarifa(id: string, nombre: string, tarifaPorPieza: number) {
+  await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
+  
+  const parsed = servicioEspecialTarifaUpdateSchema.safeParse({
+    id,
+    nombre,
+    tarifaPorPieza,
+  });
+
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message || "Datos de tarifa inválidos.");
+  }
+
+  if (!hasSupabaseEnv()) {
+    const updated = demoUpdateServicioEspecialTarifa(parsed.data.id, {
+      nombre: parsed.data.nombre,
+      tarifa_por_pieza: parsed.data.tarifaPorPieza,
+    });
+    if (!updated) throw new Error("Tarifa no encontrada en el almacén local.");
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { error } = await supabase
+      .from("servicios_especiales_tarifa")
+      .update({
+        nombre: parsed.data.nombre,
+        tarifa_por_pieza: parsed.data.tarifaPorPieza,
+      })
+      .eq("id", parsed.data.id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+      
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  revalidatePath("/configuracion");
+  return { success: true };
 }
 

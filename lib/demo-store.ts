@@ -2737,6 +2737,17 @@ export function demoCreateServicioEspecialTarifa(
   persistStore();
 }
 
+export function demoUpdateServicioEspecialTarifa(
+  id: string,
+  patch: Partial<Pick<ServicioEspecialTarifaRow, "nombre" | "tarifa_por_pieza">>
+) {
+  const row = store.serviciosEspecialesTarifa.find((t) => t.id === id);
+  if (!row) return null;
+  Object.assign(row, patch);
+  persistStore();
+  return row;
+}
+
 export function demoZonasEntregaRows() {
   return [...store.zonasEntrega]
     .filter((z) => z.activo)

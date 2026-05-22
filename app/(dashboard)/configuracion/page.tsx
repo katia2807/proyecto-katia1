@@ -8,6 +8,7 @@ import { requireAuthContext } from "@/lib/auth";
 import { getEmpresaConfig } from "@/lib/company-config";
 import { getServiciosEspecialesTarifaRows } from "@/lib/data";
 import { formatPen } from "@/lib/utils";
+import { TarifasSettingsForm } from "@/components/configuracion/tarifas-settings-form";
 
 export const dynamic = "force-dynamic";
 
@@ -140,17 +141,8 @@ export default async function ConfiguracionPage({ searchParams }: ConfiguracionP
             <CardDescription>
               {tarifas.length} servicios disponibles en el formulario de aserradero.
             </CardDescription>
-            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {tarifas.map((t) => (
-                <div
-                  key={t.id}
-                  className="rounded-xl border border-[var(--katia-border-subtle)] bg-[var(--katia-bg-elevated)] p-3"
-                >
-                  <p className="text-xs uppercase text-[var(--katia-text-secondary)]">{t.codigo}</p>
-                  <p className="text-sm font-semibold text-[var(--katia-text-primary)]">{t.nombre}</p>
-                  <p className="text-base font-bold text-[var(--katia-text-primary)]">{formatPen(t.tarifa_por_pieza)} / pieza</p>
-                </div>
-              ))}
+            <div className="mt-4">
+              <TarifasSettingsForm inicialTarifas={tarifas} />
             </div>
           </Card>
         </div>
