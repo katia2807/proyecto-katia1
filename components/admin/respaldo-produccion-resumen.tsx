@@ -36,8 +36,8 @@ export function RespaldoProduccionResumen({ resumen }: { resumen: RespaldoSupaba
         <div
           className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${
             resumen.connectionOk
-              ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200"
-              : "border-red-500/50 bg-red-500/10 text-red-200"
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
+              : "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-200"
           }`}
         >
           {resumen.connectionOk ? "Lectura verificada" : "Sin lectura"}
@@ -49,7 +49,7 @@ export function RespaldoProduccionResumen({ resumen }: { resumen: RespaldoSupaba
       </p>
 
       {!resumen.connectionOk && resumen.connectionError ? (
-        <p className="mt-3 text-sm text-red-200/90">{resumen.connectionError}</p>
+        <p className="mt-3 text-sm text-red-600 dark:text-red-200/90">{resumen.connectionError}</p>
       ) : null}
 
       <div className="mt-4 space-y-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/60 p-3 text-sm">
@@ -73,7 +73,7 @@ export function RespaldoProduccionResumen({ resumen }: { resumen: RespaldoSupaba
           >
             <p className="text-xs text-[var(--color-text-secondary)]">{row.label}</p>
             {row.error ? (
-              <p className="mt-0.5 text-sm text-red-200/85">{row.error}</p>
+              <p className="mt-0.5 text-sm text-red-600 dark:text-red-200/85">{row.error}</p>
             ) : (
               <p className="text-lg font-semibold tabular-nums text-[var(--color-text-primary)]">{row.count}</p>
             )}

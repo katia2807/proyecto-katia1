@@ -484,7 +484,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                 <Button
                   type="button"
                   variant="secondary"
-                  className="shrink-0 border border-emerald-500/45 bg-emerald-500/15 text-emerald-50 hover:bg-emerald-500/25"
+                  className="shrink-0 border border-[var(--color-op-success-border)] bg-[var(--color-op-success-bg)] text-[var(--color-op-success-text)] hover:bg-[var(--color-op-success-hover)]"
                   disabled={!canMutate}
                   onClick={() => openCompraReponer(item.id)}
                 >
@@ -1019,7 +1019,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                                 <Button
                                   type="button"
                                   variant="secondary"
-                                  className="shrink-0 whitespace-nowrap border border-emerald-500/45 bg-emerald-500/15 text-emerald-950 hover:bg-emerald-500/25"
+                                  className="shrink-0 whitespace-nowrap border border-[var(--color-op-success-border)] bg-[var(--color-op-success-bg)] text-[var(--color-op-success-text)] hover:bg-[var(--color-op-success-hover)]"
                                   onClick={() => openCompraReponer(p.id)}
                                 >
                                   Reponer

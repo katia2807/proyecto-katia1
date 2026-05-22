@@ -117,7 +117,7 @@ export function InventarioProductoEditModal({
                 disabled={!canMutate}
               />
             </div>
-            <div className="sm:col-span-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            <div className="sm:col-span-2 rounded-lg border border-amber-800/35 bg-amber-50/50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-250">
               ⚠️ Modificar el stock directamente <strong>no genera movimiento en el Kardex</strong>. Para trazabilidad completa, usá <em>Ajuste de conteo</em> en la pestaña Alertas.
             </div>
           </form>

@@ -108,7 +108,7 @@ export function ImportReviewer() {
               <Button type="button" disabled={!reviewed || ambiguous}>
                 Confirmar e importar
               </Button>
-              {ambiguous ? <p className="text-sm text-amber-300">Corrige los campos amarillos antes de importar.</p> : null}
+              {ambiguous ? <p className="text-sm text-amber-700 dark:text-amber-300">Corrige los campos amarillos antes de importar.</p> : null}
             </div>
           </>
         ) : null}

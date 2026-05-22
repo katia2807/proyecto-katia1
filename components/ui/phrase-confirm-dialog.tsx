@@ -134,7 +134,7 @@ export function PhraseConfirmDialog({
                 spellCheck={false}
               />
               {submitError ? (
-                <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200" role="alert">
+                <p className="rounded-lg border border-red-500/25 bg-red-50/50 px-3 py-2 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200" role="alert">
                   {submitError}
                 </p>
               ) : null}

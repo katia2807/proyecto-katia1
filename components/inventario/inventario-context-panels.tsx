@@ -345,7 +345,7 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
                 type="button"
                 title="Agregar nueva categoría"
                 onClick={() => setShowNuevaCategoria((v) => !v)}
-                className="flex items-center gap-1 rounded-xl border border-violet-500/40 bg-violet-500/15 px-2.5 py-2 text-xs font-semibold text-violet-300 transition hover:bg-violet-500/25"
+                className="flex items-center gap-1 rounded-xl border border-[var(--color-op-primary-border)] bg-[var(--color-op-primary-bg)] px-2.5 py-2 text-xs font-semibold text-[var(--color-op-primary-text)] transition hover:bg-[var(--color-op-primary-hover)]"
               >
                 <span>+ Nueva</span>
               </button>
@@ -368,7 +368,7 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
                 <button
                   type="button"
                   onClick={handleAgregarCategoria}
-                  className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/25 transition"
+                  className="rounded-xl border border-[var(--color-op-success-border)] bg-[var(--color-op-success-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--color-op-success-text)] hover:bg-[var(--color-op-success-hover)] transition"
                 >
                   Agregar
                 </button>
@@ -387,7 +387,7 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
                 {categoriasExtra.map((cat) => (
                   <span
                     key={cat}
-                    className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2.5 py-0.5 text-xs font-medium text-violet-300 border border-violet-500/20"
+                    className="inline-flex items-center gap-1 rounded-full bg-[var(--color-op-primary-bg)] px-2.5 py-0.5 text-xs font-medium text-[var(--color-op-primary-text)] border border-[var(--color-op-primary-border)]"
                   >
                     {cat}
                     <button
@@ -398,7 +398,7 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
                           setSelectedCategoria("");
                         }
                       }}
-                      className="ml-1 text-violet-400 hover:text-violet-250 transition-colors"
+                      className="ml-1 text-[var(--color-op-primary-text)] opacity-70 hover:opacity-100 transition-opacity"
                       title={`Eliminar categoría ${cat}`}
                     >
                       ✕
