@@ -4,9 +4,9 @@ import { cn } from "@/lib/utils";
 const buttonVariants = {
   primary: [
     "border border-transparent text-white",
-    "bg-[var(--katia-gradient-hero)]",
-    "shadow-[var(--katia-shadow-soft)]",
-    "hover:brightness-110 hover:shadow-[var(--katia-glow-primary)]",
+    "[background:var(--katia-gradient-hero)]",
+    "shadow-md shadow-[var(--color-primary)]/20",
+    "hover:brightness-110 hover:shadow-lg hover:shadow-[var(--color-primary)]/35",
     "active:scale-[0.98]",
   ],
   secondary: [

@@ -310,7 +310,9 @@ export function AserraderoForm({
       <input type="hidden" name="precio_cobrado" value={precioCobrado.toFixed(2)} />
       <input type="hidden" name="lineas_json" value={JSON.stringify(lineasPayload)} />
 
-      <Button>Registrar servicio</Button>
+      <Button size="lg" className="w-full mt-4 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all">
+        Registrar servicio
+      </Button>
     </form>
   );
 }

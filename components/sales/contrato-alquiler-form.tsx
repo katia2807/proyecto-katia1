@@ -199,7 +199,9 @@ export function ContratoAlquilerForm({
         </div>
       </div>
 
-      <Button>Registrar contrato</Button>
+      <Button size="lg" className="w-full mt-4 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all">
+        Registrar contrato
+      </Button>
     </form>
   );
 }
