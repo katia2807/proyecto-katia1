@@ -1498,7 +1498,7 @@ export function CotizacionUnificadaWizard({
   );
 
   return (
-    <div className="space-y-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 md:p-6">
+    <div id="cotizacion-wizard" className="space-y-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 md:p-6">
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Card className="p-4">
