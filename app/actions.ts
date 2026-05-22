@@ -306,6 +306,7 @@ const inventarioProductoSchema = z.object({
   categoria: z.string().min(2),
   unidad: z.string().min(1),
   stockMinimo: z.coerce.number().nonnegative(),
+  fotoUrl: z.string().optional().nullable(),
 });
 
 const inventarioMovimientoSchema = z.object({
@@ -2232,6 +2233,7 @@ export async function createInventarioProducto(formData: FormData) {
     categoria: formData.get("categoria"),
     unidad: formData.get("unidad"),
     stockMinimo: formData.get("stock_minimo"),
+    fotoUrl: formData.get("foto_url"),
   });
   if (!parsed.success) {
     throw new Error("Datos de producto inválidos.");
@@ -2254,6 +2256,7 @@ export async function createInventarioProducto(formData: FormData) {
       categoria: parsed.data.categoria,
       unidad: parsed.data.unidad,
       stock_minimo: parsed.data.stockMinimo,
+      foto_url: parsed.data.fotoUrl ?? null,
     });
 
     if (stockInicial > 0) {
@@ -2279,6 +2282,7 @@ export async function createInventarioProducto(formData: FormData) {
       stock_minimo: parsed.data.stockMinimo,
       stock_actual: 0,
       activo: true,
+      foto_url: parsed.data.fotoUrl ?? null,
     });
     if (error) {
       throw new Error(error.message);
@@ -3269,18 +3273,50 @@ export async function aprobarCotizacionAOrden(formData: FormData) {
     throw new Error("Cotización inválida.");
   }
   if (!hasSupabaseEnv()) {
-    const { demoCotizacionesRows } = await import("@/lib/demo-store");
-    const cotizacion = demoCotizacionesRows().find((c) => c.id === parsed.data.cotizacionId);
-    if (!cotizacion) {
-      throw new Error("La cotización ya no existe.");
+    const { demoCotizacionesRows, demoCotizacionesUnificadasRows, demoUpdateCotizacionUnificada } = await import("@/lib/demo-store");
+    let cotizacion = demoCotizacionesRows().find((c) => c.id === parsed.data.cotizacionId);
+    let isUnificada = false;
+    let clienteId = "";
+    let correlativo = "";
+    let total = 0;
+
+    if (cotizacion) {
+      clienteId = cotizacion.cliente_id;
+      correlativo = cotizacion.correlativo ?? cotizacion.id.slice(0, 8);
+      total = Number(cotizacion.precio_acordado);
+    } else {
+      const cu = (demoCotizacionesUnificadasRows() as any[]).find((c) => c.id === parsed.data.cotizacionId);
+      if (!cu) {
+        throw new Error("La cotización ya no existe.");
+      }
+      isUnificada = true;
+      clienteId = cu.cliente_id;
+      correlativo = cu.correlativo ?? cu.id.slice(0, 8);
+      total = Number(cu.total);
     }
-    demoCreateOrdenProduccion({
-      organization_id: DEFAULT_ORG_ID,
-      cliente_id: cotizacion.cliente_id,
-      cotizacion_id: cotizacion.id,
-      notas: parsed.data.notas || null,
-      correlativo: await nextCorrelativo("orden_produccion"),
-    });
+
+    if (isUnificada) {
+      demoUpdateCotizacionUnificada(parsed.data.cotizacionId, { estado_flujo: "en_produccion" });
+      demoCreateOrdenProduccion({
+        organization_id: DEFAULT_ORG_ID,
+        cliente_id: clienteId,
+        cotizacion_id: null,
+        cotizacion_unificada_id: parsed.data.cotizacionId,
+        estado: "en_produccion",
+        notas: parsed.data.notas || `Generada desde cotización ${correlativo} · Total S/ ${total.toFixed(2)}`,
+        correlativo: await nextCorrelativo("orden_produccion"),
+      });
+    } else {
+      demoCreateOrdenProduccion({
+        organization_id: DEFAULT_ORG_ID,
+        cliente_id: clienteId,
+        cotizacion_id: parsed.data.cotizacionId,
+        cotizacion_unificada_id: null,
+        estado: "en_produccion",
+        notes: parsed.data.notas || null,
+        correlativo: await nextCorrelativo("orden_produccion"),
+      } as any);
+    }
 
     const adelanto = parsed.data.adelanto ?? 0;
     if (adelanto > 0) {
@@ -3292,9 +3328,9 @@ export async function aprobarCotizacionAOrden(formData: FormData) {
         medio,
         categoria: "adelanto_mueble_personalizado",
         monto: adelanto,
-        descripcion: `Adelanto al aprobar cotización ${cotizacion.correlativo ?? cotizacion.id.slice(0, 8)}`,
+        descripcion: `Adelanto al aprobar cotización ${correlativo}`,
         modulo_origen: "ventas",
-        referencia_id: cotizacion.id,
+        referencia_id: parsed.data.cotizacionId,
       });
     }
   } else {
@@ -3309,66 +3345,181 @@ export async function aprobarCotizacionAOrden(formData: FormData) {
     if (cotErr) {
       throw new Error(cotErr.message);
     }
-    if (!cot) {
-      throw new Error("La cotización ya no existe.");
-    }
-    if (cot.estado !== "confirmada") {
-      throw new Error("Solo se pueden aprobar cotizaciones confirmadas.");
-    }
 
-    const { data: ordenExistente } = await supabase
-      .from("ordenes_produccion")
-      .select("id")
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .eq("cotizacion_id", cot.id)
-      .maybeSingle();
+    if (cot) {
+      if (cot.estado !== "confirmada") {
+        throw new Error("Solo se pueden aprobar cotizaciones confirmadas.");
+      }
 
-    if (ordenExistente) {
-      throw new Error("Esta cotización ya tiene una orden de producción.");
-    }
+      const { data: ordenExistente } = await supabase
+        .from("ordenes_produccion")
+        .select("id")
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .eq("cotizacion_id", cot.id)
+        .maybeSingle();
 
-    const correlativo = await nextCorrelativo("orden_produccion");
-    const hoy = new Date().toISOString().slice(0, 10);
+      if (ordenExistente) {
+        throw new Error("Esta cotización ya tiene una orden de producción.");
+      }
 
-    const { data: orden, error: ordenErr } = await supabase
-      .from("ordenes_produccion")
-      .insert({
-        organization_id: DEFAULT_ORG_ID,
-        cliente_id: cot.cliente_id,
-        cotizacion_id: cot.id,
-        cotizacion_unificada_id: null,
-        estado: "en_produccion",
-        notas: parsed.data.notas?.trim() || null,
-        fecha_aprobacion: hoy,
-        correlativo,
-        created_by: actor.userId,
-        updated_by: actor.userId,
-      })
-      .select("id")
-      .single();
+      const correlativo = await nextCorrelativo("orden_produccion");
+      const hoy = new Date().toISOString().slice(0, 10);
 
-    if (ordenErr || !orden) {
-      throw new Error(ordenErr?.message ?? "No se pudo crear la orden.");
-    }
+      const { data: orden, error: ordenErr } = await supabase
+        .from("ordenes_produccion")
+        .insert({
+          organization_id: DEFAULT_ORG_ID,
+          cliente_id: cot.cliente_id,
+          cotizacion_id: cot.id,
+          cotizacion_unificada_id: null,
+          estado: "en_produccion",
+          notas: parsed.data.notas?.trim() || null,
+          fecha_aprobacion: hoy,
+          correlativo,
+          created_by: actor.userId,
+          updated_by: actor.userId,
+        })
+        .select("id")
+        .single();
 
-    const adelanto = parsed.data.adelanto ?? 0;
-    if (adelanto > 0) {
-      const medio = parsed.data.metodoAdelanto ?? "efectivo";
-      const { error: cajaError } = await supabase.from("movimientos_caja").insert({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: hoy,
-        tipo: "ingreso",
-        medio,
-        categoria: "adelanto_mueble_personalizado",
-        monto: adelanto,
-        descripcion: `Adelanto al aprobar cotización ${cot.fecha} (${cot.id.slice(0, 8)})`,
-        modulo_origen: "ventas",
-        referencia_id: orden.id,
-        created_by: actor.userId,
-        updated_by: actor.userId,
+      if (ordenErr || !orden) {
+        throw new Error(ordenErr?.message ?? "No se pudo crear la orden.");
+      }
+
+      const adelanto = parsed.data.adelanto ?? 0;
+      if (adelanto > 0) {
+        const medio = parsed.data.metodoAdelanto ?? "efectivo";
+        const { error: cajaError } = await supabase.from("movimientos_caja").insert({
+          organization_id: DEFAULT_ORG_ID,
+          fecha: hoy,
+          tipo: "ingreso",
+          medio,
+          categoria: "adelanto_mueble_personalizado",
+          monto: adelanto,
+          descripcion: `Adelanto al aprobar cotización ${cot.fecha} (${cot.id.slice(0, 8)})`,
+          modulo_origen: "ventas",
+          referencia_id: orden.id,
+          created_by: actor.userId,
+          updated_by: actor.userId,
+        });
+        if (cajaError) {
+          throw new Error(cajaError.message);
+        }
+      }
+    } else {
+      const { data: cu, error: cuErr } = await supabase
+        .from("cotizaciones_unificadas")
+        .select("id, cliente_id, estado_flujo, fecha, total, detalle, correlativo")
+        .eq("id", parsed.data.cotizacionId)
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .maybeSingle();
+
+      if (cuErr) {
+        throw new Error(cuErr.message);
+      }
+      if (!cu) {
+        throw new Error("La cotización ya no existe.");
+      }
+      if (cu.estado_flujo === "cobrada") {
+        throw new Error("La cotización ya fue cobrada.");
+      }
+
+      const { data: ordenExistente } = await supabase
+        .from("ordenes_produccion")
+        .select("id")
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .eq("cotizacion_unificada_id", cu.id)
+        .maybeSingle();
+
+      if (ordenExistente) {
+        throw new Error("Esta cotización ya tiene una orden de producción.");
+      }
+
+      const prevEstado = cu.estado_flujo;
+      const debeActualizarFlujo = prevEstado !== "en_produccion";
+
+      if (debeActualizarFlujo) {
+        const { error: upErr } = await supabase
+          .from("cotizaciones_unificadas")
+          .update({ estado_flujo: "en_produccion" })
+          .eq("id", cu.id)
+          .eq("organization_id", DEFAULT_ORG_ID);
+        if (upErr) {
+          throw new Error(upErr.message);
+        }
+      }
+
+      const correlativo = await nextCorrelativo("orden_produccion");
+      const hoy = new Date().toISOString().slice(0, 10);
+
+      const { data: clienteRow } = await supabase
+        .from("clientes")
+        .select("nombre")
+        .eq("id", cu.cliente_id)
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .maybeSingle();
+
+      const clienteNombre = clienteRow?.nombre ?? "Cliente";
+
+      const defaultNotas = textoNotasOrdenProduccionDesdeUnificada({
+        clienteNombre,
+        correlativo: cu.correlativo,
+        cotIdShort: cu.id.slice(0, 8),
+        total: Number(cu.total),
+        detalle: cu.detalle,
       });
-      if (cajaError) {
-        throw new Error(cajaError.message);
+
+      const notasFinal = parsed.data.notas?.trim()
+        ? `${parsed.data.notas.trim()}\n\n---\n${defaultNotas}`
+        : defaultNotas;
+
+      const { data: orden, error: ordenErr } = await supabase
+        .from("ordenes_produccion")
+        .insert({
+          organization_id: DEFAULT_ORG_ID,
+          cliente_id: cu.cliente_id,
+          cotizacion_id: null,
+          cotizacion_unificada_id: cu.id,
+          estado: "en_produccion",
+          notas: notasFinal,
+          fecha_aprobacion: hoy,
+          correlativo,
+          created_by: actor.userId,
+          updated_by: actor.userId,
+        })
+        .select("id")
+        .single();
+
+      if (ordenErr || !orden) {
+        if (debeActualizarFlujo) {
+          await supabase
+            .from("cotizaciones_unificadas")
+            .update({ estado_flujo: prevEstado })
+            .eq("id", cu.id)
+            .eq("organization_id", DEFAULT_ORG_ID);
+        }
+        throw new Error(ordenErr?.message ?? "No se pudo crear la orden.");
+      }
+
+      const adelanto = parsed.data.adelanto ?? 0;
+      if (adelanto > 0) {
+        const medio = parsed.data.metodoAdelanto ?? "efectivo";
+        const { error: cajaError } = await supabase.from("movimientos_caja").insert({
+          organization_id: DEFAULT_ORG_ID,
+          fecha: hoy,
+          tipo: "ingreso",
+          medio,
+          categoria: "adelanto_mueble_personalizado",
+          monto: adelanto,
+          descripcion: `Adelanto al aprobar cotización ${cu.fecha} (${cu.id.slice(0, 8)})`,
+          modulo_origen: "ventas",
+          referencia_id: orden.id,
+          created_by: actor.userId,
+          updated_by: actor.userId,
+        });
+        if (cajaError) {
+          throw new Error(cajaError.message);
+        }
       }
     }
   }

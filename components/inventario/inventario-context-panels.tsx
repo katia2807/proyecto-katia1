@@ -17,6 +17,7 @@ import { IconArrowsLeftRight, IconCirclePlus, IconShoppingCart } from "@tabler/i
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CodigoProductoPreview } from "@/components/inventario/codigo-producto-preview";
+import { FotoUpload } from "@/components/sales/foto-upload";
 
 type ProductoOpt = { id: string; nombre: string };
 type ProveedorOpt = { id: string; nombre: string };
@@ -456,6 +457,13 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
             <div className="h-10 flex items-center rounded-[var(--radius-md)] border border-[rgba(255,255,255,0.1)] bg-[var(--bg-primary)] px-3 text-sm font-semibold text-[var(--color-accent)] opacity-80 shadow-[var(--shadow-soft)]">
               S/ {costoTotalActual.toFixed(2)}
             </div>
+          </div>
+          <div className="md:col-span-2">
+            <FotoUpload
+              bucket="muebles"
+              name="foto_url"
+              label={selectedCategoria === "Muebles" ? "Foto del mueble (Muy sugerido)" : "Foto del producto (Opcional)"}
+            />
           </div>
           <input type="hidden" name="return_to" value="/inventario" />
           <input type="hidden" name="next_quick" value="movimiento" />

@@ -17,6 +17,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { IconPhoto } from "@tabler/icons-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PhraseConfirmDialog } from "@/components/ui/phrase-confirm-dialog";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
@@ -42,6 +43,7 @@ type ProductoEnriched = {
   valor_stock: number;
   dias_sin_movimiento: number | null;
   ultimo_movimiento: string | null;
+  foto_url: string | null;
 };
 
 type MovimientoRow = {
@@ -195,6 +197,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
   const { showToast } = useToast();
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [filterText, setFilterText] = useState("");
+  const [viewPerspective, setViewPerspective] = useState<"texto" | "galeria">("texto");
   const [filterCategoria, setFilterCategoria] = useState("todas");
   const [filterEstado, setFilterEstado] = useState<"todos" | "activos" | "inactivos" | "stock_bajo">("todos");
   const [filterStockMin, setFilterStockMin] = useState("");
@@ -567,32 +570,67 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
           Editá cada producto desde el panel lateral (botón Editar). Desactivar y eliminar piden confirmación; eliminar
           exige escribir ELIMINAR.
         </CardDescription>
-        <div className="mt-4 grid gap-3 md:grid-cols-6">
-          <Field label="Buscar" value={filterText} onChange={(e) => setFilterText(e.target.value)} placeholder="Código, nombre..." />
-          <SelectField label="Categoría" value={filterCategoria} onChange={(e) => setFilterCategoria(e.target.value)}>
-            <option value="todas">Todas</option>
-            {categorias.map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </SelectField>
-          <SelectField
-            label="Estado"
-            value={filterEstado}
-            onChange={(e) => setFilterEstado(e.target.value as typeof filterEstado)}
-          >
-            <option value="todos">Todos</option>
-            <option value="activos">Activos</option>
-            <option value="inactivos">Inactivos</option>
-            <option value="stock_bajo">Stock bajo</option>
-          </SelectField>
-          <Field label="Stock min." type="number" value={filterStockMin} onChange={(e) => setFilterStockMin(e.target.value)} placeholder="0" />
-          <Field label="Stock max." type="number" value={filterStockMax} onChange={(e) => setFilterStockMax(e.target.value)} placeholder="999" />
-          <div className="rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-secondary)]">
-            {productosFiltrados.length === 0
-              ? "0 productos"
-              : productosListLimit >= productosFiltrados.length
-                ? `${productosFiltrados.length} productos encontrados`
-                : `Mostrando ${productosFiltradosVisibles.length} de ${productosFiltrados.length} productos`}
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--color-border)] pb-4">
+          <div className="grid gap-3 md:grid-cols-5 flex-1 min-w-[280px]">
+            <Field label="Buscar" value={filterText} onChange={(e) => setFilterText(e.target.value)} placeholder="Código, nombre..." />
+            <SelectField label="Categoría" value={filterCategoria} onChange={(e) => setFilterCategoria(e.target.value)}>
+              <option value="todas">Todas</option>
+              {categorias.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </SelectField>
+            <SelectField
+              label="Estado"
+              value={filterEstado}
+              onChange={(e) => setFilterEstado(e.target.value as typeof filterEstado)}
+            >
+              <option value="todos">Todos</option>
+              <option value="activos">Activos</option>
+              <option value="inactivos">Inactivos</option>
+              <option value="stock_bajo">Stock bajo</option>
+            </SelectField>
+            <Field label="Stock min." type="number" value={filterStockMin} onChange={(e) => setFilterStockMin(e.target.value)} placeholder="0" />
+            <Field label="Stock max." type="number" value={filterStockMax} onChange={(e) => setFilterStockMax(e.target.value)} placeholder="999" />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <div className="rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-secondary)]">
+              {productosFiltrados.length === 0
+                ? "0 productos"
+                : productosListLimit >= productosFiltrados.length
+                  ? `${productosFiltrados.length} productos`
+                  : `Mostrando ${productosFiltradosVisibles.length} de ${productosFiltrados.length}`}
+            </div>
+
+            <div className="flex flex-col gap-1 shrink-0">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] opacity-70">Perspectiva</span>
+              <div className="inline-flex rounded-xl bg-[var(--color-primary-soft)] p-0.5 border border-[var(--color-border)]">
+                <button
+                  type="button"
+                  onClick={() => setViewPerspective("texto")}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-semibold transition",
+                    viewPerspective === "texto"
+                      ? "bg-[var(--color-accent)] text-white shadow-sm"
+                      : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  )}
+                >
+                  Puro texto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewPerspective("galeria")}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-semibold transition",
+                    viewPerspective === "galeria"
+                      ? "bg-[var(--color-accent)] text-white shadow-sm"
+                      : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  )}
+                >
+                  Imagen y nombre
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         {selectedBatchIds.size > 0 ? (
@@ -603,83 +641,208 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
             <Button type="button" variant="secondary" disabled={!canMutate}>Ajustar stock</Button>
           </div>
         ) : null}
-        <div className="mt-4 space-y-3">
-          {productosFiltradosVisibles.map((row) => (
-            <div
-              key={row.id}
-              id={`producto-${row.id}`}
-              className={cn(
-                "cursor-pointer rounded-xl border border-[var(--color-border)] p-4",
-                highlightedId === row.id && "bg-[var(--color-highlight-bg)] ring-2 ring-[var(--color-highlight-ring)]",
-              )}
-              onClick={() => setSelectedProductId(row.id)}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <input
-                  type="checkbox"
-                  aria-label={`Seleccionar ${row.nombre}`}
-                  checked={selectedBatchIds.has(row.id)}
-                  onChange={(event) => {
-                    event.stopPropagation();
-                    setSelectedBatchIds((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(row.id)) next.delete(row.id);
-                      else next.add(row.id);
-                      return next;
-                    });
-                  }}
-                  onClick={(event) => event.stopPropagation()}
-                  className="mt-1 size-4"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">{row.nombre}</p>
-                  <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-                    {row.codigo} · {row.categoria} · {row.unidad} · Mín. {row.stock_minimo} · Costo unit. promedio: S/ {Number(row.costo_unitario_promedio ?? 0).toFixed(2)} · Stock {row.stock_actual} · Valor: S/ {Number(row.valor_stock ?? 0).toFixed(2)}
-                    {Number(row.costo_unitario_promedio ?? 0) === 0 && Number(row.stock_actual) > 0 ? (
-                      <span className="ml-1 text-[var(--color-text-secondary)] opacity-70">(sin costo registrado)</span>
-                    ) : null}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                    Estado: {row.activo ? "Activo" : "Inactivo"} · Último mov.:{" "}
-                    {row.ultimo_movimiento ? formatDate(row.ultimo_movimiento) : "Sin movimientos"}
-                  </p>
+        {viewPerspective === "galeria" ? (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {productosFiltradosVisibles.map((row) => {
+              const esImagen = row.foto_url && /\.(png|jpe?g|webp|gif)$/i.test(row.foto_url);
+              return (
+                <div
+                  key={row.id}
+                  id={`producto-${row.id}`}
+                  className={cn(
+                    "group relative overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--bg-surface)] hover:border-[var(--color-border-strong)] transition-all flex flex-col cursor-pointer",
+                    highlightedId === row.id && "bg-[var(--color-highlight-bg)] ring-2 ring-[var(--color-highlight-ring)]",
+                  )}
+                  onClick={() => setSelectedProductId(row.id)}
+                >
+                  {/* Checkbox multi-select floating */}
+                  <div className="absolute left-2 top-2 z-10">
+                    <input
+                      type="checkbox"
+                      aria-label={`Seleccionar ${row.nombre}`}
+                      checked={selectedBatchIds.has(row.id)}
+                      onChange={(event) => {
+                        event.stopPropagation();
+                        setSelectedBatchIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(row.id)) next.delete(row.id);
+                          else next.add(row.id);
+                          return next;
+                        });
+                      }}
+                      onClick={(event) => event.stopPropagation()}
+                      className="size-4 rounded cursor-pointer opacity-0 group-hover:opacity-100 checked:opacity-100 transition-opacity"
+                    />
+                  </div>
+
+                  {/* Imagen del producto */}
+                  <div className="relative aspect-[4/3] w-full bg-[var(--color-primary-soft)] overflow-hidden flex items-center justify-center border-b border-[var(--color-border)]">
+                    {esImagen ? (
+                      <img
+                        src={row.foto_url!}
+                        alt={row.nombre}
+                        className="object-cover w-full h-full transition duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-1.5 text-[var(--color-text-secondary)] opacity-40">
+                        <IconPhoto className="size-8" aria-hidden />
+                        <span className="text-[10px]">Sin imagen</span>
+                      </div>
+                    )}
+
+                    {/* Stock badge */}
+                    <div className="absolute right-2 bottom-2 rounded-lg bg-black/60 backdrop-blur-sm px-2 py-0.5 text-[10px] font-semibold text-white">
+                      Stock: {row.stock_actual}
+                    </div>
+
+                    {/* Categoría badge */}
+                    <div className="absolute right-2 top-2 rounded-lg bg-[var(--color-accent)] px-2 py-0.5 text-[10px] font-semibold text-white">
+                      {row.categoria}
+                    </div>
+                  </div>
+
+                  {/* Detalle simple: Nombre del producto */}
+                  <div className="p-3 flex-1 flex flex-col justify-between gap-2">
+                    <p className="text-sm font-semibold text-[var(--color-text-primary)] line-clamp-2">
+                      {row.nombre}
+                    </p>
+
+                    {/* Botones de acción minimalistas */}
+                    <div className="flex justify-end gap-1.5 pt-2 border-t border-[rgba(255,255,255,0.05)]">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 px-2 text-[10px] font-medium"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openProductoModal(row.id);
+                        }}
+                        disabled={!canMutate}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={row.activo ? "danger" : "secondary"}
+                        size="sm"
+                        className="h-7 px-2 text-[10px] font-medium"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setToggleTarget({
+                            id: row.id,
+                            nextActivo: !row.activo,
+                            nombre: row.nombre,
+                          });
+                        }}
+                        disabled={!canMutate}
+                      >
+                        {row.activo ? "Desactivar" : "Activar"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="sm"
+                        className="h-7 px-2 text-[10px] font-medium"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDeleteProductTarget({ id: row.id, nombre: row.nombre });
+                          setDeleteProductStep1Open(true);
+                        }}
+                        disabled={!canMutate}
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="secondary" onClick={(event) => { event.stopPropagation(); openProductoModal(row.id); }} disabled={!canMutate}>
-                    Editar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={row.activo ? "danger" : "secondary"}
-                    onClick={(event) => {
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {productosFiltradosVisibles.map((row) => (
+              <div
+                key={row.id}
+                id={`producto-${row.id}`}
+                className={cn(
+                  "cursor-pointer rounded-xl border border-[var(--color-border)] p-4",
+                  highlightedId === row.id && "bg-[var(--color-highlight-bg)] ring-2 ring-[var(--color-highlight-ring)]",
+                )}
+                onClick={() => setSelectedProductId(row.id)}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <input
+                    type="checkbox"
+                    aria-label={`Seleccionar ${row.nombre}`}
+                    checked={selectedBatchIds.has(row.id)}
+                    onChange={(event) => {
                       event.stopPropagation();
-                      setToggleTarget({
-                        id: row.id,
-                        nextActivo: !row.activo,
-                        nombre: row.nombre,
-                      })
+                      setSelectedBatchIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(row.id)) next.delete(row.id);
+                        else next.add(row.id);
+                        return next;
+                      });
                     }}
-                    disabled={!canMutate}
-                  >
-                    {row.activo ? "Desactivar" : "Activar"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setDeleteProductTarget({ id: row.id, nombre: row.nombre });
-                      setDeleteProductStep1Open(true);
-                    }}
-                    disabled={!canMutate}
-                  >
-                    Eliminar
-                  </Button>
+                    onClick={(event) => event.stopPropagation()}
+                    className="mt-1 size-4"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[var(--color-text-primary)]">{row.nombre}</p>
+                    <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
+                      {row.codigo} · {row.categoria} · {row.unidad} · Mín. {row.stock_minimo} · Costo unit. promedio: S/ {Number(row.costo_unitario_promedio ?? 0).toFixed(2)} · Stock {row.stock_actual} · Valor: S/ {Number(row.valor_stock ?? 0).toFixed(2)}
+                      {Number(row.costo_unitario_promedio ?? 0) === 0 && Number(row.stock_actual) > 0 ? (
+                        <span className="ml-1 text-[var(--color-text-secondary)] opacity-70">(sin costo registrado)</span>
+                      ) : null}
+                    </p>
+                    {row.foto_url && (
+                      <p className="mt-1 text-xs text-[var(--color-accent)] font-semibold flex items-center gap-1">
+                        <IconPhoto className="size-3.5" /> Tiene foto referencial
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                      Estado: {row.activo ? "Activo" : "Inactivo"} · Último mov.:{" "}
+                      {row.ultimo_movimiento ? formatDate(row.ultimo_movimiento) : "Sin movimientos"}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="secondary" onClick={(event) => { event.stopPropagation(); openProductoModal(row.id); }} disabled={!canMutate}>
+                      Editar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={row.activo ? "danger" : "secondary"}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setToggleTarget({
+                          id: row.id,
+                          nextActivo: !row.activo,
+                          nombre: row.nombre,
+                        })
+                      }}
+                      disabled={!canMutate}
+                    >
+                      {row.activo ? "Desactivar" : "Activar"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setDeleteProductTarget({ id: row.id, nombre: row.nombre });
+                        setDeleteProductStep1Open(true);
+                      }}
+                      disabled={!canMutate}
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
         {productosListLimit < productosFiltrados.length ? (
           <div className="mt-4 flex justify-center">
             <Button

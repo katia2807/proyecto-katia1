@@ -496,6 +496,7 @@ export type Database = {
           stock_minimo: number;
           activo: boolean;
           created_at: string;
+          foto_url: string | null;
         };
         Insert: {
           id?: string;
@@ -508,6 +509,7 @@ export type Database = {
           stock_minimo?: number;
           activo?: boolean;
           created_at?: string;
+          foto_url?: string | null;
         };
         Update: {
           nombre?: string;
@@ -516,6 +518,7 @@ export type Database = {
           stock_actual?: number;
           stock_minimo?: number;
           activo?: boolean;
+          foto_url?: string | null;
         };
       };
       inventario_movimientos: {

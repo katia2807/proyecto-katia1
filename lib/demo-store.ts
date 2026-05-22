@@ -330,6 +330,7 @@ type InventarioProductoRow = {
   stock_minimo: number;
   activo: boolean;
   created_at: string;
+  foto_url: string | null;
 };
 
 type InventarioMovimientoRow = {
@@ -949,6 +950,7 @@ function createDefaultDemoStore(): DemoStore {
       stock_minimo: 18,
       activo: true,
       created_at: nowIso(),
+      foto_url: null,
     },
     {
       id: producto2,
@@ -961,6 +963,7 @@ function createDefaultDemoStore(): DemoStore {
       stock_minimo: 15,
       activo: true,
       created_at: nowIso(),
+      foto_url: null,
     },
     {
       id: producto3,
@@ -973,6 +976,7 @@ function createDefaultDemoStore(): DemoStore {
       stock_minimo: 6,
       activo: true,
       created_at: nowIso(),
+      foto_url: null,
     },
     {
       id: producto4,
@@ -985,6 +989,7 @@ function createDefaultDemoStore(): DemoStore {
       stock_minimo: 5,
       activo: true,
       created_at: nowIso(),
+      foto_url: null,
     },
   ],
   inventarioMovimientos: [
@@ -2269,6 +2274,7 @@ export function demoCreateInventarioProducto(
     stock_actual: 0,
     activo: true,
     ...input,
+    foto_url: input.foto_url ?? null,
     id: newId,
   });
   persistStore();

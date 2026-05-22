@@ -26,6 +26,91 @@ type MueblesPersonalizadosContextPanelsProps = {
 
 
 
+function CrearCotizacionRapidaFormFields({
+  clienteOptions,
+  formAction,
+}: {
+  clienteOptions: { value: string; label: string }[];
+  formAction: FormActionProp;
+}) {
+  const [clienteId, setClienteId] = useState("");
+  const hoy = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  return (
+    <form action={formAction} className="grid gap-3">
+      {/* Tipo oculto */}
+      <input type="hidden" name="tipo" value="mueble_personalizado" />
+
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+        <span>Cliente</span>
+        <Combobox
+          options={clienteOptions}
+          value={clienteId}
+          onChange={setClienteId}
+          hiddenInputName="cliente_id"
+          placeholder="Buscar cliente…"
+          inputAriaLabel="Cliente para la cotización"
+        />
+      </label>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <Field
+          name="fecha"
+          label="Fecha"
+          type="date"
+          defaultValue={hoy}
+          required
+        />
+        <Field
+          name="especie_madera"
+          label="Especie de madera"
+          placeholder="Ej. Tornillo, Cedro, Caoba..."
+          required
+        />
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <SelectField name="unidad_medida" label="Unidad de medida" defaultValue="cm">
+          <option value="cm">Centímetros (cm)</option>
+          <option value="in">Pulgadas (in)</option>
+          <option value="otro">Otro</option>
+        </SelectField>
+        <SelectField name="estado" label="Estado" defaultValue="confirmada">
+          <option value="confirmada">Confirmada (Lista para producción)</option>
+          <option value="borrador">Borrador</option>
+        </SelectField>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <Field
+          name="precio_calculado"
+          label="Precio Calculado (S/)"
+          type="number"
+          min="0"
+          step="0.01"
+          required
+        />
+        <Field
+          name="precio_acordado"
+          label="Precio Acordado (S/)"
+          type="number"
+          min="0.01"
+          step="0.01"
+          required
+        />
+      </div>
+
+      <Field
+        name="motivo_ajuste"
+        label="Motivo del ajuste (opcional)"
+        placeholder="Ej. Descuento por volumen, cliente recurrente..."
+      />
+
+      <Button>Guardar Cotización</Button>
+    </form>
+  );
+}
+
 function AceptarCotizacionFormFields({
   cotizacionAprOptions,
   formAction,
@@ -86,21 +171,42 @@ export function MueblesPersonalizadosContextPanels({
 }: MueblesPersonalizadosContextPanelsProps) {
   const { showToast } = useToast();
 
-
+  const [openCreate, setOpenCreate] = useState(false);
+  const [createKey, setCreateKey] = useState(0);
+  const [stateCreate, actionCreate] = useActionState(submitCreateCotizacionForm, mutationFormInitialState);
 
   const [openApr, setOpenApr] = useState(false);
   const [aprKey, setAprKey] = useState(0);
   const [stateApr, actionApr] = useActionState(submitAprobarCotizacionForm, mutationFormInitialState);
 
   useEffect(() => {
+    if (stateCreate.success && stateCreate.message) {
+      showToast({ variant: "success", message: stateCreate.message });
+      setOpenCreate(false);
+      setCreateKey((k) => k + 1);
+      window.location.reload();
+    } else if (stateCreate.error) {
+      showToast({ variant: "error", message: stateCreate.error });
+    }
+  }, [stateCreate, showToast]);
+
+  useEffect(() => {
     if (stateApr.success && stateApr.message) {
       showToast({ variant: "success", message: stateApr.message });
       setOpenApr(false);
       setAprKey((k) => k + 1);
+      window.location.reload();
     } else if (stateApr.error) {
       showToast({ variant: "error", message: stateApr.error });
     }
   }, [stateApr, showToast]);
+
+  const clienteOptions = useMemo(() => {
+    return clientes.map((c) => ({
+      value: c.id,
+      label: c.nombre,
+    }));
+  }, [clientes]);
 
   const cotizacionAprOptions = useMemo(() => {
     const src = mockData ? MOCK_COTIZACIONES_APROBACION : opcionesAprobacion;
@@ -117,6 +223,19 @@ export function MueblesPersonalizadosContextPanels({
           Nueva cotización
         </Button>
       </Link>
+
+      <ContextActionPanel
+        triggerLabel="Crear cotización rápida"
+        title="Crear cotización rápida"
+        description="Registra una cotización simple directamente en el sistema."
+        open={openCreate}
+        onOpenChange={(next) => {
+          setOpenCreate(next);
+          if (!next) setCreateKey((k) => k + 1);
+        }}
+      >
+        <CrearCotizacionRapidaFormFields key={createKey} clienteOptions={clienteOptions} formAction={actionCreate} />
+      </ContextActionPanel>
 
       <ContextActionPanel
         triggerLabel="Aceptar (orden + adelanto)"

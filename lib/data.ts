@@ -78,7 +78,7 @@ const INVENTARIO_MOVIMIENTOS_PAGE_LIMIT = 5000;
 
 /** Columnas físicas habituales de `public.inventario_productos`. */
 const INVENTARIO_PRODUCTOS_SELECT =
-  "id,organization_id,codigo,nombre,categoria,unidad,stock_actual,stock_minimo,activo,created_at" as const;
+  "id,organization_id,codigo,nombre,categoria,unidad,stock_actual,stock_minimo,activo,created_at,foto_url" as const;
 
 type OrdenProduccionRow = Database["public"]["Tables"]["ordenes_produccion"]["Row"];
 type MuebleCatalogoRow = Database["public"]["Tables"]["muebles_catalogo"]["Row"];

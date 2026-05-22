@@ -34,14 +34,37 @@ export default async function MueblesPersonalizadosPage() {
     cotizacionesUnificadas.map((c) => [c.id, c]),
   );
 
+  // Obtener IDs de cotizaciones que ya tienen orden de producción para evitar duplicaciones
+  const ordenesCotizacionIds = new Set(ordenes.map((o) => o.cotizacion_id).filter(Boolean));
+  const ordenesCotizacionUnificadaIds = new Set(ordenes.map((o) => o.cotizacion_unificada_id).filter(Boolean));
+
   const cotizacionesPersonalizadas = cotizaciones.filter(
     (c) => c.tipo === "mueble_personalizado",
   );
-  const aprobables = cotizacionesPersonalizadas.filter((c) => c.estado === "confirmada");
-  const opcionesAprobacion = aprobables.map((c) => ({
-    id: c.id,
-    label: `${c.correlativo ?? formatDate(c.fecha)} · ${clientesById.get(c.cliente_id) ?? "Cliente"} · ${formatPen(Number(c.precio_acordado))}`,
-  }));
+
+  // Filtrar cotizaciones simples aprobables (estado confirmada y sin orden)
+  const aprobablesSimples = cotizacionesPersonalizadas.filter(
+    (c) => c.estado === "confirmada" && !ordenesCotizacionIds.has(c.id)
+  );
+
+  // Filtrar cotizaciones unificadas (inteligentes) aprobables
+  const aprobablesUnificadas = cotizacionesUnificadas.filter(
+    (c) =>
+      ["pendiente", "lista_produccion", "cobrada"].includes(c.estado_flujo) &&
+      !ordenesCotizacionUnificadaIds.has(c.id)
+  );
+
+  // Mapear ambas a un formato de opción común
+  const opcionesAprobacion = [
+    ...aprobablesSimples.map((c) => ({
+      id: c.id,
+      label: `${c.correlativo ?? formatDate(c.fecha)} · ${clientesById.get(c.cliente_id) ?? "Cliente"} · ${formatPen(Number(c.precio_acordado))}`,
+    })),
+    ...aprobablesUnificadas.map((c) => ({
+      id: c.id,
+      label: `${c.correlativo ?? formatDate(c.fecha)} (Inteligente) · ${clientesById.get(c.cliente_id) ?? "Cliente"} · ${formatPen(Number(c.total))}`,
+    })),
+  ];
 
   return (
     <div className="space-y-6">

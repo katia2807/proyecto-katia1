@@ -136,6 +136,7 @@ export const MOCK_INVENTARIO_PRODUCTOS: InventarioRow[] = MOCK_CLIENTES_COMPLETO
     stock_minimo: 10,
     activo: true,
     created_at: new Date().toISOString(),
+    foto_url: null,
   };
 });
 

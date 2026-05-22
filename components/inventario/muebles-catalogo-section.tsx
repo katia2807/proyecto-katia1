@@ -433,61 +433,7 @@ export function MueblesCatalogoSection({ muebles, canMutate }: Props) {
             que existan acá (no hay alta de catálogo en el módulo de ventas).
           </CardDescription>
         </div>
-        {canMutate ? (
-          <ContextActionPanel
-            triggerLabel="Agregar mueble"
-            title="Nuevo mueble del catalogo"
-            description="Se publicara para seleccion en cotizacion de mueble terminado."
-            open={open}
-            onOpenChange={(next) => {
-              setOpen(next);
-              if (!next) setFormKey((k) => k + 1);
-            }}
-          >
-            <form
-              key={formKey}
-              ref={createFormRef}
-              action={actionCreate}
-              className="grid gap-3 md:grid-cols-2"
-              onSubmit={(e) => {
-                if (createConfirmedRef.current) {
-                  createConfirmedRef.current = false;
-                  return;
-                }
-                e.preventDefault();
-                setConfirmCrear(true);
-              }}
-            >
-              <Field name="codigo" label="Codigo" placeholder="CAT-001" required />
-              <Field name="nombre" label="Nombre" required />
-              <Field className="md:col-span-2" name="descripcion" label="Descripcion" />
-              <Field name="precio_lista" label="Precio sugerido (S/)" type="number" min="0" step="0.01" required />
-              <Field name="stock_disponible" label="Stock inicial" type="number" min="0" step="1" defaultValue="0" />
-              <div className="md:col-span-2">
-                <FotoUpload bucket="muebles" name="foto_url" label="Foto opcional del mueble" />
-              </div>
-              <div className="md:col-span-2">
-                <Button>Guardar mueble</Button>
-              </div>
-            </form>
 
-            <ConfirmDialog
-              open={confirmCrear}
-              onOpenChange={setConfirmCrear}
-              title="¿Registrar nuevo mueble?"
-              tone="neutral"
-              confirmVariant="primary"
-              confirmLabel="Registrar"
-              onConfirm={() => {
-                setConfirmCrear(false);
-                createConfirmedRef.current = true;
-                createFormRef.current?.requestSubmit();
-              }}
-            >
-              <p>El mueble quedará disponible para selección en cotizaciones y ventas de mueble terminado.</p>
-            </ConfirmDialog>
-          </ContextActionPanel>
-        ) : null}
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
