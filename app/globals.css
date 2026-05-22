@@ -107,6 +107,25 @@
   --shadow-soft:    var(--katia-shadow-soft);
   --shadow-card:    var(--katia-shadow-card);
   --shadow-focus:   var(--katia-shadow-focus);
+
+  /* ── Superficie elevada adicional (para cards e inline panels) ── */
+  --katia-surface-raised: #1A1A2E;
+
+  /* ── Variables de contraste adaptativo para botones funcionales ── */
+  --color-op-success-bg: rgba(16, 185, 129, 0.15);
+  --color-op-success-border: rgba(16, 185, 129, 0.45);
+  --color-op-success-text: #a7f3d0;
+  --color-op-success-hover: rgba(16, 185, 129, 0.25);
+
+  --color-op-primary-bg: rgba(139, 92, 246, 0.15);
+  --color-op-primary-border: rgba(139, 92, 246, 0.45);
+  --color-op-primary-text: #ddd6fe;
+  --color-op-primary-hover: rgba(139, 92, 246, 0.25);
+
+  --color-op-info-bg: rgba(14, 165, 233, 0.15);
+  --color-op-info-border: rgba(14, 165, 233, 0.45);
+  --color-op-info-text: #bae6fd;
+  --color-op-info-hover: rgba(14, 165, 233, 0.25);
 }
 
 /* ── Tema claro (inverso automático de los tokens oscuros) ── */
@@ -185,6 +204,25 @@
   --shadow-soft:  var(--katia-shadow-soft);
   --shadow-card:  var(--katia-shadow-card);
   --shadow-focus: var(--katia-shadow-focus);
+
+  /* ── Superficie elevada adicional en tema claro (gris claro distinguible) ── */
+  --katia-surface-raised: #F4F4F5;
+
+  /* ── Variables de contraste adaptativo en tema claro ── */
+  --color-op-success-bg: rgba(5, 150, 105, 0.08);
+  --color-op-success-border: rgba(5, 150, 105, 0.30);
+  --color-op-success-text: #047857;
+  --color-op-success-hover: rgba(5, 150, 105, 0.18);
+
+  --color-op-primary-bg: rgba(124, 58, 237, 0.08);
+  --color-op-primary-border: rgba(124, 58, 237, 0.30);
+  --color-op-primary-text: #6d28d9;
+  --color-op-primary-hover: rgba(124, 58, 237, 0.18);
+
+  --color-op-info-bg: rgba(2, 132, 199, 0.08);
+  --color-op-info-border: rgba(2, 132, 199, 0.30);
+  --color-op-info-text: #0369a1;
+  --color-op-info-hover: rgba(2, 132, 199, 0.18);
 }
 
 @theme inline {

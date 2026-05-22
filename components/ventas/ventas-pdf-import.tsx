@@ -141,7 +141,7 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
                   <select
                     name="cliente_id"
                     defaultValue={extractedData.clienteId}
-                    className="w-full rounded-xl border border-[var(--color-border)] bg-white p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)] p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
                     required
                   >
                     {clientes.map((c) => (
@@ -171,7 +171,7 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
                       type="number"
                       step="0.01"
                       defaultValue={extractedData.total}
-                      className="w-full rounded-xl border border-[var(--color-border)] bg-white p-2 pl-8 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)] font-bold text-[var(--color-text-primary)]"
+                      className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-2 pl-8 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)] font-bold text-[var(--color-text-primary)]"
                       required
                     />
                   </div>
@@ -184,7 +184,7 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
                   <select
                     name="tipo_evento"
                     defaultValue={extractedData.tipoEvento}
-                    className="w-full rounded-xl border border-[var(--color-border)] bg-white p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)] p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
                     required
                   >
                     <option value="General">Venta General</option>
@@ -204,7 +204,7 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
                     type="text"
                     defaultValue={extractedData.banco}
                     placeholder="Ej. BCP, BBVA..."
-                    className="w-full rounded-xl border border-[var(--color-border)] bg-white p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)] p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
                   />
                 </div>
 
@@ -217,7 +217,7 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
                     type="text"
                     defaultValue={extractedData.numeroOperacion}
                     placeholder="N° de referencia"
-                    className="w-full rounded-xl border border-[var(--color-border)] bg-white p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)] p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
                   />
                 </div>
 
@@ -237,7 +237,7 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
                     name="notas_completas"
                     rows={4}
                     defaultValue={extractedData.notasCompletas}
-                    className="mt-1 w-full rounded-xl border border-[var(--color-border)] bg-white p-3 text-xs font-mono focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
+                    className="mt-1 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)] p-3 text-xs font-mono focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
                   />
                 </div>
 
@@ -247,7 +247,7 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
                   </label>
                   <select
                     name="metodo_pago"
-                    className="w-full rounded-xl border border-[var(--color-border)] bg-white p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)] p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
                   >
                     <option value="efectivo">Efectivo</option>
                     <option value="yape">Yape / Plin</option>
@@ -262,7 +262,7 @@ export function VentasPdfImport({ clientes }: VentasPdfImportProps) {
                   </label>
                   <select
                     name="modalidad_pago"
-                    className="w-full rounded-xl border border-[var(--color-border)] bg-white p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)] p-2 text-sm focus:border-[var(--color-accent)] focus:ring-1 focus:ring-[var(--color-accent)]"
                   >
                     <option value="contado">Al contado</option>
                     <option value="adelanto">Adelanto</option>

@@ -79,6 +79,8 @@ const pillClass =
   "rounded-full border border-[var(--color-border)] bg-[var(--color-primary-soft)] px-5 py-2 text-sm font-semibold text-[var(--color-text-primary)]";
 const navBtnClass =
   "h-10 min-w-28 rounded-full bg-[var(--color-accent)] px-5 text-sm font-semibold text-[var(--color-on-accent)] transition hover:brightness-110";
+const navBtnSecondaryClass =
+  "h-10 min-w-28 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-5 text-sm font-semibold text-[var(--color-text-primary)] transition hover:bg-[var(--color-primary-soft)] hover:brightness-105";
 const MUEBLE_TEMPLATES_KEY = "cotizacion_muebles_templates_v1";
 const COTIZACION_DRAFT_KEY = "cotizacion_unificada_draft_v1";
 const WIZARD_TEMPLATES_EVENT = "katia:cotizacion-templates-changed";
@@ -1660,7 +1662,7 @@ export function CotizacionUnificadaWizard({
             </label>
           </div>
           <div className="flex justify-between gap-2">
-            <button type="button" onClick={back} className={`${navBtnClass} border border-[var(--color-border)] bg-transparent`}>
+            <button type="button" onClick={back} className={navBtnSecondaryClass}>
               Anterior
             </button>
             <button type="button" onClick={next} className={navBtnClass}>
@@ -2263,7 +2265,7 @@ export function CotizacionUnificadaWizard({
           </div>
 
           <div className="flex justify-between gap-2">
-            <button type="button" onClick={back} className={`${navBtnClass} border border-[var(--color-border)] bg-transparent`}>
+            <button type="button" onClick={back} className={navBtnSecondaryClass}>
               Anterior
             </button>
             <button type="button" onClick={next} className={navBtnClass}>
@@ -2461,7 +2463,7 @@ export function CotizacionUnificadaWizard({
           ) : null}
 
           <div className="flex justify-between gap-2">
-            <button type="button" onClick={back} className={`${navBtnClass} border border-[var(--color-border)] bg-transparent`}>
+            <button type="button" onClick={back} className={navBtnSecondaryClass}>
               Anterior
             </button>
             <button type="button" onClick={next} className={navBtnClass}>
