@@ -223,6 +223,17 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
   const deepLinkProductoIdRef = useRef<string | null>(null);
   const deepLinkScrollHechoRef = useRef(false);
 
+  const getFotoUrlEfectiva = useCallback((row: ProductoEnriched) => {
+    if (row.foto_url) return row.foto_url;
+    if (!mueblesCatalogo) return null;
+    const match = mueblesCatalogo.find(
+      (m) =>
+        m.nombre.trim().toLowerCase() === row.nombre.trim().toLowerCase() ||
+        m.codigo.trim().toLowerCase() === row.codigo.trim().toLowerCase()
+    );
+    return match?.foto_url || null;
+  }, [mueblesCatalogo]);
+
   const irATab = useCallback(
     (tab: InventarioInteractiveTab) => {
       const qs = new URLSearchParams(searchParams.toString());
@@ -644,7 +655,8 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
         {viewPerspective === "galeria" ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {productosFiltradosVisibles.map((row) => {
-              const esImagen = row.foto_url && /\.(png|jpe?g|webp|gif)$/i.test(row.foto_url);
+              const fotoUrlEfectiva = getFotoUrlEfectiva(row);
+              const esImagen = fotoUrlEfectiva && /\.(png|jpe?g|webp|gif)$/i.test(fotoUrlEfectiva);
               return (
                 <div
                   key={row.id}
@@ -679,7 +691,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                   <div className="relative aspect-[4/3] w-full bg-[var(--color-primary-soft)] overflow-hidden flex items-center justify-center border-b border-[var(--color-border)]">
                     {esImagen ? (
                       <img
-                        src={row.foto_url!}
+                        src={fotoUrlEfectiva!}
                         alt={row.nombre}
                         className="object-cover w-full h-full transition duration-300 group-hover:scale-105"
                       />
@@ -796,7 +808,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                         <span className="ml-1 text-[var(--color-text-secondary)] opacity-70">(sin costo registrado)</span>
                       ) : null}
                     </p>
-                    {row.foto_url && (
+                    {getFotoUrlEfectiva(row) && (
                       <p className="mt-1 text-xs text-[var(--color-accent)] font-semibold flex items-center gap-1">
                         <IconPhoto className="size-3.5" /> Tiene foto referencial
                       </p>
