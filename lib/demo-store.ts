@@ -2289,7 +2289,31 @@ export function demoUpdateInventarioProducto(
 ) {
   const row = store.inventarioProductos.find((p) => p.id === id);
   if (!row) return null;
+
+  // Proteger foto existente si se intenta sobrescribir con nulo
+  const oldFoto = row.foto_url;
   Object.assign(row, patch);
+  if (!row.foto_url && oldFoto) {
+    row.foto_url = oldFoto;
+  }
+
+  // Sincronizar hacia Catálogo si es categoría Muebles
+  if (row.categoria === "Muebles") {
+    const match = store.mueblesCatalogo.find((m) => m.id === row.id);
+    if (match) {
+      match.codigo = row.codigo;
+      match.nombre = row.nombre;
+      match.stock_disponible = row.stock_actual;
+      match.activo = row.activo;
+      // Coalescencia de imágenes
+      if (row.foto_url && !match.foto_url) {
+        match.foto_url = row.foto_url;
+      } else if (match.foto_url && !row.foto_url) {
+        row.foto_url = match.foto_url;
+      }
+    }
+  }
+
   persistStore();
   return row;
 }
@@ -2463,13 +2487,19 @@ export function demoMueblesCatalogoRows() {
           nombre: p.nombre,
           descripcion: "Producto importado del inventario",
           precio_lista: 0,
-          foto_url: null,
+          foto_url: p.foto_url || null,
           stock_disponible: p.stock_actual,
           activo: p.activo,
           created_at: p.created_at,
         });
       } else {
         match.stock_disponible = p.stock_actual;
+        // Coalescencia mutua de imágenes para proteger foto_url
+        if (p.foto_url && !match.foto_url) {
+          match.foto_url = p.foto_url;
+        } else if (match.foto_url && !p.foto_url) {
+          p.foto_url = match.foto_url;
+        }
       }
     }
   }
@@ -2481,9 +2511,11 @@ export function demoCreateMuebleCatalogo(
   input: Pick<MuebleCatalogoRow, "organization_id" | "codigo" | "nombre" | "precio_lista"> &
     Partial<Omit<MuebleCatalogoRow, "id" | "created_at" | "organization_id" | "codigo" | "nombre" | "precio_lista">>,
 ) {
+  const newId = randomUUID();
+  const org = input.organization_id || orgId || "default-org-id";
   store.mueblesCatalogo.unshift({
-    id: randomUUID(),
-    organization_id: input.organization_id,
+    id: newId,
+    organization_id: org,
     codigo: input.codigo,
     nombre: input.nombre,
     precio_lista: input.precio_lista,
@@ -2493,6 +2525,22 @@ export function demoCreateMuebleCatalogo(
     activo: input.activo ?? true,
     created_at: nowIso(),
   });
+
+  // Auto-aprovisionar en el inventario también para mantener la sincronía
+  store.inventarioProductos.unshift({
+    id: newId,
+    organization_id: org,
+    codigo: input.codigo,
+    nombre: input.nombre,
+    categoria: "Muebles",
+    unidad: "unidad",
+    stock_actual: input.stock_disponible ?? 0,
+    stock_minimo: 0,
+    activo: input.activo ?? true,
+    created_at: nowIso(),
+    foto_url: input.foto_url ?? null,
+  });
+
   persistStore();
 }
 
@@ -2504,7 +2552,20 @@ export function demoUpdateMuebleCatalogo(
   if (!row) return null;
   row.precio_lista = patch.precio_lista;
   row.descripcion = patch.descripcion ?? null;
-  row.foto_url = patch.foto_url ?? null;
+  
+  if (patch.foto_url !== undefined) {
+    row.foto_url = patch.foto_url;
+  }
+
+  // Actualizar también la fila correspondiente en el inventario
+  const invRow = store.inventarioProductos.find((p) => p.id === id);
+  if (invRow) {
+    invRow.nombre = row.nombre;
+    invRow.codigo = row.codigo;
+    invRow.foto_url = row.foto_url;
+    invRow.activo = row.activo;
+  }
+
   persistStore();
   return row;
 }
