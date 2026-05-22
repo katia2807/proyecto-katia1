@@ -71,8 +71,19 @@ export function MaderaCortadaForm({
   const [state, formAction] = useActionState(submitCreateVentaMaderaCortadaForm, mutationFormInitialState);
 
   useEffect(() => {
-    if (state?.success && onSuccess) {
-      onSuccess();
+    if (state?.success) {
+      // Limpiar estados de la calculadora y formulario
+      setClienteId("");
+      setCantidad(1);
+      setEspesor(2);
+      setAncho(6);
+      setLargo(8);
+      setPrecioPorPt(0);
+      setProductoId("");
+      
+      if (onSuccess) {
+        onSuccess();
+      }
     }
   }, [state, onSuccess]);
 

@@ -35,7 +35,10 @@ export function MaderaCortadaPanel({ clientes, choferes, productos, zonas, mockD
       title="Nueva venta de madera cortada"
       description="Cliente, tipo de corte, calculadora PT, entrega y pago."
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setFormKey((k) => k + 1);
+      }}
     >
       <MaderaCortadaForm
         key={formKey}
