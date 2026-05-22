@@ -1629,7 +1629,8 @@ export async function cambiarEstadoCotizacion(formData: FormData) {
   const supabase = getSupabaseServerClient();
   const { error } = await supabase
     .from("cotizaciones_unificadas")
-    .update({ estado_flujo: nuevoEstado, updated_at: new Date().toISOString() })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update({ estado_flujo: nuevoEstado as any })
     .eq("id", id)
     .eq("organization_id", DEFAULT_ORG_ID);
   if (error) throw new Error(error.message);
@@ -3168,25 +3169,6 @@ export async function createVentaMuebleTerminado(formData: FormData) {
     }
 
     const stockPrevio = mueble.stock_disponible;
-    const { data: muebleActualizado, error: stockErr } = await supabase
-      .from("muebles_catalogo")
-      .update({
-        stock_disponible: stockPrevio - parsed.data.cantidad,
-      })
-      .eq("id", muebleId)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .eq("stock_disponible", stockPrevio)
-      .select("id")
-      .maybeSingle();
-
-    if (stockErr) {
-      await supabase.from("ventas_mueble_terminado").delete().eq("id", venta.id);
-      throw new Error(stockErr.message);
-    }
-    if (!muebleActualizado) {
-      await supabase.from("ventas_mueble_terminado").delete().eq("id", venta.id);
-      throw new Error("El stock cambió mientras procesabas la venta; intenta de nuevo.");
-    }
 
     let montoCaja = total;
     if (parsed.data.modalidadPago === "credito") {

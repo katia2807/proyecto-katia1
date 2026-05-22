@@ -58,22 +58,25 @@ export async function resetDatabaseAction(confirmacion: string) {
       }
     }
 
-    // 6. Registrar la acción en audit_log
-    const { error: auditError } = await supabase.from("audit_log").insert({
+    // 6. Registrar la acción en audit_logs
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: auditError } = await supabase.from("audit_logs" as any).insert({
       organization_id: organizationId,
-      action: "DATABASE_RESET",
-      entity: "database",
-      entity_id: null,
-      payload: {
+      user_id: userId,
+      user_name: context.fullName || null,
+      accion: "DATABASE_RESET",
+      modulo: "database",
+      entidad_id: null,
+      detalles: {
         timestamp: new Date().toISOString(),
         tablas_limpiadas: tables,
         ejecutado_por: context.fullName || userId
-      },
-      actor_id: userId
-    });
+      }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
 
     if (auditError) {
-      console.error("Error al registrar audit_log:", auditError);
+      console.error("Error al registrar audit_logs:", auditError);
       // No arrojamos excepción aquí para no deshacer la eliminación de datos operativos
       // si solo falla el log complementario.
     }

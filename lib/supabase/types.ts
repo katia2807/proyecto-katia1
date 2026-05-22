@@ -1063,6 +1063,7 @@ export type Database = {
           created_at?: string;
         };
         Update: {
+          cliente_id?: string;
           fecha?: string;
           correlativo?: string | null;
           tipo_cliente?: "natural" | "empresa";

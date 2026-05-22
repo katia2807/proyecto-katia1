@@ -210,11 +210,14 @@ export async function GET() {
     ],
     personal.sueldos.map((s) => {
       const emp = personal.empleados.find((e) => e.id === s.empleado_id);
+      const adelantosPeriodo = personal.adelantos
+        .filter((a) => a.empleado_id === s.empleado_id && a.fecha.startsWith(s.periodo))
+        .reduce((sum, a) => sum + Number(a.monto), 0);
       return {
         periodo: s.periodo,
         empleado: emp?.nombre ?? "—",
         bruto: Number(s.monto_bruto),
-        adelantos: Number(s.adelantos_aplicados),
+        adelantos: adelantosPeriodo,
         descuentos: Number(s.descuentos),
         neto: Number(s.monto_neto),
       };

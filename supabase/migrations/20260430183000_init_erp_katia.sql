@@ -237,7 +237,11 @@ begin
   if old.periodo_cerrado then
     raise exception 'Este registro pertenece a un período cerrado. No se puede editar ni eliminar.';
   end if;
-  return old;
+  if tg_op = 'DELETE' then
+    return old;
+  else
+    return new;
+  end if;
 end;
 $$;
 

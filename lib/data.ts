@@ -490,13 +490,13 @@ export async function getPersonalRows() {
       .order("nombre"),
     supabase
       .from("adelantos")
-      .select("*")
+      .select("*, empleados(nombre)")
       .eq("organization_id", DEFAULT_ORG_ID)
       .order("fecha", { ascending: false })
       .limit(30),
     supabase
       .from("sueldos")
-      .select("*")
+      .select("*, empleados(nombre)")
       .eq("organization_id", DEFAULT_ORG_ID)
       .order("periodo", { ascending: false })
       .limit(30),

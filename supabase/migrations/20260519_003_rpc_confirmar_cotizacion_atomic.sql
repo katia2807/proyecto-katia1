@@ -27,7 +27,7 @@ BEGIN
 
   -- Actualizar estado
   UPDATE public.cotizaciones_unificadas
-     SET estado_flujo = 'cobrada', updated_at = now()
+     SET estado_flujo = 'cobrada'
    WHERE id = p_cotizacion_id AND organization_id = p_org_id;
 
   -- Crear movimiento de caja

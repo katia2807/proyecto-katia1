@@ -50,21 +50,26 @@ export default async function PersonalPage() {
             <Table>
               <THead>
                 <TRow>
+                  <TH>Empleado</TH>
                   <TH>Fecha</TH>
                   <TH>Estado</TH>
                   <TH className="text-right">Monto</TH>
                 </TRow>
               </THead>
               <tbody>
-                {adelantos.map((row) => (
-                  <TRow key={row.id}>
-                    <TD>{formatDate(row.fecha)}</TD>
-                    <TD>
-                      <Badge variant={row.estado === "pendiente" ? "warning" : "success"}>{row.estado}</Badge>
-                    </TD>
-                    <TD className="text-right font-semibold">{formatPen(Number(row.monto))}</TD>
-                  </TRow>
-                ))}
+                {adelantos.map((row) => {
+                  const empName = (row as { empleados?: { nombre?: string } }).empleados?.nombre || empleados.find((e) => e.id === row.empleado_id)?.nombre || "—";
+                  return (
+                    <TRow key={row.id}>
+                      <TD className="font-medium">{empName}</TD>
+                      <TD>{formatDate(row.fecha)}</TD>
+                      <TD>
+                        <Badge variant={row.estado === "pendiente" ? "warning" : "success"}>{row.estado}</Badge>
+                      </TD>
+                      <TD className="text-right font-semibold">{formatPen(Number(row.monto))}</TD>
+                    </TRow>
+                  );
+                })}
               </tbody>
             </Table>
           </div>
@@ -76,6 +81,7 @@ export default async function PersonalPage() {
             <Table>
               <THead>
                 <TRow>
+                  <TH>Empleado</TH>
                   <TH>Periodo</TH>
                   <TH className="text-right">Bruto</TH>
                   <TH className="text-right">Descuento</TH>
@@ -83,14 +89,18 @@ export default async function PersonalPage() {
                 </TRow>
               </THead>
               <tbody>
-                {sueldos.map((row) => (
-                  <TRow key={row.id}>
-                    <TD>{row.periodo}</TD>
-                    <TD className="text-right">{formatPen(Number(row.monto_bruto))}</TD>
-                    <TD className="text-right">{formatPen(Number(row.descuentos))}</TD>
-                    <TD className="text-right font-semibold">{formatPen(Number(row.monto_neto))}</TD>
-                  </TRow>
-                ))}
+                {sueldos.map((row) => {
+                  const empName = (row as { empleados?: { nombre?: string } }).empleados?.nombre || empleados.find((e) => e.id === row.empleado_id)?.nombre || "—";
+                  return (
+                    <TRow key={row.id}>
+                      <TD className="font-medium">{empName}</TD>
+                      <TD>{row.periodo}</TD>
+                      <TD className="text-right">{formatPen(Number(row.monto_bruto))}</TD>
+                      <TD className="text-right">{formatPen(Number(row.descuentos))}</TD>
+                      <TD className="text-right font-semibold">{formatPen(Number(row.monto_neto))}</TD>
+                    </TRow>
+                  );
+                })}
               </tbody>
             </Table>
           </div>
