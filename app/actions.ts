@@ -978,6 +978,23 @@ export async function createVentaMadera(formData: FormData) {
   maybeRedirectToQuickStep(formData);
 }
 
+/** Wrapper con MutationFormState para useActionState (cierre automático del modal). */
+export async function submitCreateVentaMaderaForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await createVentaMadera(formData);
+    return { success: true, error: null, message: "Venta registrada correctamente." };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "No se pudo registrar la venta.",
+      message: null,
+    };
+  }
+}
+
 export async function createCliente(formData: FormData) {
   await requireMutationAccess(writerRoles);
   const parsed = clienteSchema.safeParse({

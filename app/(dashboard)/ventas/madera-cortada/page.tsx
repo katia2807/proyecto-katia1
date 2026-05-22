@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MaderaCortadaPanel } from "@/components/sales/madera-cortada-panel";
+import { VentaMaderaPanel } from "@/components/sales/venta-madera-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
@@ -21,8 +22,8 @@ export default async function MaderaCortadaPage() {
     getClientesRows(),
     getChoferesRows(),
     getInventarioProductosRows(),
-    getVentasRows(),
     getZonasEntregaRows().catch(() => []),
+    getVentasRows(),
   ]);
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
@@ -44,16 +45,23 @@ export default async function MaderaCortadaPage() {
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <CardTitle>Operaciones</CardTitle>
-          <CardDescription>Venta de madera cortada con cubicaje y entrega.</CardDescription>
+          <CardDescription>Venta de madera (flujo clásico) o venta de madera cortada.</CardDescription>
         </div>
         {canMutate ? (
-          <MaderaCortadaPanel
-            clientes={clientes}
-            choferes={choferes}
-            productos={productosMadera}
-            zonas={zonas}
-            mockData={comboMock}
-          />
+          <div className="flex flex-wrap gap-2">
+            <VentaMaderaPanel
+              clientes={clientes}
+              productos={productosMadera}
+              mockData={comboMock}
+            />
+            <MaderaCortadaPanel
+              clientes={clientes}
+              choferes={choferes}
+              productos={productosMadera}
+              zonas={zonas}
+              mockData={comboMock}
+            />
+          </div>
         ) : (
           <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
             Tu rol es de solo lectura.

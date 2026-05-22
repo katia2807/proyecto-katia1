@@ -13,6 +13,7 @@ import { liteClientesToCompleto, MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobo
 import { formatPen } from "@/lib/utils";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import type { ZonaEntregaRow } from "@/lib/demo-store";
+import { useToast } from "@/components/ui/toast";
 
 type Cliente = { id: string; nombre: string };
 type Chofer = { id: string; nombre: string; telefono?: string | null; placa?: string | null };
@@ -53,16 +54,30 @@ export function MaderaCortadaForm({
   mockData = false,
   onSuccess,
 }: MaderaCortadaFormProps) {
+  const { showToast } = useToast();
   const hoy = new Date().toISOString().slice(0, 10);
+
+  // Wizard Navigation States
+  const [step, setStep] = useState(1);
+  const [touchedSteps, setTouchedSteps] = useState<Record<number, boolean>>({});
+
+  // Paso 1 States
   const [clienteId, setClienteId] = useState("");
+  const [fecha, setFecha] = useState(hoy);
   const [clientesLocales, setClientesLocales] = useState<Cliente[]>([]);
   const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
+
+  // Paso 2 States
+  const [tipoCorte, setTipoCorte] = useState("tabla");
+  const [productoId, setProductoId] = useState("");
   const [cantidad, setCantidad] = useState<number | "">("");
   const [espesor, setEspesor] = useState<number | "">("");
   const [ancho, setAncho] = useState<number | "">("");
   const [largo, setLargo] = useState<number | "">("");
   const [precioPorPt, setPrecioPorPt] = useState<number | "">("");
-  const [productoId, setProductoId] = useState("");
+
+  // Paso 3 States
+  const [totalManual, setTotalManual] = useState<string>("");
 
   const totalPt = useMemo(() => {
     const cant = cantidad === "" ? 0 : cantidad;
@@ -72,30 +87,37 @@ export function MaderaCortadaForm({
     return calcularPT(cant, esp, anc, lar);
   }, [cantidad, espesor, ancho, largo]);
 
-  const totalSoles = useMemo(() => {
+  const totalSolesCalculado = useMemo(() => {
     const price = precioPorPt === "" ? 0 : precioPorPt;
     return totalPt * price;
   }, [totalPt, precioPorPt]);
+
+  const totalFinal = totalManual !== "" ? (Number(totalManual) || 0) : totalSolesCalculado;
 
   // useActionState para detectar éxito y cerrar automáticamente
   const [state, formAction] = useActionState(submitCreateVentaMaderaCortadaForm, mutationFormInitialState);
 
   useEffect(() => {
-    if (state?.success) {
+    if (state?.success && state?.message) {
+      showToast({ variant: "success", message: state.message });
       // Limpiar estados de la calculadora y formulario
       setClienteId("");
+      setFecha(hoy);
       setCantidad("");
       setEspesor("");
       setAncho("");
       setLargo("");
       setPrecioPorPt("");
       setProductoId("");
+      setTotalManual("");
       
       if (onSuccess) {
         onSuccess();
       }
+    } else if (state?.error) {
+      showToast({ variant: "error", message: state.error });
     }
-  }, [state, onSuccess]);
+  }, [state, showToast, onSuccess, hoy]);
 
   const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
 
@@ -114,7 +136,7 @@ export function MaderaCortadaForm({
 
   const productoComboOptions = useMemo(
     () => [
-      { value: "", label: "Sin descontar inventario", sublabel: undefined as string | undefined },
+      { value: "", label: "Sin descontar inventario", sublabel: undefined },
       ...effectiveProductos.map((p) => ({
         value: p.id,
         label: p.nombre,
@@ -125,8 +147,8 @@ export function MaderaCortadaForm({
   );
 
   const productoSeleccionado = effectiveProductos.find((p) => p.id === productoId);
-  const sinStock =
-    productoSeleccionado && Number(productoSeleccionado.stock_actual) <= 0;
+  const stockDisponible = productoSeleccionado ? Number(productoSeleccionado.stock_actual) : 0;
+  const sinStock = productoSeleccionado && stockDisponible <= 0;
 
   function handleClienteCreado(id: string, nombre: string) {
     setClientesLocales((prev) => [...prev, { id, nombre }]);
@@ -134,165 +156,505 @@ export function MaderaCortadaForm({
     setModoCliente("buscar");
   }
 
+  function handleStepClick(targetStep: number) {
+    setTouchedSteps((prev) => ({ ...prev, [step]: true }));
+    setStep(targetStep);
+  }
+
+  // Dynamic Validation indicators per step
+  const stepErrors = useMemo(() => {
+    const errors: Record<number, boolean> = {};
+
+    // Paso 1: Cliente y Fecha
+    errors[1] = !clienteId || !fecha;
+
+    // Paso 2: Detalles de Corte y Calculadora
+    errors[2] =
+      cantidad === "" ||
+      cantidad <= 0 ||
+      espesor === "" ||
+      espesor <= 0 ||
+      ancho === "" ||
+      ancho <= 0 ||
+      largo === "" ||
+      largo <= 0 ||
+      precioPorPt === "" ||
+      precioPorPt < 0 ||
+      (productoSeleccionado !== undefined && cantidad > stockDisponible);
+
+    // Paso 3: Resumen y Cobro (si es totalManual menor a cero, por ejemplo)
+    errors[3] = totalFinal < 0;
+
+    return errors;
+  }, [clienteId, fecha, cantidad, espesor, ancho, largo, precioPorPt, totalFinal, productoSeleccionado, stockDisponible]);
+
+  const anyValidationError = stepErrors[1] || stepErrors[2] || stepErrors[3];
+
   return (
-    <form action={formAction} className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2">
-        {/* ── CLIENTE ── */}
-        <div className="space-y-2">
-          {modoCliente === "buscar" ? (
-            <>
-              <ClienteCombobox
-                mockData={mockData}
-                clientes={clientesCombo}
-                value={clienteId}
-                onChange={setClienteId}
-                hiddenInputName="cliente_id"
-                label="Cliente"
-                placeholder="Buscar cliente…"
-                inputAriaLabel="Cliente para venta de madera cortada"
-              />
-              <div className="flex gap-2">
+    <form action={formAction} className="space-y-6">
+      {/* ── STEPPER DE WIZARD ── */}
+      <div className="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          {[
+            { n: 1, label: "Cliente" },
+            { n: 2, label: "Corte" },
+            { n: 3, label: "Cobro" },
+            { n: 4, label: "Confirmar" },
+          ].map((item, index) => {
+            const isCompleted = step > item.n;
+            const isActive = step === item.n;
+            const hasError = stepErrors[item.n] && (touchedSteps[item.n] || step > item.n);
+
+            return (
+              <div key={item.n} className="flex flex-1 items-center">
                 <button
                   type="button"
-                  onClick={() => setModoCliente("nuevo")}
-                  className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                  onClick={() => handleStepClick(item.n)}
+                  className="flex flex-col items-center flex-1 focus:outline-none group"
                 >
-                  + Nuevo cliente
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-bold transition-all duration-300 ${
+                      hasError
+                        ? "bg-[var(--color-danger)] border-[var(--color-danger)] text-white animate-pulse"
+                        : isCompleted
+                        ? "bg-[var(--color-success)] border-[var(--color-success)] text-white"
+                        : isActive
+                        ? "bg-[var(--color-primary)] border-[var(--color-primary)] text-white shadow-md shadow-[var(--color-primary)]/20"
+                        : "border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-secondary)]"
+                    }`}
+                  >
+                    {hasError ? "⚠️" : isCompleted ? "✓" : item.n}
+                  </div>
+                  <span
+                    className={`mt-1.5 text-xs font-semibold tracking-wide transition-all duration-300 hidden sm:inline ${
+                      hasError
+                        ? "text-[var(--color-danger)] font-bold"
+                        : isActive
+                        ? "text-[var(--color-primary)] font-bold"
+                        : isCompleted
+                        ? "text-[var(--color-success)]"
+                        : "text-[var(--color-text-secondary)]"
+                    }`}
+                  >
+                    {item.label}
+                  </span>
                 </button>
-                <span className="text-xs text-[var(--color-text-secondary)]">·</span>
-                <button
-                  type="button"
-                  onClick={() => setModoCliente("temporal")}
-                  className="text-xs font-semibold text-[var(--color-text-secondary)] hover:underline"
-                >
-                  + Cliente temporal
-                </button>
+                {index < 3 && (
+                  <div
+                    className={`h-0.5 w-full -mt-4 transition-all duration-500 ${
+                      step > item.n
+                        ? "bg-[var(--color-success)]"
+                        : "bg-[var(--color-border)]"
+                    }`}
+                  />
+                )}
               </div>
-            </>
-          ) : (
-            <NuevoClienteInlinePanel
-              temporal={modoCliente === "temporal"}
-              onCreated={handleClienteCreado}
-              onCancel={() => setModoCliente("buscar")}
-            />
-          )}
+            );
+          })}
         </div>
-
-        <Field name="fecha" type="date" label="Fecha" defaultValue={hoy} required />
-        <SelectField name="tipo_corte" label="Tipo de corte" defaultValue="tabla">
-          {tiposCorte.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
-          ))}
-        </SelectField>
-        <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
-          <span>Producto en inventario (opcional)</span>
-          <Combobox
-            options={productoComboOptions}
-            value={productoId}
-            onChange={setProductoId}
-            hiddenInputName="inventario_producto_id"
-            placeholder="Buscar producto o dejar sin inventario…"
-            inputAriaLabel="Producto de inventario para descontar stock"
-          />
-        </label>
       </div>
 
-      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-3">
-        <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-          Calculadora de pies tablares
-        </p>
-        <div className="mt-2 grid gap-3 md:grid-cols-4">
-          <Field
-            label="Cantidad"
-            type="number"
-            min="0"
-            step="1"
-            value={cantidad}
-            onChange={(e) => setCantidad(e.target.value === "" ? "" : (Number(e.target.value) || 0))}
-          />
-          <Field
-            label="Espesor (in)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={espesor}
-            onChange={(e) => setEspesor(e.target.value === "" ? "" : (Number(e.target.value) || 0))}
-          />
-          <Field
-            label="Ancho (in)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={ancho}
-            onChange={(e) => setAncho(e.target.value === "" ? "" : (Number(e.target.value) || 0))}
-          />
-          <Field
-            label="Largo (ft)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={largo}
-            onChange={(e) => setLargo(e.target.value === "" ? "" : (Number(e.target.value) || 0))}
-          />
-        </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
-            <p className="text-xs text-[var(--color-text-secondary)]">Total PT</p>
-            <p className="text-xl font-bold">{totalPt.toFixed(2)}</p>
-          </div>
-          <Field
-            label="Precio por PT (S/)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={precioPorPt}
-            onChange={(e) => setPrecioPorPt(e.target.value === "" ? "" : (Number(e.target.value) || 0))}
-          />
-          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/40 p-2">
-            <p className="text-xs text-[var(--color-text-secondary)]">Total venta</p>
-            <p className="text-2xl font-black text-[var(--color-text-primary)]">
-              {formatPen(totalSoles)}
-            </p>
-          </div>
-        </div>
-        {sinStock ? (
-          <p className="mt-2 text-xs font-semibold text-[var(--color-danger)]">
-            ⚠ El producto seleccionado no tiene stock disponible.
+      {/* ── PASO 1: DATOS DEL CLIENTE ── */}
+      <div style={{ display: step === 1 ? "block" : "none" }} className="space-y-4">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 1: Datos del cliente</h3>
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Busca un cliente existente o registra uno nuevo para la venta de madera cortada.
           </p>
-        ) : null}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              {modoCliente === "buscar" ? (
+                <>
+                  <ClienteCombobox
+                    mockData={mockData}
+                    clientes={clientesCombo}
+                    value={clienteId}
+                    onChange={(val) => {
+                      setClienteId(val);
+                      setTouchedSteps((prev) => ({ ...prev, 1: true }));
+                    }}
+                    hiddenInputName="cliente_id"
+                    label="Cliente *"
+                    placeholder="Buscar cliente…"
+                    inputAriaLabel="Cliente para venta de madera cortada"
+                    className={touchedSteps[1] && !clienteId ? "!border-[var(--color-danger)]" : ""}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setModoCliente("nuevo")}
+                      className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                    >
+                      + Nuevo cliente
+                    </button>
+                    <span className="text-xs text-[var(--color-text-secondary)]">·</span>
+                    <button
+                      type="button"
+                      onClick={() => setModoCliente("temporal")}
+                      className="text-xs font-semibold text-[var(--color-text-secondary)] hover:underline"
+                    >
+                      + Cliente temporal
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <NuevoClienteInlinePanel
+                  temporal={modoCliente === "temporal"}
+                  onCreated={handleClienteCreado}
+                  onCancel={() => setModoCliente("buscar")}
+                />
+              )}
+            </div>
+
+            <Field
+              name="fecha"
+              type="date"
+              label="Fecha *"
+              value={fecha}
+              onChange={(e) => {
+                setFecha(e.target.value);
+                setTouchedSteps((prev) => ({ ...prev, 1: true }));
+              }}
+              required
+              className={touchedSteps[1] && !fecha ? "!border-[var(--color-danger)]" : ""}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-4">
+          <Button
+            type="button"
+            onClick={() => {
+              setTouchedSteps((prev) => ({ ...prev, 1: true }));
+              setStep(2);
+            }}
+            className="px-6 py-2 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
+          >
+            Siguiente: Detalle del corte →
+          </Button>
+        </div>
       </div>
 
+      {/* ── PASO 2: DETALLE DEL CORTE ── */}
+      <div style={{ display: step === 2 ? "block" : "none" }} className="space-y-4">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 2: Detalle del corte y cubicaje</h3>
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Define el tipo de corte y calcula el volumen total de pies tablares (PT) de madera.
+          </p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <SelectField
+              name="tipo_corte"
+              label="Tipo de corte"
+              value={tipoCorte}
+              onChange={(e) => setTipoCorte(e.target.value)}
+            >
+              {tiposCorte.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </SelectField>
+
+            <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+              <span>Producto en inventario (opcional)</span>
+              <Combobox
+                options={productoComboOptions}
+                value={productoId}
+                onChange={(val) => {
+                  setProductoId(val);
+                  setTouchedSteps((prev) => ({ ...prev, 2: true }));
+                }}
+                hiddenInputName="inventario_producto_id"
+                placeholder="Buscar producto o dejar sin inventario…"
+                inputAriaLabel="Producto de inventario para descontar stock"
+              />
+            </label>
+          </div>
+
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-4 space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+              Calculadora de pies tablares
+            </p>
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+              <Field
+                label="Cantidad *"
+                type="number"
+                min="0"
+                step="1"
+                value={cantidad}
+                onChange={(e) => {
+                  setCantidad(e.target.value === "" ? "" : (Number(e.target.value) || 0));
+                  setTouchedSteps((prev) => ({ ...prev, 2: true }));
+                }}
+                className={
+                  touchedSteps[2] && (cantidad === "" || cantidad <= 0 || (productoSeleccionado && cantidad > stockDisponible))
+                    ? "!border-[var(--color-danger)]"
+                    : ""
+                }
+              />
+              <Field
+                label="Espesor (in) *"
+                type="number"
+                min="0"
+                step="0.01"
+                value={espesor}
+                onChange={(e) => {
+                  setEspesor(e.target.value === "" ? "" : (Number(e.target.value) || 0));
+                  setTouchedSteps((prev) => ({ ...prev, 2: true }));
+                }}
+                className={touchedSteps[2] && (espesor === "" || espesor <= 0) ? "!border-[var(--color-danger)]" : ""}
+              />
+              <Field
+                label="Ancho (in) *"
+                type="number"
+                min="0"
+                step="0.01"
+                value={ancho}
+                onChange={(e) => {
+                  setAncho(e.target.value === "" ? "" : (Number(e.target.value) || 0));
+                  setTouchedSteps((prev) => ({ ...prev, 2: true }));
+                }}
+                className={touchedSteps[2] && (ancho === "" || ancho <= 0) ? "!border-[var(--color-danger)]" : ""}
+              />
+              <Field
+                label="Largo (ft) *"
+                type="number"
+                min="0"
+                step="0.01"
+                value={largo}
+                onChange={(e) => {
+                  setLargo(e.target.value === "" ? "" : (Number(e.target.value) || 0));
+                  setTouchedSteps((prev) => ({ ...prev, 2: true }));
+                }}
+                className={touchedSteps[2] && (largo === "" || largo <= 0) ? "!border-[var(--color-danger)]" : ""}
+              />
+            </div>
+
+            {productoSeleccionado && cantidad !== "" && cantidad > stockDisponible ? (
+              <p className="text-xs font-semibold text-[var(--color-danger)] pt-1">
+                ⚠️ La cantidad ingresada ({cantidad}) excede el stock disponible ({stockDisponible} {productoSeleccionado.unidad}).
+              </p>
+            ) : null}
+
+            {sinStock ? (
+              <p className="text-xs font-semibold text-[var(--color-danger)] pt-1">
+                ⚠️ El producto seleccionado no tiene stock disponible en inventario.
+              </p>
+            ) : null}
+
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
+                <p className="text-xs text-[var(--color-text-secondary)]">Total PT volumen</p>
+                <p className="text-xl font-bold">{totalPt.toFixed(2)} ft²</p>
+              </div>
+              
+              <Field
+                label="Precio por PT (S/) *"
+                type="number"
+                min="0"
+                step="0.01"
+                value={precioPorPt}
+                onChange={(e) => {
+                  setPrecioPorPt(e.target.value === "" ? "" : (Number(e.target.value) || 0));
+                  setTouchedSteps((prev) => ({ ...prev, 2: true }));
+                }}
+                className={touchedSteps[2] && (precioPorPt === "" || precioPorPt < 0) ? "!border-[var(--color-danger)]" : ""}
+              />
+              
+              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/40 p-2">
+                <p className="text-xs text-[var(--color-text-secondary)]">Costo sugerido</p>
+                <p className="text-2xl font-black text-[var(--color-text-primary)]">
+                  {formatPen(totalSolesCalculado)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between pt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setStep(1)}
+            className="px-6 py-2"
+          >
+            ← Anterior
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              setTouchedSteps((prev) => ({ ...prev, 2: true }));
+              setStep(3);
+            }}
+            className="px-6 py-2"
+          >
+            Siguiente: Cobro y Entrega →
+          </Button>
+        </div>
+      </div>
+
+      {/* ── PASO 3: RESUMEN Y COBRO ── */}
+      <div style={{ display: step === 3 ? "block" : "none" }} className="space-y-4">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 3: Resumen de cobro, entrega y pago</h3>
+          
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-4">
+              <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/10 p-4 space-y-3">
+                <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Costo sugerido</h4>
+                <div className="flex justify-between items-center text-sm border-b border-[var(--color-border)] pb-2">
+                  <span>Corte: {totalPt.toFixed(2)} PT a S/ {precioPorPt || "0.00"}</span>
+                  <span className="font-semibold">{formatPen(totalSolesCalculado)}</span>
+                </div>
+                
+                <div className="space-y-1.5 pt-1">
+                  <label htmlFor="total-editable" className="text-sm font-medium text-[var(--color-text-primary)]">Total editable (S/)</label>
+                  <input
+                    id="total-editable"
+                    name="total_manual_input"
+                    type="number"
+                    step="0.01"
+                    value={totalManual}
+                    placeholder={totalSolesCalculado.toFixed(2)}
+                    onChange={(e) => {
+                      setTotalManual(e.target.value);
+                      setTouchedSteps((prev) => ({ ...prev, 3: true }));
+                    }}
+                    className="w-full h-10 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-bold text-[var(--color-text-primary)] focus-visible:border-[var(--accent-primary)] focus-visible:ring-2"
+                  />
+                  <p className="text-[10px] text-[var(--color-text-secondary)]">Deja en blanco para usar el costo sugerido ({formatPen(totalSolesCalculado)}).</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[var(--color-border)] p-4 space-y-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">Datos de pago</p>
+                <PagoFormFields showAdelantoInput={true} />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[var(--color-border)] p-4 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">Datos de entrega</p>
+              <EntregaFormFields mockData={mockData} choferes={choferes} zonas={zonas} />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between pt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setStep(2)}
+            className="px-6 py-2"
+          >
+            ← Anterior
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              setTouchedSteps((prev) => ({ ...prev, 3: true }));
+              setStep(4);
+            }}
+            className="px-6 py-2"
+          >
+            Siguiente: Confirmar →
+          </Button>
+        </div>
+      </div>
+
+      {/* ── PASO 4: CONFIRMAR Y REGISTRAR ── */}
+      <div style={{ display: step === 4 ? "block" : "none" }} className="space-y-4">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 4: Confirmar y registrar</h3>
+
+          {anyValidationError ? (
+            <div className="rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-4 text-[var(--color-danger)]">
+              <p className="text-sm font-semibold">⚠️ Existen errores de validación en pasos anteriores</p>
+              <p className="text-xs">Por favor, regresa a los pasos marcados con advertencias para completar todos los campos obligatorios.</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-[var(--color-success)]/30 bg-[var(--color-success)]/5 p-4 text-[var(--color-success)]">
+              <p className="text-sm font-semibold">✓ Todo listo para registrar</p>
+              <p className="text-xs">Por favor, revisa el resumen a continuación antes de proceder a registrar la venta.</p>
+            </div>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Resumen Cliente y Corte */}
+            <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
+              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cliente & Fecha</h4>
+              <p className="text-sm">
+                <strong>Cliente:</strong> {todosLosClientes.find((c) => c.id === clienteId)?.nombre ?? "No seleccionado"}
+              </p>
+              <p className="text-sm">
+                <strong>Fecha:</strong> {fecha}
+              </p>
+
+              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider mt-4">Detalles del Corte</h4>
+              <p className="text-sm capitalize">
+                <strong>Tipo de corte:</strong> {tipoCorte}
+              </p>
+              <p className="text-sm">
+                <strong>Volumen:</strong> {totalPt.toFixed(2)} PT
+              </p>
+              <p className="text-sm">
+                <strong>Costo por PT:</strong> {formatPen(Number(precioPorPt) || 0)}
+              </p>
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                Dimensiones: {cantidad || 0} pzs ({espesor || 0}{"\""} x {ancho || 0}{"\""} x {largo || 0}{"'"})
+              </p>
+            </div>
+
+            {/* Resumen Cobro Final */}
+            <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
+              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cobro y Financiero</h4>
+              <div className="space-y-1.5 pt-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--color-text-secondary)]">Costo sugerido:</span>
+                  <span>{formatPen(totalSolesCalculado)}</span>
+                </div>
+                {totalManual !== "" && (
+                  <div className="flex justify-between text-xs text-[var(--color-accent)] font-bold">
+                    <span>Ajuste manual:</span>
+                    <span>{formatPen(Number(totalManual) || 0)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-black border-t border-[var(--color-border)] pt-2 text-[var(--color-primary)]">
+                  <span>PRECIO COBRADO FINAL:</span>
+                  <span>{formatPen(totalFinal)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between pt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setStep(3)}
+            className="px-6 py-2"
+          >
+            ← Anterior
+          </Button>
+          <Button
+            size="lg"
+            disabled={anyValidationError}
+            className="px-8 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
+          >
+            Registrar venta ✓
+          </Button>
+        </div>
+      </div>
+
+      {/* Hidden inputs expected by submitCreateVentaMaderaCortadaForm */}
       <input type="hidden" name="total_pt" value={totalPt.toFixed(4)} />
       <input type="hidden" name="precio_por_pt" value={precioPorPt} />
-      <input type="hidden" name="total" value={totalSoles.toFixed(2)} />
+      <input type="hidden" name="total" value={totalFinal.toFixed(2)} />
 
-      <div className="rounded-xl border border-[var(--color-border)] p-3">
-        <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-          Datos de entrega
-        </p>
-        <div className="mt-2">
-          <EntregaFormFields mockData={mockData} choferes={choferes} zonas={zonas} />
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-[var(--color-border)] p-3">
-        <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-          Datos de pago
-        </p>
-        <div className="mt-2">
-          <PagoFormFields showAdelantoInput={true} />
-        </div>
-      </div>
-
-      {state?.error ? (
-        <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-600">{state.error}</p>
-      ) : null}
-
-      <Button size="lg" className="w-full mt-4 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all">
-        Confirmar venta
-      </Button>
+      {state?.error && (
+        <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-600 mt-2">{state.error}</p>
+      )}
     </form>
   );
 }
