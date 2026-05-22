@@ -57,15 +57,25 @@ export function MaderaCortadaForm({
   const [clienteId, setClienteId] = useState("");
   const [clientesLocales, setClientesLocales] = useState<Cliente[]>([]);
   const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
-  const [cantidad, setCantidad] = useState(1);
-  const [espesor, setEspesor] = useState(2);
-  const [ancho, setAncho] = useState(6);
-  const [largo, setLargo] = useState(8);
-  const [precioPorPt, setPrecioPorPt] = useState(0);
+  const [cantidad, setCantidad] = useState<number | "">("");
+  const [espesor, setEspesor] = useState<number | "">("");
+  const [ancho, setAncho] = useState<number | "">("");
+  const [largo, setLargo] = useState<number | "">("");
+  const [precioPorPt, setPrecioPorPt] = useState<number | "">("");
   const [productoId, setProductoId] = useState("");
 
-  const totalPt = useMemo(() => calcularPT(cantidad, espesor, ancho, largo), [cantidad, espesor, ancho, largo]);
-  const totalSoles = useMemo(() => totalPt * precioPorPt, [totalPt, precioPorPt]);
+  const totalPt = useMemo(() => {
+    const cant = cantidad === "" ? 0 : cantidad;
+    const esp = espesor === "" ? 0 : espesor;
+    const anc = ancho === "" ? 0 : ancho;
+    const lar = largo === "" ? 0 : largo;
+    return calcularPT(cant, esp, anc, lar);
+  }, [cantidad, espesor, ancho, largo]);
+
+  const totalSoles = useMemo(() => {
+    const price = precioPorPt === "" ? 0 : precioPorPt;
+    return totalPt * price;
+  }, [totalPt, precioPorPt]);
 
   // useActionState para detectar éxito y cerrar automáticamente
   const [state, formAction] = useActionState(submitCreateVentaMaderaCortadaForm, mutationFormInitialState);
@@ -74,11 +84,11 @@ export function MaderaCortadaForm({
     if (state?.success) {
       // Limpiar estados de la calculadora y formulario
       setClienteId("");
-      setCantidad(1);
-      setEspesor(2);
-      setAncho(6);
-      setLargo(8);
-      setPrecioPorPt(0);
+      setCantidad("");
+      setEspesor("");
+      setAncho("");
+      setLargo("");
+      setPrecioPorPt("");
       setProductoId("");
       
       if (onSuccess) {
@@ -200,7 +210,7 @@ export function MaderaCortadaForm({
             min="0"
             step="1"
             value={cantidad}
-            onChange={(e) => setCantidad(Number(e.target.value) || 0)}
+            onChange={(e) => setCantidad(e.target.value === "" ? "" : (Number(e.target.value) || 0))}
           />
           <Field
             label="Espesor (in)"
@@ -208,7 +218,7 @@ export function MaderaCortadaForm({
             min="0"
             step="0.01"
             value={espesor}
-            onChange={(e) => setEspesor(Number(e.target.value) || 0)}
+            onChange={(e) => setEspesor(e.target.value === "" ? "" : (Number(e.target.value) || 0))}
           />
           <Field
             label="Ancho (in)"
@@ -216,7 +226,7 @@ export function MaderaCortadaForm({
             min="0"
             step="0.01"
             value={ancho}
-            onChange={(e) => setAncho(Number(e.target.value) || 0)}
+            onChange={(e) => setAncho(e.target.value === "" ? "" : (Number(e.target.value) || 0))}
           />
           <Field
             label="Largo (ft)"
@@ -224,7 +234,7 @@ export function MaderaCortadaForm({
             min="0"
             step="0.01"
             value={largo}
-            onChange={(e) => setLargo(Number(e.target.value) || 0)}
+            onChange={(e) => setLargo(e.target.value === "" ? "" : (Number(e.target.value) || 0))}
           />
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -238,7 +248,7 @@ export function MaderaCortadaForm({
             min="0"
             step="0.01"
             value={precioPorPt}
-            onChange={(e) => setPrecioPorPt(Number(e.target.value) || 0)}
+            onChange={(e) => setPrecioPorPt(e.target.value === "" ? "" : (Number(e.target.value) || 0))}
           />
           <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/40 p-2">
             <p className="text-xs text-[var(--color-text-secondary)]">Total venta</p>
