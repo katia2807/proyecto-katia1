@@ -3,7 +3,7 @@
 import { createCliente } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Field, SelectField } from "@/components/ui/field";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 /**
  * Mini formulario reutilizable para crear un cliente sin salir del panel de venta.
@@ -20,19 +20,39 @@ export function NuevoClienteInlinePanel({
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSave() {
+    if (!containerRef.current) return;
     setLoading(true);
     setError(null);
+
+    const formData = new FormData();
+    const inputs = containerRef.current.querySelectorAll("input, select");
+    
+    inputs.forEach((el) => {
+      const input = el as HTMLInputElement | HTMLSelectElement;
+      if (input.name) {
+        formData.append(input.name, input.value);
+      }
+    });
+
+    const nombre = formData.get("nombre") as string;
+    if (!nombre || nombre.trim().length < 3) {
+      setError("El nombre es requerido y debe tener al menos 3 caracteres.");
+      setLoading(false);
+      return;
+    }
+
     if (temporal) formData.set("es_temporal", "true");
     formData.set("skip_redirect", "true");
+
     try {
       const result = await createCliente(formData);
       if (result && typeof result === "object" && "id" in result) {
         onCreated(
           result.id as string,
-          (result as { nombre?: string }).nombre ??
-            (formData.get("nombre") as string),
+          (result as { nombre?: string }).nombre ?? nombre,
         );
       } else {
         onCancel();
@@ -44,8 +64,20 @@ export function NuevoClienteInlinePanel({
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      handleSave();
+    }
+  };
+
   return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+    <div 
+      ref={containerRef}
+      onKeyDown={handleKeyDown}
+      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+    >
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm font-semibold text-[var(--color-text-primary)]">
           {temporal ? "Cliente temporal" : "Nuevo cliente"}
@@ -63,7 +95,7 @@ export function NuevoClienteInlinePanel({
           Se guarda como cliente normal pero marcado como &ldquo;temporal&rdquo; para diferenciarlo en reportes.
         </p>
       )}
-      <form action={handleSubmit} className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field
           name="nombre"
           label="Nombre *"
@@ -87,11 +119,11 @@ export function NuevoClienteInlinePanel({
           <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button type="submit" size="sm" disabled={loading}>
+          <Button type="button" size="sm" disabled={loading} onClick={handleSave}>
             {loading ? "Guardando…" : "Guardar cliente"}
           </Button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }
