@@ -73,6 +73,11 @@ function MuebleEditableRow({ row, canMutate }: { row: MuebleRow; canMutate: bool
     }
   }, [stateToggle, showToast]);
 
+  // Sincronizar el preview de la foto cuando la fila se actualiza desde el backend
+  useEffect(() => {
+    setFotoPreview(row.foto_url ?? "");
+  }, [row.foto_url]);
+
   async function handleEliminar() {
     setDeleting(true);
     const res = await deleteMuebleCatalogo(row.id);
