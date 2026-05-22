@@ -2076,16 +2076,24 @@ export function demoCreateRegistroGeneral(
   persistStore();
 }
 
-export function demoCreateVenta(input: Omit<VentaRow, "id" | "created_at" | "created_by">) {
+export function demoCreateVenta(
+  input: Omit<VentaRow, "id" | "created_at" | "created_by"> & {
+    confirmaIngreso?: boolean;
+  },
+) {
   const row: VentaRow = {
     id: randomUUID(),
     created_at: nowIso(),
     created_by: null,
-    ...input,
+    organization_id: input.organization_id,
+    cliente_id: input.cliente_id,
+    fecha: input.fecha,
+    estado: input.estado,
+    total: input.total,
     correlativo: input.correlativo ?? null,
   };
   store.ventas.unshift(row);
-  if (row.estado === "confirmada") {
+  if (row.estado === "confirmada" && input.confirmaIngreso !== false) {
     demoCreateCaja({
       organization_id: row.organization_id,
       fecha: row.fecha,
@@ -2777,44 +2785,47 @@ export function demoCreateContratoAlquiler(
     AlquilerContratoRow,
     "organization_id" | "cliente_id" | "activo" | "fecha_inicio" | "tarifa"
   > &
-    Partial<Omit<AlquilerContratoRow, "id" | "created_at" | "organization_id" | "cliente_id" | "activo" | "fecha_inicio" | "tarifa">>,
+    Partial<Omit<AlquilerContratoRow, "id" | "created_at" | "organization_id" | "cliente_id" | "activo" | "fecha_inicio" | "tarifa">> & {
+      confirmaIngreso?: boolean;
+    },
 ) {
-  const monto = input.monto_total ?? input.tarifa * (input.dias_alquiler ?? 1);
+  const { confirmaIngreso = true, ...restInput } = input;
+  const monto = restInput.monto_total ?? restInput.tarifa * (restInput.dias_alquiler ?? 1);
   const deposito = Number((monto * 0.3).toFixed(2));
 
   const newRow: AlquilerContratoRow = {
     id: randomUUID(),
-    organization_id: input.organization_id,
-    cliente_id: input.cliente_id,
-    activo: input.activo,
-    fecha_inicio: input.fecha_inicio,
-    fecha_fin: input.fecha_fin ?? null,
-    tarifa: input.tarifa,
-    penalidad: input.penalidad ?? 0,
-    estado: input.estado ?? "abierto",
+    organization_id: restInput.organization_id,
+    cliente_id: restInput.cliente_id,
+    activo: restInput.activo,
+    fecha_inicio: restInput.fecha_inicio,
+    fecha_fin: restInput.fecha_fin ?? null,
+    tarifa: restInput.tarifa,
+    penalidad: restInput.penalidad ?? 0,
+    estado: restInput.estado ?? "abierto",
     created_at: nowIso(),
-    codigo: input.codigo ?? null,
-    representante: input.representante ?? null,
-    ruc_empresa: input.ruc_empresa ?? null,
-    direccion_ejecucion: input.direccion_ejecucion ?? null,
-    fecha_termino: input.fecha_termino ?? null,
-    dias_alquiler: input.dias_alquiler ?? null,
-    tarifa_unidad: input.tarifa_unidad ?? null,
+    codigo: restInput.codigo ?? null,
+    representante: restInput.representante ?? null,
+    ruc_empresa: restInput.ruc_empresa ?? null,
+    direccion_ejecucion: restInput.direccion_ejecucion ?? null,
+    fecha_termino: restInput.fecha_termino ?? null,
+    dias_alquiler: restInput.dias_alquiler ?? null,
+    tarifa_unidad: restInput.tarifa_unidad ?? null,
     monto_total: monto,
-    deposito_30: input.deposito_30 ?? deposito,
-    penalidad_retraso_pago_pct: input.penalidad_retraso_pago_pct ?? PENALIDAD_ALQUILER_PCT_DEFAULT,
+    deposito_30: restInput.deposito_30 ?? deposito,
+    penalidad_retraso_pago_pct: restInput.penalidad_retraso_pago_pct ?? PENALIDAD_ALQUILER_PCT_DEFAULT,
     penalidad_devolucion_tardia_pct:
-      input.penalidad_devolucion_tardia_pct ?? PENALIDAD_ALQUILER_PCT_DEFAULT,
-    penalidad_danios_pct: input.penalidad_danios_pct ?? PENALIDAD_ALQUILER_PCT_DEFAULT,
-    observaciones_retorno: input.observaciones_retorno ?? null,
-    metodo_pago: input.metodo_pago ?? null,
-    modalidad_pago: input.modalidad_pago ?? null,
-    fecha_pago_credito: input.fecha_pago_credito ?? null,
+      restInput.penalidad_devolucion_tardia_pct ?? PENALIDAD_ALQUILER_PCT_DEFAULT,
+    penalidad_danios_pct: restInput.penalidad_danios_pct ?? PENALIDAD_ALQUILER_PCT_DEFAULT,
+    observaciones_retorno: restInput.observaciones_retorno ?? null,
+    metodo_pago: restInput.metodo_pago ?? null,
+    modalidad_pago: restInput.modalidad_pago ?? null,
+    fecha_pago_credito: restInput.fecha_pago_credito ?? null,
   };
 
   store.alquileres.unshift(newRow);
 
-  if (newRow.estado === "abierto" && newRow.deposito_30 && newRow.deposito_30 > 0) {
+  if (confirmaIngreso && newRow.estado === "abierto" && newRow.deposito_30 && newRow.deposito_30 > 0) {
     demoCreateCaja({
       organization_id: newRow.organization_id,
       fecha: newRow.fecha_inicio,

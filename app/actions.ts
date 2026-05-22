@@ -10,6 +10,7 @@ import {
   demoCambiarEstadoOrden,
   demoCerrarContratoAlquiler,
   demoCerrarMes,
+  demoClientesRows,
   demoCreateAdelanto,
   demoCreateAlquiler,
   demoCreateCaja,
@@ -867,6 +868,21 @@ export async function createVentaMadera(formData: FormData) {
     throw new Error("Datos de venta inválidos.");
   }
 
+  // Obtener nombre de cliente para la descripción de caja
+  let clienteNombre = "Cliente Desconocido";
+  if (!hasSupabaseEnv()) {
+    const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
+    if (c) clienteNombre = c.nombre;
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { data: cData } = await supabase
+      .from("clientes")
+      .select("nombre")
+      .eq("id", parsed.data.clienteId)
+      .maybeSingle();
+    if (cData) clienteNombre = cData.nombre;
+  }
+
   if (!hasSupabaseEnv()) {
     const anioCorrel = Number(parsed.data.fecha.slice(0, 4)) || new Date().getFullYear();
     const correlativo = await nextCorrelativo("venta_madera", anioCorrel);
@@ -877,6 +893,7 @@ export async function createVentaMadera(formData: FormData) {
       total: parsed.data.total,
       estado: parsed.data.estado,
       correlativo,
+      confirmaIngreso: false,
     });
     if (parsed.data.estado === "confirmada" && parsed.data.productoInventarioId && parsed.data.cantidadProducto) {
       demoCreateInventarioMovimiento({
@@ -887,6 +904,18 @@ export async function createVentaMadera(formData: FormData) {
         cantidad: parsed.data.cantidadProducto,
         costo_unitario: Number((parsed.data.total / parsed.data.cantidadProducto).toFixed(2)),
         referencia: "Venta confirmada",
+      });
+    }
+    if (parsed.data.estado === "confirmada") {
+      demoCreateCaja({
+        organization_id: DEFAULT_ORG_ID,
+        fecha: parsed.data.fecha,
+        tipo: "ingreso",
+        medio: "efectivo",
+        categoria: "venta_madera",
+        monto: parsed.data.total,
+        descripcion: `Venta de madera - ${clienteNombre}`,
+        modulo_origen: "ventas_madera",
       });
     }
   } else {
@@ -951,7 +980,7 @@ export async function createVentaMadera(formData: FormData) {
         medio: "efectivo",
         categoria: "venta_madera",
         monto: parsed.data.total,
-        descripcion: `Venta madera ${correlativo}`,
+        descripcion: `Venta de madera - ${clienteNombre}`,
         modulo_origen: "ventas_madera",
         referencia_id: data.id,
         created_by: actor.userId,
@@ -3111,6 +3140,28 @@ export async function createVentaMuebleTerminado(formData: FormData) {
 
   const total = Number((parsed.data.cantidad * parsed.data.precioUnitario).toFixed(2));
 
+  let montoCaja = total;
+  if (parsed.data.modalidadPago === "credito") {
+    montoCaja = 0;
+  } else if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
+    montoCaja = parsed.data.adelanto ?? 0;
+  }
+
+  // Obtener nombre de cliente para la descripción de caja
+  let clienteNombre = "Cliente Desconocido";
+  if (!hasSupabaseEnv()) {
+    const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
+    if (c) clienteNombre = c.nombre;
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { data: cData } = await supabase
+      .from("clientes")
+      .select("nombre")
+      .eq("id", parsed.data.clienteId)
+      .maybeSingle();
+    if (cData) clienteNombre = cData.nombre;
+  }
+
   if (!hasSupabaseEnv()) {
     demoCreateVentaMuebleTerminado({
       organization_id: DEFAULT_ORG_ID,
@@ -3130,7 +3181,21 @@ export async function createVentaMuebleTerminado(formData: FormData) {
       montoCredito: parsed.data.montoCredito,
       fecha: parsed.data.fecha,
       correlativo: await nextCorrelativo("venta_mueble"),
+      confirmaIngreso: false, // Desactivar ingreso implícito para controlarlo manualmente
     });
+
+    if (montoCaja > 0) {
+      demoCreateCaja({
+        organization_id: DEFAULT_ORG_ID,
+        fecha: parsed.data.fecha,
+        tipo: "ingreso",
+        medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
+        categoria: "venta_mueble_terminado",
+        monto: montoCaja,
+        descripcion: `Venta de mueble - ${clienteNombre}`,
+        modulo_origen: "ventas_muebles_terminados",
+      });
+    }
   } else {
     const supabase = getSupabaseServerClient();
     const muebleId = parsed.data.muebleCatalogoId;
@@ -3188,13 +3253,6 @@ export async function createVentaMuebleTerminado(formData: FormData) {
 
     const stockPrevio = mueble.stock_disponible;
 
-    let montoCaja = total;
-    if (parsed.data.modalidadPago === "credito") {
-      montoCaja = 0;
-    } else if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
-      montoCaja = parsed.data.adelanto ?? 0;
-    }
-
     if (montoCaja > 0) {
       const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
       const { error: cajaError } = await supabase.from("movimientos_caja").insert({
@@ -3204,7 +3262,7 @@ export async function createVentaMuebleTerminado(formData: FormData) {
         medio: medioCaja,
         categoria: "venta_mueble_terminado",
         monto: montoCaja,
-        descripcion: `Venta de ${parsed.data.cantidad} × ${mueble.nombre}`,
+        descripcion: `Venta de mueble - ${clienteNombre}`,
         modulo_origen: "ventas_muebles_terminados",
         referencia_id: venta.id,
         created_by: actor.userId,
@@ -3835,6 +3893,21 @@ export async function createContratoAlquiler(formData: FormData) {
     deposito30 = 0;
   }
 
+  // Obtener nombre de cliente para la descripción de caja
+  let clienteNombre = "Cliente Desconocido";
+  if (!hasSupabaseEnv()) {
+    const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
+    if (c) clienteNombre = c.nombre;
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { data: cData } = await supabase
+      .from("clientes")
+      .select("nombre")
+      .eq("id", parsed.data.clienteId)
+      .maybeSingle();
+    if (cData) clienteNombre = cData.nombre;
+  }
+
   if (!hasSupabaseEnv()) {
     const codigo = parsed.data.codigo || (await nextCorrelativo("contrato_alquiler"));
     demoCreateContratoAlquiler({
@@ -3855,7 +3928,20 @@ export async function createContratoAlquiler(formData: FormData) {
       metodo_pago: parsed.data.metodoPago,
       modalidad_pago: parsed.data.modalidadPago,
       fecha_pago_credito: parsed.data.fechaPagoCredito || null,
+      confirmaIngreso: false,
     });
+    if (deposito30 > 0) {
+      demoCreateCaja({
+        organization_id: DEFAULT_ORG_ID,
+        fecha: parsed.data.fechaInicio,
+        tipo: "ingreso",
+        medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
+        categoria: "alquiler_bomba_mixer",
+        monto: deposito30,
+        descripcion: `Alquiler de mixer - ${clienteNombre}`,
+        modulo_origen: "ventas_alquiler",
+      });
+    }
   } else {
     const supabase = getSupabaseServerClient();
     const codigo = parsed.data.codigo?.trim() || (await nextCorrelativo("contrato_alquiler"));
@@ -3908,7 +3994,7 @@ export async function createContratoAlquiler(formData: FormData) {
         medio: medioCaja,
         categoria: "alquiler_bomba_mixer",
         monto: deposito30,
-        descripcion: `Depósito contrato ${codigo}`,
+        descripcion: `Alquiler de mixer - ${clienteNombre}`,
         modulo_origen: "ventas_alquiler",
         referencia_id: contrato.id,
         created_by: actor.userId,
@@ -4085,6 +4171,21 @@ export async function createServicioAserradero(formData: FormData) {
     (parsed.data.precioCobrado - parsed.data.costoCubicaje).toFixed(2),
   );
 
+  // Obtener nombre de cliente para la descripción de caja
+  let clienteNombre = "Cliente Desconocido";
+  if (!hasSupabaseEnv()) {
+    const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
+    if (c) clienteNombre = c.nombre;
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { data: cData } = await supabase
+      .from("clientes")
+      .select("nombre")
+      .eq("id", parsed.data.clienteId)
+      .maybeSingle();
+    if (cData) clienteNombre = cData.nombre;
+  }
+
   if (!hasSupabaseEnv()) {
     demoCreateServicioAserradero({
       organization_id: DEFAULT_ORG_ID,
@@ -4096,7 +4197,20 @@ export async function createServicioAserradero(formData: FormData) {
       utilidad,
       lineas_json: lineasJson,
       correlativo: await nextCorrelativo("servicio_aserradero"),
+      confirmaIngreso: false,
     });
+    if (parsed.data.precioCobrado > 0) {
+      demoCreateCaja({
+        organization_id: DEFAULT_ORG_ID,
+        fecha: parsed.data.fecha,
+        tipo: "ingreso",
+        medio: "efectivo",
+        categoria: "servicio_aserradero",
+        monto: parsed.data.precioCobrado,
+        descripcion: `Servicio de aserradero - ${clienteNombre}`,
+        modulo_origen: "ventas_aserradero",
+      });
+    }
   } else {
     const supabase = getSupabaseServerClient();
     const correlativo = await nextCorrelativo("servicio_aserradero");
@@ -4131,7 +4245,7 @@ export async function createServicioAserradero(formData: FormData) {
         medio: "efectivo",
         categoria: "servicio_aserradero",
         monto: parsed.data.precioCobrado,
-        descripcion: `Servicio aserradero (${parsed.data.piesCubicos.toFixed(2)} pies cúbicos)`,
+        descripcion: `Servicio de aserradero - ${clienteNombre}`,
         modulo_origen: "ventas_aserradero",
         referencia_id: servicio.id,
         created_by: actor.userId,

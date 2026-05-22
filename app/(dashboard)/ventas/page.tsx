@@ -22,7 +22,10 @@ import {
   getProveedoresRows,
   getServiciosAserraderoRows,
   getVentasMuebleTerminadoRows,
+  getVentasRows,
+  getAlquilerRows,
 } from "@/lib/data";
+import { VentasListWithFilters, UnifiedVenta } from "@/components/ventas/ventas-list-with-filters";
 import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 
@@ -92,6 +95,8 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
     ordenes,
     serviciosAserradero,
     cobrosVencidos,
+    ventasMadera,
+    alquilerBundle,
   ] = await Promise.all([
     getClientesRows(),
     getProveedoresRows(),
@@ -101,11 +106,60 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
     getOrdenesProduccionRows(),
     getServiciosAserraderoRows(),
     getCobrosVencidos(),
+    getVentasRows(),
+    getAlquilerRows(),
   ]);
   const totalCobrosVencidos = cobrosVencidos.reduce((acc, c) => acc + c.monto, 0);
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
   const clientesById = new Map(clientes.map((c) => [c.id, c.nombre]));
+
+  // Mapear todas las categorías de ventas a una estructura uniforme
+  const listMuebles = ventasMuebles.map((v) => {
+    const mueble = muebles.find((m) => m.id === v.mueble_catalogo_id);
+    return {
+      id: v.id,
+      fecha: v.fecha,
+      clienteNombre: clientesById.get(v.cliente_id) ?? "Cliente Desconocido",
+      concepto: `Mueble: ${mueble?.nombre ?? "Mueble terminado"} (x${v.cantidad})`,
+      total: Number(v.total),
+      categoria: "muebles" as const,
+    };
+  });
+
+  const listMadera = ventasMadera.map((v) => ({
+    id: v.id,
+    fecha: v.fecha,
+    clienteNombre: clientesById.get(v.cliente_id) ?? "Cliente Desconocido",
+    concepto: `Madera: ${v.correlativo ?? "Venta de Madera"}`.trim(),
+    total: Number(v.total),
+    categoria: "madera" as const,
+  }));
+
+  const listAserradero = serviciosAserradero.map((v) => ({
+    id: v.id,
+    fecha: v.fecha,
+    clienteNombre: clientesById.get(v.cliente_id) ?? "Cliente Desconocido",
+    concepto: `Servicio Aserradero (${v.pies_cubicos.toFixed(2)} PT)`,
+    total: Number(v.precio_cobrado),
+    categoria: "aserradero" as const,
+  }));
+
+  const listAlquileres = alquilerBundle.rows.map((v) => ({
+    id: v.id,
+    fecha: v.fecha_inicio,
+    clienteNombre: clientesById.get(v.cliente_id) ?? "Cliente Desconocido",
+    concepto: `Alquiler Mixer: ${v.activo} (${v.codigo ?? "Contrato"})`,
+    total: Number(v.monto_total),
+    categoria: "alquileres" as const,
+  }));
+
+  const allVentas: UnifiedVenta[] = [
+    ...listMuebles,
+    ...listMadera,
+    ...listAserradero,
+    ...listAlquileres,
+  ].sort((a, b) => b.fecha.localeCompare(a.fecha));
 
   return (
     <div className="space-y-6">
@@ -203,83 +257,47 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
         </div>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardTitle>Últimas ventas de muebles terminados</CardTitle>
-          <CardDescription>
-            {ventasMuebles.length} ventas registradas en total.
-          </CardDescription>
-          <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
-            <Table>
-              <THead>
-                <TRow>
-                  <TH>Fecha</TH>
-                  <TH>Cliente</TH>
-                  <TH>Mueble</TH>
-                  <TH className="text-right">Total</TH>
-                </TRow>
-              </THead>
-              <tbody>
-                {ventasMuebles.slice(0, 5).map((venta) => {
-                  const mueble = muebles.find((m) => m.id === venta.mueble_catalogo_id);
-                  return (
-                    <TRow key={venta.id}>
-                      <TD>{formatDate(venta.fecha)}</TD>
-                      <TD>{clientesById.get(venta.cliente_id) ?? "—"}</TD>
-                      <TD>{mueble?.nombre ?? "—"}</TD>
-                      <TD className="text-right font-semibold">
-                        {formatPen(Number(venta.total))}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <VentasListWithFilters ventas={allVentas} />
+        </div>
+        <div>
+          <Card className="h-full">
+            <CardTitle>Órdenes de producción activas</CardTitle>
+            <CardDescription>
+              {ordenes.filter((o) => o.estado !== "entregado").length} órdenes en curso.
+            </CardDescription>
+            <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
+              <Table>
+                <THead>
+                  <TRow>
+                    <TH>Cliente</TH>
+                    <TH>Estado</TH>
+                    <TH>Aprobada</TH>
+                  </TRow>
+                </THead>
+                <tbody>
+                  {ordenes.slice(0, 5).map((orden) => (
+                    <TRow key={orden.id}>
+                      <TD>{clientesById.get(orden.cliente_id) ?? "—"}</TD>
+                      <TD className="capitalize">{orden.estado.replace(/_/g, " ")}</TD>
+                      <TD>
+                        {orden.fecha_aprobacion ? formatDate(orden.fecha_aprobacion) : "—"}
                       </TD>
                     </TRow>
-                  );
-                })}
-                {ventasMuebles.length === 0 ? (
-                  <TRow>
-                    <TD colSpan={4} className="text-center text-[var(--color-text-secondary)]">
-                      Aún no hay ventas registradas.
-                    </TD>
-                  </TRow>
-                ) : null}
-              </tbody>
-            </Table>
-          </div>
-        </Card>
-
-        <Card>
-          <CardTitle>Órdenes de producción activas</CardTitle>
-          <CardDescription>
-            {ordenes.filter((o) => o.estado !== "entregado").length} órdenes en curso.
-          </CardDescription>
-          <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
-            <Table>
-              <THead>
-                <TRow>
-                  <TH>Cliente</TH>
-                  <TH>Estado</TH>
-                  <TH>Aprobada</TH>
-                </TRow>
-              </THead>
-              <tbody>
-                {ordenes.slice(0, 5).map((orden) => (
-                  <TRow key={orden.id}>
-                    <TD>{clientesById.get(orden.cliente_id) ?? "—"}</TD>
-                    <TD className="capitalize">{orden.estado.replace(/_/g, " ")}</TD>
-                    <TD>
-                      {orden.fecha_aprobacion ? formatDate(orden.fecha_aprobacion) : "—"}
-                    </TD>
-                  </TRow>
-                ))}
-                {ordenes.length === 0 ? (
-                  <TRow>
-                    <TD colSpan={3} className="text-center text-[var(--color-text-secondary)]">
-                      Sin órdenes aún. Aprueba una cotización para crear una.
-                    </TD>
-                  </TRow>
-                ) : null}
-              </tbody>
-            </Table>
-          </div>
-        </Card>
+                  ))}
+                  {ordenes.length === 0 ? (
+                    <TRow>
+                      <TD colSpan={3} className="text-center text-[var(--color-text-secondary)]">
+                        Sin órdenes aún. Aprueba una cotización para crear una.
+                      </TD>
+                    </TRow>
+                  ) : null}
+                </tbody>
+              </Table>
+            </div>
+          </Card>
+        </div>
       </div>
 
       <Card>
