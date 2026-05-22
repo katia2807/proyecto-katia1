@@ -588,15 +588,39 @@ async function loadInventarioProductosRows(includeInactive: boolean): Promise<{
     return { rows, usedFallback: false };
   } catch (e) {
     console.log(
-      "[TEMP inventario] loadInventarioProductosRows fallo:",
-      e instanceof Error ? e.message : String(e),
-      e instanceof Error ? e.stack : e,
+      "[TEMP inventario] loadInventarioProductosRows fallo con foto_url, intentando consulta sin foto_url:",
+      e instanceof Error ? e.message : String(e)
     );
-    let rows = fallback.inventarioProductos;
-    if (!includeInactive) {
-      rows = rows.filter((row) => row.activo !== false);
+    try {
+      const supabase = getSupabaseServerClient();
+      let query = supabase
+        .from("inventario_productos")
+        .select("id,organization_id,codigo,nombre,categoria,unidad,stock_actual,stock_minimo,activo,created_at")
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .order("nombre");
+      if (!includeInactive) {
+        query = query.eq("activo", true);
+      }
+      const { data, error } = await query;
+      if (error) {
+        throw new Error(error.message);
+      }
+      const rows = (data ?? []).map((row) => ({
+        ...row,
+        foto_url: null,
+      })) as InventarioProductoRow[];
+      return { rows, usedFallback: false };
+    } catch (e2) {
+      console.log(
+        "[TEMP inventario] loadInventarioProductosRows fallo secundario completo:",
+        e2 instanceof Error ? e2.message : String(e2)
+      );
+      let rows = fallback.inventarioProductos;
+      if (!includeInactive) {
+        rows = rows.filter((row) => row.activo !== false);
+      }
+      return { rows, usedFallback: true };
     }
-    return { rows, usedFallback: true };
   }
 }
 
