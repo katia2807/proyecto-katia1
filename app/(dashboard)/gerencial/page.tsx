@@ -471,7 +471,6 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
               </Card>
             )}
           </div>
-                              ? "bg-[var(--katia-warning)]/15 text-[var(--katia-warning)]"
           <Card>
             <CardTitle>Flujo de caja — últimos 30 días</CardTitle>            <CardDescription>Saldo acumulado solo con movimientos de empresa.</CardDescription>
             <div className="mt-4">

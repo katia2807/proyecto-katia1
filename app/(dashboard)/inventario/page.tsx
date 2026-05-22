@@ -72,7 +72,7 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
         <InventarioAccionesRapidas
           canMutate={canMutate}
           noPermisoHint={
-            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
               Tu rol no tiene permisos de escritura en inventario.
             </p>
           }

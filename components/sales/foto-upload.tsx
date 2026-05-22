@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { compressImage } from "@/lib/image-compress";
 
 type FotoUploadProps = {
   /** Bucket destino dentro de data/uploads/. */
@@ -32,11 +33,19 @@ export function FotoUpload({ bucket, name, label, defaultUrl = "", disabled = fa
     const file = event.target.files?.[0];
     if (!file) return;
     setEstado("subiendo");
-    setMensaje("");
+    setMensaje("Preparando archivo...");
     try {
+      let fileToUpload = file;
+      if (file.type.startsWith("image/")) {
+        setMensaje("Optimizando imagen...");
+        fileToUpload = await compressImage(file);
+      }
+
       const fd = new FormData();
       fd.append("bucket", bucket);
-      fd.append("file", file);
+      fd.append("file", fileToUpload);
+
+      setMensaje("Subiendo archivo...");
       const res = await fetch("/api/uploads", { method: "POST", body: fd });
       const json = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !json.url) {
@@ -44,13 +53,13 @@ export function FotoUpload({ bucket, name, label, defaultUrl = "", disabled = fa
       }
       setUrl(json.url);
       setEstado("ok");
-      setMensaje("Archivo guardado.");
+      setMensaje("Archivo guardado con éxito.");
     } catch (err) {
       setEstado("error");
       setMensaje(
         err instanceof Error && err.message
-          ? "No se pudo subir el archivo. Intenta de nuevo."
-          : "Ocurrio un problema, intenta de nuevo.",
+          ? `Error al subir: ${err.message}`
+          : "No se pudo subir el archivo. Intenta de nuevo.",
       );
     }
   }

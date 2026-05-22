@@ -88,7 +88,7 @@ function NuevoClienteInlinePanel({
       </div>
       {temporal && (
         <p className="mb-3 text-xs text-[var(--color-text-secondary)]">
-          Se guarda igual en la base de datos como cliente normal, pero marcado como "temporal" para diferenciarlo en reportes.
+          Se guarda igual en la base de datos como cliente normal, pero marcado como &quot;temporal&quot; para diferenciarlo en reportes.
         </p>
       )}
       <form action={handleSubmit} className="grid gap-3 sm:grid-cols-2">

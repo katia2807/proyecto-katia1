@@ -54,7 +54,7 @@ export default async function AlquilerMixerPage() {
               </ContextActionPanel>
             </>
           ) : (
-            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
               Tu rol es de solo lectura.
             </p>
           )}
@@ -152,7 +152,7 @@ export default async function AlquilerMixerPage() {
               {contratos.length === 0 ? (
                 <TRow>
                   <TD colSpan={9} className="text-center text-[var(--color-text-secondary)]">
-                    Aún no hay contratos. Crea uno con "Nuevo contrato".
+                    Aún no hay contratos. Crea uno con &quot;Nuevo contrato&quot;.
                   </TD>
                 </TRow>
               ) : null}

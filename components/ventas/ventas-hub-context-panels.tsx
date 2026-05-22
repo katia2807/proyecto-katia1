@@ -33,14 +33,18 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
   const { showToast } = useToast();
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (quick === "cliente") setOpenCliente(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (quick === "proveedor") setOpenProveedor(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (quick === "chofer") setOpenChofer(true);
   }, [quick]);
 
   useEffect(() => {
     if (clienteState.success && clienteState.message) {
       showToast({ variant: "success", message: clienteState.message });
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenCliente(false);
       setClienteFormKey((k) => k + 1);
     } else if (clienteState.error) {
@@ -51,6 +55,7 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
   useEffect(() => {
     if (proveedorState.success && proveedorState.message) {
       showToast({ variant: "success", message: proveedorState.message });
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenProveedor(false);
       setProveedorFormKey((k) => k + 1);
     } else if (proveedorState.error) {
@@ -61,6 +66,7 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
   useEffect(() => {
     if (choferState.success && choferState.message) {
       showToast({ variant: "success", message: choferState.message });
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenChofer(false);
       setChoferFormKey((k) => k + 1);
     } else if (choferState.error) {

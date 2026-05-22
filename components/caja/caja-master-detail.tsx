@@ -23,7 +23,6 @@ type CajaRow = {
 
 export function CajaMasterDetail({ rows }: { rows: CajaRow[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
   const selected = useMemo(() => rows.find((row) => row.id === selectedId) ?? null, [rows, selectedId]);
 
   if (rows.length === 0) {
@@ -77,9 +76,7 @@ export function CajaMasterDetail({ rows }: { rows: CajaRow[] }) {
         description="Detalle de caja"
         onClose={() => {
           setSelectedId(null);
-          setEditing(false);
         }}
-        onEdit={() => setEditing(true)}
       >
         {selected ? (
           <div className="space-y-3">
@@ -90,11 +87,13 @@ export function CajaMasterDetail({ rows }: { rows: CajaRow[] }) {
             <DetailField label="Descripcion / notas" value={selected.descripcion ?? "Sin notas"} />
             <DetailField label="Modulo origen" value={selected.modulo_origen ?? "Manual"} />
             <DetailField label="Comprobante" value={selected.url_comprobante ? <Link className="underline" href={selected.url_comprobante} target="_blank">Ver comprobante</Link> : "Sin comprobante"} />
-            {editing ? (
-              <p className="rounded-lg border border-[var(--color-border)] bg-[var(--bg-surface)] p-3 text-sm text-[var(--color-text-secondary)]">
-                La edicion de movimientos cerrados se mantiene en el flujo autorizado de Caja para preservar auditoria.
+            
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--bg-surface)] p-3 text-xs text-[var(--color-text-secondary)] flex items-center gap-2">
+              <span>🔒</span>
+              <p>
+                Este movimiento está cerrado. Los registros de caja son inmutables para preservar la auditoría y control de flujo del negocio. Para correcciones, realice un contra-movimiento o anulación autorizada.
               </p>
-            ) : null}
+            </div>
           </div>
         ) : null}
       </DetailDrawer>

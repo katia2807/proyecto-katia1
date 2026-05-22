@@ -153,9 +153,9 @@ function DetalleVisual({ detalle }: { detalle: unknown }) {
                               <tr key={p.id} className={pi % 2 === 0 ? "" : "bg-[var(--color-primary-soft)]/10"}>
                                 <td className="px-2 py-1">{p.descripcion || `Pieza ${pi + 1}`}</td>
                                 <td className="px-2 py-1 text-center">{p.cantidad}</td>
-                                <td className="px-2 py-1 text-center">{p.espesor}"</td>
-                                <td className="px-2 py-1 text-center">{p.ancho}"</td>
-                                <td className="px-2 py-1 text-center">{p.largo}'</td>
+                                <td className="px-2 py-1 text-center">{p.espesor}{"\""}</td>
+                                <td className="px-2 py-1 text-center">{p.ancho}{"\""}</td>
+                                <td className="px-2 py-1 text-center">{p.largo}{"'"}</td>
                                 <td className="px-2 py-1 text-right font-semibold">{pt.toFixed(2)}</td>
                               </tr>
                             );

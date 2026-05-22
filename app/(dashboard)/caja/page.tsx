@@ -62,7 +62,7 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
             <CajaContextPanels />
           </div>
         ) : (
-          <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
             Tu rol tiene vista de caja, pero no permisos para registrar movimientos.
           </p>
         )}

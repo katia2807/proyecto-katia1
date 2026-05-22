@@ -18,6 +18,7 @@ import { formatPen } from "@/lib/utils";
 import { IconCamera, IconChevronDown, IconChevronUp, IconPhoto } from "@tabler/icons-react";
 import Image from "next/image";
 import { useActionState, useEffect, useRef, useState } from "react";
+import { compressImage } from "@/lib/image-compress";
 
 type MuebleRow = {
   id: string;
@@ -338,11 +339,18 @@ function FotoUploadWithPreview({
     const file = event.target.files?.[0];
     if (!file) return;
     setEstado("subiendo");
-    setMensaje("");
+    setMensaje("Optimizando imagen...");
     try {
+      let fileToUpload = file;
+      if (file.type.startsWith("image/")) {
+        fileToUpload = await compressImage(file);
+      }
+
       const fd = new FormData();
       fd.append("bucket", bucket);
-      fd.append("file", file);
+      fd.append("file", fileToUpload);
+
+      setMensaje("Subiendo...");
       const res = await fetch("/api/uploads", { method: "POST", body: fd });
       const json = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !json.url) {
@@ -356,8 +364,8 @@ function FotoUploadWithPreview({
       setEstado("error");
       setMensaje(
         err instanceof Error && err.message
-          ? "No se pudo subir la imagen. Intenta de nuevo."
-          : "Ocurrió un problema, intenta de nuevo.",
+          ? `Error al subir: ${err.message}`
+          : "No se pudo subir la imagen. Intenta de nuevo.",
       );
     }
   }

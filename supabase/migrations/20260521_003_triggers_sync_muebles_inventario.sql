@@ -1,21 +1,22 @@
-﻿-- Trigger 1: inventario -> catalogo
+-- Trigger 1: inventario -> catalogo
 CREATE OR REPLACE FUNCTION sync_inventario_to_catalogo()
 RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.categoria = 'Muebles' THEN
     INSERT INTO public.muebles_catalogo (
       id, organization_id, codigo, nombre, descripcion,
-      precio_lista, stock_disponible, activo, created_at
+      precio_lista, stock_disponible, foto_url, activo, created_at
     )
     VALUES (
       NEW.id, NEW.organization_id, NEW.codigo, NEW.nombre,
       COALESCE(NEW.descripcion, 'Producto importado del inventario'),
-      0, NEW.stock_actual, NEW.activo, NEW.created_at
+      0, NEW.stock_actual, NEW.foto_url, NEW.activo, NEW.created_at
     )
     ON CONFLICT (id) DO UPDATE SET
       codigo = EXCLUDED.codigo,
       nombre = EXCLUDED.nombre,
       stock_disponible = EXCLUDED.stock_disponible,
+      foto_url = EXCLUDED.foto_url,
       activo = EXCLUDED.activo;
   END IF;
   RETURN NEW;
@@ -33,6 +34,7 @@ BEGIN
   UPDATE public.inventario_productos SET
     nombre = NEW.nombre,
     codigo = NEW.codigo,
+    foto_url = NEW.foto_url,
     activo = NEW.activo
   WHERE id = NEW.id
     AND organization_id = NEW.organization_id;

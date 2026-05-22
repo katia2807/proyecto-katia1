@@ -1333,7 +1333,7 @@ export async function cambiarEstadoCotizacionUnificada(
     const supabase = getSupabaseServerClient();
     const { error } = await supabase
       .from("cotizaciones_unificadas")
-      .update({ estado_flujo: nuevoEstado as any })
+      .update({ estado_flujo: nuevoEstado as string })
       .eq("id", id)
       .eq("organization_id", DEFAULT_ORG_ID);
     if (error) {
@@ -3278,7 +3278,7 @@ export async function aprobarCotizacionAOrden(formData: FormData) {
   }
   if (!hasSupabaseEnv()) {
     const { demoCotizacionesRows, demoCotizacionesUnificadasRows, demoUpdateCotizacionUnificada } = await import("@/lib/demo-store");
-    let cotizacion = demoCotizacionesRows().find((c) => c.id === parsed.data.cotizacionId);
+    const cotizacion = demoCotizacionesRows().find((c) => c.id === parsed.data.cotizacionId);
     let isUnificada = false;
     let clienteId = "";
     let correlativo = "";
@@ -3289,7 +3289,7 @@ export async function aprobarCotizacionAOrden(formData: FormData) {
       correlativo = cotizacion.correlativo ?? cotizacion.id.slice(0, 8);
       total = Number(cotizacion.precio_acordado);
     } else {
-      const cu = (demoCotizacionesUnificadasRows() as any[]).find((c) => c.id === parsed.data.cotizacionId);
+      const cu = (demoCotizacionesUnificadasRows() as unknown as { id: string; cliente_id: string; correlativo?: string | null; total: number }[]).find((c) => c.id === parsed.data.cotizacionId);
       if (!cu) {
         throw new Error("La cotización ya no existe.");
       }
@@ -3317,9 +3317,9 @@ export async function aprobarCotizacionAOrden(formData: FormData) {
         cotizacion_id: parsed.data.cotizacionId,
         cotizacion_unificada_id: null,
         estado: "en_produccion",
-        notes: parsed.data.notas || null,
+        notas: parsed.data.notas || null,
         correlativo: await nextCorrelativo("orden_produccion"),
-      } as any);
+      });
     }
 
     const adelanto = parsed.data.adelanto ?? 0;

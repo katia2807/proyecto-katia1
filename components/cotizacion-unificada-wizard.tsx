@@ -3086,7 +3086,7 @@ export function CotizacionUnificadaWizard({
                   <select
                     value={c.estado_flujo}
                     onChange={async (e) => {
-                      const nuevo = e.target.value as any;
+                      const nuevo = e.target.value as Parameters<typeof cambiarEstadoCotizacionUnificada>[1];
                       if (!confirm(`¿Cambiar el estado de la cotización a "${nuevo}"?`)) return;
                       const r = await cambiarEstadoCotizacionUnificada(c.id, nuevo);
                       if (!r.ok) alert(r.error);
