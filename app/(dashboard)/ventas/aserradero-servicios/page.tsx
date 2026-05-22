@@ -84,6 +84,7 @@ export default async function AserraderoServiciosPage() {
                 <TH className="text-right">Costo</TH>
                 <TH className="text-right">Cobrado</TH>
                 <TH className="text-right">Utilidad</TH>
+                <TH />
               </TRow>
             </THead>
             <tbody>
@@ -99,11 +100,21 @@ export default async function AserraderoServiciosPage() {
                   <TD className="text-right text-[var(--color-success)]">
                     {formatPen(Number(s.utilidad))}
                   </TD>
+                  <TD>
+                    <Link
+                      href={`/ventas/comprobante/aserradero/${s.id}`}
+                      target="_blank"
+                      className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                      title="Imprimir comprobante"
+                    >
+                      🖨️
+                    </Link>
+                  </TD>
                 </TRow>
               ))}
               {servicios.length === 0 ? (
                 <TRow>
-                  <TD colSpan={6} className="text-center text-[var(--color-text-secondary)]">
+                  <TD colSpan={7} className="text-center text-[var(--color-text-secondary)]">
                     Aún no hay servicios registrados.
                   </TD>
                 </TRow>

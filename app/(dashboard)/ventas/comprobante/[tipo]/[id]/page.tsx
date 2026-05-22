@@ -52,8 +52,61 @@ type MuebleTerminadoRow = {
   created_at: string;
 };
 
+type ServicioAserraderoRow = {
+  id: string;
+  cliente_id: string;
+  fecha: string;
+  pies_cubicos: number;
+  costo_cubicaje: number;
+  precio_cobrado: number;
+  utilidad: number;
+  lineas_json: any;
+  correlativo: string | null;
+  created_at: string;
+};
+
+type VentaMaderaRow = {
+  id: string;
+  cliente_id: string;
+  fecha: string;
+  estado: string;
+  total: number;
+  correlativo: string | null;
+  created_at: string;
+};
+
+type VentaMaderaLineaRow = {
+  id: string;
+  venta_id: string;
+  item_id: string | null;
+  volumen_m3_o_pies3: number;
+  cantidad: number;
+  precio_unitario: number;
+};
+
 async function getMaderaCortadaById(id: string): Promise<MaderaCortadaRow | null> {
-  if (!hasSupabaseEnv()) return null;
+  if (!hasSupabaseEnv()) {
+    const { demoVentasRows } = await import("@/lib/demo-store");
+    const found = demoVentasRows().find((v) => v.id === id);
+    if (!found) return null;
+    return {
+      id: found.id,
+      cliente_id: found.cliente_id,
+      fecha: found.fecha,
+      tipo_corte: "tabla",
+      total_pt: 10,
+      precio_por_pt: found.total / 10,
+      total: found.total,
+      metodo_pago: "efectivo",
+      modalidad_pago: "contado",
+      tipo_entrega: "recojo",
+      direccion_entrega: null,
+      estado_entrega: "entregado",
+      correlativo: found.correlativo,
+      costo_envio: 0,
+      created_at: found.created_at,
+    };
+  }
   const supabase = getSupabaseServerClient();
   const { data } = await supabase
     .from("ventas_madera_cortada")
@@ -87,12 +140,84 @@ async function getMuebleNombre(id: string): Promise<string | null> {
   return data ? `${data.codigo} — ${data.nombre}` : null;
 }
 
+async function getServicioAserraderoById(id: string): Promise<ServicioAserraderoRow | null> {
+  if (!hasSupabaseEnv()) {
+    const { demoServiciosAserraderoRows } = await import("@/lib/demo-store");
+    const found = demoServiciosAserraderoRows().find((s) => s.id === id);
+    return found ? (found as unknown as ServicioAserraderoRow) : null;
+  }
+  const supabase = getSupabaseServerClient();
+  const { data } = await supabase
+    .from("servicios_aserradero")
+    .select("*")
+    .eq("id", id)
+    .eq("organization_id", DEFAULT_ORG_ID)
+    .maybeSingle();
+  return data ?? null;
+}
+
+async function getVentaMaderaById(id: string): Promise<(VentaMaderaRow & { lineas: VentaMaderaLineaRow[] }) | null> {
+  if (!hasSupabaseEnv()) {
+    const { demoVentasRows } = await import("@/lib/demo-store");
+    const found = demoVentasRows().find((v) => v.id === id);
+    if (!found) return null;
+    return {
+      id: found.id,
+      cliente_id: found.cliente_id,
+      fecha: found.fecha,
+      estado: found.estado,
+      total: found.total,
+      correlativo: found.correlativo,
+      created_at: found.created_at,
+      lineas: [
+        {
+          id: "linea-demo-" + found.id,
+          venta_id: found.id,
+          item_id: null,
+          volumen_m3_o_pies3: 0,
+          cantidad: 1,
+          precio_unitario: found.total,
+        }
+      ]
+    };
+  }
+  const supabase = getSupabaseServerClient();
+  const { data: venta } = await supabase
+    .from("ventas_madera")
+    .select("*")
+    .eq("id", id)
+    .eq("organization_id", DEFAULT_ORG_ID)
+    .maybeSingle();
+  if (!venta) return null;
+
+  const { data: lineas } = await supabase
+    .from("ventas_madera_lineas")
+    .select("*")
+    .eq("venta_id", id);
+
+  return {
+    ...venta,
+    lineas: lineas ?? [],
+  };
+}
+
+async function getProductoMaderaById(id: string) {
+  if (!hasSupabaseEnv()) return null;
+  const supabase = getSupabaseServerClient();
+  const { data } = await supabase
+    .from("productos_madera")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  return data ?? null;
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function ComprobantePage({ params }: { params: Promise<Params> }) {
   const { tipo, id } = await params;
 
-  if (!["madera", "mueble"].includes(tipo)) notFound();
+  if (!["madera", "mueble", "aserradero", "venta-madera"].includes(tipo)) notFound();
 
   const [empresa, clientes, choferes] = await Promise.all([
     getEmpresaConfig(),
@@ -113,7 +238,74 @@ export default async function ComprobantePage({ params }: { params: Promise<Para
   let metodo        = "—";
   let entrega       = "—";
 
-  if (tipo === "madera") {
+  // New states for specific types
+  let aserraderoServicio: ServicioAserraderoRow | null = null;
+  let aserraderoLineasEspeciales: Array<{ id: string; codigo: string; nombre: string; cantidad: number; tarifa: number; subtotal: number }> = [];
+
+  let ventaMadera: VentaMaderaRow & { lineas: VentaMaderaLineaRow[] } | null = null;
+  let ventaMaderaLineasResueltas: Array<{ desc: string; qty: string; unidad: string; unitario: string; total: string }> = [];
+
+  if (tipo === "aserradero") {
+    aserraderoServicio = await getServicioAserraderoById(id);
+    if (!aserraderoServicio) notFound();
+
+    correlativo = aserraderoServicio.correlativo ?? aserraderoServicio.id.slice(0, 8).toUpperCase();
+    fechaVenta  = fmt(aserraderoServicio.fecha);
+    totalSoles  = Number(aserraderoServicio.precio_cobrado);
+    modalidad   = "Contado";
+    metodo      = "efectivo";
+    entrega     = "recojo";
+
+    const cli     = clienteMap.get(aserraderoServicio.cliente_id);
+    clienteNombre = cli?.nombre ?? "—";
+    clienteDoc    = cli?.documento ?? cli?.ruc ?? "—";
+
+    if (aserraderoServicio.lineas_json) {
+      try {
+        const parsed = typeof aserraderoServicio.lineas_json === "string" 
+          ? JSON.parse(aserraderoServicio.lineas_json) 
+          : aserraderoServicio.lineas_json;
+        if (Array.isArray(parsed)) {
+          aserraderoLineasEspeciales = parsed;
+        }
+      } catch (e) {
+        console.error("Error parsing lineas_json", e);
+      }
+    }
+  } else if (tipo === "venta-madera") {
+    ventaMadera = await getVentaMaderaById(id);
+    if (!ventaMadera) notFound();
+
+    correlativo = ventaMadera.correlativo ?? ventaMadera.id.slice(0, 8).toUpperCase();
+    fechaVenta  = fmt(ventaMadera.fecha);
+    totalSoles  = Number(ventaMadera.total);
+    modalidad   = ventaMadera.estado === "confirmada" ? "contado" : "—";
+    metodo      = "efectivo";
+    entrega     = "entrega local";
+
+    const cli     = clienteMap.get(ventaMadera.cliente_id);
+    clienteNombre = cli?.nombre ?? "—";
+    clienteDoc    = cli?.documento ?? cli?.ruc ?? "—";
+
+    for (const linea of ventaMadera.lineas) {
+      let desc = "Venta de madera";
+      let unidad = "pies3";
+      if (linea.item_id) {
+        const prod = await getProductoMaderaById(linea.item_id);
+        if (prod) {
+          desc = prod.nombre + (prod.especie ? ` (${prod.especie})` : "");
+          unidad = prod.unidad_base || "pies3";
+        }
+      }
+      ventaMaderaLineasResueltas.push({
+        desc,
+        qty: String(linea.cantidad),
+        unidad,
+        unitario: formatPen(Number(linea.precio_unitario)),
+        total: formatPen(Number(linea.cantidad * linea.precio_unitario)),
+      });
+    }
+  } else if (tipo === "madera") {
     const venta = await getMaderaCortadaById(id);
     if (!venta) notFound();
 
@@ -258,42 +450,162 @@ export default async function ComprobantePage({ params }: { params: Promise<Para
             </div>
           </div>
 
-          {/* Items */}
-          <div className="voucher-section mt-4 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4">
-            <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Detalle</p>
-            <table className="w-full">
-              <thead>
-                <tr>
-                  <th className="voucher-th w-1/2 border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-left">Descripción</th>
-                  <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Cant.</th>
-                  <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Precio unit.</th>
-                  <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, i) => (
-                  <tr key={i} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
-                    <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)]">{item.desc}</td>
-                    <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{item.qty}</td>
-                    <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{item.unitario}</td>
-                    <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right font-semibold">{item.total}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Total */}
-          <div className="mt-4 flex justify-end">
-            <div className="w-64">
-              <div className="voucher-total-line flex justify-between border-t border-[var(--color-border,#334155)] pt-2 text-base font-bold text-[var(--color-text-primary,#0f172a)]">
-                <span>TOTAL</span>
-                <span>{formatPen(totalSoles)}</span>
+          {/* Detalle Conditional Rendering based on tipo */}
+          {tipo === "aserradero" && aserraderoServicio && (
+            <>
+              {/* Detalle de Cubicaje (Piezas) */}
+              <div className="voucher-section mt-4 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4">
+                <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Detalle de piezas (Cubicaje Base)</p>
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th className="voucher-th w-1/3 border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-left">Descripción</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Cant.</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Espesor (in)</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Ancho (in)</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Largo (ft)</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">PT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]">
+                      <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-left">Servicio de cubicaje base ({Number(aserraderoServicio.pies_cubicos).toFixed(2)} ft³)</td>
+                      <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">1</td>
+                      <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">—</td>
+                      <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">—</td>
+                      <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">—</td>
+                      <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right font-semibold">{(Number(aserraderoServicio.pies_cubicos) * 12).toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            </div>
-          </div>
 
-          {/* Payment + delivery */}
+              {/* Servicios Especiales Aplicados */}
+              <div className="voucher-section mt-4 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4">
+                <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Servicios especiales aplicados</p>
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th className="voucher-th w-1/2 border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-left">Servicio</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Cant.</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Tarifa</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {aserraderoLineasEspeciales.map((linea, i) => (
+                      <tr key={linea.id} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-left">{linea.nombre}</td>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{linea.cantidad}</td>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{formatPen(linea.tarifa)}</td>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right font-semibold">{formatPen(linea.subtotal)}</td>
+                      </tr>
+                    ))}
+                    {aserraderoLineasEspeciales.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="voucher-td py-2 text-sm text-center text-[var(--color-text-secondary,#64748b)]">Ningún servicio especial aplicado.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Resumen financiero detallado */}
+              <div className="mt-4 flex justify-between gap-4">
+                <div className="text-[11px] text-[var(--color-text-secondary,#64748b)] p-3 rounded-lg border border-[var(--color-border,#e2e8f0)] bg-[var(--color-primary-soft,rgba(0,0,0,0.02))]">
+                  <p><strong>Costo de Cubicaje (Base):</strong> {formatPen(Number(aserraderoServicio.costo_cubicaje))}</p>
+                  <p className="text-[var(--color-success,#10b981)] font-semibold mt-1"><strong>Utilidad estimada:</strong> {formatPen(Number(aserraderoServicio.utilidad))}</p>
+                </div>
+                <div className="w-64">
+                  <div className="voucher-total-line flex justify-between border-t border-[var(--color-border,#334155)] pt-2 text-base font-bold text-[var(--color-text-primary,#0f172a)]">
+                    <span>PRECIO COBRADO</span>
+                    <span>{formatPen(totalSoles)}</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {tipo === "venta-madera" && ventaMadera && (
+            <>
+              {/* Detalle Venta Madera */}
+              <div className="voucher-section mt-4 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4">
+                <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Detalle de Venta</p>
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th className="voucher-th w-1/2 border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-left">Especie de madera / Descripción</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Cant.</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Unidad</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Precio unit.</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ventaMaderaLineasResueltas.map((linea, i) => (
+                      <tr key={i} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-left">{linea.desc}</td>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{linea.qty}</td>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right font-medium text-[var(--color-text-secondary,#64748b)] capitalize">{linea.unidad}</td>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{linea.unitario}</td>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right font-semibold">{linea.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <div className="w-64">
+                  <div className="voucher-total-line flex justify-between border-t border-[var(--color-border,#334155)] pt-2 text-base font-bold text-[var(--color-text-primary,#0f172a)]">
+                    <span>TOTAL</span>
+                    <span>{formatPen(totalSoles)}</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {["madera", "mueble"].includes(tipo) && (
+            <>
+              {/* Detalle Mueble o Madera Cortada */}
+              <div className="voucher-section mt-4 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4">
+                <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Detalle</p>
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th className="voucher-th w-1/2 border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-left">Descripción</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Cant.</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Precio unit.</th>
+                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item, i) => (
+                      <tr key={i} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)]">{item.desc}</td>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{item.qty}</td>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{item.unitario}</td>
+                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right font-semibold">{item.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Total */}
+              <div className="mt-4 flex justify-end">
+                <div className="w-64">
+                  <div className="voucher-total-line flex justify-between border-t border-[var(--color-border,#334155)] pt-2 text-base font-bold text-[var(--color-text-primary,#0f172a)]">
+                    <span>TOTAL</span>
+                    <span>{formatPen(totalSoles)}</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Payment + delivery info */}
           <div className="voucher-section mt-4 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4 grid grid-cols-3 gap-4">
             <div>
               <p className="voucher-label text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#94a3b8)]">Modalidad de pago</p>

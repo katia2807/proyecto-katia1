@@ -115,7 +115,11 @@ export default async function MaderaCortadaPage() {
                   <TD className="text-right font-semibold">{formatPen(Number(venta.total))}</TD>
                   <TD>
                     <Link
-                      href={`/ventas/comprobante/madera/${venta.id}`}
+                      href={
+                        venta.correlativo !== null
+                          ? `/ventas/comprobante/venta-madera/${venta.id}`
+                          : `/ventas/comprobante/madera/${venta.id}`
+                      }
                       target="_blank"
                       className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
                       title="Imprimir comprobante"
