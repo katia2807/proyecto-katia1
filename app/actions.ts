@@ -1009,7 +1009,7 @@ export async function createCliente(formData: FormData) {
     const skipRedirect = formData.get("skip_redirect") === "true";
     if (skipRedirect) return { id: newId, nombre: parsed.data.nombre };
     maybeRedirectToQuickStep(formData);
-    return;
+    return { id: newId, nombre: parsed.data.nombre };
   } else {
     const supabase = getSupabaseServerClient();
     const { data: newCliente, error } = await supabase
@@ -1033,7 +1033,7 @@ export async function createCliente(formData: FormData) {
     const skipRedirect = formData.get("skip_redirect") === "true";
     if (skipRedirect) return { id: newCliente.id, nombre: parsed.data.nombre };
     maybeRedirectToQuickStep(formData);
-    return;
+    return { id: newCliente.id, nombre: parsed.data.nombre };
   }
 }
 

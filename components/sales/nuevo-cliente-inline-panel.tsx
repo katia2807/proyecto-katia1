@@ -25,6 +25,7 @@ export function NuevoClienteInlinePanel({
     setLoading(true);
     setError(null);
     if (temporal) formData.set("es_temporal", "true");
+    formData.set("skip_redirect", "true");
     try {
       const result = await createCliente(formData);
       if (result && typeof result === "object" && "id" in result) {

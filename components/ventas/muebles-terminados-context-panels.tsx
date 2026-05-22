@@ -57,6 +57,7 @@ function NuevoClienteInlinePanel({
     setError(null);
     // Marcar si es temporal para que la action lo guarde con la flag
     if (temporal) formData.set("es_temporal", "true");
+    formData.set("skip_redirect", "true");
     try {
       const result = await createCliente(formData);
       // createCliente debe retornar { id, nombre } — ajustar si tu action devuelve diferente
@@ -138,6 +139,7 @@ export function MueblesTerminadosContextPanels({
   const [clienteVentaId, setClienteVentaId] = useState("");
   const [muebleCatalogoId, setMuebleCatalogoId] = useState("");
   const [tipoComprobante, setTipoComprobante] = useState<TipoComprobante>("nota_venta");
+  const [precioUnitario, setPrecioUnitario] = useState("");
 
   // Estado para crear cliente inline
   const [clientesLocales, setClientesLocales] = useState<ClienteOpt[]>([]);
@@ -168,8 +170,8 @@ export function MueblesTerminadosContextPanels({
     [clientes, clientesLocales],
   );
 
-  const muebleOptions = useMemo(() => {
-    const src: MuebleOpt[] = (mockData && muebles.length === 0)
+  const activeMuebles = useMemo((): MuebleOpt[] => {
+    return (mockData && muebles.length === 0)
       ? [...MOCK_MUEBLES_CATALOGO_VENTA].map((m) => ({
         id: m.id,
         codigo: m.codigo,
@@ -178,13 +180,27 @@ export function MueblesTerminadosContextPanels({
         stock_disponible: m.stock_disponible,
       }))
       : muebles;
-    return src.map((m) => ({
+  }, [mockData, muebles]);
+
+  const muebleOptions = useMemo(() => {
+    return activeMuebles.map((m) => ({
       value: m.id,
       label: `${m.codigo} — ${m.nombre}`,
       sublabel: `${formatPen(Number(m.precio_lista))}${Number(m.stock_disponible) <= 0 ? " · sin stock" : ""
         }`,
     }));
-  }, [mockData, muebles]);
+  }, [activeMuebles]);
+
+  useEffect(() => {
+    if (muebleCatalogoId) {
+      const selected = activeMuebles.find((m) => m.id === muebleCatalogoId);
+      if (selected) {
+        setPrecioUnitario(String(selected.precio_lista));
+      }
+    } else {
+      setPrecioUnitario("");
+    }
+  }, [muebleCatalogoId, activeMuebles]);
 
   function handleClienteCreado(id: string, nombre: string) {
     setClientesLocales((prev) => [...prev, { id, nombre }]);
@@ -333,6 +349,8 @@ export function MueblesTerminadosContextPanels({
               min="0"
               step="0.01"
               required
+              value={precioUnitario}
+              onChange={(e) => setPrecioUnitario(e.target.value)}
             />
           </div>
 
