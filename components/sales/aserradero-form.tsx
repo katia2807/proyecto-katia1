@@ -52,6 +52,8 @@ export function AserraderoForm({
   const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
   const [costoPorPieCubico, setCostoPorPieCubico] = useState(defaultCostoPorPieCubico);
   const [piezasJson, setPiezasJson] = useState<string>(DEFAULT_LINEAS_CUBICAJE_JSON);
+  const [step, setStep] = useState(1);
+  const [precioCobradoManual, setPrecioCobradoManual] = useState<string>("");
 
   const [state, formAction] = useActionState(submitCreateServicioAserraderoForm, mutationFormInitialState);
 
@@ -73,7 +75,17 @@ export function AserraderoForm({
   const piezas = useMemo(() => {
     try {
       const arr = JSON.parse(piezasJson);
-      return Array.isArray(arr) ? (arr as { subtotalPT?: number }[]) : [];
+      return Array.isArray(arr)
+        ? (arr as {
+            id?: number;
+            cantidad?: number;
+            espesor?: number;
+            ancho?: number;
+            largo?: number;
+            descripcion?: string;
+            subtotalPT?: number;
+          }[])
+        : [];
     } catch {
       return [];
     }
@@ -96,7 +108,8 @@ export function AserraderoForm({
     }, 0);
   }, [seleccionados]);
 
-  const precioCobrado = costoCubicaje + totalServiciosEspeciales;
+  const precioCalculado = costoCubicaje + totalServiciosEspeciales;
+  const precioCobrado = precioCobradoManual !== "" ? (Number(precioCobradoManual) || 0) : precioCalculado;
   const utilidad = precioCobrado - costoCubicaje;
 
   const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
@@ -126,10 +139,21 @@ export function AserraderoForm({
     [seleccionados, serviciosEspeciales],
   );
 
+  function handleSaltarServicios() {
+    setSeleccionados((prev) => {
+      const reset: Record<string, { activo: boolean; cantidad: number; tarifa: number }> = {};
+      for (const [key, val] of Object.entries(prev)) {
+        reset[key] = { ...val, activo: false };
+      }
+      return reset;
+    });
+    setStep(4);
+  }
+
   return (
     <form
       action={formAction}
-      className="space-y-4"
+      className="space-y-6"
       onChange={(e) => {
         const target = e.target as unknown as HTMLInputElement;
         if (target && target.name === "lineas_cubicaje") {
@@ -137,182 +161,476 @@ export function AserraderoForm({
         }
       }}
     >
-      <div className="grid gap-3 md:grid-cols-2">
-        {/* ── CLIENTE ── */}
-        <div className="space-y-2">
-          {modoCliente === "buscar" ? (
-            <>
-              <ClienteCombobox
-                mockData={mockData}
-                clientes={clientesCombo}
-                value={clienteId}
-                onChange={setClienteId}
-                hiddenInputName="cliente_id"
-                label="Cliente"
-                placeholder="Buscar cliente…"
-                inputAriaLabel="Cliente para servicio de aserradero"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setModoCliente("nuevo")}
-                  className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
-                >
-                  + Nuevo cliente
-                </button>
-                <span className="text-xs text-[var(--color-text-secondary)]">·</span>
-                <button
-                  type="button"
-                  onClick={() => setModoCliente("temporal")}
-                  className="text-xs font-semibold text-[var(--color-text-secondary)] hover:underline"
-                >
-                  + Cliente temporal
-                </button>
-              </div>
-            </>
-          ) : (
-            <NuevoClienteInlinePanel
-              temporal={modoCliente === "temporal"}
-              onCreated={handleClienteCreado}
-              onCancel={() => setModoCliente("buscar")}
-            />
-          )}
-        </div>
-
-        <Field name="fecha" type="date" label="Fecha" defaultValue={hoy} required />
-      </div>
-
-      <div className="rounded-xl border border-[var(--color-border)] p-3">
-        <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-          Cubicaje rápido (pies tablares y volumen)
-        </p>
-        <div className="mt-2">
-          <CubicajeInput precioEditable={false} />
-        </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <Field
-            label="Costo por pie cúbico (S/)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={costoPorPieCubico}
-            onChange={(e) => setCostoPorPieCubico(Number(e.target.value) || 0)}
-          />
-          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-            <p className="text-xs text-[var(--color-text-secondary)]">Pies cúbicos</p>
-            <p className="text-xl font-bold">{piesCubicos.toFixed(2)}</p>
-          </div>
-          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/40 p-3">
-            <p className="text-xs text-[var(--color-text-secondary)]">Costo cubicaje</p>
-            <p className="text-2xl font-bold">{formatPen(costoCubicaje)}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-[var(--color-border)] p-3">
-        <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">
-          Servicios especiales (multi-select con tarifa por pieza editable)
-        </p>
-        <div className="mt-2 space-y-2">
-          {serviciosEspeciales.length === 0 ? (
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              Aún no hay servicios especiales configurados.
-            </p>
-          ) : null}
-          {serviciosEspeciales.map((servicio) => {
-            const estado = seleccionados[servicio.id] ?? {
-              activo: false,
-              cantidad: 1,
-              tarifa: servicio.tarifa_por_pieza,
-            };
+      {/* ── STEPPER DE WIZARD ── */}
+      <div className="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          {[
+            { n: 1, label: "Cliente" },
+            { n: 2, label: "Cubicaje" },
+            { n: 3, label: "Servicios" },
+            { n: 4, label: "Resumen" },
+            { n: 5, label: "Confirmar" },
+          ].map((item, index) => {
+            const isCompleted = step > item.n;
+            const isActive = step === item.n;
             return (
-              <div
-                key={servicio.id}
-                className="grid items-end gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-2 md:grid-cols-[1.5fr_repeat(3,1fr)]"
-              >
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={estado.activo}
-                    onChange={(e) =>
-                      setSeleccionados((prev) => ({
-                        ...prev,
-                        [servicio.id]: { ...estado, activo: e.target.checked },
-                      }))
-                    }
-                  />
-                  <span>
-                    <strong>{servicio.codigo}</strong> · {servicio.nombre}
+              <div key={item.n} className="flex flex-1 items-center">
+                <div className="flex flex-col items-center flex-1">
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-bold transition-all duration-300 ${
+                      isCompleted
+                        ? "bg-[var(--color-success)] border-[var(--color-success)] text-white"
+                        : isActive
+                        ? "bg-[var(--color-primary)] border-[var(--color-primary)] text-white shadow-md shadow-[var(--color-primary)]/20"
+                        : "border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-secondary)]"
+                    }`}
+                  >
+                    {isCompleted ? "✓" : item.n}
+                  </div>
+                  <span
+                    className={`mt-1.5 text-xs font-semibold tracking-wide transition-all duration-300 hidden sm:inline ${
+                      isActive
+                        ? "text-[var(--color-primary)] font-bold"
+                        : isCompleted
+                        ? "text-[var(--color-success)]"
+                        : "text-[var(--color-text-secondary)]"
+                    }`}
+                  >
+                    {item.label}
                   </span>
-                </label>
-                <Field
-                  label="Cantidad"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={estado.cantidad}
-                  disabled={!estado.activo}
-                  onChange={(e) =>
-                    setSeleccionados((prev) => ({
-                      ...prev,
-                      [servicio.id]: { ...estado, cantidad: Number(e.target.value) || 0 },
-                    }))
-                  }
-                />
-                <Field
-                  label="Tarifa S/"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={estado.tarifa}
-                  disabled={!estado.activo}
-                  onChange={(e) =>
-                    setSeleccionados((prev) => ({
-                      ...prev,
-                      [servicio.id]: { ...estado, tarifa: Number(e.target.value) || 0 },
-                    }))
-                  }
-                />
-                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-right">
-                  <p className="text-[10px] uppercase text-[var(--color-text-secondary)]">Subtotal</p>
-                  <p className="text-sm font-bold">
-                    {formatPen(estado.activo ? estado.cantidad * estado.tarifa : 0)}
-                  </p>
                 </div>
+                {index < 4 && (
+                  <div
+                    className={`h-0.5 w-full -mt-4 transition-all duration-500 ${
+                      step > item.n
+                        ? "bg-[var(--color-success)]"
+                        : "bg-[var(--color-border)]"
+                    }`}
+                  />
+                )}
               </div>
             );
           })}
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <div className="rounded-xl border border-[var(--color-border)] p-3">
-          <p className="text-xs uppercase text-[var(--color-text-secondary)]">Costo cubicaje</p>
-          <p className="text-xl font-bold">{formatPen(costoCubicaje)}</p>
-        </div>
-        <div className="rounded-xl border border-[var(--color-border)] p-3">
-          <p className="text-xs uppercase text-[var(--color-text-secondary)]">Servicios especiales</p>
-          <p className="text-xl font-bold">{formatPen(totalServiciosEspeciales)}</p>
-        </div>
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/40 p-3">
-          <p className="text-xs uppercase text-[var(--color-text-secondary)]">Precio cobrado</p>
-          <p className="text-2xl font-black">{formatPen(precioCobrado)}</p>
+      {/* ── PASO 1: DATOS DEL CLIENTE ── */}
+      <div style={{ display: step === 1 ? "block" : "none" }} className="space-y-4">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 1: Datos del cliente</h3>
           <p className="text-xs text-[var(--color-text-secondary)]">
-            Utilidad: {formatPen(utilidad)}
+            Busca un cliente existente o registra uno nuevo.
           </p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              {modoCliente === "buscar" ? (
+                <>
+                  <ClienteCombobox
+                    mockData={mockData}
+                    clientes={clientesCombo}
+                    value={clienteId}
+                    onChange={setClienteId}
+                    hiddenInputName="cliente_id"
+                    label="Cliente"
+                    placeholder="Buscar cliente…"
+                    inputAriaLabel="Cliente para servicio de aserradero"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setModoCliente("nuevo")}
+                      className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                    >
+                      + Nuevo cliente
+                    </button>
+                    <span className="text-xs text-[var(--color-text-secondary)]">·</span>
+                    <button
+                      type="button"
+                      onClick={() => setModoCliente("temporal")}
+                      className="text-xs font-semibold text-[var(--color-text-secondary)] hover:underline"
+                    >
+                      + Cliente temporal
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <NuevoClienteInlinePanel
+                  temporal={modoCliente === "temporal"}
+                  onCreated={handleClienteCreado}
+                  onCancel={() => setModoCliente("buscar")}
+                />
+              )}
+            </div>
+
+            <Field name="fecha" type="date" label="Fecha" defaultValue={hoy} required />
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-4 mt-4">
+          <Button
+            type="button"
+            disabled={!clienteId}
+            onClick={() => setStep(2)}
+            className="px-6 py-2 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
+          >
+            Siguiente: Cubicaje →
+          </Button>
         </div>
       </div>
 
-      <MargenIndicator costo={costoCubicaje} precio={precioCobrado} label="Margen del servicio" />
+      {/* ── PASO 2: CUBICAJE BASE ── */}
+      <div style={{ display: step === 2 ? "block" : "none" }} className="space-y-4">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 2: Cubicaje</h3>
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Ingresa las piezas, cantidades y dimensiones para realizar el cubicaje rápido.
+          </p>
+          <div className="mt-2">
+            <CubicajeInput precioEditable={false} />
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <Field
+              label="Costo por pie cúbico (S/)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={costoPorPieCubico}
+              onChange={(e) => setCostoPorPieCubico(Number(e.target.value) || 0)}
+            />
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+              <p className="text-xs text-[var(--color-text-secondary)]">Pies cúbicos</p>
+              <p className="text-xl font-bold">{piesCubicos.toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/40 p-3">
+              <p className="text-xs text-[var(--color-text-secondary)]">Costo cubicaje</p>
+              <p className="text-2xl font-bold">{formatPen(costoCubicaje)}</p>
+            </div>
+          </div>
+        </div>
 
+        <div className="flex justify-between pt-4 mt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setStep(1)}
+            className="px-6 py-2"
+          >
+            ← Anterior
+          </Button>
+          <Button
+            type="button"
+            disabled={totalPT === 0}
+            onClick={() => setStep(3)}
+            className="px-6 py-2"
+          >
+            Siguiente: Servicios →
+          </Button>
+        </div>
+      </div>
+
+      {/* ── PASO 3: SERVICIOS ESPECIALES ── */}
+      <div style={{ display: step === 3 ? "block" : "none" }} className="space-y-4">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 3: Servicios especiales (Opcional)</h3>
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Activa y edita las tarifas y cantidades de los servicios adicionales solicitados por el cliente.
+          </p>
+          <div className="mt-2 space-y-2">
+            {serviciosEspeciales.length === 0 ? (
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                Aún no hay servicios especiales configurados.
+              </p>
+            ) : null}
+            {serviciosEspeciales.map((servicio) => {
+              const estado = seleccionados[servicio.id] ?? {
+                activo: false,
+                cantidad: 1,
+                tarifa: servicio.tarifa_por_pieza,
+              };
+              return (
+                <div
+                  key={servicio.id}
+                  className="grid items-end gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-2 md:grid-cols-[1.5fr_repeat(3,1fr)]"
+                >
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={estado.activo}
+                      onChange={(e) =>
+                        setSeleccionados((prev) => ({
+                          ...prev,
+                          [servicio.id]: { ...estado, activo: e.target.checked },
+                        }))
+                      }
+                      className="rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                    />
+                    <span>
+                      <strong>{servicio.codigo}</strong> · {servicio.nombre}
+                    </span>
+                  </label>
+                  <Field
+                    label="Cantidad"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={estado.cantidad}
+                    disabled={!estado.activo}
+                    onChange={(e) =>
+                      setSeleccionados((prev) => ({
+                        ...prev,
+                        [servicio.id]: { ...estado, cantidad: Number(e.target.value) || 0 },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Tarifa S/"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={estado.tarifa}
+                    disabled={!estado.activo}
+                    onChange={(e) =>
+                      setSeleccionados((prev) => ({
+                        ...prev,
+                        [servicio.id]: { ...estado, tarifa: Number(e.target.value) || 0 },
+                      }))
+                    }
+                  />
+                  <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-right">
+                    <p className="text-[10px] uppercase text-[var(--color-text-secondary)]">Subtotal</p>
+                    <p className="text-sm font-bold">
+                      {formatPen(estado.activo ? estado.cantidad * estado.tarifa : 0)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex justify-between pt-4 mt-4 flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setStep(2)}
+            className="px-6 py-2"
+          >
+            ← Anterior
+          </Button>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleSaltarServicios}
+              className="px-4 py-2"
+            >
+              Saltar este paso
+            </Button>
+            <Button
+              type="button"
+              onClick={() => setStep(4)}
+              className="px-6 py-2"
+            >
+              Siguiente: Resumen y cobro →
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── PASO 4: RESUMEN Y COBRO ── */}
+      <div style={{ display: step === 4 ? "block" : "none" }} className="space-y-4">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 4: Resumen y cobro</h3>
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Visualiza los costos acumulados y define el precio final a cobrar al cliente.
+          </p>
+
+          <div className="space-y-4 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">Desglose de Costos</h4>
+            
+            <div className="divide-y divide-[var(--color-border)]">
+              <div className="flex justify-between py-2.5">
+                <div>
+                  <p className="font-semibold text-sm">Cubicaje Base ({piesCubicos.toFixed(2)} pies³)</p>
+                  <p className="text-xs text-[var(--color-text-secondary)]">{totalPT} piezas a S/ {costoPorPieCubico.toFixed(2)} por pie³</p>
+                </div>
+                <p className="font-bold text-sm">{formatPen(costoCubicaje)}</p>
+              </div>
+
+              <div className="flex justify-between py-2.5">
+                <div>
+                  <p className="font-semibold text-sm">Servicios Especiales</p>
+                  {lineasPayload.length === 0 ? (
+                    <p className="text-xs text-[var(--color-text-secondary)]">Ninguno seleccionado</p>
+                  ) : (
+                    <p className="text-xs text-[var(--color-text-secondary)]">
+                      {lineasPayload.map(s => `${s.nombre} (x${s.cantidad})`).join(', ')}
+                    </p>
+                  )}
+                </div>
+                <p className="font-bold text-sm">{formatPen(totalServiciosEspeciales)}</p>
+              </div>
+
+              <div className="flex justify-between py-3 text-[var(--color-primary)]">
+                <span className="font-bold text-base">Costo Total Sugerido</span>
+                <span className="font-black text-base">{formatPen(precioCalculado)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="precio-cobrado-input" className="text-sm font-semibold text-[var(--color-text-primary)]">
+              Precio Cobrado Final (S/)
+            </label>
+            <input
+              id="precio-cobrado-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={precioCobradoManual}
+              placeholder={precioCalculado.toFixed(2)}
+              onChange={(e) => setPrecioCobradoManual(e.target.value)}
+              className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5 text-lg font-bold text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+            />
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Deja en blanco para usar el costo total sugerido ({formatPen(precioCalculado)}).
+            </p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 mt-4 pt-2">
+            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+              <p className="text-xs uppercase text-[var(--color-text-secondary)]">Utilidad estimada</p>
+              <p className="text-2xl font-black text-[var(--color-success)]">{formatPen(utilidad)}</p>
+            </div>
+            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3 flex flex-col justify-center">
+              <MargenIndicator costo={costoCubicaje} precio={precioCobrado} label="Margen del servicio" />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between pt-4 mt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setStep(3)}
+            className="px-6 py-2"
+          >
+            ← Anterior
+          </Button>
+          <Button
+            type="button"
+            onClick={() => setStep(5)}
+            className="px-6 py-2"
+          >
+            Siguiente: Confirmar →
+          </Button>
+        </div>
+      </div>
+
+      {/* ── PASO 5: CONFIRMAR Y REGISTRAR ── */}
+      <div style={{ display: step === 5 ? "block" : "none" }} className="space-y-4">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 5: Confirmar y registrar</h3>
+          
+          <div className="rounded-xl border border-[var(--color-success)]/30 bg-[var(--color-success)]/5 p-4 text-[var(--color-success)]">
+            <p className="text-sm font-semibold">✓ Todo listo para registrar</p>
+            <p className="text-xs">Por favor, revisa el resumen a continuación antes de proceder a guardar el servicio.</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Resumen Cliente y Cubicaje */}
+            <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
+              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cliente & Fecha</h4>
+              <p className="text-sm">
+                <strong>Cliente:</strong> {todosLosClientes.find((c) => c.id === clienteId)?.nombre ?? "No seleccionado"}
+              </p>
+              <p className="text-sm">
+                <strong>Fecha de Registro:</strong> {hoy}
+              </p>
+              
+              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider mt-4">Detalle de Cubicaje</h4>
+              <p className="text-sm">
+                <strong>Pies Cúbicos Totales:</strong> {piesCubicos.toFixed(2)} ft³
+              </p>
+              <p className="text-sm">
+                <strong>Costo de Cubicaje (Base):</strong> {formatPen(costoCubicaje)}
+              </p>
+              
+              <div className="text-xs border-t border-[var(--color-border)] pt-2 mt-2 max-h-32 overflow-y-auto space-y-1">
+                <span className="font-semibold text-[var(--color-text-secondary)]">Piezas ingresadas:</span>
+                {piezas.map((p, i) => (
+                  <div key={i} className="flex justify-between text-[var(--color-text-secondary)]">
+                    <span>{p.cantidad ?? 0} pzs ({p.espesor ?? 0}{"\""} x {p.ancho ?? 0}{"\""} x {p.largo ?? 0}{"'"})</span>
+                    <span>{p.subtotalPT ?? 0} PT</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Resumen Servicios y Cobro */}
+            <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
+              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Servicios Especiales</h4>
+              {lineasPayload.length === 0 ? (
+                <p className="text-xs text-[var(--color-text-secondary)]">Ningún servicio especial seleccionado.</p>
+              ) : (
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {lineasPayload.map((s) => (
+                    <div key={s.id} className="flex justify-between text-sm">
+                      <span>{s.nombre} <span className="text-xs text-[var(--color-text-secondary)]">(x{s.cantidad})</span></span>
+                      <span className="font-semibold">{formatPen(s.subtotal)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="border-t border-[var(--color-border)] pt-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--color-text-secondary)]">Subtotal Cubicaje:</span>
+                  <span>{formatPen(costoCubicaje)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--color-text-secondary)]">Subtotal Servicios:</span>
+                  <span>{formatPen(totalServiciosEspeciales)}</span>
+                </div>
+                <div className="flex justify-between text-base font-black border-t border-[var(--color-border)] pt-2 text-[var(--color-primary)]">
+                  <span>PRECIO FINAL COBRADO:</span>
+                  <span>{formatPen(precioCobrado)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-[var(--color-success)] font-bold">
+                  <span>Utilidad Estimada:</span>
+                  <span>{formatPen(utilidad)}</span>
+                </div>
+                <div className="pt-1">
+                  <MargenIndicator costo={costoCubicaje} precio={precioCobrado} label="Margen Final" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between pt-4 mt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setStep(4)}
+            className="px-6 py-2"
+          >
+            ← Anterior
+          </Button>
+          <Button
+            size="lg"
+            className="px-8 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
+          >
+            Registrar servicio ✓
+          </Button>
+        </div>
+      </div>
+
+      {/* Inputs ocultos requeridos para el Server Action */}
       <input type="hidden" name="pies_cubicos" value={piesCubicos.toFixed(4)} />
       <input type="hidden" name="costo_cubicaje" value={costoCubicaje.toFixed(2)} />
       <input type="hidden" name="precio_cobrado" value={precioCobrado.toFixed(2)} />
       <input type="hidden" name="lineas_json" value={JSON.stringify(lineasPayload)} />
-
-      <Button size="lg" className="w-full mt-4 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all">
-        Registrar servicio
-      </Button>
     </form>
   );
 }
