@@ -99,7 +99,7 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
               : "Vista combinada de personal y empresa."}
         </CardDescription>
         <div className="mt-4">
-          <CajaMasterDetail rows={rows} />
+          <CajaMasterDetail rows={rows} userRole={role} />
         </div>
       </Card>
     </div>

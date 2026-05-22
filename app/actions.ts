@@ -4758,3 +4758,39 @@ export async function updateServicioEspecialTarifa(id: string, nombre: string, t
   return { success: true };
 }
 
+export async function deleteCajaMovimiento(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireMutationAccess(["owner_admin"]);
+    const parsedId = z.string().uuid().safeParse(id);
+    if (!parsedId.success) {
+      return { ok: false, error: "Identificador inválido." };
+    }
+    if (!hasSupabaseEnv()) {
+      const res = demoDeleteOneById("caja", id);
+      if (res.eliminados === 0) {
+        return { ok: false, error: "Movimiento no encontrado o no se pudo eliminar." };
+      }
+      revalidatePath("/caja");
+      revalidatePath("/");
+      return { ok: true };
+    }
+    const supabase = getSupabaseServerClient();
+    const { error } = await supabase
+      .from("movimientos_caja")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+    revalidatePath("/caja");
+    revalidatePath("/");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Error desconocido." };
+  }
+}
+
+

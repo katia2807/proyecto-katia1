@@ -6,6 +6,11 @@ import { DetailDrawer, DetailField } from "@/components/ui/detail-drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { formatDate, formatPen } from "@/lib/utils";
+import { Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/ui/toast";
+import { deleteCajaMovimiento } from "@/app/actions";
+import type { AppRole } from "@/lib/supabase/types";
 
 type CajaRow = {
   id: string;
@@ -21,8 +26,16 @@ type CajaRow = {
   url_comprobante: string | null;
 };
 
-export function CajaMasterDetail({ rows }: { rows: CajaRow[] }) {
+export function CajaMasterDetail({
+  rows,
+  userRole,
+}: {
+  rows: CajaRow[];
+  userRole: AppRole | null;
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [movimientoAEliminar, setMovimientoAEliminar] = useState<CajaRow | null>(null);
+  const { showToast } = useToast();
   const selected = useMemo(() => rows.find((row) => row.id === selectedId) ?? null, [rows, selectedId]);
 
   if (rows.length === 0) {
@@ -49,6 +62,9 @@ export function CajaMasterDetail({ rows }: { rows: CajaRow[] }) {
               <TH>Marca</TH>
               <TH>Comprobante</TH>
               <TH className="text-right">Monto</TH>
+              {userRole === "owner_admin" && (
+                <TH className="w-12 text-center">Acciones</TH>
+              )}
             </TRow>
           </THead>
           <tbody>
@@ -64,6 +80,21 @@ export function CajaMasterDetail({ rows }: { rows: CajaRow[] }) {
                 <TD>{row.es_personal ? "Personal" : "Empresa"}</TD>
                 <TD>{row.url_comprobante ? "Si" : "No"}</TD>
                 <TD className="text-right font-semibold">{formatPen(Number(row.monto))}</TD>
+                {userRole === "owner_admin" && (
+                  <TD className="text-center" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMovimientoAEliminar(row);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors"
+                      title="Eliminar movimiento"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </TD>
+                )}
               </TRow>
             ))}
           </tbody>
@@ -97,6 +128,47 @@ export function CajaMasterDetail({ rows }: { rows: CajaRow[] }) {
           </div>
         ) : null}
       </DetailDrawer>
+
+      <ConfirmDialog
+        open={Boolean(movimientoAEliminar)}
+        onOpenChange={(open) => {
+          if (!open) setMovimientoAEliminar(null);
+        }}
+        title="¿Eliminar este movimiento?"
+        confirmLabel="Sí, eliminar"
+        cancelLabel="Cancelar"
+        confirmVariant="danger"
+        tone="caution"
+        onConfirm={async () => {
+          if (!movimientoAEliminar) return;
+          const res = await deleteCajaMovimiento(movimientoAEliminar.id);
+          if (!res.ok) {
+            showToast({ message: res.error, variant: "error" });
+            return false;
+          }
+          showToast({ message: "Movimiento eliminado con éxito.", variant: "success" });
+          if (selectedId === movimientoAEliminar.id) {
+            setSelectedId(null);
+          }
+          setMovimientoAEliminar(null);
+          return true;
+        }}
+      >
+        <p className="text-sm text-[var(--color-text-secondary)]">
+          ¿Eliminar este movimiento? Esta acción no se puede deshacer.
+        </p>
+        {movimientoAEliminar && (
+          <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--bg-surface)] p-3 text-xs space-y-1">
+            <p><strong>Fecha:</strong> {formatDate(movimientoAEliminar.fecha)}</p>
+            <p className="capitalize"><strong>Tipo:</strong> {movimientoAEliminar.tipo}</p>
+            <p><strong>Categoría:</strong> {movimientoAEliminar.categoria}</p>
+            {movimientoAEliminar.descripcion && (
+              <p><strong>Descripción:</strong> {movimientoAEliminar.descripcion}</p>
+            )}
+            <p><strong>Monto:</strong> {formatPen(Number(movimientoAEliminar.monto))}</p>
+          </div>
+        )}
+      </ConfirmDialog>
     </>
   );
 }
