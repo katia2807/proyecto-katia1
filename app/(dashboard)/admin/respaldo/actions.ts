@@ -47,10 +47,11 @@ export async function resetDatabaseAction(confirmacion: string) {
   try {
     // 5. Ejecutar DELETE por cada tabla para la organización del usuario
     for (const table of tables) {
+      const orgColumn = table === "correlativos" ? "org_id" : "organization_id";
       const { error } = await supabase
         .from(table)
         .delete()
-        .eq("organization_id", organizationId);
+        .eq(orgColumn, organizationId);
 
       if (error) {
         throw new Error(`Error al limpiar la tabla "${table}": ${error.message}`);
