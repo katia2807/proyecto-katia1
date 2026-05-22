@@ -606,7 +606,7 @@ export function CotizacionUnificadaWizard({
   );
 
   const steps = useMemo(() => {
-    const base: string[] = ["tipo", "cliente", "rubros"];
+    const base: string[] = ["cliente", "rubros"];
     if (detalle.rubros.muebles) base.push("muebles");
     if (detalle.rubros.aserradero) base.push("aserradero");
     if (detalle.rubros.alquiler) base.push("alquiler");
@@ -615,7 +615,7 @@ export function CotizacionUnificadaWizard({
   }, [detalle.rubros]);
 
   const effectiveStepIndex = Math.min(stepIndex, Math.max(0, steps.length - 1));
-  const currentStepId = steps[effectiveStepIndex] ?? "tipo";
+  const currentStepId = steps[effectiveStepIndex] ?? "cliente";
 
   const totales = useMemo(() => computeTotalesDetalle(detalle), [detalle]);
   const totalGral = useMemo(() => totalGeneralDetalle(detalle), [detalle]);
@@ -866,6 +866,44 @@ export function CotizacionUnificadaWizard({
       setMedidaLargoUI(feetToUI(nextPieza.largo, unidadLargoUI));
     }
   }, [detalle.muebles_lineas, selectedPiezaIndexSafe, unidadAnchoUI, unidadEspesorUI, unidadLargoUI]);
+
+  const removePiezaAtIndex = useCallback((idx: number) => {
+    const currentPiezas = detalle.muebles_lineas[0]?.piezas ?? [];
+    if (currentPiezas.length <= 1) {
+      const empty = emptyPieza();
+      setDetalle((d) => {
+        const lineas = d.muebles_lineas.length > 0 ? [...d.muebles_lineas] : [emptyLineaMadera()];
+        const first = lineas[0];
+        lineas[0] = { ...first, piezas: [empty] };
+        return { ...d, muebles_lineas: lineas };
+      });
+      setSelectedPiezaIndexUI(0);
+      setMedidaEspesorUI("");
+      setMedidaAnchoUI("");
+      setMedidaLargoUI("");
+      return;
+    }
+
+    const nextSelected = Math.max(0, idx - 1);
+    const piezasSinEliminada = currentPiezas.filter((_, i) => i !== idx);
+    const nextPieza = piezasSinEliminada[nextSelected] ?? null;
+
+    setDetalle((d) => {
+      const lineas = d.muebles_lineas.length > 0 ? [...d.muebles_lineas] : [emptyLineaMadera()];
+      const first = lineas[0];
+      const piezas = [...(first.piezas.length > 0 ? first.piezas : [emptyPieza()])];
+      piezas.splice(idx, 1);
+      lineas[0] = { ...first, piezas };
+      return { ...d, muebles_lineas: lineas };
+    });
+
+    setSelectedPiezaIndexUI(nextSelected);
+    if (nextPieza) {
+      setMedidaEspesorUI(inchesToUI(nextPieza.espesor, unidadEspesorUI));
+      setMedidaAnchoUI(inchesToUI(nextPieza.ancho, unidadAnchoUI));
+      setMedidaLargoUI(feetToUI(nextPieza.largo, unidadLargoUI));
+    }
+  }, [detalle.muebles_lineas, unidadAnchoUI, unidadEspesorUI, unidadLargoUI]);
 
   const applyMuebleTemplate = useCallback(
     (templateId: string) => {
@@ -1198,8 +1236,7 @@ export function CotizacionUnificadaWizard({
   );
   const stepLabels: Record<string, string> = useMemo(
     () => ({
-      tipo: "Tipo cliente",
-      cliente: "Datos cliente",
+      cliente: "Cliente",
       rubros: "Alcance y rubros",
       muebles: "Costeo muebles",
       aserradero: "Costeo aserradero",
@@ -1272,11 +1309,6 @@ export function CotizacionUnificadaWizard({
     setError("");
     const idxNow = Math.min(stepIndex, Math.max(0, steps.length - 1));
     const id = steps[idxNow];
-    if (id === "tipo") {
-      setMaxStep((m) => Math.max(m, idxNow + 1));
-      setStepIndex(idxNow + 1);
-      return;
-    }
     if (id === "cliente") {
       if (!nombreCliente.trim()) {
         setError("Indica el nombre o razón social.");
@@ -1449,8 +1481,14 @@ export function CotizacionUnificadaWizard({
     }
     setCostoManoObraUI(String(d.costoManoObra ?? 0));
     setSelectedPiezaIndexUI(0);
-    setStepIndex(0);
-    setMaxStep(30);
+    const baseSteps: string[] = ["cliente", "rubros"];
+    if (d.rubros.muebles) baseSteps.push("muebles");
+    if (d.rubros.aserradero) baseSteps.push("aserradero");
+    if (d.rubros.alquiler) baseSteps.push("alquiler");
+    baseSteps.push("resumen");
+    const targetIdx = baseSteps.length - 1;
+    setStepIndex(targetIdx);
+    setMaxStep(targetIdx);
     setError("");
   }, [effectiveClientes]);
 
@@ -1492,6 +1530,36 @@ export function CotizacionUnificadaWizard({
           <p className="text-xs text-[var(--color-text-secondary)]">Ingreso registrado en caja.</p>
         </Card>
       </div>
+
+      {guardadaRow ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300 shadow-sm transition-all">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">📝</span>
+            <div>
+              <p className="text-sm font-bold">Modo Edición Activo</p>
+              <p className="text-xs opacity-90">
+                Estás editando la cotización <strong className="font-extrabold">{guardadaRow.correlativo ?? guardadaRow.id.slice(0, 8)}</strong> de <strong className="font-bold">{nombreCliente || "Sin definir"}</strong>.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-sm"
+              onClick={() => goStep(steps.length - 1)}
+            >
+              Ir al Resumen
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-50 dark:border-amber-900 dark:bg-zinc-900 dark:text-amber-400 transition-colors shadow-sm"
+              onClick={resetWizardFast}
+            >
+              Cancelar (Nueva)
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <Card className="sticky top-2 z-10 border-[var(--color-border)] bg-[var(--color-surface)]/95 p-4 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1566,38 +1634,6 @@ export function CotizacionUnificadaWizard({
         </div>
       </Card>
 
-      {currentStepId === "tipo" ? (
-        <Card className={`${panelClass} space-y-5 border-none`}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => setTipoCliente("natural")}
-              className={`rounded-3xl border px-4 py-6 text-xl font-bold text-[var(--color-text-primary)] ${tipoCliente === "natural"
-                  ? "border-[var(--color-accent)] bg-[var(--color-primary-soft)]"
-                  : "border-[var(--color-border)] bg-[var(--color-surface)]"
-                }`}
-            >
-              Persona natural
-            </button>
-            <button
-              type="button"
-              onClick={() => setTipoCliente("empresa")}
-              className={`rounded-3xl border px-4 py-6 text-xl font-bold text-[var(--color-text-primary)] ${tipoCliente === "empresa"
-                  ? "border-[var(--color-accent)] bg-[var(--color-primary-soft)]"
-                  : "border-[var(--color-border)] bg-[var(--color-surface)]"
-                }`}
-            >
-              Empresa
-            </button>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={next} className={navBtnClass}>
-              Siguiente
-            </button>
-          </div>
-        </Card>
-      ) : null}
-
       {currentStepId === "cliente" ? (
         <Card className={`${panelClass} space-y-5 border-none`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1612,6 +1648,32 @@ export function CotizacionUnificadaWizard({
             />
           </div>
           <CardTitle className="text-center text-2xl font-extrabold">Datos del cliente</CardTitle>
+
+          <div className="mx-auto max-w-xs grid grid-cols-2 gap-1 bg-[var(--color-primary-soft)]/30 p-1 rounded-xl border border-[var(--color-border)]">
+            <button
+              type="button"
+              onClick={() => setTipoCliente("natural")}
+              className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all duration-200 ${
+                tipoCliente === "natural"
+                  ? "bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-sm border border-[var(--color-border)]"
+                  : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              }`}
+            >
+              👤 Persona Natural
+            </button>
+            <button
+              type="button"
+              onClick={() => setTipoCliente("empresa")}
+              className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all duration-200 ${
+                tipoCliente === "empresa"
+                  ? "bg-[var(--color-surface)] text-[var(--color-text-primary)] shadow-sm border border-[var(--color-border)]"
+                  : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+              }`}
+            >
+              🏢 Empresa
+            </button>
+          </div>
+
           <div className="grid gap-3 md:grid-cols-2">
             <ClienteCombobox
               className="[&>span]:text-xs [&>span]:font-medium [&>span]:text-[var(--color-text-secondary)]"
@@ -1682,10 +1744,12 @@ export function CotizacionUnificadaWizard({
               />
             </label>
           </div>
-          <div className="flex justify-between gap-2">
-            <button type="button" onClick={back} className={navBtnSecondaryClass}>
-              Anterior
-            </button>
+          <div className="flex justify-end gap-2">
+            {effectiveStepIndex > 0 ? (
+              <button type="button" onClick={back} className={navBtnSecondaryClass}>
+                Anterior
+              </button>
+            ) : null}
             <button type="button" onClick={next} className={navBtnClass}>
               Siguiente
             </button>
@@ -1695,23 +1759,34 @@ export function CotizacionUnificadaWizard({
 
       {currentStepId === "rubros" ? (
         <Card className={`${panelClass} space-y-5 border-none`}>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-2">
-              <span className={`${pillClass} inline-flex`}>Tipo de cotización</span>
-              <select
-                className={`${inputClass} h-12 min-w-[260px] border-[var(--color-border)] bg-[var(--color-surface)] text-center font-bold text-[var(--color-text-primary)]`}
-                value={tipoCotizacionPreset}
-                onChange={(e) =>
-                  applyCotizacionPreset(
-                    e.target.value as "muebles" | "aserradero" | "alquiler" | "general",
-                  )
-                }
-              >
-                <option value="aserradero">Aserradero</option>
-                <option value="muebles">Mueble personalizado</option>
-                <option value="alquiler">Alquiler</option>
-                <option value="general">Cotización general</option>
-              </select>
+          <div className="space-y-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
+              Tipo de Cotización
+            </span>
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+              {(
+                [
+                  { id: "muebles", label: "Mueble Personalizado", icon: "🪑", desc: "Mesas, sillas, armarios a medida" },
+                  { id: "aserradero", label: "Servicio Aserradero", icon: "🪵", desc: "Corte y cubicaje de madera" },
+                  { id: "alquiler", label: "Alquiler Maquinaria", icon: "🚜", desc: "Equipos y herramientas" },
+                  { id: "general", label: "Cotización General", icon: "📋", desc: "Múltiples servicios combinados" },
+                ] as const
+              ).map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => applyCotizacionPreset(p.id)}
+                  className={`flex flex-col items-center justify-center p-4 rounded-2xl border text-center transition-all duration-200 ${
+                    tipoCotizacionPreset === p.id
+                      ? "border-[var(--color-accent)] bg-[var(--color-primary-soft)]/40 text-[var(--color-text-primary)] shadow-sm scale-[1.02]"
+                      : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-secondary)]"
+                  }`}
+                >
+                  <span className="text-3xl mb-2">{p.icon}</span>
+                  <span className="text-sm font-bold text-[var(--color-text-primary)]">{p.label}</span>
+                  <span className="text-[10px] mt-1 leading-normal text-[var(--color-text-secondary)]">{p.desc}</span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -1795,96 +1870,101 @@ export function CotizacionUnificadaWizard({
                     ] as const
                   ).map(({ label, unidad, setUnidad, medida, setMedida }) => (
                     <div key={label} className="space-y-1">
-                      <div className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] py-2 text-center text-sm font-extrabold text-[var(--color-text-primary)]">
-                        {label}
+                      <span className="block text-xs font-bold text-[var(--color-text-secondary)]">{label}</span>
+                      <div className="flex rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--color-accent)]/50 transition-all">
+                        <input
+                          type="number"
+                          className="w-full border-none bg-transparent h-10 px-3 text-sm focus:outline-none focus:ring-0 text-[var(--color-text-primary)]"
+                          value={medida}
+                          onChange={(e) => setMedida(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addPiezaDesdeDimensiones();
+                            }
+                          }}
+                          placeholder="0"
+                        />
+                        <select
+                          className="border-l border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 px-2 h-10 text-xs font-semibold text-[var(--color-text-primary)] focus:outline-none focus:ring-0 cursor-pointer"
+                          value={unidad}
+                          onChange={(e) => {
+                            const newUnit = e.target.value as "" | "mm" | "cm" | "m" | "in" | "ft";
+                            if (label === "Espesor") {
+                              const valIn = toInches(Number(medidaEspesorUI) || 0, unidadEspesorUI);
+                              setUnidadEspesorUI(newUnit);
+                              setMedidaEspesorUI(inchesToUI(valIn, newUnit));
+                            } else if (label === "Ancho") {
+                              const valIn = toInches(Number(medidaAnchoUI) || 0, unidadAnchoUI);
+                              setUnidadAnchoUI(newUnit);
+                              setMedidaAnchoUI(inchesToUI(valIn, newUnit));
+                            } else {
+                              const valFt = toFeet(Number(medidaLargoUI) || 0, unidadLargoUI);
+                              setUnidadLargoUI(newUnit);
+                              setMedidaLargoUI(feetToUI(valFt, newUnit));
+                            }
+                          }}
+                          aria-label={`Unidad ${label}`}
+                        >
+                          <option value="mm">mm</option>
+                          <option value="cm">cm</option>
+                          <option value="m">m</option>
+                          <option value="in">in</option>
+                          <option value="ft">ft</option>
+                        </select>
                       </div>
-                      <select
-                        className={inputClass + " h-10"}
-                        value={unidad}
-                        onChange={(e) => {
-                          const newUnit = e.target.value as "" | "mm" | "cm" | "m" | "in" | "ft";
-                          // Al cambiar unidad, recalcular el valor de texto en la nueva unidad
-                          // pero mantener el valor almacenado (en in/ft) igual.
-                          if (label === "Espesor") {
-                            const valIn = toInches(Number(medidaEspesorUI) || 0, unidadEspesorUI);
-                            setUnidadEspesorUI(newUnit);
-                            setMedidaEspesorUI(inchesToUI(valIn, newUnit));
-                          } else if (label === "Ancho") {
-                            const valIn = toInches(Number(medidaAnchoUI) || 0, unidadAnchoUI);
-                            setUnidadAnchoUI(newUnit);
-                            setMedidaAnchoUI(inchesToUI(valIn, newUnit));
-                          } else {
-                            const valFt = toFeet(Number(medidaLargoUI) || 0, unidadLargoUI);
-                            setUnidadLargoUI(newUnit);
-                            setMedidaLargoUI(feetToUI(valFt, newUnit));
-                          }
-                        }}
-                        aria-label={`Unidad ${label}`}
-                      >
-                        <option value="mm">mm</option>
-                        <option value="cm">cm</option>
-                        <option value="m">m</option>
-                        <option value="in">in</option>
-                        <option value="ft">ft</option>
-                      </select>
-                      <input
-                        type="number"
-                        className={`${inputClass} h-10 rounded-sm`}
-                        value={medida}
-                        onChange={(e) => setMedida(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            addPiezaDesdeDimensiones();
-                          }
-                        }}
-                        placeholder={unidad ? String(unidad).toUpperCase() : "Unidad"}
-                      />
                     </div>
                   ))}
                 </div>
-                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-2">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-[var(--color-text-secondary)]">
-                      Muebles personalizados ({piezasMuebleActual.length || 1}) · Enter = agregar siguiente
+                <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/10 p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold text-[var(--color-text-secondary)]">
+                      Piezas ({piezasMuebleActual.length || 1})
                     </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="rounded-md border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
-                        onClick={removeSelectedPieza}
-                      >
-                        Eliminar seleccionada
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-md border border-[var(--color-border)] px-2 py-1 text-xs font-semibold"
-                        onClick={addPiezaDesdeDimensiones}
-                      >
-                        + Agregar
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-[var(--color-border)] px-2.5 py-1 text-xs font-semibold bg-[var(--color-surface)] hover:bg-[var(--color-primary-soft)]/20 transition-colors"
+                      onClick={addPiezaDesdeDimensiones}
+                    >
+                      + Agregar pieza
+                    </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {(piezasMuebleActual.length > 0 ? piezasMuebleActual : [emptyPieza()]).map((pieza, idx) => {
                       const ptPieza = (pieza.cantidad * pieza.espesor * pieza.ancho * pieza.largo) / 12;
                       return (
-                        <button
+                        <div
                           key={`pieza-pos-${idx}`}
-                          type="button"
-                          onClick={() => {
-                            setSelectedPiezaIndexUI(idx);
-                            // Al seleccionar una pieza, cargar sus valores al UI
-                            loadPiezaToUI(pieza);
-                          }}
-                          className={`rounded-md border px-2 py-1 text-xs font-semibold ${idx === selectedPiezaIndexSafe
+                          className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-semibold transition-all ${
+                            idx === selectedPiezaIndexSafe
                               ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                              : "border-[var(--color-border)] bg-[var(--color-surface)]"
-                            }`}
+                              : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+                          }`}
                         >
-                          <span>Pieza {idx + 1}</span>
-                          <span className="ml-1 opacity-75 text-[10px]">{ptPieza.toFixed(2)} PT</span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPiezaIndexUI(idx);
+                              loadPiezaToUI(pieza);
+                            }}
+                            className="text-left"
+                          >
+                            <span>Pieza {idx + 1}</span>
+                            <span className="ml-1.5 opacity-75 text-[10px]">{ptPieza.toFixed(2)} PT</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removePiezaAtIndex(idx)}
+                            className={`ml-1 rounded p-0.5 hover:bg-black/10 dark:hover:bg-white/10 ${
+                              idx === selectedPiezaIndexSafe
+                                ? "text-[var(--color-on-accent)]"
+                                : "text-[var(--color-text-secondary)]"
+                            }`}
+                            title="Eliminar pieza"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -2150,34 +2230,70 @@ export function CotizacionUnificadaWizard({
                   <option value="hora">Por tiempo</option>
                   <option value="total">Monto total</option>
                 </select>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2 pt-1">
                   {(
                     [
-                      ["Espesor", asrUnidadEspesorUI, setAsrUnidadEspesorUI, asrMedidaEspesorUI, setAsrMedidaEspesorUI],
-                      ["Ancho", asrUnidadAnchoUI, setAsrUnidadAnchoUI, asrMedidaAnchoUI, setAsrMedidaAnchoUI],
-                      ["Largo", asrUnidadLargoUI, setAsrUnidadLargoUI, asrMedidaLargoUI, setAsrMedidaLargoUI],
+                      {
+                        label: "Espesor",
+                        unidad: asrUnidadEspesorUI,
+                        setUnidad: setAsrUnidadEspesorUI,
+                        medida: asrMedidaEspesorUI,
+                        setMedida: setAsrMedidaEspesorUI,
+                      },
+                      {
+                        label: "Ancho",
+                        unidad: asrUnidadAnchoUI,
+                        setUnidad: setAsrUnidadAnchoUI,
+                        medida: asrMedidaAnchoUI,
+                        setMedida: setAsrMedidaAnchoUI,
+                      },
+                      {
+                        label: "Largo",
+                        unidad: asrUnidadLargoUI,
+                        setUnidad: setAsrUnidadLargoUI,
+                        medida: asrMedidaLargoUI,
+                        setMedida: setAsrMedidaLargoUI,
+                      },
                     ] as const
-                  ).map(([label, unidad, setUnidad, medida, setMedida]) => (
+                  ).map(({ label, unidad, setUnidad, medida, setMedida }) => (
                     <div key={`asr-${label}`} className="space-y-1">
-                      <span className="text-[11px] font-semibold text-[var(--color-text-secondary)]">{label}</span>
-                      <select
-                        className={`${inputClass} h-9`}
-                        value={unidad}
-                        onChange={(e) => setUnidad(e.target.value as "" | "mm" | "cm" | "m" | "in" | "ft")}
-                      >
-                        <option value="mm">mm</option>
-                        <option value="cm">cm</option>
-                        <option value="m">m</option>
-                        <option value="in">in</option>
-                        <option value="ft">ft</option>
-                      </select>
-                      <input
-                        type="number"
-                        className={`${inputClass} h-9`}
-                        value={medida}
-                        onChange={(e) => setMedida(e.target.value)}
-                        placeholder={String(unidad).toUpperCase()}
-                      />
+                      <span className="block text-xs font-bold text-[var(--color-text-secondary)]">{label}</span>
+                      <div className="flex rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--color-accent)]/50 transition-all">
+                        <input
+                          type="number"
+                          className="w-full border-none bg-transparent h-10 px-3 text-sm focus:outline-none focus:ring-0 text-[var(--color-text-primary)]"
+                          value={medida}
+                          onChange={(e) => setMedida(e.target.value)}
+                          placeholder="0"
+                        />
+                        <select
+                          className="border-l border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 px-2 h-10 text-xs font-semibold text-[var(--color-text-primary)] focus:outline-none focus:ring-0 cursor-pointer"
+                          value={unidad}
+                          onChange={(e) => {
+                            const newUnit = e.target.value as "" | "mm" | "cm" | "m" | "in" | "ft";
+                            if (label === "Espesor") {
+                              const valIn = toInches(Number(asrMedidaEspesorUI) || 0, asrUnidadEspesorUI);
+                              setUnidad(newUnit);
+                              setMedida(inchesToUI(valIn, newUnit));
+                            } else if (label === "Ancho") {
+                              const valIn = toInches(Number(asrMedidaAnchoUI) || 0, asrUnidadAnchoUI);
+                              setUnidad(newUnit);
+                              setMedida(inchesToUI(valIn, newUnit));
+                            } else {
+                              const valFt = toFeet(Number(asrMedidaLargoUI) || 0, asrUnidadLargoUI);
+                              setUnidad(newUnit);
+                              setMedida(feetToUI(valFt, newUnit));
+                            }
+                          }}
+                          aria-label={`Unidad ${label}`}
+                        >
+                          <option value="mm">mm</option>
+                          <option value="cm">cm</option>
+                          <option value="m">m</option>
+                          <option value="in">in</option>
+                          <option value="ft">ft</option>
+                        </select>
+                      </div>
                     </div>
                   ))}
                 </div>
