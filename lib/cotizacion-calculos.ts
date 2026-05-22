@@ -33,9 +33,10 @@ export function computeTotalesDetalle(detalle: CotizacionDetalleV1): TotalesRubr
       muebles += ptCompra * Math.max(0, linea.precioPorPt);
     }
   }
-  // Costo fijo de acabado (S/) para el rubro muebles.
+  // Costo fijo de acabado (S/) y mano de obra (S/) para el rubro muebles.
   if (detalle.rubros.muebles) {
     muebles += Math.max(0, detalle.costoAcabadoSoles ?? 0);
+    muebles += Math.max(0, detalle.costoManoObra ?? 0);
   }
 
   let aserradero = 0;
@@ -125,6 +126,7 @@ export function computeEconomiaInterna(detalle: CotizacionDetalleV1): EconomiaIn
       }
     }
     costoMuebles += Math.max(0, detalle.costoAcabadoSoles ?? 0);
+    costoMuebles += Math.max(0, detalle.costoManoObra ?? 0);
   }
   const costoTotalEstimado = round2(costoMuebles);
   const gananciaEstimada = round2(precioTotal - costoTotalEstimado);

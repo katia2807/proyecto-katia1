@@ -172,6 +172,11 @@ function DetalleVisual({ detalle }: { detalle: unknown }) {
                 Acabado: <strong className="text-[var(--color-text-primary)]">{formatPen(d.costoAcabadoSoles)}</strong>
               </p>
             )}
+            {d.costoManoObra > 0 && (
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                Mano de obra: <strong className="text-[var(--color-text-primary)]">{formatPen(d.costoManoObra)}</strong>
+              </p>
+            )}
           </div>
         </section>
       )}

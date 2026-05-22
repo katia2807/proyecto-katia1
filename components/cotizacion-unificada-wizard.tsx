@@ -131,6 +131,7 @@ type MuebleTemplate = {
   acabadoUI: string;
   acabadoOtroUI: string;
   costoAcabadoSolesUI: string;
+  costoManoObraUI?: string;
   pagoMetodoUI: "efectivo" | "transferencia" | "yape" | "billetera_digital" | "otro";
   pagoModalidadUI: "" | "contado" | "adelanto" | "adelanto_saldo" | "credito";
   plazoDiasUI: string;
@@ -158,6 +159,7 @@ type CotizacionDraft = {
   acabadoUI: string;
   acabadoOtroUI: string;
   costoAcabadoSolesUI: string;
+  costoManoObraUI?: string;
   pagoMetodoUI: "efectivo" | "transferencia" | "yape" | "billetera_digital" | "otro";
   pagoModalidadUI: "" | "contado" | "adelanto" | "adelanto_saldo" | "credito";
   plazoDiasUI: string;
@@ -496,6 +498,7 @@ export function CotizacionUnificadaWizard({
   const [acabadoUI, setAcabadoUI] = useState("");
   const [acabadoOtroUI, setAcabadoOtroUI] = useState("");
   const [costoAcabadoSolesUI, setCostoAcabadoSolesUI] = useState("0");
+  const [costoManoObraUI, setCostoManoObraUI] = useState("0");
   const [pagoMetodoUI, setPagoMetodoUI] = useState<
     "efectivo" | "transferencia" | "yape" | "billetera_digital" | "otro"
   >("efectivo");
@@ -561,11 +564,13 @@ export function CotizacionUnificadaWizard({
         precioVentaPtUI ||
         acabadoUI ||
         costoAcabadoSolesUI !== "0" ||
+        costoManoObraUI !== "0" ||
         pagoModalidadUI,
       ),
     [
       acabadoUI,
       costoAcabadoSolesUI,
+      costoManoObraUI,
       medidaAnchoUI,
       medidaEspesorUI,
       medidaLargoUI,
@@ -880,7 +885,12 @@ export function CotizacionUnificadaWizard({
       setAcabadoUI(selected.acabadoUI);
       setAcabadoOtroUI(selected.acabadoOtroUI);
       setCostoAcabadoSolesUI(selected.costoAcabadoSolesUI ?? "0");
-      setDetalle((d) => ({ ...d, costoAcabadoSoles: Number(selected.costoAcabadoSolesUI) || 0 }));
+      setCostoManoObraUI(selected.costoManoObraUI ?? "0");
+      setDetalle((d) => ({
+        ...d,
+        costoAcabadoSoles: Number(selected.costoAcabadoSolesUI) || 0,
+        costoManoObra: Number(selected.costoManoObraUI) || 0,
+      }));
       setPagoMetodoUI(selected.pagoMetodoUI);
       setPagoModalidadUI(selected.pagoModalidadUI);
       setPlazoDiasUI(selected.plazoDiasUI);
@@ -908,6 +918,7 @@ export function CotizacionUnificadaWizard({
       acabadoUI,
       acabadoOtroUI,
       costoAcabadoSolesUI,
+      costoManoObraUI,
       pagoMetodoUI,
       pagoModalidadUI,
       plazoDiasUI,
@@ -928,6 +939,7 @@ export function CotizacionUnificadaWizard({
     acabadoOtroUI,
     acabadoUI,
     costoAcabadoSolesUI,
+    costoManoObraUI,
     medidaAnchoUI,
     medidaEspesorUI,
     medidaLargoUI,
@@ -965,6 +977,7 @@ export function CotizacionUnificadaWizard({
       acabadoUI,
       acabadoOtroUI,
       costoAcabadoSolesUI,
+      costoManoObraUI,
       pagoMetodoUI,
       pagoModalidadUI,
       plazoDiasUI,
@@ -980,6 +993,7 @@ export function CotizacionUnificadaWizard({
     acabadoOtroUI,
     acabadoUI,
     costoAcabadoSolesUI,
+    costoManoObraUI,
     direccion,
     documento,
     fecha,
@@ -1036,7 +1050,12 @@ export function CotizacionUnificadaWizard({
     setAcabadoUI(draft.acabadoUI);
     setAcabadoOtroUI(draft.acabadoOtroUI);
     setCostoAcabadoSolesUI(draft.costoAcabadoSolesUI ?? "0");
-    setDetalle((d) => ({ ...d, costoAcabadoSoles: Number(draft.costoAcabadoSolesUI) || 0 }));
+    setCostoManoObraUI(draft.costoManoObraUI ?? "0");
+    setDetalle((d) => ({
+      ...d,
+      costoAcabadoSoles: Number(draft.costoAcabadoSolesUI) || 0,
+      costoManoObra: Number(draft.costoManoObraUI) || 0,
+    }));
     setPagoMetodoUI(draft.pagoMetodoUI);
     setPagoModalidadUI(draft.pagoModalidadUI);
     setPlazoDiasUI(draft.plazoDiasUI);
@@ -1069,6 +1088,7 @@ export function CotizacionUnificadaWizard({
     setPrecioVentaPtUI("");
     setAcabadoUI("");
     setCostoAcabadoSolesUI("0");
+    setCostoManoObraUI("0");
     setAcabadoOtroUI("");
     setPagoMetodoUI("efectivo");
     setPagoModalidadUI("");
@@ -1427,6 +1447,7 @@ export function CotizacionUnificadaWizard({
         setTipoMaderaUI(primeraLinea.inventario_producto_id);
       }
     }
+    setCostoManoObraUI(String(d.costoManoObra ?? 0));
     setSelectedPiezaIndexUI(0);
     setStepIndex(0);
     setMaxStep(30);
@@ -1893,6 +1914,54 @@ export function CotizacionUnificadaWizard({
                     </p>
                   </div>
                 )}
+                
+                {/* Inputs de Precio por Pie y Mano de obra integrados en la calculadora */}
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--color-border)] pt-3">
+                  <label className="space-y-1 text-left">
+                    <span className="block text-[11px] font-bold text-[var(--color-text-secondary)]">Precio por Pie (S/)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className={`${inputClass} h-10 text-center`}
+                      value={precioVentaPtUI}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPrecioVentaPtUI(val);
+                        const precioPt = Number(val) || 0;
+                        setDetalle((d) => {
+                          if (!d.rubros.muebles || d.muebles_lineas.length === 0) return d;
+                          const lineas = [...d.muebles_lineas];
+                          lineas[0] = { ...lineas[0], precioPorPt: precioPt };
+                          return { ...d, muebles_lineas: lineas };
+                        });
+                      }}
+                      placeholder="S/ por pie"
+                    />
+                  </label>
+                  <label className="space-y-1 text-left">
+                    <span className="block text-[11px] font-bold text-[var(--color-text-secondary)]">Mano de Obra (S/)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className={`${inputClass} h-10 text-center`}
+                      value={costoManoObraUI}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCostoManoObraUI(val);
+                        const manoObra = Number(val) || 0;
+                        setDetalle((d) => ({ ...d, costoManoObra: manoObra }));
+                      }}
+                      placeholder="S/ mano obra"
+                    />
+                  </label>
+                </div>
+                
+                {Number(precioVentaPtUI) > 0 && (
+                  <p className="mt-2 text-[11px] text-left text-[var(--color-text-secondary)]">
+                    Madera proyectada: <strong className="text-[var(--color-text-primary)]">{formatPen(totalMaderaProyectado)}</strong>
+                  </p>
+                )}
+
                 <p className="text-xs text-[var(--color-text-secondary)]">
                   Cada unidad se convierte automáticamente a pulgadas/pies para el cálculo.
                 </p>
@@ -2344,34 +2413,6 @@ export function CotizacionUnificadaWizard({
                 <p className="mt-1 text-4xl font-extrabold text-[var(--color-text-primary)]">{formatPen(totalGralSafe)}</p>
                 <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
                   Madera: {formatPen(safeMoney(totales.muebles))} · Aserradero: {formatPen(safeMoney(totales.aserradero))} · Alquiler: {formatPen(safeMoney(totales.alquiler))}
-                </p>
-              </div>
-              <div className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-center">
-                <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
-                  Precio de venta por pie (madera)
-                </p>
-                <input
-                  type="number"
-                  min={0}
-                  className={`${inputClass} mt-3 h-11 text-center`}
-                  value={precioVentaPtUI}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setPrecioVentaPtUI(val);
-                    const precioPt = Number(val) || 0;
-                    // Persistir precioPorPt en la primera línea de madera
-                    setDetalle((d) => {
-                      if (!d.rubros.muebles || d.muebles_lineas.length === 0) return d;
-                      const lineas = [...d.muebles_lineas];
-                      lineas[0] = { ...lineas[0], precioPorPt: precioPt };
-                      return { ...d, muebles_lineas: lineas };
-                    });
-                  }}
-                  placeholder="S/ por pie"
-                />
-                <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
-                  PT calculado: <strong>{conversionMedidasUI.pt.toFixed(2)}</strong> · Total madera proyectado:{" "}
-                  <strong>{formatPen(totalMaderaProyectado)}</strong>
                 </p>
               </div>
             </div>

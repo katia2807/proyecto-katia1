@@ -32,6 +32,8 @@ export type CotizacionDetalleV1 = {
   desperdicioPctMuebles: number;
   /** Costo fijo de acabado (S/) que se suma al total del rubro muebles. */
   costoAcabadoSoles: number;
+  /** Costo fijo de mano de obra (S/) que se suma al total del rubro muebles. */
+  costoManoObra: number;
   muebles_lineas: MuebleLineaMadera[];
   /** Texto libre para el bloque NOTA al pie (condiciones, exclusiones, etc.). */
   notas_generales: string;
@@ -117,6 +119,7 @@ export const cotizacionDetalleV1Schema = z.object({
   rubros: rubrosSchema,
   desperdicioPctMuebles: z.number().nonnegative(),
   costoAcabadoSoles: z.number().nonnegative().optional().default(0),
+  costoManoObra: z.number().nonnegative().optional().default(0),
   muebles_lineas: z.array(lineaMaderaSchema),
   notas_generales: z.string().optional().default(""),
   descripcion_cliente: z.string().optional().default(""),
@@ -130,6 +133,7 @@ export function defaultCotizacionDetalleV1(): CotizacionDetalleV1 {
     rubros: { muebles: false, aserradero: false, alquiler: false },
     desperdicioPctMuebles: 30,
     costoAcabadoSoles: 0,
+    costoManoObra: 0,
     muebles_lineas: [],
     notas_generales: "",
     descripcion_cliente: "",

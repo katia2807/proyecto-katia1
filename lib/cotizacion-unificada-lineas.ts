@@ -70,6 +70,26 @@ export function buildLineasResumen(detalle: CotizacionDetalleV1): LineaFormal[] 
       precioUnit: round2(totalMonto / totalCantidad),
       precioTotal: round2(totalMonto),
     });
+
+    if (detalle.costoAcabadoSoles > 0) {
+      lineas.push({
+        cantidad: 1,
+        titulo: "ACABADO Y TERMINACIÓN",
+        bullets: ["Costo de laca, barniz o pintura aplicada."],
+        precioUnit: detalle.costoAcabadoSoles,
+        precioTotal: detalle.costoAcabadoSoles,
+      });
+    }
+
+    if (detalle.costoManoObra > 0) {
+      lineas.push({
+        cantidad: 1,
+        titulo: "MANO DE OBRA",
+        bullets: ["Costo de fabricación, armado o mano de obra."],
+        precioUnit: detalle.costoManoObra,
+        precioTotal: detalle.costoManoObra,
+      });
+    }
   }
 
   const totRubros = computeTotalesDetalle(detalle);
