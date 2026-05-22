@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AserraderoPanel } from "@/components/sales/aserradero-panel";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
@@ -112,24 +113,14 @@ export default async function AserraderoServiciosPage() {
         </div>
       </Card>
 
-      <Card>
-        <CardTitle>Tarifas de servicios especiales</CardTitle>
-        <CardDescription>
-          {tarifas.length} servicios disponibles en el formulario.
-        </CardDescription>
-        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {tarifas.map((t) => (
-            <div
-              key={t.id}
-              className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3"
-            >
-              <p className="text-xs uppercase text-[var(--color-text-secondary)]">{t.codigo}</p>
-              <p className="text-sm font-semibold">{t.nombre}</p>
-              <p className="text-base font-bold">{formatPen(t.tarifa_por_pieza)} / pieza</p>
-            </div>
-          ))}
-        </div>
-      </Card>
+      <div className="text-center py-4">
+        <p className="text-xs text-[var(--color-text-secondary)]">
+          Las tarifas de servicios especiales se configuran en{" "}
+          <Link href="/configuracion?tab=tarifas" className="font-semibold text-[var(--color-accent)] underline hover:brightness-110">
+            Configuración &gt; Tarifas
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

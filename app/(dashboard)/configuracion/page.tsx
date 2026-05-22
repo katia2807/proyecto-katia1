@@ -6,6 +6,8 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ConfiguracionTabs } from "@/components/configuracion/configuracion-tabs";
 import { requireAuthContext } from "@/lib/auth";
 import { getEmpresaConfig } from "@/lib/company-config";
+import { getServiciosEspecialesTarifaRows } from "@/lib/data";
+import { formatPen } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +25,10 @@ export default async function ConfiguracionPage({ searchParams }: ConfiguracionP
   const activeTab = firstParam(params?.tab) || "cuenta";
 
   const context = await requireAuthContext({ allowedRoles: ["owner_admin"] });
-  const empresa = await getEmpresaConfig();
+  const [empresa, tarifas] = await Promise.all([
+    getEmpresaConfig(),
+    getServiciosEspecialesTarifaRows(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -123,6 +128,30 @@ export default async function ConfiguracionPage({ searchParams }: ConfiguracionP
             <CardDescription>
               El sistema opera completamente en español. Moneda: Soles peruanos (S/).
             </CardDescription>
+          </Card>
+        </div>
+      ) : null}
+
+      {/* ── TARIFAS ── */}
+      {activeTab === "tarifas" ? (
+        <div className="space-y-6">
+          <Card>
+            <CardTitle>Tarifas de servicios especiales</CardTitle>
+            <CardDescription>
+              {tarifas.length} servicios disponibles en el formulario de aserradero.
+            </CardDescription>
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {tarifas.map((t) => (
+                <div
+                  key={t.id}
+                  className="rounded-xl border border-[var(--katia-border-subtle)] bg-[var(--katia-bg-elevated)] p-3"
+                >
+                  <p className="text-xs uppercase text-[var(--katia-text-secondary)]">{t.codigo}</p>
+                  <p className="text-sm font-semibold text-[var(--katia-text-primary)]">{t.nombre}</p>
+                  <p className="text-base font-bold text-[var(--katia-text-primary)]">{formatPen(t.tarifa_por_pieza)} / pieza</p>
+                </div>
+              ))}
+            </div>
           </Card>
         </div>
       ) : null}
