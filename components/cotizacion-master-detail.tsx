@@ -127,10 +127,8 @@ function DetalleVisual({ detalle }: { detalle: unknown }) {
                     Línea {li + 1}{linea.especie_label ? ` · ${linea.especie_label}` : ""}
                   </p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-[var(--color-text-secondary)]">
-                    <span>PT neto: <strong className="text-[var(--color-text-primary)]">{totalPt.toFixed(2)}</strong></span>
-                    <span>Desperdicio: <strong className="text-[var(--color-text-primary)]">{d.desperdicioPctMuebles}%</strong></span>
-                    <span>PT compra: <strong className="text-[var(--color-text-primary)]">{ptCompra.toFixed(2)}</strong></span>
-                    <span>S/ por PT: <strong className="text-[var(--color-text-primary)]">{formatPen(linea.precioPorPt)}</strong></span>
+                    <span>Volumen de Madera (PT): <strong className="text-[var(--color-text-primary)]">{ptCompra.toFixed(2)} PT</strong></span>
+                    <span>Precio por Pie: <strong className="text-[var(--color-text-primary)]">{formatPen(linea.precioPorPt)}</strong></span>
                     <span className="col-span-2">Subtotal línea: <strong className="text-[var(--color-text-primary)]">{formatPen(montoLinea)}</strong></span>
                   </div>
                   {linea.piezas.length > 0 && (
