@@ -60,7 +60,7 @@ type ServicioAserraderoRow = {
   costo_cubicaje: number;
   precio_cobrado: number;
   utilidad: number;
-  lineas_json: any;
+  lineas_json: unknown;
   correlativo: string | null;
   created_at: string;
 };
@@ -243,7 +243,7 @@ export default async function ComprobantePage({ params }: { params: Promise<Para
   let aserraderoLineasEspeciales: Array<{ id: string; codigo: string; nombre: string; cantidad: number; tarifa: number; subtotal: number }> = [];
 
   let ventaMadera: VentaMaderaRow & { lineas: VentaMaderaLineaRow[] } | null = null;
-  let ventaMaderaLineasResueltas: Array<{ desc: string; qty: string; unidad: string; unitario: string; total: string }> = [];
+  const ventaMaderaLineasResueltas: Array<{ desc: string; qty: string; unidad: string; unitario: string; total: string }> = [];
 
   if (tipo === "aserradero") {
     aserraderoServicio = await getServicioAserraderoById(id);

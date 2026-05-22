@@ -7,7 +7,6 @@ import { ConfiguracionTabs } from "@/components/configuracion/configuracion-tabs
 import { requireAuthContext } from "@/lib/auth";
 import { getEmpresaConfig } from "@/lib/company-config";
 import { getServiciosEspecialesTarifaRows } from "@/lib/data";
-import { formatPen } from "@/lib/utils";
 import { TarifasSettingsForm } from "@/components/configuracion/tarifas-settings-form";
 
 export const dynamic = "force-dynamic";
