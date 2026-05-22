@@ -96,6 +96,8 @@ export function AserraderoForm({
     [piezas],
   );
   const piesCubicos = useMemo(() => totalPT * PIE_TABLAR_A_PIE_CUBICO, [totalPT]);
+  const hasStep1Warning = !clienteId;
+  const hasStep2Warning = piezas.length === 0 || totalPT === 0;
   const costoCubicaje = useMemo(
     () => piesCubicos * costoPorPieCubico,
     [piesCubicos, costoPorPieCubico],
@@ -173,23 +175,28 @@ export function AserraderoForm({
           ].map((item, index) => {
             const isCompleted = step > item.n;
             const isActive = step === item.n;
+            const hasWarning = (item.n === 1 && hasStep1Warning) || (item.n === 2 && hasStep2Warning);
             return (
               <div key={item.n} className="flex flex-1 items-center">
                 <div className="flex flex-col items-center flex-1">
                   <div
                     className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-bold transition-all duration-300 ${
-                      isCompleted
+                      hasWarning
+                        ? "border-red-500 bg-red-500/10 text-red-500 shadow-md shadow-red-500/10"
+                        : isCompleted
                         ? "bg-[var(--color-success)] border-[var(--color-success)] text-white"
                         : isActive
                         ? "bg-[var(--color-primary)] border-[var(--color-primary)] text-white shadow-md shadow-[var(--color-primary)]/20"
                         : "border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-secondary)]"
                     }`}
                   >
-                    {isCompleted ? "✓" : item.n}
+                    {hasWarning ? "⚠️" : isCompleted ? "✓" : item.n}
                   </div>
                   <span
                     className={`mt-1.5 text-xs font-semibold tracking-wide transition-all duration-300 hidden sm:inline ${
-                      isActive
+                      hasWarning
+                        ? "text-red-500 font-bold"
+                        : isActive
                         ? "text-[var(--color-primary)] font-bold"
                         : isCompleted
                         ? "text-[var(--color-success)]"
@@ -234,7 +241,13 @@ export function AserraderoForm({
                     label="Cliente"
                     placeholder="Buscar cliente…"
                     inputAriaLabel="Cliente para servicio de aserradero"
+                    className={hasStep1Warning ? "[&_input]:!border-red-500/80 [&_input]:focus:!border-red-500 [&_input]:focus:!ring-red-500 [&_input]:shadow-[0_0_0_1px_rgba(239,68,68,0.2)]" : ""}
                   />
+                  {hasStep1Warning && (
+                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
+                      ⚠️ Debe seleccionar un cliente antes de confirmar el registro.
+                    </p>
+                  )}
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -269,7 +282,6 @@ export function AserraderoForm({
         <div className="flex justify-end pt-4 mt-4">
           <Button
             type="button"
-            disabled={!clienteId}
             onClick={() => setStep(2)}
             className="px-6 py-2 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
           >
@@ -285,9 +297,14 @@ export function AserraderoForm({
           <p className="text-xs text-[var(--color-text-secondary)]">
             Ingresa las piezas, cantidades y dimensiones para realizar el cubicaje rápido.
           </p>
-          <div className="mt-2">
+          <div className={`mt-2 rounded-xl p-1 transition-all duration-300 ${hasStep2Warning ? "border border-red-500/30 bg-red-500/5 shadow-[0_0_0_1px_rgba(239,68,68,0.1)]" : ""}`}>
             <CubicajeInput precioEditable={false} />
           </div>
+          {hasStep2Warning && (
+            <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
+              ⚠️ Debe agregar al menos una pieza antes de confirmar el registro.
+            </p>
+          )}
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             <Field
               label="Costo por pie cúbico (S/)"
@@ -319,7 +336,6 @@ export function AserraderoForm({
           </Button>
           <Button
             type="button"
-            disabled={totalPT === 0}
             onClick={() => setStep(3)}
             className="px-6 py-2"
           >
@@ -532,10 +548,23 @@ export function AserraderoForm({
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
           <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 5: Confirmar y registrar</h3>
           
-          <div className="rounded-xl border border-[var(--color-success)]/30 bg-[var(--color-success)]/5 p-4 text-[var(--color-success)]">
-            <p className="text-sm font-semibold">✓ Todo listo para registrar</p>
-            <p className="text-xs">Por favor, revisa el resumen a continuación antes de proceder a guardar el servicio.</p>
-          </div>
+          {hasStep1Warning || hasStep2Warning ? (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-red-600 dark:text-red-400 space-y-1">
+              <p className="text-sm font-bold">⚠️ Faltan datos obligatorios para registrar el servicio</p>
+              <ul className="list-disc list-inside text-xs space-y-0.5 font-medium">
+                {hasStep1Warning && <li>Debes seleccionar un cliente en el Paso 1.</li>}
+                {hasStep2Warning && <li>Debes agregar al menos una pieza en el Paso 2.</li>}
+              </ul>
+              <p className="text-[11px] text-red-500/80 pt-1">
+                Por favor, regresa a los pasos correspondientes usando los botones de navegación para completar la información antes de guardar.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-[var(--color-success)]/30 bg-[var(--color-success)]/5 p-4 text-[var(--color-success)]">
+              <p className="text-sm font-semibold">✓ Todo listo para registrar</p>
+              <p className="text-xs">Por favor, revisa el resumen a continuación antes de proceder a guardar el servicio.</p>
+            </div>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2">
             {/* Resumen Cliente y Cubicaje */}
@@ -619,6 +648,7 @@ export function AserraderoForm({
           </Button>
           <Button
             size="lg"
+            disabled={hasStep1Warning || hasStep2Warning}
             className="px-8 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
           >
             Registrar servicio ✓
