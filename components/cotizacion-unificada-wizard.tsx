@@ -2369,15 +2369,7 @@ export function CotizacionUnificadaWizard({
 
               <div className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3 text-sm text-[var(--color-text-primary)]">
                 <div className="flex items-center justify-between">
-                  <span className="text-[var(--color-text-secondary)]">Pies Tablares Netos:</span>
-                  <strong className="font-extrabold">{conversionMedidasUI.pt.toFixed(2)} PT</strong>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[var(--color-text-secondary)]">Desperdicio:</span>
-                  <strong>{detalle.desperdicioPctMuebles}%</strong>
-                </div>
-                <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-2">
-                  <span className="text-[var(--color-text-secondary)]">Total Pies (PT compra):</span>
+                  <span className="text-[var(--color-text-secondary)]">Volumen de Madera (PT):</span>
                   <strong className="text-[var(--color-accent)] font-extrabold">
                     {(conversionMedidasUI.pt * (1 + detalle.desperdicioPctMuebles / 100)).toFixed(2)} PT
                   </strong>
@@ -2443,6 +2435,14 @@ export function CotizacionUnificadaWizard({
                 <p className="text-xs text-[var(--color-text-secondary)]">
                   Esta sección muestra los costos y márgenes estimados del taller. No se incluye en el PDF impreso del cliente.
                 </p>
+                <div className="grid grid-cols-2 gap-4 rounded-xl bg-[var(--color-surface)] p-3 text-xs text-[var(--color-text-secondary)] border border-[var(--color-border)] mb-3">
+                  <div>
+                    Pies Tablares Netos: <strong className="text-[var(--color-text-primary)]">{conversionMedidasUI.pt.toFixed(2)} PT</strong>
+                  </div>
+                  <div>
+                    Desperdicio de Madera: <strong className="text-[var(--color-text-primary)]">{detalle.desperdicioPctMuebles}%</strong>
+                  </div>
+                </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   {detalle.muebles_lineas.map((linea, idx) => {
                     const eco = economiaLineaMueble(linea, detalle.desperdicioPctMuebles);
