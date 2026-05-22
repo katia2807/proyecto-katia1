@@ -2527,6 +2527,29 @@ export async function updateInventarioProducto(formData: FormData) {
       .eq("id", parsed.data.id)
       .eq("organization_id", DEFAULT_ORG_ID);
     if (error) throw new Error(error.message);
+
+    // Sincronizar foto_url y stock hacia muebles_catalogo si es categoría "Muebles"
+    if (parsed.data.categoria === "Muebles") {
+      const filterStr = `id.eq.${parsed.data.id},codigo.eq.${parsed.data.codigo || "NONE_VALUE"},nombre.ilike.${parsed.data.nombre}`;
+      const catUpdates: {
+        foto_url: string | null;
+        codigo: string;
+        nombre: string;
+        stock_disponible?: number;
+      } = {
+        foto_url: parsed.data.fotoUrl ?? null,
+        codigo: parsed.data.codigo,
+        nombre: parsed.data.nombre,
+      };
+      if (parsed.data.stockActual !== undefined) {
+        catUpdates.stock_disponible = parsed.data.stockActual;
+      }
+      await supabase
+        .from("muebles_catalogo")
+        .update(catUpdates)
+        .or(filterStr)
+        .eq("organization_id", DEFAULT_ORG_ID);
+    }
   }
   revalidatePath("/inventario");
 }
@@ -2943,6 +2966,15 @@ export async function updateMuebleCatalogo(formData: FormData) {
     if (!updated) throw new Error("Mueble no encontrado.");
   } else {
     const supabase = getSupabaseServerClient();
+
+    // Obtener los datos del catálogo actual para hacer matching en el inventario
+    const { data: currentMueble } = await supabase
+      .from("muebles_catalogo")
+      .select("codigo, nombre")
+      .eq("id", parsed.data.id)
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .single();
+
     const { error } = await supabase
       .from("muebles_catalogo")
       .update({
@@ -2953,6 +2985,18 @@ export async function updateMuebleCatalogo(formData: FormData) {
       .eq("id", parsed.data.id)
       .eq("organization_id", DEFAULT_ORG_ID);
     if (error) throw new Error(error.message);
+
+    // Sincronizar foto_url hacia inventario_productos
+    if (currentMueble) {
+      const filterStr = `id.eq.${parsed.data.id},codigo.eq.${currentMueble.codigo || "NONE_VALUE"},nombre.ilike.${currentMueble.nombre}`;
+      await supabase
+        .from("inventario_productos")
+        .update({
+          foto_url: parsed.data.fotoUrl?.trim() || null,
+        })
+        .or(filterStr)
+        .eq("organization_id", DEFAULT_ORG_ID);
+    }
   }
 
   revalidatePath("/inventario");

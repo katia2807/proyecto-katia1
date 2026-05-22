@@ -2290,26 +2290,23 @@ export function demoUpdateInventarioProducto(
   const row = store.inventarioProductos.find((p) => p.id === id);
   if (!row) return null;
 
-  // Proteger foto existente si se intenta sobrescribir con nulo
-  const oldFoto = row.foto_url;
   Object.assign(row, patch);
-  if (!row.foto_url && oldFoto) {
-    row.foto_url = oldFoto;
-  }
 
   // Sincronizar hacia Catálogo si es categoría Muebles
   if (row.categoria === "Muebles") {
-    const match = store.mueblesCatalogo.find((m) => m.id === row.id);
+    const match = store.mueblesCatalogo.find(
+      (m) =>
+        m.id === row.id ||
+        (row.codigo && m.codigo === row.codigo) ||
+        m.nombre.toLowerCase() === row.nombre.toLowerCase()
+    );
     if (match) {
       match.codigo = row.codigo;
       match.nombre = row.nombre;
       match.stock_disponible = row.stock_actual;
       match.activo = row.activo;
-      // Coalescencia de imágenes
-      if (row.foto_url && !match.foto_url) {
-        match.foto_url = row.foto_url;
-      } else if (match.foto_url && !row.foto_url) {
-        row.foto_url = match.foto_url;
+      if (patch.foto_url !== undefined) {
+        match.foto_url = patch.foto_url;
       }
     }
   }
@@ -2558,11 +2555,18 @@ export function demoUpdateMuebleCatalogo(
   }
 
   // Actualizar también la fila correspondiente en el inventario
-  const invRow = store.inventarioProductos.find((p) => p.id === id);
+  const invRow = store.inventarioProductos.find(
+    (p) =>
+      p.id === id ||
+      (row.codigo && p.codigo === row.codigo) ||
+      p.nombre.toLowerCase() === row.nombre.toLowerCase()
+  );
   if (invRow) {
     invRow.nombre = row.nombre;
     invRow.codigo = row.codigo;
-    invRow.foto_url = row.foto_url;
+    if (patch.foto_url !== undefined) {
+      invRow.foto_url = patch.foto_url;
+    }
     invRow.activo = row.activo;
   }
 

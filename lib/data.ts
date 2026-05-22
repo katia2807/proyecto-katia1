@@ -894,6 +894,70 @@ export async function getMueblesCatalogoRows(includeInactive = false) {
     return data ?? [];
   }, []);
 
+  // 3. Sincronizar en segundo plano/paralelo si hay diferencias (Asegura consistencia de fotos y stock)
+  for (const p of furnitureProducts) {
+    const match = fetched.find(
+      (m) =>
+        m.id === p.id ||
+        (p.codigo && m.codigo?.toLowerCase() === p.codigo.toLowerCase()) ||
+        m.nombre.toLowerCase() === p.nombre.toLowerCase()
+    );
+
+    if (!match) {
+      // Auto-aprovisionar en el catálogo
+      await safeQuery(async () => {
+        await supabase.from("muebles_catalogo").insert({
+          id: p.id,
+          organization_id: DEFAULT_ORG_ID,
+          codigo: p.codigo || `MUEB-${p.id.slice(0, 4)}`,
+          nombre: p.nombre,
+          descripcion: "Producto importado del inventario",
+          precio_lista: 0,
+          foto_url: p.foto_url || null,
+          stock_disponible: p.stock_actual,
+          activo: p.activo,
+        });
+      }, null);
+    } else {
+      // Actualizar stock y coalescencia de fotos
+      const updates: Partial<MuebleCatalogoRow> = {};
+      let needsCatalogUpdate = false;
+      let needsInventoryUpdate = false;
+
+      if (match.stock_disponible !== p.stock_actual) {
+        updates.stock_disponible = p.stock_actual;
+        needsCatalogUpdate = true;
+      }
+
+      if (p.foto_url && !match.foto_url) {
+        updates.foto_url = p.foto_url;
+        needsCatalogUpdate = true;
+      } else if (match.foto_url && !p.foto_url) {
+        needsInventoryUpdate = true;
+      }
+
+      if (needsCatalogUpdate) {
+        await safeQuery(async () => {
+          await supabase
+            .from("muebles_catalogo")
+            .update(updates)
+            .eq("id", match.id)
+            .eq("organization_id", DEFAULT_ORG_ID);
+        }, null);
+      }
+
+      if (needsInventoryUpdate && match.foto_url) {
+        await safeQuery(async () => {
+          await supabase
+            .from("inventario_productos")
+            .update({ foto_url: match.foto_url })
+            .eq("id", p.id)
+            .eq("organization_id", DEFAULT_ORG_ID);
+        }, null);
+      }
+    }
+  }
+
   // 4. Return final, fully synced catalog items
   return safeQuery(async () => {
     let query = supabase
