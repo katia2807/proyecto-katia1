@@ -8,6 +8,8 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { fetchRespaldoSupabaseResumen } from "@/lib/respaldo-supabase-resumen";
 import { hasSupabaseEnv } from "@/lib/runtime";
+import { getAuthContext } from "@/lib/auth";
+import { ResetDatabasePanel } from "@/components/admin/reset-database-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,9 @@ export default async function RespaldoPage() {
   const prodDb = hasSupabaseEnv();
   const mockData =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
+
+  const context = await getAuthContext();
+  const isOwnerAdmin = context?.role === "owner_admin" || context?.uiRole === "owner_admin";
 
   if (prodDb) {
     const resumen = await fetchRespaldoSupabaseResumen();
@@ -104,6 +109,8 @@ export default async function RespaldoPage() {
             credenciales (URL, anon y service role).
           </p>
         </Card>
+
+        {isOwnerAdmin && <ResetDatabasePanel />}
       </div>
     );
   }
