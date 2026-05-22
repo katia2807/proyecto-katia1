@@ -2348,13 +2348,16 @@ export function CotizacionUnificadaWizard({
         <Card className="space-y-4 border-[var(--color-border)] bg-[var(--color-surface)] p-5">
           <CardTitle>Muebles — madera y cubicaje (pies-tablar)</CardTitle>
           <CardDescription>
-            Elegí material del inventario para amarrar stock; el costo usa precio por PT que definís (referencia de
-            compra/venta).
+            Resumen simplificado de medidas y cobro para la cotización de muebles personalizados.
           </CardDescription>
+          
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-4">
-              <div className="grid grid-cols-[1fr_1.5fr] gap-2">
-                <span className={pillClass}>Tipo de mueble</span>
+            {/* Card 1: Información de Madera y Cubicaje */}
+            <div className="space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-5">
+              <p className="text-sm font-bold uppercase text-[var(--color-text-secondary)]">Madera y Cubicaje</p>
+              
+              <div className="grid grid-cols-[1.2fr_1fr] gap-2 pt-2">
+                <span className={pillClass}>Categoría Mueble</span>
                 <Combobox
                   options={muebleTipoComboboxOptions}
                   value={tipoMuebleVista}
@@ -2363,144 +2366,162 @@ export function CotizacionUnificadaWizard({
                   inputAriaLabel="Tipo de mueble"
                 />
               </div>
-              <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-[var(--color-text-primary)]">
-                <p className="mb-2 text-sm font-bold uppercase text-[var(--color-text-secondary)]">Detalle de cobro</p>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between rounded-md bg-[var(--color-primary-soft)]/40 px-3 py-2">
-                    <span>Cliente</span>
-                    <strong>{nombreCliente || "Sin definir"}</strong>
-                  </div>
-                  <div className="flex items-center justify-between rounded-md bg-[var(--color-primary-soft)]/40 px-3 py-2">
-                    <span>Tipo de mueble</span>
-                    <strong>{selectedTipoMuebleLabel}</strong>
-                  </div>
-                  {lineasFormalSafe.slice(0, 6).map((linea) => (
-                    <div key={`${linea.titulo}-${linea.precioTotal}`} className="flex items-start justify-between gap-2">
-                      <span className="line-clamp-2">{linea.titulo}</span>
-                      <strong>{formatPen(safeMoney(linea.precioTotal))}</strong>
-                    </div>
-                  ))}
-                  {lineasFormalSafe.length === 0 ? (
-                    <p className="text-[var(--color-text-secondary)]">Aun no hay lineas cargadas.</p>
-                  ) : null}
+
+              <div className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3 text-sm text-[var(--color-text-primary)]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--color-text-secondary)]">Pies Tablares Netos:</span>
+                  <strong className="font-extrabold">{conversionMedidasUI.pt.toFixed(2)} PT</strong>
                 </div>
-                {tipoMuebleVista ? (
-                  <p className="mt-2 text-center text-sm font-semibold text-[var(--color-text-secondary)]">
-                    Tipo seleccionado: {selectedTipoMuebleLabel}
-                  </p>
-                ) : (
-                  <p className="mt-2 text-center text-xs text-[var(--color-text-secondary)]">
-                    Los tipos de mueble se toman del inventario; si no hay, se muestran ejemplos.
-                  </p>
-                )}
-              </div>
-              <div className="mx-auto max-w-[220px] rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-3 text-center text-3xl font-extrabold text-[var(--color-text-primary)]">
-                {formatPen(totalGralSafe)}
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--color-text-secondary)]">Desperdicio:</span>
+                  <strong>{detalle.desperdicioPctMuebles}%</strong>
+                </div>
+                <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-2">
+                  <span className="text-[var(--color-text-secondary)]">Total Pies (PT compra):</span>
+                  <strong className="text-[var(--color-accent)] font-extrabold">
+                    {(conversionMedidasUI.pt * (1 + detalle.desperdicioPctMuebles / 100)).toFixed(2)} PT
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[var(--color-text-secondary)]">Precio por Pie (S/):</span>
+                  <strong>{formatPen(Number(precioVentaPtUI) || 0)}</strong>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-                <p className="mb-2 text-sm font-semibold text-[var(--color-text-secondary)]">Vista previa del mueble</p>
-                <div className="grid min-h-24 place-items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-primary-soft)] px-4 py-6 text-center">
-                  <p className="text-lg font-bold text-[var(--color-text-primary)]">
-                    {selectedTipoMuebleLabel === "Mueble" ? "Selecciona un tipo de mueble" : selectedTipoMuebleLabel}
-                  </p>
+            {/* Card 2: Totales y Desglose de Cobro */}
+            <div className="space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-5 flex flex-col justify-between">
+              <div>
+                <p className="text-sm font-bold uppercase text-[var(--color-text-secondary)]">Detalle del Cobro</p>
+                
+                <div className="mt-4 space-y-3 text-sm text-[var(--color-text-primary)]">
+                  <div className="flex items-center justify-between">
+                    <span>Cliente:</span>
+                    <strong className="font-extrabold">{nombreCliente || "Sin definir"}</strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Madera Proyectada:</span>
+                    <strong>{formatPen(totalMaderaProyectado)}</strong>
+                  </div>
+                  {Number(costoManoObraUI) > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span>Mano de Obra:</span>
+                      <strong>{formatPen(Number(costoManoObraUI))}</strong>
+                    </div>
+                  )}
+                  {Number(costoAcabadoSolesUI) > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span>Acabado / Terminación:</span>
+                      <strong>{formatPen(Number(costoAcabadoSolesUI))}</strong>
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-primary-soft)] p-5 text-center">
-                <p className="text-sm font-semibold text-[var(--color-text-secondary)]">Precio sugerido de venta</p>
-                <p className="mt-1 text-4xl font-extrabold text-[var(--color-text-primary)]">{formatPen(totalGralSafe)}</p>
-                <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                  Madera: {formatPen(safeMoney(totales.muebles))} · Aserradero: {formatPen(safeMoney(totales.aserradero))} · Alquiler: {formatPen(safeMoney(totales.alquiler))}
-                </p>
+
+              <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-center">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">Precio Total Mueble</p>
+                <p className="mt-1 text-4xl font-black text-[var(--color-accent)]">{formatPen(totales.muebles)}</p>
+                {tipoMuebleVista && (
+                  <p className="mt-2 text-xs font-medium text-[var(--color-text-secondary)]">
+                    Tipo de mueble: {selectedTipoMuebleLabel}
+                  </p>
+                )}
               </div>
             </div>
           </div>
 
+          {/* Seccion de Costos Internos Colapsada por defecto */}
           {detalle.rubros.muebles && detalle.muebles_lineas.length > 0 ? (
-            <div className="space-y-4 rounded-2xl border border-dashed border-amber-800/35 bg-amber-50/40 p-4 dark:border-amber-500/30 dark:bg-amber-950/25">
-              <p className="text-sm font-bold text-[var(--color-text-primary)]">
-                Costos internos por línea de madera (no van al PDF del cliente)
-              </p>
-              <div className="grid gap-4 md:grid-cols-2">
-                {detalle.muebles_lineas.map((linea, idx) => {
-                  const eco = economiaLineaMueble(linea, detalle.desperdicioPctMuebles);
-                  const margenNegativo = eco.margenSoles != null && eco.margenSoles < 0;
-                  return (
-                    <div
-                      key={linea.id}
-                      className="space-y-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm"
-                    >
-                      <p className="font-semibold text-[var(--color-text-primary)]">
-                        Línea {idx + 1}
-                        {linea.especie_label ? ` · ${linea.especie_label}` : ""}
-                      </p>
-                      <label className="block space-y-1">
-                        <span className="text-xs font-medium text-[var(--color-text-secondary)]">
-                          Costo por PT — lo que pagaste por la madera (S/, opcional)
-                        </span>
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          className={`${inputClass} h-10`}
-                          value={linea.costoPorPt === undefined ? "" : linea.costoPorPt}
-                          onChange={(e) => {
-                            const raw = e.target.value.trim();
-                            setDetalle((d) => {
-                              const lineas = [...d.muebles_lineas];
-                              const cur = lineas[idx];
-                              if (!cur) return d;
-                              let nextCost: number | undefined;
-                              if (raw === "") nextCost = undefined;
-                              else {
-                                const n = Number(raw);
-                                nextCost = Number.isFinite(n) && n >= 0 ? n : undefined;
-                              }
-                              lineas[idx] = { ...cur, costoPorPt: nextCost };
-                              return { ...d, muebles_lineas: lineas };
-                            });
-                          }}
-                          placeholder="Ej: 12"
-                        />
-                      </label>
-                      <p className="text-xs text-[var(--color-text-secondary)]">
-                        PT compra (con desperdicio): <strong>{eco.ptCompra.toFixed(2)}</strong>
-                      </p>
-                      <div className="space-y-1 rounded-lg bg-[var(--color-primary-soft)]/25 px-3 py-2 text-xs">
-                        <p>
-                          Costo estimado:{" "}
-                          <strong>
-                            {eco.costoEstimado != null ? formatPen(eco.costoEstimado) : "—"}
-                          </strong>{" "}
-                          <span className="text-[var(--color-text-secondary)]">
-                            (PT compra × costo por PT)
+            <details className="group rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden transition-all duration-200">
+              <summary className="flex cursor-pointer items-center justify-between p-4 font-bold text-sm text-[var(--color-text-secondary)] select-none hover:bg-[var(--color-primary-soft)]/20">
+                <span className="flex items-center gap-2">
+                  ⚙️ Ver costos internos y margen (Avanzado)
+                </span>
+                <span className="text-xs transition-transform group-open:rotate-180">▼</span>
+              </summary>
+              <div className="p-4 border-t border-[var(--color-border)] bg-[var(--color-primary-soft)]/5 space-y-4">
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  Esta sección muestra los costos y márgenes estimados del taller. No se incluye en el PDF impreso del cliente.
+                </p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {detalle.muebles_lineas.map((linea, idx) => {
+                    const eco = economiaLineaMueble(linea, detalle.desperdicioPctMuebles);
+                    const margenNegativo = eco.margenSoles != null && eco.margenSoles < 0;
+                    return (
+                      <div
+                        key={linea.id}
+                        className="space-y-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm"
+                      >
+                        <p className="font-semibold text-[var(--color-text-primary)]">
+                          Línea {idx + 1}
+                          {linea.especie_label ? ` · ${linea.especie_label}` : ""}
+                        </p>
+                        <label className="block space-y-1">
+                          <span className="text-xs font-medium text-[var(--color-text-secondary)]">
+                            Costo por PT — lo que pagaste por la madera (S/, opcional)
                           </span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            className={`${inputClass} h-10`}
+                            value={linea.costoPorPt === undefined ? "" : linea.costoPorPt}
+                            onChange={(e) => {
+                              const raw = e.target.value.trim();
+                              setDetalle((d) => {
+                                const lineas = [...d.muebles_lineas];
+                                const cur = lineas[idx];
+                                if (!cur) return d;
+                                let nextCost: number | undefined;
+                                if (raw === "") nextCost = undefined;
+                                else {
+                                  const n = Number(raw);
+                                  nextCost = Number.isFinite(n) && n >= 0 ? n : undefined;
+                                }
+                                lineas[idx] = { ...cur, costoPorPt: nextCost };
+                                return { ...d, muebles_lineas: lineas };
+                              });
+                            }}
+                            placeholder="Ej: 12"
+                          />
+                        </label>
+                        <p className="text-xs text-[var(--color-text-secondary)]">
+                          PT compra (con desperdicio): <strong>{eco.ptCompra.toFixed(2)}</strong>
                         </p>
-                        <p>
-                          Precio de venta: <strong>{formatPen(eco.precioVenta)}</strong>{" "}
-                          <span className="text-[var(--color-text-secondary)]">
-                            (PT compra × precio venta por PT)
-                          </span>
-                        </p>
-                        <p className={margenNegativo ? "font-semibold text-red-600 dark:text-red-400" : ""}>
-                          Margen:{" "}
-                          {eco.margenSoles != null ? (
-                            <>
-                              {formatPen(eco.margenSoles)}
-                              {eco.margenPct != null ? ` (${eco.margenPct.toFixed(1)}%)` : ""}
-                            </>
-                          ) : (
-                            "—"
-                          )}
-                        </p>
+                        <div className="space-y-1 rounded-lg bg-[var(--color-primary-soft)]/25 px-3 py-2 text-xs">
+                          <p>
+                            Costo estimado:{" "}
+                            <strong>
+                              {eco.costoEstimado != null ? formatPen(eco.costoEstimado) : "—"}
+                            </strong>{" "}
+                            <span className="text-[var(--color-text-secondary)]">
+                              (PT compra × costo por PT)
+                            </span>
+                          </p>
+                          <p>
+                            Precio de venta: <strong>{formatPen(eco.precioVenta)}</strong>{" "}
+                            <span className="text-[var(--color-text-secondary)]">
+                              (PT compra × precio venta por PT)
+                            </span>
+                          </p>
+                          <p className={margenNegativo ? "font-semibold text-red-600 dark:text-red-400" : ""}>
+                            Margen:{" "}
+                            {eco.margenSoles != null ? (
+                              <>
+                                {formatPen(eco.margenSoles)}
+                                {eco.margenPct != null ? ` (${eco.margenPct.toFixed(1)}%)` : ""}
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            </details>
           ) : null}
 
           <div className="flex justify-between gap-2">
