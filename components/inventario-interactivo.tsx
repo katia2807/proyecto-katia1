@@ -44,6 +44,7 @@ type ProductoEnriched = {
   dias_sin_movimiento: number | null;
   ultimo_movimiento: string | null;
   foto_url: string | null;
+  costo_unitario: number | null;
 };
 
 type MovimientoRow = {

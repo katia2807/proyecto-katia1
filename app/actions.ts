@@ -348,6 +348,10 @@ const inventarioProductoUpdateSchema = z.object({
     z.coerce.number().nonnegative().optional(),
   ),
   fotoUrl: z.string().optional().nullable(),
+  costoUnitario: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : v),
+    z.coerce.number().nonnegative().optional(),
+  ),
 });
 
 const inventarioToggleActivoSchema = z.object({
@@ -2399,6 +2403,7 @@ export async function createInventarioProducto(formData: FormData) {
       unidad: parsed.data.unidad,
       stock_minimo: parsed.data.stockMinimo,
       foto_url: parsed.data.fotoUrl ?? null,
+      costo_unitario: costoUnitario > 0 ? costoUnitario : null,
     });
 
     if (stockInicial > 0) {
@@ -2638,6 +2643,7 @@ export async function updateInventarioProducto(formData: FormData) {
     stockMinimo: formData.get("stock_minimo"),
     stockActual: formData.get("stock_actual"),
     fotoUrl: formData.get("foto_url"),
+    costoUnitario: formData.get("costo_unitario"),
   });
   if (!parsed.success) throw new Error("Datos de producto inválidos.");
 
@@ -2650,6 +2656,7 @@ export async function updateInventarioProducto(formData: FormData) {
       stock_minimo: parsed.data.stockMinimo,
       ...(parsed.data.stockActual !== undefined ? { stock_actual: parsed.data.stockActual } : {}),
       foto_url: parsed.data.fotoUrl ?? null,
+      costo_unitario: parsed.data.costoUnitario ?? null,
     });
     if (!updated) throw new Error("Producto no encontrado.");
   } else {
@@ -2664,6 +2671,7 @@ export async function updateInventarioProducto(formData: FormData) {
         stock_minimo: parsed.data.stockMinimo,
         ...(parsed.data.stockActual !== undefined ? { stock_actual: parsed.data.stockActual } : {}),
         foto_url: parsed.data.fotoUrl ?? null,
+        costo_unitario: parsed.data.costoUnitario ?? null,
       })
       .eq("id", parsed.data.id)
       .eq("organization_id", DEFAULT_ORG_ID);
@@ -4884,6 +4892,27 @@ export async function deleteCajaMovimiento(
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Error desconocido." };
   }
+}
+
+export async function createUnidadMedida(formData: FormData) {
+  await requireMutationAccess(writerRoles);
+  const nombre = formData.get("nombre");
+  if (!nombre || typeof nombre !== "string" || !nombre.trim()) {
+    throw new Error("El nombre de la unidad es requerido.");
+  }
+
+  if (hasSupabaseEnv()) {
+    const supabase = getSupabaseServerClient();
+    const { error } = await supabase.from("unidades_medida").insert({
+      organization_id: DEFAULT_ORG_ID,
+      nombre: nombre.trim(),
+      activo: true,
+    });
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+  revalidatePath("/inventario");
 }
 
 

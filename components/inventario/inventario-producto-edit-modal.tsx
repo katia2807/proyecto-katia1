@@ -20,6 +20,7 @@ type ProductoEnriched = {
   valor_stock: number;
   ultimo_movimiento: string | null;
   foto_url: string | null;
+  costo_unitario: number | null;
 };
 
 type SaveState = { ok: boolean; err: string | null };
@@ -106,6 +107,15 @@ export function InventarioProductoEditModal({
               step="0.01"
               defaultValue={String(product.stock_actual)}
               required
+              disabled={!canMutate}
+            />
+            <Field
+              name="costo_unitario"
+              label="Costo unitario (S/)"
+              type="number"
+              min="0"
+              step="0.01"
+              defaultValue={String(product.costo_unitario ?? "")}
               disabled={!canMutate}
             />
             <div className="sm:col-span-2">

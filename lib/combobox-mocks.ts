@@ -137,6 +137,7 @@ export const MOCK_INVENTARIO_PRODUCTOS: InventarioRow[] = MOCK_CLIENTES_COMPLETO
     activo: true,
     created_at: new Date().toISOString(),
     foto_url: null,
+    costo_unitario: null,
   };
 });
 

@@ -16,6 +16,7 @@ export type ComboboxProps = {
   inputAriaLabel?: string;
   /** Si se define, se renderiza un input hidden para envío tradicional de formularios */
   hiddenInputName?: string;
+  allowFreeText?: boolean;
 };
 
 const controlClass =
@@ -30,6 +31,7 @@ export function Combobox({
   className,
   inputAriaLabel = "Buscar y seleccionar",
   hiddenInputName,
+  allowFreeText = false,
 }: ComboboxProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const listId = useId();
@@ -60,7 +62,7 @@ export function Combobox({
     (next: string) => {
       const opt = options.find((o) => o.value === next);
       onChange(next);
-      setInputValue(opt?.label ?? "");
+      setInputValue(opt?.label ?? next);
       setIsTyping(false);
       setOpen(false);
       setHighlight(0);
@@ -71,9 +73,13 @@ export function Combobox({
   const closeAndRevertInput = useCallback(() => {
     setOpen(false);
     setIsTyping(false);
-    const sel = options.find((o) => o.value === value);
-    setInputValue(sel?.label ?? "");
-  }, [options, value]);
+    if (allowFreeText) {
+      onChange(inputValue);
+    } else {
+      const sel = options.find((o) => o.value === value);
+      setInputValue(sel?.label ?? "");
+    }
+  }, [options, value, allowFreeText, inputValue, onChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -81,12 +87,16 @@ export function Combobox({
       if (containerRef.current?.contains(e.target as Node)) return;
       setOpen(false);
       setIsTyping(false);
-      const sel = options.find((o) => o.value === value);
-      setInputValue(sel?.label ?? "");
+      if (allowFreeText) {
+        onChange(inputValue);
+      } else {
+        const sel = options.find((o) => o.value === value);
+        setInputValue(sel?.label ?? "");
+      }
     }
     document.addEventListener("mousedown", handleMouseDown);
     return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [open, options, value]);
+  }, [open, options, value, allowFreeText, inputValue, onChange]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
@@ -116,7 +126,7 @@ export function Combobox({
     }
   };
 
-  const selectedLabel = selected?.label ?? "";
+  const selectedLabel = selected?.label ?? (allowFreeText ? value : "");
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
@@ -141,7 +151,9 @@ export function Combobox({
           setIsTyping(true);
           setHighlight(0);
           setOpen(true);
-          if (value) {
+          if (allowFreeText) {
+            onChange(e.target.value);
+          } else if (value) {
             onChange("");
           }
         }}

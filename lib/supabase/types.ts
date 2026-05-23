@@ -137,6 +137,26 @@ export type Database = {
           tipo_proveedor?: string | null;
         };
       };
+      unidades_medida: {
+        Row: {
+          id: string;
+          organization_id: string;
+          nombre: string;
+          activo: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          nombre: string;
+          activo?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          nombre?: string;
+          activo?: boolean;
+        };
+      };
       servicios_aserradero: {
         Row: {
           id: string;
@@ -503,6 +523,7 @@ export type Database = {
           activo: boolean;
           created_at: string;
           foto_url: string | null;
+          costo_unitario: number | null;
         };
         Insert: {
           id?: string;
@@ -516,6 +537,7 @@ export type Database = {
           activo?: boolean;
           created_at?: string;
           foto_url?: string | null;
+          costo_unitario?: number | null;
         };
         Update: {
           nombre?: string;
@@ -525,6 +547,7 @@ export type Database = {
           stock_minimo?: number;
           activo?: boolean;
           foto_url?: string | null;
+          costo_unitario?: number | null;
         };
       };
       inventario_movimientos: {

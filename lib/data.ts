@@ -78,7 +78,7 @@ const INVENTARIO_MOVIMIENTOS_PAGE_LIMIT = 5000;
 
 /** Columnas físicas habituales de `public.inventario_productos`. */
 const INVENTARIO_PRODUCTOS_SELECT =
-  "id,organization_id,codigo,nombre,categoria,unidad,stock_actual,stock_minimo,activo,created_at,foto_url" as const;
+  "id,organization_id,codigo,nombre,categoria,unidad,stock_actual,stock_minimo,activo,created_at,foto_url,costo_unitario" as const;
 
 type OrdenProduccionRow = Database["public"]["Tables"]["ordenes_produccion"]["Row"];
 type MuebleCatalogoRow = Database["public"]["Tables"]["muebles_catalogo"]["Row"];
@@ -768,6 +768,7 @@ export async function getInventarioRobustoData() {
       valor_stock: valorStock,
       dias_sin_movimiento: diasSinMovimiento,
       ultimo_movimiento: ultimoMov,
+      costo_unitario: p.costo_unitario ?? null,
     };
   });
 
@@ -1157,4 +1158,20 @@ export async function getCobrosVencidos(hoy: string = new Date().toISOString().s
   }
 
   return cobros.sort((a, b) => a.fecha_vencimiento.localeCompare(b.fecha_vencimiento));
+}
+
+export async function getUnidadesMedida(): Promise<{ id: string; nombre: string }[]> {
+  if (!hasSupabaseEnv()) {
+    return [];
+  }
+  const supabase = getSupabaseServerClient();
+  return safeQuery(async () => {
+    const { data } = await supabase
+      .from("unidades_medida")
+      .select("id, nombre")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .eq("activo", true)
+      .order("nombre", { ascending: true });
+    return data ?? [];
+  }, []);
 }

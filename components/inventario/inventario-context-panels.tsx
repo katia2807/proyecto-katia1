@@ -4,6 +4,7 @@ import {
   submitCreateInventarioProductoForm,
   submitCreateInventarioMovimientoForm,
   submitInventarioCompraRapidaForm,
+  createUnidadMedida,
 } from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { CubicajeInput } from "@/components/sales/cubicaje-input";
@@ -38,9 +39,16 @@ type InventarioContextPanelsProps = {
   productos: ProductoOpt[];
   proveedores?: ProveedorOpt[];
   mockData?: boolean;
+  unidadesExtra?: string[];
 };
 
-export function InventarioContextPanels({ quick, productos, proveedores = [], mockData = false }: InventarioContextPanelsProps) {
+export function InventarioContextPanels({
+  quick,
+  productos,
+  proveedores = [],
+  mockData = false,
+  unidadesExtra = [],
+}: InventarioContextPanelsProps) {
   const searchParams = useSearchParams();
   const [productoMovId, setProductoMovId] = useState("");
   const [productoCompraId, setProductoCompraId] = useState("");
@@ -76,6 +84,109 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
   const [showNuevaCategoria, setShowNuevaCategoria] = useState(false);
   const [selectedCategoria, setSelectedCategoria] = useState("");
   const nuevaCategoriaRef = useRef<HTMLInputElement>(null);
+
+  // Estado para unidades de medida personalizadas en nuevo producto
+  const [unidadesExtraState, setUnidadesExtraState] = useState<string[]>([]);
+  const [nuevaUnidadInput, setNuevaUnidadInput] = useState("");
+  const [showNuevaUnidad, setShowNuevaUnidad] = useState(false);
+  const [selectedUnidad, setSelectedUnidad] = useState("");
+  const nuevaUnidadRef = useRef<HTMLInputElement>(null);
+
+  const UNIDADES_BASE = useMemo(() => [
+    "unidad",
+    "caja",
+    "lata",
+    "litro",
+    "galón",
+    "pie tablar",
+    "m2",
+    "m3",
+    "kg",
+    "bolsa",
+  ], []);
+
+  const todasLasUnidades = useMemo(() => {
+    return Array.from(new Set([...UNIDADES_BASE, ...unidadesExtraState]));
+  }, [UNIDADES_BASE, unidadesExtraState]);
+
+  useEffect(() => {
+    if (unidadesExtra) {
+      setUnidadesExtraState(unidadesExtra);
+    }
+  }, [unidadesExtra]);
+
+  async function handleAgregarUnidad() {
+    const valor = nuevaUnidadInput.trim();
+    if (!valor) return;
+    if (todasLasUnidades.map((u) => u.toLowerCase()).includes(valor.toLowerCase())) {
+      setSelectedUnidad(valor);
+      setShowNuevaUnidad(false);
+      setNuevaUnidadInput("");
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.append("nombre", valor);
+      await createUnidadMedida(formData);
+      
+      setUnidadesExtraState((prev) => [...prev, valor]);
+      setSelectedUnidad(valor);
+      setNuevaUnidadInput("");
+      setShowNuevaUnidad(false);
+    } catch (e) {
+      showToast({ variant: "error", message: e instanceof Error ? e.message : "Error al guardar la unidad de medida." });
+    }
+  }
+
+  useEffect(() => {
+    if (showNuevaUnidad && nuevaUnidadRef.current) {
+      nuevaUnidadRef.current.focus();
+    }
+  }, [showNuevaUnidad]);
+
+  // Combobox proveedor y errores
+  const [compraProveedor, setCompraProveedor] = useState("");
+  const proveedorOptions = useMemo(() => {
+    return proveedores.map((p) => ({ value: p.nombre, label: p.nombre }));
+  }, [proveedores]);
+
+  const [compraErrors, setCompraErrors] = useState<{ producto_id?: string; cantidad?: string }>({});
+  const [movimientoErrors, setMovimientoErrors] = useState<{ producto_id?: string; cantidad?: string }>({});
+
+  const handleCompraSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const errors: { producto_id?: string; cantidad?: string } = {};
+    if (!productoCompraId) {
+      errors.producto_id = "Debe seleccionar un producto.";
+    }
+    const qty = parseFloat(cantidadCubicada);
+    if (!cantidadCubicada || isNaN(qty) || qty <= 0) {
+      errors.cantidad = "La cantidad debe ser mayor a 0.";
+    }
+    if (Object.keys(errors).length > 0) {
+      e.preventDefault();
+      setCompraErrors(errors);
+      return;
+    }
+    setCompraErrors({});
+  };
+
+  const handleMovimientoSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const errors: { producto_id?: string; cantidad?: string } = {};
+    if (!productoMovId) {
+      errors.producto_id = "Debe seleccionar un producto.";
+    }
+    const qtyVal = (e.currentTarget.elements.namedItem("cantidad") as HTMLInputElement)?.value;
+    const qty = parseFloat(qtyVal);
+    if (!qtyVal || isNaN(qty) || qty <= 0) {
+      errors.cantidad = "La cantidad debe ser mayor a 0.";
+    }
+    if (Object.keys(errors).length > 0) {
+      e.preventDefault();
+      setMovimientoErrors(errors);
+      return;
+    }
+    setMovimientoErrors({});
+  };
 
   const todasLasCategorias = useMemo(() => {
     return [...CATEGORIAS_BASE, ...categoriasExtra];
@@ -125,6 +236,10 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
       setOpenCompra(false);
       setCompraFormKey((k) => k + 1);
       setProductoCompraId("");
+      setCompraProveedor("");
+      setCompraErrors({});
+      setShowCubicaje(false);
+      setCantidadCubicada("");
     } else if (compraState.error) {
       showToast({ variant: "error", message: compraState.error });
     }
@@ -136,6 +251,7 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
       setOpenProducto(false);
       setProductoFormKey((k) => k + 1);
       setSelectedCategoria("");
+      setSelectedUnidad("");
       setStockInicial("");
       setCostoUnitario("");
     } else if (productoState.error) {
@@ -149,6 +265,7 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
       setOpenMovimiento(false);
       setMovimientoFormKey((k) => k + 1);
       setProductoMovId("");
+      setMovimientoErrors({});
     } else if (movimientoState.error) {
       showToast({ variant: "error", message: movimientoState.error });
     }
@@ -190,10 +307,14 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
           if (!next) {
             setCompraFormKey((k) => k + 1);
             setProductoCompraId("");
+            setCompraProveedor("");
+            setCompraErrors({});
+            setShowCubicaje(false);
+            setCantidadCubicada("");
           }
         }}
       >
-        <form key={compraFormKey} action={compraFormAction} className="grid gap-3 md:grid-cols-2">
+        <form key={compraFormKey} action={compraFormAction} onSubmit={handleCompraSubmit} className="grid gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)] md:col-span-2">
             <span>Producto</span>
             <Combobox
@@ -204,6 +325,9 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
               placeholder="Buscar producto…"
               inputAriaLabel="Producto para registrar compra"
             />
+            {compraErrors.producto_id && (
+              <p className="text-xs text-red-500 mt-1">{compraErrors.producto_id}</p>
+            )}
           </label>
 
           {/* Cubicaje toggle — útil para compras de madera */}
@@ -245,16 +369,21 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
             </div>
           ) : null}
 
-          <Field
-            name="cantidad"
-            label="Cantidad recibida"
-            type="number"
-            min="0.01"
-            step="0.01"
-            required
-            value={cantidadCubicada || undefined}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCantidadCubicada(e.target.value)}
-          />
+          <div className="flex flex-col gap-1.5">
+            <Field
+              name="cantidad"
+              label="Cantidad recibida"
+              type="number"
+              min="0.01"
+              step="0.01"
+              required
+              value={cantidadCubicada || undefined}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCantidadCubicada(e.target.value)}
+            />
+            {compraErrors.cantidad && (
+              <p className="text-xs text-red-500 mt-1">{compraErrors.cantidad}</p>
+            )}
+          </div>
           <Field
             name="costo_unitario"
             label="Costo unitario compra (opcional)"
@@ -263,34 +392,26 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
             step="0.01"
           />
 
-          {/* Campo Proveedor como texto + lista de sugerencias (datalist) */}
+          {/* Campo Proveedor como Combobox Real con allowFreeText */}
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="compra-proveedor-input" className="text-sm font-medium text-[var(--color-text-primary)]">
+            <label className="text-sm font-medium text-[var(--color-text-primary)]">
               Proveedor (opcional)
             </label>
-            <input
-              id="compra-proveedor-input"
-              name="proveedor"
-              type="text"
-              list={proveedores.length > 0 ? "compra-proveedores-list" : undefined}
-              placeholder={proveedores.length > 0 ? "Buscar proveedor o escribir nombre…" : "Texto libre"}
-              className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface)_90%,var(--color-surface-2))] px-3 text-sm text-[var(--color-text-primary)] outline-none shadow-[var(--shadow-soft)] focus-visible:border-[var(--color-border-strong)] focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+            <Combobox
+              options={proveedorOptions}
+              value={compraProveedor}
+              onChange={setCompraProveedor}
+              hiddenInputName="proveedor"
+              placeholder="Buscar proveedor o escribir nombre…"
+              inputAriaLabel="Proveedor para registrar compra"
+              allowFreeText={true}
             />
-            {proveedores.length > 0 && (
-              <datalist id="compra-proveedores-list">
-                {proveedores.map((p) => (
-                  <option key={p.id} value={p.nombre} />
-                ))}
-              </datalist>
-            )}
-            {proveedores.length > 0 && (
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                Podés elegir de la lista o escribir un nombre nuevo.
-              </p>
-            )}
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Podés elegir de la lista o escribir un nombre nuevo.
+            </p>
           </div>
 
-          <Field name="fecha" type="date" label="Fecha" required />
+          <Field name="fecha" type="date" label="Fecha" required defaultValue={new Date().toISOString().split("T")[0]} />
           <Field className="md:col-span-2" name="nota" label="Nota (opcional)" placeholder="Observación de la compra" />
           <div className="md:col-span-2">
             <Button>Guardar compra</Button>
@@ -311,6 +432,7 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
           if (!next) {
             setProductoFormKey((k) => k + 1);
             setSelectedCategoria("");
+            setSelectedUnidad("");
             setStockInicial("");
             setCostoUnitario("");
           }
@@ -409,19 +531,68 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
             )}
           </div>
 
-          <SelectField name="unidad" label="Unidad" required>
-            <option value="">Seleccionar…</option>
-            <option value="unidad">Unidad</option>
-            <option value="caja">Caja</option>
-            <option value="lata">Lata</option>
-            <option value="litro">Litro</option>
-            <option value="galón">Galón</option>
-            <option value="pie tablar">Pie tablar</option>
-            <option value="m2">m²</option>
-            <option value="m3">m³</option>
-            <option value="kg">kg</option>
-            <option value="bolsa">Bolsa</option>
-          </SelectField>
+          {/* Selector de unidad de medida con botón para agregar nueva */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-[var(--color-text-primary)]">
+              Unidad <span className="text-red-400">*</span>
+            </label>
+            <div className="flex gap-2">
+              <select
+                name="unidad"
+                required
+                value={selectedUnidad}
+                onChange={(e) => setSelectedUnidad(e.target.value)}
+                className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+              >
+                <option value="">Seleccionar…</option>
+                {todasLasUnidades.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                title="Agregar nueva unidad"
+                onClick={() => setShowNuevaUnidad((v) => !v)}
+                className="flex items-center gap-1 rounded-xl border border-[var(--color-op-primary-border)] bg-[var(--color-op-primary-bg)] px-2.5 py-2 text-xs font-semibold text-[var(--color-op-primary-text)] transition hover:bg-[var(--color-op-primary-hover)]"
+              >
+                <span>+ Nueva</span>
+              </button>
+            </div>
+
+            {showNuevaUnidad && (
+              <div className="flex gap-2 items-center mt-1">
+                <input
+                  ref={nuevaUnidadRef}
+                  type="text"
+                  value={nuevaUnidadInput}
+                  onChange={(e) => setNuevaUnidadInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); handleAgregarUnidad(); }
+                    if (e.key === "Escape") { setShowNuevaUnidad(false); setNuevaUnidadInput(""); }
+                  }}
+                  placeholder="Nombre de la unidad"
+                  className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                />
+                <button
+                  type="button"
+                  onClick={handleAgregarUnidad}
+                  className="rounded-xl border border-[var(--color-op-success-border)] bg-[var(--color-op-success-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--color-op-success-text)] hover:bg-[var(--color-op-success-hover)] transition"
+                >
+                  Agregar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowNuevaUnidad(false); setNuevaUnidadInput(""); }}
+                  className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-soft)] transition"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+
           <Field
             name="stock_minimo"
             label="Stock mínimo de alerta"
@@ -486,11 +657,12 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
           if (!next) {
             setMovimientoFormKey((k) => k + 1);
             setProductoMovId("");
+            setMovimientoErrors({});
           }
         }}
         replacePathOnClose="/inventario"
       >
-        <form key={movimientoFormKey} action={movimientoFormAction} className="grid gap-3 md:grid-cols-2">
+        <form key={movimientoFormKey} action={movimientoFormAction} onSubmit={handleMovimientoSubmit} className="grid gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
             <span>Producto</span>
             <Combobox
@@ -501,14 +673,22 @@ export function InventarioContextPanels({ quick, productos, proveedores = [], mo
               placeholder="Buscar producto…"
               inputAriaLabel="Producto para movimiento de inventario"
             />
+            {movimientoErrors.producto_id && (
+              <p className="text-xs text-red-500 mt-1">{movimientoErrors.producto_id}</p>
+            )}
           </label>
-          <Field name="fecha" type="date" label="Fecha" required />
+          <Field name="fecha" type="date" label="Fecha" required defaultValue={new Date().toISOString().split("T")[0]} />
           <SelectField name="tipo" label="Tipo" defaultValue="entrada_compra" required>
             <option value="entrada_compra">Entrada por compra</option>
             <option value="salida_venta">Salida por venta</option>
             <option value="ajuste">Ajuste</option>
           </SelectField>
-          <Field name="cantidad" label="Cantidad" type="number" min="0.01" step="0.01" required />
+          <div className="flex flex-col gap-1.5">
+            <Field name="cantidad" label="Cantidad" type="number" min="0.01" step="0.01" required />
+            {movimientoErrors.cantidad && (
+              <p className="text-xs text-red-500 mt-1">{movimientoErrors.cantidad}</p>
+            )}
+          </div>
           <Field name="costo_unitario" label="Costo unitario (opcional)" type="number" min="0" step="0.01" />
           <Field name="referencia" label="Referencia" placeholder="Factura, pedido, ajuste..." />
           <input type="hidden" name="return_to" value="/inventario" />

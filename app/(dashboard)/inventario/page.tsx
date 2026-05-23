@@ -4,7 +4,7 @@ import { InventarioContextPanels } from "@/components/inventario/inventario-cont
 import { InventarioInteractivo } from "@/components/inventario-interactivo";
 import { MetricCard } from "@/components/metric-card";
 import { getDashboardSession } from "@/lib/current-user-role";
-import { getInventarioRobustoData, getMueblesCatalogoRows, getProveedoresRows } from "@/lib/data";
+import { getInventarioRobustoData, getMueblesCatalogoRows, getProveedoresRows, getUnidadesMedida } from "@/lib/data";
 import { canMutateInventario } from "@/lib/permissions";
 
 type InventarioPageProps = {
@@ -21,10 +21,11 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const sp = (await searchParams) ?? {};
   const quick = normalizeQuickParam(sp.quick);
-  const [inventario, mueblesCatalogo, proveedores] = await Promise.all([
+  const [inventario, mueblesCatalogo, proveedores, unidades] = await Promise.all([
     getInventarioRobustoData(),
     getMueblesCatalogoRows(true),
     getProveedoresRows(),
+    getUnidadesMedida(),
   ]);
   const { loadWarning, ...inventarioData } = inventario;
   const { productos } = inventarioData;
@@ -82,6 +83,7 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
             productos={productos.map((p) => ({ id: p.id, nombre: p.nombre }))}
             proveedores={proveedores.map((p) => ({ id: p.id, nombre: p.nombre }))}
             mockData={comboMock}
+            unidadesExtra={unidades.map((u) => u.nombre)}
           />
         </InventarioAccionesRapidas>
       </Suspense>

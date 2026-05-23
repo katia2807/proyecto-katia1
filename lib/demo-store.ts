@@ -333,6 +333,7 @@ type InventarioProductoRow = {
   activo: boolean;
   created_at: string;
   foto_url: string | null;
+  costo_unitario: number | null;
 };
 
 type InventarioMovimientoRow = {
@@ -956,6 +957,7 @@ function createDefaultDemoStore(): DemoStore {
       activo: true,
       created_at: nowIso(),
       foto_url: null,
+      costo_unitario: null,
     },
     {
       id: producto2,
@@ -969,6 +971,7 @@ function createDefaultDemoStore(): DemoStore {
       activo: true,
       created_at: nowIso(),
       foto_url: null,
+      costo_unitario: null,
     },
     {
       id: producto3,
@@ -982,6 +985,7 @@ function createDefaultDemoStore(): DemoStore {
       activo: true,
       created_at: nowIso(),
       foto_url: null,
+      costo_unitario: null,
     },
     {
       id: producto4,
@@ -995,6 +999,7 @@ function createDefaultDemoStore(): DemoStore {
       activo: true,
       created_at: nowIso(),
       foto_url: null,
+      costo_unitario: null,
     },
   ],
   inventarioMovimientos: [
@@ -2322,7 +2327,7 @@ export function demoCreateInventarioProducto(
 export function demoUpdateInventarioProducto(
   id: string,
   patch: Partial<
-    Pick<InventarioProductoRow, "codigo" | "nombre" | "categoria" | "unidad" | "stock_minimo" | "activo" | "stock_actual" | "foto_url">
+    Pick<InventarioProductoRow, "codigo" | "nombre" | "categoria" | "unidad" | "stock_minimo" | "activo" | "stock_actual" | "foto_url" | "costo_unitario">
   >,
 ) {
   const row = store.inventarioProductos.find((p) => p.id === id);
@@ -2589,6 +2594,7 @@ export function demoCreateMuebleCatalogo(
     activo: input.activo ?? true,
     created_at: nowIso(),
     foto_url: input.foto_url ?? null,
+    costo_unitario: null,
   });
 
   persistStore();
