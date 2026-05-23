@@ -872,6 +872,44 @@ export async function getChoferesRows() {
   }, fallback.choferes);
 }
 
+export async function getChoferTiposVehiculo(): Promise<string[]> {
+  if (!hasSupabaseEnv()) {
+    const choferes = demoChoferesRows();
+    const unique = new Set(choferes.map((c) => c.tipo_vehiculo).filter(Boolean) as string[]);
+    return Array.from(unique).sort();
+  }
+  const supabase = getSupabaseServerClient();
+  return safeQuery(async () => {
+    const { data } = await supabase
+      .from("choferes")
+      .select("tipo_vehiculo")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .not("tipo_vehiculo", "is", null);
+    if (!data) return [];
+    const unique = new Set(data.map((c) => c.tipo_vehiculo).filter(Boolean) as string[]);
+    return Array.from(unique).sort();
+  }, []);
+}
+
+export async function getProveedorTipos(): Promise<string[]> {
+  if (!hasSupabaseEnv()) {
+    const proveedores = demoProveedoresRows();
+    const unique = new Set(proveedores.map((p) => p.tipo_proveedor).filter(Boolean) as string[]);
+    return Array.from(unique).sort();
+  }
+  const supabase = getSupabaseServerClient();
+  return safeQuery(async () => {
+    const { data } = await supabase
+      .from("proveedores")
+      .select("tipo_proveedor")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .not("tipo_proveedor", "is", null);
+    if (!data) return [];
+    const unique = new Set(data.map((p) => p.tipo_proveedor).filter(Boolean) as string[]);
+    return Array.from(unique).sort();
+  }, []);
+}
+
 export async function getMueblesCatalogoRows(includeInactive = false) {
   if (!hasSupabaseEnv()) {
     const rows = demoMueblesCatalogoRows();

@@ -63,6 +63,7 @@ type ProveedorRow = {
   documento: string | null;
   telefono: string | null;
   created_at: string;
+  tipo_proveedor: string | null;
 };
 
 type RegistroCategoriaRow = {
@@ -205,6 +206,7 @@ type ChoferRow = {
   placa: string | null;
   activo: boolean;
   created_at: string;
+  tipo_vehiculo: string | null;
 };
 
 type MuebleCatalogoRow = {
@@ -530,6 +532,7 @@ function createDefaultDemoStore(): DemoStore {
       documento: "74120123",
       telefono: "978591269",
       created_at: nowIso(),
+      tipo_proveedor: "Madera",
     },
     {
       id: proveedorHuillca,
@@ -538,6 +541,7 @@ function createDefaultDemoStore(): DemoStore {
       documento: "10456789432",
       telefono: "976112545",
       created_at: nowIso(),
+      tipo_proveedor: "Madera",
     },
     {
       id: proveedorBosco,
@@ -546,6 +550,7 @@ function createDefaultDemoStore(): DemoStore {
       documento: "20600522389",
       telefono: null,
       created_at: nowIso(),
+      tipo_proveedor: "Insumos",
     },
   ],
   registroCategorias: [
@@ -1127,6 +1132,7 @@ function createDefaultDemoStore(): DemoStore {
       placa: "ABC-123",
       activo: true,
       created_at: nowIso(),
+      tipo_vehiculo: "Camión",
     },
     {
       id: choferMario,
@@ -1136,6 +1142,7 @@ function createDefaultDemoStore(): DemoStore {
       placa: "DEF-456",
       activo: true,
       created_at: nowIso(),
+      tipo_vehiculo: "Trailer",
     },
   ] as ChoferRow[],
   mueblesCatalogo: [
@@ -2056,8 +2063,31 @@ export function demoCreateCliente(input: Omit<ClienteRow, "id" | "created_at">):
   return id;
 }
 
-export function demoCreateProveedor(input: Omit<ProveedorRow, "id" | "created_at">) {
-  store.proveedores.unshift({ id: randomUUID(), created_at: nowIso(), ...input });
+export function demoCreateProveedor(
+  input: Pick<ProveedorRow, "organization_id" | "nombre"> & Partial<Omit<ProveedorRow, "id" | "created_at" | "organization_id" | "nombre">>,
+) {
+  store.proveedores.unshift({
+    id: randomUUID(),
+    organization_id: input.organization_id,
+    nombre: input.nombre,
+    documento: input.documento ?? null,
+    telefono: input.telefono ?? null,
+    tipo_proveedor: input.tipo_proveedor ?? null,
+    created_at: nowIso(),
+  });
+  persistStore();
+}
+
+export function demoUpdateProveedor(
+  id: string,
+  patch: Partial<Omit<ProveedorRow, "id" | "created_at" | "organization_id">>,
+) {
+  const row = store.proveedores.find((p) => p.id === id);
+  if (!row) return;
+  if (patch.nombre !== undefined) row.nombre = patch.nombre;
+  if (patch.documento !== undefined) row.documento = patch.documento;
+  if (patch.telefono !== undefined) row.telefono = patch.telefono;
+  if (patch.tipo_proveedor !== undefined) row.tipo_proveedor = patch.tipo_proveedor;
   persistStore();
 }
 
@@ -2470,7 +2500,22 @@ export function demoCreateChofer(
     placa: input.placa ?? null,
     activo: input.activo ?? true,
     created_at: nowIso(),
+    tipo_vehiculo: input.tipo_vehiculo ?? null,
   });
+  persistStore();
+}
+
+export function demoUpdateChofer(
+  id: string,
+  patch: Partial<Omit<ChoferRow, "id" | "created_at" | "organization_id">>,
+) {
+  const row = store.choferes.find((c) => c.id === id);
+  if (!row) return;
+  if (patch.nombre !== undefined) row.nombre = patch.nombre;
+  if (patch.telefono !== undefined) row.telefono = patch.telefono;
+  if (patch.placa !== undefined) row.placa = patch.placa;
+  if (patch.tipo_vehiculo !== undefined) row.tipo_vehiculo = patch.tipo_vehiculo;
+  if (patch.activo !== undefined) row.activo = patch.activo;
   persistStore();
 }
 

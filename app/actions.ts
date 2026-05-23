@@ -15,6 +15,7 @@ import {
   demoCreateAlquiler,
   demoCreateCaja,
   demoCreateChofer,
+  demoUpdateChofer,
   demoCreateCliente,
   demoCreateCompraMadera,
   demoCreateCotizacionUnificada,
@@ -38,6 +39,7 @@ import {
   demoGetCotizacionUnificada,
   demoInventarioMovimientosRows,
   demoCreateProveedor,
+  demoUpdateProveedor,
   demoCreateRegistroGeneral,
   demoDeleteByCategory,
   demoDeleteOneById,
@@ -153,6 +155,7 @@ const choferSchema = z.object({
   nombre: z.string().min(3),
   telefono: z.string().optional(),
   placa: z.string().optional(),
+  tipo_vehiculo: z.string().optional(),
 });
 
 const zonaEntregaSchema = z.object({
@@ -286,6 +289,7 @@ const proveedorSchema = z.object({
   nombre: z.string().min(3),
   documento: z.string().optional(),
   telefono: z.string().optional(),
+  tipo_proveedor: z.string().optional(),
 });
 
 const compraMaderaSchema = z.object({
@@ -1690,6 +1694,7 @@ export async function createChofer(formData: FormData) {
     nombre: formData.get("nombre"),
     telefono: formData.get("telefono"),
     placa: formData.get("placa"),
+    tipo_vehiculo: formData.get("tipo_vehiculo"),
   });
   if (!parsed.success) {
     throw new Error("Datos de chofer inválidos.");
@@ -1700,6 +1705,7 @@ export async function createChofer(formData: FormData) {
       nombre: parsed.data.nombre,
       telefono: parsed.data.telefono || null,
       placa: parsed.data.placa || null,
+      tipo_vehiculo: parsed.data.tipo_vehiculo || null,
     });
   } else {
     const supabase = getSupabaseServerClient();
@@ -1708,6 +1714,7 @@ export async function createChofer(formData: FormData) {
       nombre: parsed.data.nombre.trim(),
       telefono: parsed.data.telefono?.trim() || null,
       placa: parsed.data.placa?.trim() || null,
+      tipo_vehiculo: parsed.data.tipo_vehiculo?.trim() || null,
       activo: true,
     });
     if (error) {
@@ -1717,6 +1724,51 @@ export async function createChofer(formData: FormData) {
   revalidatePath("/ventas");
   revalidatePath("/personal");
   maybeRedirectToQuickStep(formData);
+}
+
+export async function updateChofer(id: string, formData: FormData) {
+  await requireMutationAccess(writerRoles);
+  
+  const activoVal = formData.get("activo");
+  const activo = activoVal === "true" || activoVal === "on" || activoVal === "1";
+
+  const parsed = choferSchema.safeParse({
+    nombre: formData.get("nombre"),
+    telefono: formData.get("telefono"),
+    placa: formData.get("placa"),
+    tipo_vehiculo: formData.get("tipo_vehiculo"),
+  });
+  if (!parsed.success) {
+    throw new Error("Datos de chofer inválidos.");
+  }
+
+  if (!hasSupabaseEnv()) {
+    demoUpdateChofer(id, {
+      nombre: parsed.data.nombre,
+      telefono: parsed.data.telefono || null,
+      placa: parsed.data.placa || null,
+      tipo_vehiculo: parsed.data.tipo_vehiculo || null,
+      activo,
+    });
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { error } = await supabase
+      .from("choferes")
+      .update({
+        nombre: parsed.data.nombre.trim(),
+        telefono: parsed.data.telefono?.trim() || null,
+        placa: parsed.data.placa?.trim() || null,
+        tipo_vehiculo: parsed.data.tipo_vehiculo?.trim() || null,
+        activo,
+      })
+      .eq("id", id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+  revalidatePath("/ventas");
+  revalidatePath("/personal");
 }
 
 export async function createZonaEntrega(formData: FormData) {
@@ -1760,6 +1812,7 @@ export async function createProveedor(formData: FormData) {
     nombre: formData.get("nombre"),
     documento: formData.get("documento"),
     telefono: formData.get("telefono"),
+    tipo_proveedor: formData.get("tipo_proveedor"),
   });
   if (!parsed.success) {
     throw new Error("Datos de proveedor inválidos.");
@@ -1770,6 +1823,7 @@ export async function createProveedor(formData: FormData) {
       nombre: parsed.data.nombre,
       documento: parsed.data.documento || null,
       telefono: parsed.data.telefono || null,
+      tipo_proveedor: parsed.data.tipo_proveedor || null,
     });
   } else {
     const supabase = getSupabaseServerClient();
@@ -1778,6 +1832,7 @@ export async function createProveedor(formData: FormData) {
       nombre: parsed.data.nombre,
       documento: parsed.data.documento || null,
       telefono: parsed.data.telefono || null,
+      tipo_proveedor: parsed.data.tipo_proveedor || null,
     });
     if (error) {
       throw new Error(error.message);
@@ -1785,6 +1840,44 @@ export async function createProveedor(formData: FormData) {
   }
   revalidatePath("/ventas");
   maybeRedirectToQuickStep(formData);
+}
+
+export async function updateProveedor(id: string, formData: FormData) {
+  await requireMutationAccess(ventasRoles);
+  const parsed = proveedorSchema.safeParse({
+    nombre: formData.get("nombre"),
+    documento: formData.get("documento"),
+    telefono: formData.get("telefono"),
+    tipo_proveedor: formData.get("tipo_proveedor"),
+  });
+  if (!parsed.success) {
+    throw new Error("Datos de proveedor inválidos.");
+  }
+
+  if (!hasSupabaseEnv()) {
+    demoUpdateProveedor(id, {
+      nombre: parsed.data.nombre,
+      documento: parsed.data.documento || null,
+      telefono: parsed.data.telefono || null,
+      tipo_proveedor: parsed.data.tipo_proveedor || null,
+    });
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { error } = await supabase
+      .from("proveedores")
+      .update({
+        nombre: parsed.data.nombre,
+        documento: parsed.data.documento || null,
+        telefono: parsed.data.telefono || null,
+        tipo_proveedor: parsed.data.tipo_proveedor || null,
+      })
+      .eq("id", id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+  revalidatePath("/ventas");
 }
 
 export async function createCompraMadera(formData: FormData) {

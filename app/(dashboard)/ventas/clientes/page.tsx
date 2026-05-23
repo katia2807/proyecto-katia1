@@ -2,19 +2,21 @@ import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Field, SelectField } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
-import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
+import { Table, TH, THead } from "@/components/ui/table";
 import { ClientesMasterDetail } from "@/components/ventas/clientes-master-detail";
 import { NuevoClienteInline } from "@/components/ventas/nuevo-cliente-inline";
-import { RegistrarChoferInline } from "@/components/ventas/registrar-chofer-inline";
-import { RegistrarProveedorInline } from "@/components/ventas/registrar-proveedor-inline";
+import { RegistrarChoferInline, ChoferRowWrapper } from "@/components/ventas/registrar-chofer-inline";
+import { RegistrarProveedorInline, ProveedorRowWrapper } from "@/components/ventas/registrar-proveedor-inline";
 import {
   getAlquilerRows,
   getChoferesRows,
+  getChoferTiposVehiculo,
   getClientesRows,
   getCotizacionesRows,
   getCobrosVencidos,
   getOrdenesProduccionRows,
   getProveedoresRows,
+  getProveedorTipos,
   getServiciosAserraderoRows,
   getVentasMuebleTerminadoRows,
   getVentasRows,
@@ -37,7 +39,7 @@ function first(value: string | string[] | undefined, fallback = "") {
 
 const TABS = [
   { id: "compradores", label: "Compradores" },
-  { id: "base_datos",  label: "Base de datos" },
+  { id: "base_datos",  label: "Choferes / Proveedores" },
 ] as const;
 
 export default async function ClientesPage({ searchParams }: PageProps) {
@@ -47,7 +49,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
   const tipo   = first(params?.tipo);
   const estado = first(params?.estado);
 
-  const [clientes, ventasMuebles, ventasMadera, alquilerBundle, servicios, cotizaciones, ordenes, cobros, choferes, proveedores] =
+  const [clientes, ventasMuebles, ventasMadera, alquilerBundle, servicios, cotizaciones, ordenes, cobros, choferes, proveedores, tiposChofer, tiposProveedor] =
     await Promise.all([
       getClientesRows(),
       getVentasMuebleTerminadoRows(),
@@ -59,6 +61,8 @@ export default async function ClientesPage({ searchParams }: PageProps) {
       getCobrosVencidos(),
       getChoferesRows(),
       getProveedoresRows(),
+      getChoferTiposVehiculo(),
+      getProveedorTipos(),
     ]);
   const contratos = alquilerBundle.rows;
 
@@ -226,7 +230,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                   Transportistas que realizan entregas a domicilio o en obra.
                 </p>
               </div>
-              <RegistrarChoferInline />
+              <RegistrarChoferInline tiposExistentes={tiposChofer} />
             </div>
             {choferes.length === 0 ? (
               <div className="mt-6 flex flex-col items-center justify-center gap-2 py-8 text-center">
@@ -241,24 +245,10 @@ export default async function ClientesPage({ searchParams }: PageProps) {
             ) : (
               <div className="mt-4 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
                 <Table>
-                  <THead><tr><TH>Nombre</TH><TH>Teléfono</TH><TH>Placa</TH><TH>Estado</TH></tr></THead>
+                  <THead><tr><TH>Nombre</TH><TH>Teléfono</TH><TH>Placa</TH><TH>Tipo vehículo</TH><TH>Estado</TH><TH className="w-20">Acción</TH></tr></THead>
                   <tbody>
                     {choferes.map((c) => (
-                      <TRow key={c.id}>
-                        <TD className="font-medium">{c.nombre}</TD>
-                        <TD className="font-mono text-xs">{c.telefono ?? "—"}</TD>
-                        <TD className="font-mono text-xs font-semibold uppercase">{c.placa ?? "—"}</TD>
-                        <TD>
-                          <span className={cn(
-                            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
-                            c.activo
-                              ? "bg-[var(--katia-success)]/15 text-[var(--katia-success)]"
-                              : "bg-[var(--katia-text-tertiary)]/10 text-[var(--katia-text-tertiary)]",
-                          )}>
-                            {c.activo ? "Activo" : "Inactivo"}
-                          </span>
-                        </TD>
-                      </TRow>
+                      <ChoferRowWrapper key={c.id} c={c} tiposExistentes={tiposChofer} />
                     ))}
                   </tbody>
                 </Table>
@@ -275,7 +265,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                   Empresas y personas que suministran materia prima, insumos y servicios.
                 </p>
               </div>
-              <RegistrarProveedorInline />
+              <RegistrarProveedorInline tiposExistentes={tiposProveedor} />
             </div>
             {proveedores.length === 0 ? (
               <div className="mt-6 flex flex-col items-center justify-center gap-2 py-8 text-center">
@@ -289,17 +279,10 @@ export default async function ClientesPage({ searchParams }: PageProps) {
             ) : (
               <div className="mt-4 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
                 <Table>
-                  <THead><tr><TH>Nombre / Razón social</TH><TH>Documento / RUC</TH><TH>Teléfono</TH><TH>Registrado</TH></tr></THead>
+                  <THead><tr><TH>Nombre / Razón social</TH><TH>Documento / RUC</TH><TH>Teléfono</TH><TH>Tipo</TH><TH>Registrado</TH><TH className="w-20">Acción</TH></tr></THead>
                   <tbody>
                     {proveedores.map((p) => (
-                      <TRow key={p.id}>
-                        <TD className="font-medium">{p.nombre}</TD>
-                        <TD className="font-mono text-xs">{p.documento ?? "—"}</TD>
-                        <TD className="font-mono text-xs">{p.telefono ?? "—"}</TD>
-                        <TD className="text-xs text-[var(--katia-text-tertiary)]">
-                          {new Date(p.created_at).toLocaleDateString("es-PE")}
-                        </TD>
-                      </TRow>
+                      <ProveedorRowWrapper key={p.id} p={p} tiposExistentes={tiposProveedor} />
                     ))}
                   </tbody>
                 </Table>

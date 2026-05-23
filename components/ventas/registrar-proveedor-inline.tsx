@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { createProveedor } from "@/app/actions";
+import { createProveedor, updateProveedor } from "@/app/actions";
 import { Field } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { TRow, TD } from "@/components/ui/table";
 
-export function RegistrarProveedorInline() {
+export function RegistrarProveedorInline({ tiposExistentes = [] }: { tiposExistentes?: string[] }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +47,14 @@ export function RegistrarProveedorInline() {
         <Field name="nombre" label="Nombre / Razón social *" placeholder="Proveedor de madera SAC" required className="sm:col-span-2" />
         <Field name="documento" label="RUC / DNI" placeholder="20123456789" />
         <Field name="telefono" label="Teléfono" placeholder="999 000 000" />
+        <div className="sm:col-span-2">
+          <Field name="tipo_proveedor" label="Tipo de proveedor" placeholder="Madera, insumos, servicios, etc." list="proveedor-tipos-list" />
+          <datalist id="proveedor-tipos-list">
+            {tiposExistentes.map((t) => (
+              <option key={t} value={t} />
+            ))}
+          </datalist>
+        </div>
         {error && <p className="sm:col-span-2 text-xs text-red-500">{error}</p>}
         <div className="sm:col-span-2 flex justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={() => { setOpen(false); setError(null); }}>Cancelar</Button>
@@ -53,5 +62,97 @@ export function RegistrarProveedorInline() {
         </div>
       </form>
     </div>
+  );
+}
+
+export function EditarProveedorInline({
+  proveedor,
+  tiposExistentes,
+  onClose,
+}: {
+  proveedor: { id: string; nombre: string; documento: string | null; telefono: string | null; tipo_proveedor: string | null };
+  tiposExistentes: string[];
+  onClose: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(formData: FormData) {
+    setLoading(true);
+    setError(null);
+    try {
+      await updateProveedor(proveedor.id, formData);
+      onClose();
+      window.location.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al actualizar.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form action={handleSubmit} className="flex flex-col gap-3 p-3 bg-[var(--katia-surface-raised)] rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] mt-2 w-full">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field name="nombre" label="Nombre / Razón social *" defaultValue={proveedor.nombre} required />
+        <Field name="documento" label="Documento" defaultValue={proveedor.documento ?? ""} />
+        <Field name="telefono" label="Teléfono" defaultValue={proveedor.telefono ?? ""} />
+        <div>
+          <Field name="tipo_proveedor" label="Tipo de proveedor" defaultValue={proveedor.tipo_proveedor ?? ""} list="edit-proveedor-tipos-list" />
+          <datalist id="edit-proveedor-tipos-list">
+            {tiposExistentes.map((t) => (
+              <option key={t} value={t} />
+            ))}
+          </datalist>
+        </div>
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
+        <Button type="submit" size="sm" disabled={loading}>{loading ? "Guardando…" : "Guardar Cambios"}</Button>
+      </div>
+    </form>
+  );
+}
+
+export function ProveedorRowWrapper({
+  p,
+  tiposExistentes,
+}: {
+  p: { id: string; nombre: string; documento: string | null; telefono: string | null; tipo_proveedor: string | null; created_at: string };
+  tiposExistentes: string[];
+}) {
+  const [editing, setEditing] = useState(false);
+
+  if (editing) {
+    return (
+      <TRow>
+        <TD colSpan={6} className="p-4 bg-[var(--katia-surface-raised)]">
+          <div className="text-sm font-bold text-[var(--katia-text-primary)] mb-2">Editar Proveedor: {p.nombre}</div>
+          <EditarProveedorInline proveedor={p} tiposExistentes={tiposExistentes} onClose={() => setEditing(false)} />
+        </TD>
+      </TRow>
+    );
+  }
+
+  return (
+    <TRow>
+      <TD className="font-medium">{p.nombre}</TD>
+      <TD className="font-mono text-xs">{p.documento ?? "—"}</TD>
+      <TD className="font-mono text-xs">{p.telefono ?? "—"}</TD>
+      <TD className="text-sm">{p.tipo_proveedor ?? "—"}</TD>
+      <TD className="text-xs text-[var(--katia-text-tertiary)]">
+        {new Date(p.created_at).toLocaleDateString("es-PE")}
+      </TD>
+      <TD>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="text-xs font-semibold text-[var(--katia-primary)] hover:underline"
+        >
+          Editar
+        </button>
+      </TD>
+    </TRow>
   );
 }

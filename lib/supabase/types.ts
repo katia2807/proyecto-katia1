@@ -91,6 +91,7 @@ export type Database = {
           placa: string | null;
           activo: boolean;
           created_at: string;
+          tipo_vehiculo: string | null;
         };
         Insert: {
           id?: string;
@@ -100,12 +101,14 @@ export type Database = {
           placa?: string | null;
           activo?: boolean;
           created_at?: string;
+          tipo_vehiculo?: string | null;
         };
         Update: {
           nombre?: string;
           telefono?: string | null;
           placa?: string | null;
           activo?: boolean;
+          tipo_vehiculo?: string | null;
         };
       };
       proveedores: {
@@ -116,6 +119,7 @@ export type Database = {
           documento: string | null;
           telefono: string | null;
           created_at: string;
+          tipo_proveedor: string | null;
         };
         Insert: {
           id?: string;
@@ -124,11 +128,13 @@ export type Database = {
           documento?: string | null;
           telefono?: string | null;
           created_at?: string;
+          tipo_proveedor?: string | null;
         };
         Update: {
           nombre?: string;
           documento?: string | null;
           telefono?: string | null;
+          tipo_proveedor?: string | null;
         };
       };
       servicios_aserradero: {
