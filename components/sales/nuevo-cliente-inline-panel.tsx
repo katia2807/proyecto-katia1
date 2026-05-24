@@ -14,7 +14,7 @@ export function NuevoClienteInlinePanel({
   onCancel,
   temporal = false,
 }: {
-  onCreated: (id: string, nombre: string) => void;
+  onCreated: (id: string, nombre: string, documento?: string, ruc?: string) => void;
   onCancel: () => void;
   temporal?: boolean;
 }) {
@@ -50,9 +50,13 @@ export function NuevoClienteInlinePanel({
     try {
       const result = await createCliente(formData);
       if (result && typeof result === "object" && "id" in result) {
+        const docVal = formData.get("documento") as string || "";
+        const rucVal = formData.get("ruc") as string || "";
         onCreated(
           result.id as string,
           (result as { nombre?: string }).nombre ?? nombre,
+          docVal,
+          rucVal
         );
       } else {
         onCancel();

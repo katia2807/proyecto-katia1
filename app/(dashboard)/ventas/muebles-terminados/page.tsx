@@ -58,7 +58,7 @@ export default async function MueblesTerminadosPage() {
         <div className="flex flex-wrap gap-2">
           {canMutate ? (
             <MueblesTerminadosContextPanels
-              clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre }))}
+              clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre, ruc: c.ruc || null, documento: c.documento || null }))}
               muebles={muebles.map((m) => ({
                 id: m.id,
                 codigo: m.codigo,

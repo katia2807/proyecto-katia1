@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useMemo, useState, useCallback, useActionState, useEffect, useRef } from "react";
 
-type ClienteOpt = { id: string; nombre: string };
+type ClienteOpt = { id: string; nombre: string; ruc?: string | null; documento?: string | null };
 type ChoferOpt = { id: string; nombre: string; telefono?: string | null; placa?: string | null };
 type MuebleOpt = {
   id: string;
@@ -107,6 +107,21 @@ export function MueblesTerminadosContextPanels({
     syncFormValues();
   }
 
+  const selectedCliente = useMemo(() => {
+    const all = [...clientes, ...clientesLocales];
+    return all.find((c) => c.id === clienteVentaId);
+  }, [clienteVentaId, clientes, clientesLocales]);
+
+  useEffect(() => {
+    if (selectedCliente) {
+      setRucFactura(selectedCliente.ruc || "");
+      setDniBoleta(selectedCliente.documento || "");
+    } else {
+      setRucFactura("");
+      setDniBoleta("");
+    }
+  }, [selectedCliente]);
+
   // Sincronizar al cambiar de paso
   useEffect(() => {
     if (step === 4) {
@@ -187,10 +202,12 @@ export function MueblesTerminadosContextPanels({
     }
   }, [muebleCatalogoId, activeMuebles]);
 
-  function handleClienteCreado(id: string, nombre: string) {
-    setClientesLocales((prev) => [...prev, { id, nombre }]);
+  function handleClienteCreado(id: string, nombre: string, documento?: string, ruc?: string) {
+    setClientesLocales((prev) => [...prev, { id, nombre, documento, ruc }]);
     setClienteVentaId(id);
     setModoCliente("buscar");
+    if (documento) setDniBoleta(documento);
+    if (ruc) setRucFactura(ruc);
   }
 
   // Cálculos de validaciones visuales
