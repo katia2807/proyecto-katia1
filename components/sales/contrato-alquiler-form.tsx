@@ -64,6 +64,7 @@ export function ContratoAlquilerForm({
   const [tarifaUnidad, setTarifaUnidad] = useState<(typeof tarifas)[number]["value"]>(
     "hora_maquina",
   );
+  const [montoAdelanto, setMontoAdelanto] = useState("");
 
   const montoTotal = useMemo(() => {
     return tarifa * dias;
@@ -406,7 +407,12 @@ export function ContratoAlquilerForm({
             <p className="text-xs uppercase tracking-wide font-bold text-[var(--color-text-secondary)]">
               Datos de pago
             </p>
-            <PagoFormFields defaultModalidadPago="adelanto" />
+            <PagoFormFields
+              key={`${montoTotal}-${deposito30}`}
+              defaultModalidadPago="adelanto"
+              defaultAdelanto={montoAdelanto !== "" ? montoAdelanto : String(deposito30)}
+              onChangeAdelanto={setMontoAdelanto}
+            />
           </div>
         </div>
 
@@ -525,7 +531,7 @@ export function ContratoAlquilerForm({
                 </div>
                 <div className="flex justify-between text-sm font-bold text-[var(--color-success)] bg-[var(--color-success)]/10 px-2 py-1.5 rounded-lg border border-[var(--color-success)]/20 mt-1">
                   <span>Depósito de garantía (30%):</span>
-                  <span>{formatPen(deposito30)}</span>
+                  <span>{formatPen(montoAdelanto !== "" ? Number(montoAdelanto) : deposito30)}</span>
                 </div>
               </div>
             </div>

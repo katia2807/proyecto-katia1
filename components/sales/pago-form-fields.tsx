@@ -12,6 +12,7 @@ type PagoFormFieldsProps = {
   /** Mostrar también un input de monto adelantado cuando modalidad=adelanto. */
   showAdelantoInput?: boolean;
   defaultAdelanto?: string;
+  onChangeAdelanto?: (value: string) => void;
 };
 
 const metodos: { value: MetodoPago; label: string }[] = [
@@ -40,6 +41,7 @@ export function PagoFormFields({
   defaultFechaPagoCredito = "",
   showAdelantoInput = true,
   defaultAdelanto = "0",
+  onChangeAdelanto,
 }: PagoFormFieldsProps) {
   const [modalidad, setModalidad] = useState<ModalidadPago>(defaultModalidadPago);
   const name = (n: string) => (prefix ? `${prefix}_${n}` : n);
@@ -91,6 +93,7 @@ export function PagoFormFields({
           min="0"
           step="0.01"
           defaultValue={defaultAdelanto}
+          onChange={(e) => onChangeAdelanto?.(e.target.value)}
           required
         />
       ) : showAdelantoInput ? (

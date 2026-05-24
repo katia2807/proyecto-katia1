@@ -3351,7 +3351,7 @@ export async function createVentaMuebleTerminado(formData: FormData) {
         direccion_entrega: parsed.data.direccionEntrega?.trim() || null,
         estado_entrega: parsed.data.estadoEntrega,
         metodo_pago: parsed.data.metodoPago,
-        modalidad_pago: parsed.data.modalidadPago,
+        modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
         fecha_pago_credito: fechaCredito,
         correlativo,
         fecha: parsed.data.fecha,
@@ -3872,7 +3872,7 @@ export async function createVentaMaderaCortada(formData: FormData) {
         precio_por_pt: parsed.data.precioPorPt,
         total: parsed.data.total,
         metodo_pago: parsed.data.metodoPago,
-        modalidad_pago: parsed.data.modalidadPago,
+        modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
         fecha_pago_credito: fechaCredito,
         chofer_id: parsed.data.choferId || null,
         tipo_entrega: parsed.data.tipoEntrega,
@@ -4089,7 +4089,7 @@ export async function createContratoAlquiler(formData: FormData) {
         penalidad_devolucion_tardia_pct: PENALIDAD_ALQUILER_PCT_DEFAULT,
         penalidad_danios_pct: PENALIDAD_ALQUILER_PCT_DEFAULT,
         metodo_pago: parsed.data.metodoPago,
-        modalidad_pago: parsed.data.modalidadPago,
+        modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
         fecha_pago_credito: fechaCredito,
       })
       .select("id")
