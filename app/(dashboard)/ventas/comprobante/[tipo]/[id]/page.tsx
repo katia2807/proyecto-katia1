@@ -212,10 +212,29 @@ async function getProductoMaderaById(id: string) {
   return data ?? null;
 }
 
+async function getAdelantoFromCaja(referenciaId: string): Promise<number> {
+  if (!hasSupabaseEnv()) return 0;
+  const supabase = getSupabaseServerClient();
+  const { data } = await supabase
+    .from("movimientos_caja")
+    .select("monto")
+    .eq("referencia_id", referenciaId)
+    .eq("tipo", "ingreso")
+    .maybeSingle();
+  return data ? Number(data.monto) : 0;
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default async function ComprobantePage({ params }: { params: Promise<Params> }) {
+export default async function ComprobantePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const { tipo, id } = await params;
+  const sParams = await searchParams;
 
   if (!["madera", "mueble", "aserradero", "venta-madera"].includes(tipo)) notFound();
 
@@ -370,6 +389,40 @@ export default async function ComprobantePage({ params }: { params: Promise<Para
     ];
   }
 
+  // Fetch advance from movements of cash (caja)
+  let montoAdelanto = 0;
+  if (modalidad === "adelanto") {
+    montoAdelanto = await getAdelantoFromCaja(id);
+  }
+
+  // Determine doc type (Factura, Boleta, Nota de Venta)
+  const queryComprobante =
+    (typeof sParams?.tipoComprobante === "string" ? sParams.tipoComprobante : undefined) ||
+    (typeof sParams?.comprobante === "string" ? sParams.comprobante : undefined) ||
+    (typeof sParams?.tipo_comprobante === "string" ? sParams.tipo_comprobante : undefined);
+
+  let docType = "NOTA DE VENTA";
+  if (queryComprobante === "factura") {
+    docType = "FACTURA DE VENTA";
+  } else if (queryComprobante === "boleta") {
+    docType = "BOLETA DE VENTA";
+  } else if (queryComprobante === "nota_venta") {
+    docType = "NOTA DE VENTA";
+  } else {
+    // Fallback: check client document
+    const isRuc = clienteDoc && clienteDoc.trim().length === 11 && (clienteDoc.trim().startsWith("20") || clienteDoc.trim().startsWith("10"));
+    if (isRuc) {
+      docType = "FACTURA DE VENTA";
+    } else {
+      const isDni = clienteDoc && clienteDoc.trim().length === 8;
+      if (isDni) {
+        docType = "BOLETA DE VENTA";
+      } else {
+        docType = "NOTA DE VENTA";
+      }
+    }
+  }
+
   return (
     <>
       {/* Print + theme CSS */}
@@ -424,13 +477,16 @@ export default async function ComprobantePage({ params }: { params: Promise<Para
             </div>
 
             {/* Voucher box */}
-            <div className="rounded-xl border-2 border-[var(--color-border,#334155)] px-5 py-3 text-center">
-              <div className="no-print mb-2 flex gap-2">
-                <span className="rounded bg-[var(--color-accent,#3b82f6)] px-2 py-0.5 text-xs font-semibold text-white">BOLETA</span>
-                <span className="rounded border border-[var(--color-border,#e2e8f0)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-secondary,#64748b)]">FACTURA</span>
+            <div className="rounded-xl border-2 border-[var(--color-border,#334155)] px-5 py-3 text-center min-w-[200px]">
+              <div className="no-print mb-2 flex justify-center">
+                <span className="rounded bg-[var(--color-accent,#3b82f6)] px-2 py-0.5 text-xs font-semibold text-white uppercase tracking-wide">
+                  {docType.replace(" DE VENTA", "")}
+                </span>
               </div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-secondary,#64748b)]">COMPROBANTE DE VENTA</p>
-              <p className="mt-1 text-lg font-bold text-[var(--color-text-primary,#0f172a)]">#{correlativo}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-secondary,#64748b)]">
+                {docType}
+              </p>
+              <p className="mt-1 text-lg font-extrabold text-[var(--color-text-primary,#0f172a)]">#{correlativo}</p>
               <p className="mt-0.5 text-xs text-[var(--color-text-secondary,#64748b)]">{fechaVenta}</p>
             </div>
           </div>
@@ -556,11 +612,23 @@ export default async function ComprobantePage({ params }: { params: Promise<Para
               </div>
 
               <div className="mt-4 flex justify-end">
-                <div className="w-64">
+                <div className="w-64 space-y-1.5">
                   <div className="voucher-total-line flex justify-between border-t border-[var(--color-border,#334155)] pt-2 text-base font-bold text-[var(--color-text-primary,#0f172a)]">
                     <span>TOTAL</span>
                     <span>{formatPen(totalSoles)}</span>
                   </div>
+                  {modalidad === "adelanto" && (
+                    <>
+                      <div className="flex justify-between text-xs text-[var(--color-success,#10b981)] font-semibold">
+                        <span>ADELANTO (PAGADO)</span>
+                        <span>{formatPen(montoAdelanto)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-[var(--color-danger,#ef4444)] font-bold border-t border-dashed border-[var(--color-border,#e2e8f0)] pt-1">
+                        <span>SALDO RESTANTE</span>
+                        <span>{formatPen(totalSoles - montoAdelanto)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </>
@@ -595,11 +663,23 @@ export default async function ComprobantePage({ params }: { params: Promise<Para
 
               {/* Total */}
               <div className="mt-4 flex justify-end">
-                <div className="w-64">
+                <div className="w-64 space-y-1.5">
                   <div className="voucher-total-line flex justify-between border-t border-[var(--color-border,#334155)] pt-2 text-base font-bold text-[var(--color-text-primary,#0f172a)]">
                     <span>TOTAL</span>
                     <span>{formatPen(totalSoles)}</span>
                   </div>
+                  {modalidad === "adelanto" && (
+                    <>
+                      <div className="flex justify-between text-xs text-[var(--color-success,#10b981)] font-semibold">
+                        <span>ADELANTO (PAGADO)</span>
+                        <span>{formatPen(montoAdelanto)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-[var(--color-danger,#ef4444)] font-bold border-t border-dashed border-[var(--color-border,#e2e8f0)] pt-1">
+                        <span>SALDO RESTANTE</span>
+                        <span>{formatPen(totalSoles - montoAdelanto)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </>
