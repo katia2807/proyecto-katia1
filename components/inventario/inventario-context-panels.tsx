@@ -127,7 +127,12 @@ export function InventarioContextPanels({
     try {
       const formData = new FormData();
       formData.append("nombre", valor);
-      await createUnidadMedida(formData);
+      const res = await createUnidadMedida(formData);
+      
+      if (res && !res.ok) {
+        showToast({ variant: "error", message: res.error || "Error al guardar la unidad de medida." });
+        return;
+      }
       
       setUnidadesExtraState((prev) => [...prev, valor]);
       setSelectedUnidad(valor);

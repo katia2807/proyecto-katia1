@@ -4908,24 +4908,46 @@ export async function deleteCajaMovimiento(
 }
 
 export async function createUnidadMedida(formData: FormData) {
-  await requireMutationAccess(writerRoles);
-  const nombre = formData.get("nombre");
-  if (!nombre || typeof nombre !== "string" || !nombre.trim()) {
-    throw new Error("El nombre de la unidad es requerido.");
-  }
-
-  if (hasSupabaseEnv()) {
-    const supabase = getSupabaseServerClient();
-    const { error } = await supabase.from("unidades_medida").insert({
-      organization_id: DEFAULT_ORG_ID,
-      nombre: nombre.trim(),
-      activo: true,
-    });
-    if (error) {
-      throw new Error(error.message);
+  try {
+    await requireMutationAccess(writerRoles);
+    const nombre = formData.get("nombre");
+    if (!nombre || typeof nombre !== "string" || !nombre.trim()) {
+      return { ok: false, error: "El nombre de la unidad es requerido." };
     }
+
+    const nombreTrimmed = nombre.trim();
+
+    if (hasSupabaseEnv()) {
+      const supabase = getSupabaseServerClient();
+
+      // Verificar si ya existe para evitar lanzar una violación de restricción única en BD
+      const { data: existing } = await supabase
+        .from("unidades_medida")
+        .select("id")
+        .eq("nombre", nombreTrimmed)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        return { ok: false, error: `La unidad de medida "${nombreTrimmed}" ya existe.` };
+      }
+
+      const { error } = await supabase.from("unidades_medida").insert({
+        organization_id: DEFAULT_ORG_ID,
+        nombre: nombreTrimmed,
+        activo: true,
+      });
+      if (error) {
+        if (error.code === "23505") {
+          return { ok: false, error: `La unidad de medida "${nombreTrimmed}" ya existe.` };
+        }
+        return { ok: false, error: error.message };
+      }
+    }
+    revalidatePath("/inventario");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Error desconocido." };
   }
-  revalidatePath("/inventario");
 }
 
 
