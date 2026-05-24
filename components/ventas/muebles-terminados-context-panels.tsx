@@ -60,8 +60,7 @@ export function MueblesTerminadosContextPanels({
   const [step, setStep] = useState(1);
   const [cantidad, setCantidad] = useState("1");
   const [fecha, setFecha] = useState(fechaDefault || new Date().toISOString().slice(0, 10));
-  const [rucFactura, setRucFactura] = useState("");
-  const [dniBoleta, setDniBoleta] = useState("");
+  // El estado rucFactura y dniBoleta redundante ha sido eliminado.
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -112,15 +111,7 @@ export function MueblesTerminadosContextPanels({
     return all.find((c) => c.id === clienteVentaId);
   }, [clienteVentaId, clientes, clientesLocales]);
 
-  useEffect(() => {
-    if (selectedCliente) {
-      setRucFactura(selectedCliente.ruc || "");
-      setDniBoleta(selectedCliente.documento || "");
-    } else {
-      setRucFactura("");
-      setDniBoleta("");
-    }
-  }, [selectedCliente]);
+  // El useEffect de sincronización redundante ha sido eliminado.
 
   // Sincronizar al cambiar de paso
   useEffect(() => {
@@ -139,8 +130,6 @@ export function MueblesTerminadosContextPanels({
     setStep(1);
     setCantidad("1");
     setFecha(fechaDefault || new Date().toISOString().slice(0, 10));
-    setRucFactura("");
-    setDniBoleta("");
     setDeliveryInfo({
       tipo_entrega: "envio",
       direccion_entrega: "",
@@ -206,8 +195,6 @@ export function MueblesTerminadosContextPanels({
     setClientesLocales((prev) => [...prev, { id, nombre, documento, ruc }]);
     setClienteVentaId(id);
     setModoCliente("buscar");
-    if (documento) setDniBoleta(documento);
-    if (ruc) setRucFactura(ruc);
   }
 
   // Cálculos de validaciones visuales
@@ -357,27 +344,7 @@ export function MueblesTerminadosContextPanels({
                 </div>
                 <input type="hidden" name="tipo_comprobante" value={tipoComprobante} />
                 
-                {tipoComprobante === "factura" && (
-                  <Field
-                    name="ruc_factura"
-                    label="RUC del cliente"
-                    placeholder="20123456789"
-                    className="mt-3"
-                    value={rucFactura}
-                    onChange={(e) => setRucFactura(e.target.value)}
-                    required
-                  />
-                )}
-                {tipoComprobante === "boleta" && (
-                  <Field
-                    name="dni_boleta"
-                    label="DNI del cliente (opcional)"
-                    placeholder="12345678"
-                    className="mt-3"
-                    value={dniBoleta}
-                    onChange={(e) => setDniBoleta(e.target.value)}
-                  />
-                )}
+                {/* Los campos RUC/DNI redundantes se han eliminado ya que el cliente seleccionado ya posee estos datos */}
               </div>
 
               {/* Cliente */}
@@ -649,12 +616,12 @@ export function MueblesTerminadosContextPanels({
                     </p>
                     {tipoComprobante === "factura" && (
                       <p className="text-xs text-[var(--color-text-secondary)]">
-                        · RUC: {rucFactura || <span className="text-red-500 font-semibold">Falta RUC</span>}
+                        · RUC: {selectedCliente?.ruc || <span className="text-red-500 font-semibold">Falta RUC</span>}
                       </p>
                     )}
                     {tipoComprobante === "boleta" && (
                       <p className="text-xs text-[var(--color-text-secondary)]">
-                        · DNI: {dniBoleta || "Opcional / No ingresado"}
+                        · DNI: {selectedCliente?.documento || "Opcional / No ingresado"}
                       </p>
                     )}
                     <p>
