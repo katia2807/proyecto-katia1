@@ -186,13 +186,13 @@ BEGIN
 
   -- Productos de ejemplo
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'inventario_productos') THEN
-    INSERT INTO public.inventario_productos (organization_id, nombre, categoria, unidad, stock_actual, stock_minimo, precio_venta, created_by)
+    INSERT INTO public.inventario_productos (organization_id, nombre, categoria, unidad, stock_actual, stock_minimo, created_by)
     VALUES
-      (p_organization_id, 'Madera Cedro 2x4x8', 'madera', 'tablon', 50, 10, 35.00, p_user_id::text),
-      (p_organization_id, 'Madera Tornillo 1x6x8', 'madera', 'tablon', 30, 5, 28.00, p_user_id::text),
-      (p_organization_id, 'Clavos 4" galvanizados', 'insumos', 'kg', 20, 5, 12.00, p_user_id::text),
-      (p_organization_id, 'Barniz transparente 1L', 'insumos', 'litro', 15, 3, 25.00, p_user_id::text),
-      (p_organization_id, 'Lija grano 120 (pliego)', 'insumos', 'unidad', 100, 20, 1.50, p_user_id::text);
+      (p_organization_id, 'Madera Cedro 2x4x8', 'madera', 'tablon', 50, 10, p_user_id::text),
+      (p_organization_id, 'Madera Tornillo 1x6x8', 'madera', 'tablon', 30, 5, p_user_id::text),
+      (p_organization_id, 'Clavos 4" galvanizados', 'insumos', 'kg', 20, 5, p_user_id::text),
+      (p_organization_id, 'Barniz transparente 1L', 'insumos', 'litro', 15, 3, p_user_id::text),
+      (p_organization_id, 'Lija grano 120 (pliego)', 'insumos', 'unidad', 100, 20, p_user_id::text);
   END IF;
 
   -- Log del seed

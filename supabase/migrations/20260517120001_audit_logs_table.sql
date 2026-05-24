@@ -36,7 +36,7 @@ CREATE POLICY "audit_logs_select_privileged" ON public.audit_logs
       SELECT 1 FROM public.perfiles p
       WHERE p.user_id = auth.uid()
         AND p.organization_id = app.current_org_id()
-        AND (p.role = 'owner' OR p.ui_role IN ('owner_admin', 'operaciones'))
+        AND (p.role = 'owner_admin' OR p.ui_role IN ('owner_admin', 'operaciones'))
     )
   );
 

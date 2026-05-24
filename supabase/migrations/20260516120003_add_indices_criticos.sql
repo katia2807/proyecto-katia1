@@ -23,7 +23,7 @@ CREATE INDEX IF NOT EXISTS idx_ventas_madera_estado     ON public.ventas_madera 
 CREATE INDEX IF NOT EXISTS idx_ventas_madera_cliente    ON public.ventas_madera (organization_id, cliente_id) WHERE deleted_at IS NULL;
 
 -- cotizaciones_unificadas
-CREATE INDEX IF NOT EXISTS idx_cotiz_org_estado         ON public.cotizaciones_unificadas (organization_id, estado) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_cotiz_org_estado         ON public.cotizaciones_unificadas (organization_id, estado_flujo) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_cotiz_org_created        ON public.cotizaciones_unificadas (organization_id, created_at DESC) WHERE deleted_at IS NULL;
 
 -- alquileres

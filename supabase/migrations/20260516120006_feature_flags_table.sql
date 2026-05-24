@@ -57,7 +57,7 @@ CREATE POLICY "feature_flags_org_owner_write" ON public.feature_flags
       SELECT 1 FROM public.perfiles
       WHERE user_id = auth.uid()
         AND organization_id = app.current_org_id()
-        AND (role = 'owner' OR ui_role = 'owner_admin')
+        AND (role = 'owner_admin' OR ui_role = 'owner_admin')
     )
   );
 

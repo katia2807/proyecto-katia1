@@ -55,7 +55,7 @@ BEGIN
           SELECT 1 FROM public.perfiles p
           WHERE p.user_id = auth.uid()
             AND p.organization_id = app.current_org_id()
-            AND (p.role = 'owner' OR p.ui_role = 'owner_admin')
+            AND (p.role = 'owner_admin' OR p.ui_role = 'owner_admin')
         )
       );
   END IF;
