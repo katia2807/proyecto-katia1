@@ -32,6 +32,7 @@ export default async function MueblesTerminadosPage() {
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
   const clientesById = new Map(clientes.map((c) => [c.id, c.nombre]));
+  const clientesMap = new Map(clientes.map((c) => [c.id, c]));
   const choferesById = new Map(choferes.map((c) => [c.id, c.nombre]));
   const muebleHelpers = new Map(muebles.map((m) => [m.id, m]));
 
@@ -163,9 +164,12 @@ export default async function MueblesTerminadosPage() {
               </TRow>
             </THead>
             <tbody>
-              {ventas.map((venta) => {
+               {ventas.map((venta) => {
                 const mueble = muebleHelpers.get(venta.mueble_catalogo_id);
                 const chofer = venta.chofer_id ? choferesById.get(venta.chofer_id) : null;
+                const cli = clientesMap.get(venta.cliente_id);
+                const hasRuc = !!(cli?.ruc && cli.ruc.trim().length === 11);
+                const printUrl = `/ventas/comprobante/mueble/${venta.id}${hasRuc ? "?tipoComprobante=factura" : "?tipoComprobante=boleta"}`;
                 return (
                   <TRow key={venta.id}>
                     <TD>{formatDate(venta.fecha)}</TD>
@@ -198,7 +202,7 @@ export default async function MueblesTerminadosPage() {
                     <TD className="text-right">
                       <div className="flex flex-wrap items-center justify-end gap-2">
                         <Link
-                          href={`/ventas/comprobante/mueble/${venta.id}`}
+                          href={printUrl}
                           target="_blank"
                           className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
                           title="Imprimir comprobante"

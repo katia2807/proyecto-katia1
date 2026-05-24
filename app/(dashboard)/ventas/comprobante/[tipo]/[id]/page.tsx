@@ -277,7 +277,7 @@ export default async function ComprobantePage({
 
     const cli     = clienteMap.get(aserraderoServicio.cliente_id);
     clienteNombre = cli?.nombre ?? "—";
-    clienteDoc    = cli?.documento ?? cli?.ruc ?? "—";
+    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
 
     if (aserraderoServicio.lineas_json) {
       try {
@@ -304,7 +304,7 @@ export default async function ComprobantePage({
 
     const cli     = clienteMap.get(ventaMadera.cliente_id);
     clienteNombre = cli?.nombre ?? "—";
-    clienteDoc    = cli?.documento ?? cli?.ruc ?? "—";
+    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
 
     for (const linea of ventaMadera.lineas) {
       let desc = "Venta de madera";
@@ -337,7 +337,7 @@ export default async function ComprobantePage({
 
     const cli      = clienteMap.get(venta.cliente_id);
     clienteNombre  = cli?.nombre ?? "—";
-    clienteDoc     = cli?.documento ?? cli?.ruc ?? "—";
+    clienteDoc     = cli?.ruc ?? cli?.documento ?? "—";
 
     const pt       = Number(venta.total_pt ?? 0).toFixed(2);
     const ppt      = Number(venta.precio_por_pt ?? 0);
@@ -374,7 +374,7 @@ export default async function ComprobantePage({
 
     const cli     = clienteMap.get(venta.cliente_id);
     clienteNombre = cli?.nombre ?? "—";
-    clienteDoc    = cli?.documento ?? cli?.ruc ?? "—";
+    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
 
     const muebleNombre = venta.mueble_catalogo_id
       ? ((await getMuebleNombre(venta.mueble_catalogo_id)) ?? "Mueble")
