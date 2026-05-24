@@ -2382,6 +2382,10 @@ export async function createInventarioProducto(formData: FormData) {
     fotoUrl: formData.get("foto_url"),
   });
   if (!parsed.success) {
+    const errors = parsed.error.flatten().fieldErrors;
+    if (errors.categoria || errors.unidad) {
+      throw new Error("Selecciona una categoría y una unidad antes de guardar.");
+    }
     throw new Error("Datos de producto inválidos.");
   }
 
@@ -2430,6 +2434,7 @@ export async function createInventarioProducto(formData: FormData) {
       stock_actual: 0,
       activo: true,
       foto_url: parsed.data.fotoUrl ?? null,
+      costo_unitario: costoUnitario > 0 ? costoUnitario : null,
     });
     if (error) {
       throw new Error(error.message);
@@ -2452,7 +2457,11 @@ export async function createInventarioProducto(formData: FormData) {
   }
   revalidatePath("/inventario");
   revalidatePath("/");
-  maybeRedirectToQuickStep(formData);
+  try {
+    maybeRedirectToQuickStep(formData);
+  } catch {
+    /* redirect intencional */
+  }
 }
 
 export async function createInventarioMovimiento(formData: FormData) {
@@ -2496,7 +2505,11 @@ export async function createInventarioMovimiento(formData: FormData) {
   }
   revalidatePath("/inventario");
   revalidatePath("/");
-  maybeRedirectToQuickStep(formData);
+  try {
+    maybeRedirectToQuickStep(formData);
+  } catch {
+    /* redirect intencional */
+  }
 }
 
 export async function submitCreateInventarioProductoForm(
