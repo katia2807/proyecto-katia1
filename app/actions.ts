@@ -1904,12 +1904,16 @@ export async function createCompraMadera(formData: FormData) {
     throw new Error("Datos de compra de madera inválidos.");
   }
 
-  const total = Number((parsed.data.cantidad * parsed.data.precioUnitario).toFixed(2));
-  const adelanto =
+  const priceCents = Math.round(parsed.data.precioUnitario * 100);
+  const totalCents = priceCents * parsed.data.cantidad;
+  const total = totalCents / 100;
+  const inputAdelantoCents = Math.round(parsed.data.adelanto * 100);
+  const adelantoCents =
     parsed.data.modalidadPago === "fiado"
-      ? Number(Math.min(parsed.data.adelanto, total).toFixed(2))
-      : total;
-  const saldoPendiente = Number((total - adelanto).toFixed(2));
+      ? Math.min(inputAdelantoCents, totalCents)
+      : totalCents;
+  const adelanto = adelantoCents / 100;
+  const saldoPendiente = (totalCents - adelantoCents) / 100;
 
   if (!hasSupabaseEnv()) {
     demoCreateCompraMadera({
@@ -3252,7 +3256,8 @@ export async function createVentaMuebleTerminado(formData: FormData) {
     throw new Error("Datos de venta de mueble inválidos.");
   }
 
-  const total = Number((parsed.data.cantidad * parsed.data.precioUnitario).toFixed(2));
+  const priceCents = Math.round(parsed.data.precioUnitario * 100);
+  const total = (priceCents * parsed.data.cantidad) / 100;
 
   let montoCaja = total;
   if (parsed.data.modalidadPago === "credito") {
@@ -3998,7 +4003,9 @@ export async function createContratoAlquiler(formData: FormData) {
   }
 
   // Calculate deposito30 dynamically
-  let deposito30 = Number((parsed.data.montoTotal * 0.3).toFixed(2));
+  const totalCents = Math.round(parsed.data.montoTotal * 100);
+  const calculatedDepCents = Math.round((totalCents * 30) / 100);
+  let deposito30 = calculatedDepCents / 100;
   if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
     if (parsed.data.adelanto !== undefined && parsed.data.adelanto > 0) {
       deposito30 = parsed.data.adelanto;
@@ -4224,7 +4231,9 @@ export async function cerrarContratoAlquiler(formData: FormData) {
 
     const deposito = row.deposito_30 != null ? Number(row.deposito_30) : 0;
     if (montoTotal != null && montoTotal > 0) {
-      const saldo = Number((montoTotal - deposito).toFixed(2));
+      const totalCents = Math.round(montoTotal * 100);
+      const depCents = Math.round(deposito * 100);
+      const saldo = (totalCents - depCents) / 100;
       if (saldo > 0) {
         const medioSaldo = mapMetodoPagoVentaToMedioCaja(row.metodo_pago ?? "efectivo");
         const { error: saldoErr } = await supabase.from("movimientos_caja").insert({

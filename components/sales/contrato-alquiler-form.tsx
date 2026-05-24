@@ -67,10 +67,15 @@ export function ContratoAlquilerForm({
   const [montoAdelanto, setMontoAdelanto] = useState("");
 
   const montoTotal = useMemo(() => {
-    return tarifa * dias;
+    const tarifaCents = Math.round(tarifa * 100);
+    return (tarifaCents * dias) / 100;
   }, [tarifa, dias]);
 
-  const deposito30 = useMemo(() => Number((montoTotal * 0.3).toFixed(2)), [montoTotal]);
+  const deposito30 = useMemo(() => {
+    const totalCents = Math.round(montoTotal * 100);
+    const depCents = Math.round((totalCents * 30) / 100);
+    return depCents / 100;
+  }, [montoTotal]);
 
   const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
   const clientesCombo = useMemo(() => contratoClientesToCompleto(todosLosClientes), [todosLosClientes]);
