@@ -28,7 +28,7 @@ type MuebleOpt = {
   stock_disponible: number | string;
 };
 
-type TipoComprobante = "nota_venta" | "boleta" | "factura";
+type TipoComprobante = "boleta" | "factura";
 
 type MueblesTerminadosContextPanelsProps = {
   clientes: ClienteOpt[];
@@ -53,7 +53,7 @@ export function MueblesTerminadosContextPanels({
   const [formKey, setFormKey] = useState(0);
   const [clienteVentaId, setClienteVentaId] = useState("");
   const [muebleCatalogoId, setMuebleCatalogoId] = useState("");
-  const [tipoComprobante, setTipoComprobante] = useState<TipoComprobante>("nota_venta");
+  const [tipoComprobante, setTipoComprobante] = useState<TipoComprobante>("boleta");
   const [precioUnitario, setPrecioUnitario] = useState("");
 
   // Nuevos estados para el wizard
@@ -134,7 +134,7 @@ export function MueblesTerminadosContextPanels({
     setFormKey((k) => k + 1);
     setClienteVentaId("");
     setMuebleCatalogoId("");
-    setTipoComprobante("nota_venta");
+    setTipoComprobante("boleta");
     setModoCliente("buscar");
     setStep(1);
     setCantidad("1");
@@ -338,7 +338,6 @@ export function MueblesTerminadosContextPanels({
                 <div className="flex gap-2">
                   {(
                     [
-                      { value: "nota_venta", label: "Nota de venta" },
                       { value: "boleta", label: "Boleta" },
                       { value: "factura", label: "Factura" },
                     ] as { value: TipoComprobante; label: string }[]

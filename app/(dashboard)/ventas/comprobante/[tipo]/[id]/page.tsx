@@ -401,25 +401,20 @@ export default async function ComprobantePage({
     (typeof sParams?.comprobante === "string" ? sParams.comprobante : undefined) ||
     (typeof sParams?.tipo_comprobante === "string" ? sParams.tipo_comprobante : undefined);
 
-  let docType = "NOTA DE VENTA";
+  let docType = "BOLETA DE VENTA";
   if (queryComprobante === "factura") {
     docType = "FACTURA DE VENTA";
   } else if (queryComprobante === "boleta") {
     docType = "BOLETA DE VENTA";
   } else if (queryComprobante === "nota_venta") {
-    docType = "NOTA DE VENTA";
+    docType = "BOLETA DE VENTA";
   } else {
     // Fallback: check client document
     const isRuc = clienteDoc && clienteDoc.trim().length === 11 && (clienteDoc.trim().startsWith("20") || clienteDoc.trim().startsWith("10"));
     if (isRuc) {
       docType = "FACTURA DE VENTA";
     } else {
-      const isDni = clienteDoc && clienteDoc.trim().length === 8;
-      if (isDni) {
-        docType = "BOLETA DE VENTA";
-      } else {
-        docType = "NOTA DE VENTA";
-      }
+      docType = "BOLETA DE VENTA";
     }
   }
 
@@ -444,7 +439,7 @@ export default async function ComprobantePage({
 
       {/* Toolbar */}
       <div className="no-print sticky top-0 z-50 flex items-center justify-between gap-4 bg-[var(--color-surface,#1e293b)] border-b border-[var(--color-border,#334155)] px-6 py-3 shadow">
-        <a href="javascript:history.back()" className="text-sm text-[var(--color-text-secondary,#94a3b8)] hover:text-[var(--color-text-primary,#f8fafc)] transition-colors">
+        <a href="/ventas" className="text-sm text-[var(--color-text-secondary,#94a3b8)] hover:text-[var(--color-text-primary,#f8fafc)] transition-colors">
           ← Volver
         </a>
         <div className="flex items-center gap-3">
