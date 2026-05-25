@@ -282,7 +282,7 @@ export function CubicajeInput({
                       min="0"
                       step="1"
                       className={`${inputClass} text-right`}
-                      value={p.cantidad}
+                      value={p.cantidad === 0 ? "" : p.cantidad}
                       onChange={(e) => actualizar(p.id, { cantidad: Number(e.target.value) || 0 })}
                       autoComplete="off"
                     />
@@ -293,7 +293,7 @@ export function CubicajeInput({
                       min="0"
                       step="0.01"
                       className={`${inputClass} text-right`}
-                      value={p.espesor}
+                      value={p.espesor === 0 ? "" : p.espesor}
                       onChange={(e) => actualizar(p.id, { espesor: Number(e.target.value) || 0 })}
                       autoComplete="off"
                     />
@@ -304,7 +304,7 @@ export function CubicajeInput({
                       min="0"
                       step="0.01"
                       className={`${inputClass} text-right`}
-                      value={p.ancho}
+                      value={p.ancho === 0 ? "" : p.ancho}
                       onChange={(e) => actualizar(p.id, { ancho: Number(e.target.value) || 0 })}
                       autoComplete="off"
                     />
@@ -315,7 +315,7 @@ export function CubicajeInput({
                       min="0"
                       step="0.01"
                       className={`${inputClass} text-right`}
-                      value={p.largo}
+                      value={p.largo === 0 ? "" : p.largo}
                       onChange={(e) => actualizar(p.id, { largo: Number(e.target.value) || 0 })}
                       autoComplete="off"
                     />
