@@ -12,7 +12,7 @@ import {
   getCotizacionesUnificadasRows,
   getOrdenesProduccionRows,
 } from "@/lib/data";
-import { resumenEspeciesDesdeDetalle } from "@/lib/cotizacion-unificada-payload";
+import { resumenEspeciesDesdeDetalle, parseCotizacionDetalle } from "@/lib/cotizacion-unificada-payload";
 import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 
@@ -41,6 +41,47 @@ export default async function MueblesPersonalizadosPage() {
   const cotizacionesPersonalizadas = cotizaciones.filter(
     (c) => c.tipo === "mueble_personalizado",
   );
+
+  // Filtrar cotizaciones unificadas (inteligentes) que incluyan rubro de muebles
+  const cotizacionesUnificadasMuebles = cotizacionesUnificadas.filter((c) => {
+    const d = parseCotizacionDetalle(c.detalle);
+    return d.rubros.muebles === true;
+  });
+
+  const todasLasCotizaciones = [
+    ...cotizacionesPersonalizadas.map((c) => ({
+      id: c.id,
+      correlativo: c.correlativo,
+      fecha: c.fecha,
+      clienteId: c.cliente_id,
+      especie: c.especie_madera,
+      estado: c.estado,
+      precioCalculado: Number(c.precio_calculado),
+      precioAcordado: Number(c.precio_acordado),
+      tipo: "legacy" as const,
+      printUrl: `/ventas/muebles-personalizados/${c.id}/pdf`,
+    })),
+    ...cotizacionesUnificadasMuebles.map((c) => {
+      const especie = resumenEspeciesDesdeDetalle(c.detalle) ?? "Mueble";
+      let estadoUI = c.estado_flujo as string;
+      if (c.estado_flujo === "pendiente") estadoUI = "pendiente";
+      else if (c.estado_flujo === "lista_produccion") estadoUI = "lista prod.";
+      else if (c.estado_flujo === "en_produccion") estadoUI = "producción";
+      else if (c.estado_flujo === "cobrada") estadoUI = "cobrada";
+      return {
+        id: c.id,
+        correlativo: c.correlativo,
+        fecha: c.fecha,
+        clienteId: c.cliente_id,
+        especie,
+        estado: estadoUI,
+        precioCalculado: Number(c.total),
+        precioAcordado: Number(c.total),
+        tipo: "unificada" as const,
+        printUrl: `/cotizacion/unificada/${c.id}/pdf`,
+      };
+    })
+  ].sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0));
 
   // Filtrar cotizaciones simples aprobables (estado confirmada y sin orden)
   const aprobablesSimples = cotizacionesPersonalizadas.filter(
@@ -98,7 +139,7 @@ export default async function MueblesPersonalizadosPage() {
       <Card>
         <CardTitle>Cotizaciones registradas</CardTitle>
         <CardDescription>
-          {cotizacionesPersonalizadas.length} cotizaciones de muebles personalizados.
+          {todasLasCotizaciones.length} cotizaciones de muebles personalizados.
         </CardDescription>
         <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
           <Table>
@@ -116,31 +157,29 @@ export default async function MueblesPersonalizadosPage() {
               </TRow>
             </THead>
             <tbody>
-              {cotizacionesPersonalizadas.map((c) => {
-                const cliente = clientes.find((cli) => cli.id === c.cliente_id);
-                const mensaje = `Hola ${cliente?.nombre ?? ""}, le confirmo cotización ${c.correlativo ?? ""} por ${formatPen(Number(c.precio_acordado))}.`;
+              {todasLasCotizaciones.map((c) => {
                 return (
                 <TRow key={c.id}>
                   <TD className="font-mono text-xs">{c.correlativo ?? "—"}</TD>
                   <TD>{formatDate(c.fecha)}</TD>
                   <TD>
                     <span className="inline-flex items-center gap-2">
-                      {clientesById.get(c.cliente_id) ?? "—"}
+                      {clientesById.get(c.clienteId) ?? "—"}
                     </span>
                   </TD>
-                  <TD>{c.especie_madera}</TD>
+                  <TD>{c.especie}</TD>
                   <TD>
-                    <Badge variant={c.estado === "confirmada" ? "success" : "neutral"}>
+                    <Badge variant={c.estado === "confirmada" || c.estado === "lista prod." || c.estado === "cobrada" ? "success" : "neutral"}>
                       {c.estado}
                     </Badge>
                   </TD>
-                  <TD className="text-right">{formatPen(Number(c.precio_calculado))}</TD>
+                  <TD className="text-right">{formatPen(Number(c.precioCalculado))}</TD>
                   <TD className="text-right font-semibold">
-                    {formatPen(Number(c.precio_acordado))}
+                    {formatPen(Number(c.precioAcordado))}
                   </TD>
                   <TD className="text-right">
                     <Link
-                      href={`/ventas/muebles-personalizados/${c.id}/pdf`}
+                      href={c.printUrl}
                       target="_blank"
                       className="text-xs font-semibold text-[var(--color-accent)] underline"
                     >
@@ -149,13 +188,13 @@ export default async function MueblesPersonalizadosPage() {
                   </TD>
                   {canDeleteCotizacionesMueble ? (
                     <TD className="text-right">
-                      <EliminarCotizacionMuebleButton correlativo={c.correlativo ?? null} id={c.id} clienteId={c.cliente_id} />
+                      <EliminarCotizacionMuebleButton correlativo={c.correlativo ?? null} id={c.id} clienteId={c.clienteId} tipo={c.tipo} />
                     </TD>
                   ) : null}
                 </TRow>
               );
               })}
-              {cotizacionesPersonalizadas.length === 0 ? (
+              {todasLasCotizaciones.length === 0 ? (
                 <TRow>
                   <TD
                     colSpan={canDeleteCotizacionesMueble ? 9 : 8}

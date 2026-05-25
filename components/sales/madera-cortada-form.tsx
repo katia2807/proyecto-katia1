@@ -24,6 +24,7 @@ type Producto = {
   unidad: string;
   stock_actual: number | string;
   categoria: string;
+  costo_unitario?: number | string | null;
 };
 
 type MaderaCortadaFormProps = {
@@ -45,6 +46,52 @@ const tiposCorte = [
 
 function calcularPT(cantidad: number, espesor: number, ancho: number, largo: number) {
   return (cantidad * espesor * ancho * largo) / 12;
+}
+
+function parseDimensionesDeNombre(nombre: string) {
+  const cleanName = nombre.replace(/\s+/g, " ");
+  // Match three numbers separated by x or * or unicode × (e.g. 2x10x240 or 2×6×8)
+  const threePartMatch = cleanName.match(/(\d+(?:\/\d+)?|\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\/\d+)?|\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\/\d+)?|\d+(?:\.\d+)?)/);
+  if (threePartMatch) {
+    const parseFractionOrFloat = (str: string) => {
+      if (str.includes("/")) {
+        const parts = str.split("/");
+        return parseFloat(parts[0]) / parseFloat(parts[1]);
+      }
+      return parseFloat(str);
+    };
+    
+    const espesor = parseFractionOrFloat(threePartMatch[1]);
+    const ancho = parseFractionOrFloat(threePartMatch[2]);
+    let largo = parseFractionOrFloat(threePartMatch[3]);
+    if (largo > 20) {
+      // If length > 20, assume it's in cm and convert to feet by dividing by 30
+      largo = Math.round(largo / 30);
+    }
+    const descMatch = cleanName.match(/^(.*?)\b\d/);
+    const descripcion = descMatch ? descMatch[1].trim() : cleanName;
+
+    return { espesor, ancho, largo, descripcion };
+  }
+  
+  // Match two numbers separated by x or * or × (e.g. 2x4)
+  const twoPartMatch = cleanName.match(/(\d+(?:\/\d+)?|\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+(?:\/\d+)?|\d+(?:\.\d+)?)/);
+  if (twoPartMatch) {
+    const parseFractionOrFloat = (str: string) => {
+      if (str.includes("/")) {
+        const parts = str.split("/");
+        return parseFloat(parts[0]) / parseFloat(parts[1]);
+      }
+      return parseFloat(str);
+    };
+    const espesor = parseFractionOrFloat(twoPartMatch[1]);
+    const ancho = parseFractionOrFloat(twoPartMatch[2]);
+    const descMatch = cleanName.match(/^(.*?)\b\d/);
+    const descripcion = descMatch ? descMatch[1].trim() : cleanName;
+    return { espesor, ancho, largo: 8, descripcion }; // default 8 ft length
+  }
+
+  return { espesor: 2, ancho: 6, largo: 8, descripcion: nombre };
 }
 
 export function MaderaCortadaForm({
@@ -126,6 +173,7 @@ export function MaderaCortadaForm({
       unidad: p.unidad,
       stock_actual: p.stock_actual,
       categoria: p.categoria,
+      costo_unitario: p.costo_unitario,
     }));
   }, [mockData, productos]);
 
@@ -146,6 +194,24 @@ export function MaderaCortadaForm({
   const productoSeleccionado = effectiveProductos.find((p) => p.id === productoId);
   const stockDisponible = productoSeleccionado ? Number(productoSeleccionado.stock_actual) : 0;
   const sinStock = productoSeleccionado && stockDisponible <= 0;
+
+  const defaultPiezasParaCalculadora = useMemo(() => {
+    if (!productoId) return [];
+    const prod = effectiveProductos.find((p) => p.id === productoId);
+    if (!prod) return [];
+    const parsed = parseDimensionesDeNombre(prod.nombre);
+    return [
+      {
+        id: 1,
+        style: undefined,
+        cantidad: 1,
+        espesor: parsed.espesor,
+        ancho: parsed.ancho,
+        largo: parsed.largo,
+        descripcion: parsed.descripcion,
+      },
+    ];
+  }, [productoId, effectiveProductos]);
 
   function handleClienteCreado(id: string, nombre: string, documento?: string, ruc?: string) {
     setClientesLocales((prev) => [...prev, { id, nombre, documento, ruc }]);
@@ -402,6 +468,25 @@ export function MaderaCortadaForm({
                 inputAriaLabel="Producto de inventario para descontar stock"
               />
             </label>
+
+            {productoSeleccionado ? (
+              <div className="md:col-span-2 mt-1 flex flex-wrap items-center gap-3 bg-[var(--color-primary-soft)]/10 p-3 rounded-lg border border-[var(--color-border)] text-xs text-[var(--color-text-secondary)] shadow-inner animate-in fade-in duration-200">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-[var(--color-text-secondary)]">Stock en inventario:</span>
+                  <span className={`px-2 py-0.5 rounded font-bold ${stockDisponible > 0 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"}`}>
+                    {stockDisponible} {productoSeleccionado.unidad}s disponibles
+                  </span>
+                </div>
+                {productoSeleccionado.costo_unitario ? (
+                  <div className="flex items-center gap-1.5 border-l border-[var(--color-border)] pl-3">
+                    <span className="font-semibold text-[var(--color-text-secondary)]">Costo unitario sugerido:</span>
+                    <span className="font-bold text-[var(--color-text-primary)]">
+                      {formatPen(Number(productoSeleccionado.costo_unitario))} por PT
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-4 space-y-3">
@@ -410,9 +495,17 @@ export function MaderaCortadaForm({
             </p>
 
             <CubicajeInput
+              key={productoId || "empty"}
               name="lineas_cubicaje"
               onChange={handleCubicajeChange}
-              defaultPrecioPorPT={precioPorPt > 0 ? String(precioPorPt) : "0"}
+              defaultPiezas={defaultPiezasParaCalculadora}
+              defaultPrecioPorPT={
+                productoSeleccionado && productoSeleccionado.costo_unitario
+                  ? String(productoSeleccionado.costo_unitario)
+                  : precioPorPt > 0
+                    ? String(precioPorPt)
+                    : "0"
+              }
             />
 
             {productoSeleccionado && totalPC > stockDisponible ? (

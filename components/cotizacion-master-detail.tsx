@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DetailDrawer, DetailField } from "@/components/ui/detail-drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
@@ -284,12 +284,12 @@ export function CotizacionMasterDetail({
   cotizaciones: Cotizacion[];
   canMutate: boolean;
 }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialId = searchParams.get("cotizacion");
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     initialId && cotizaciones.some((row) => row.id === initialId) ? initialId : null,
   );
-  const [editing, setEditing] = useState(false);
   const selected = useMemo(() => cotizaciones.find((row) => row.id === selectedId) ?? null, [cotizaciones, selectedId]);
 
   const [selectedEstado, setSelectedEstado] = useState<string>("pendiente");
@@ -364,9 +364,13 @@ export function CotizacionMasterDetail({
         fullPageHref={selected ? `/cotizacion?cotizacion=${selected.id}` : undefined}
         onClose={() => {
           setSelectedId(null);
-          setEditing(false);
         }}
-        onEdit={() => setEditing(true)}
+        onEdit={() => {
+          if (selected) {
+            setSelectedId(null);
+            router.push(`/cotizacion?editar=${selected.id}`);
+          }
+        }}
       >
         {selected ? (
           <div className="space-y-4">
@@ -421,12 +425,6 @@ export function CotizacionMasterDetail({
 
             {/* Detalle visual legible */}
             <DetalleVisual detalle={selected.detalle} />
-
-            {editing ? (
-              <Link href={`/cotizacion?editar=${selected.id}`} className="inline-flex">
-                Abrir formulario de edicion
-              </Link>
-            ) : null}
           </div>
         ) : null}
       </DetailDrawer>

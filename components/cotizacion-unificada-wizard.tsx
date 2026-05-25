@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createClienteCotizacionRapida,
@@ -261,6 +261,8 @@ function safeMoney(value: number) {
 }
 
 function isEmpresaClienteRow(cliente: ClienteRow) {
+  if (cliente.tipo_persona === "empresa") return true;
+  if (cliente.tipo_persona === "natural") return false;
   const doc = (cliente.documento ?? "").replace(/\D/g, "");
   if (doc.length === 11) return true; // RUC usual
   if (doc.length === 8) return false; // DNI usual
@@ -464,6 +466,8 @@ export function CotizacionUnificadaWizard({
     [mockData, productos],
   );
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editarId = searchParams.get("editar");
   const [tipoCliente, setTipoCliente] = useState<"natural" | "empresa">("natural");
   const [nombreCliente, setNombreCliente] = useState("");
   const [documento, setDocumento] = useState("");
@@ -753,14 +757,7 @@ export function CotizacionUnificadaWizard({
     if (!clienteId) return;
     const found = clientesFiltrados.some((c) => c.id === clienteId);
     if (!found) {
-      const timer = window.setTimeout(() => {
-        setClienteId(null);
-        setNombreCliente("");
-        setDocumento("");
-        setTelefono("");
-        setDireccion("");
-      }, 0);
-      return () => window.clearTimeout(timer);
+      setClienteId(null);
     }
   }, [clienteId, clientesFiltrados]);
 
@@ -1492,6 +1489,21 @@ export function CotizacionUnificadaWizard({
     setError("");
   }, [effectiveClientes]);
 
+  useEffect(() => {
+    if (editarId) {
+      const found = cotizacionesGuardadas.find((c) => c.id === editarId);
+      if (found) {
+        loadCotizacion(found);
+        setTimeout(() => {
+          const element = document.getElementById("cotizacion-wizard");
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }, 100);
+      }
+    }
+  }, [editarId, cotizacionesGuardadas, loadCotizacion]);
+
   const productoById = useCallback(
     (id: string | null) => effectiveProductos.find((p) => p.id === id) ?? null,
     [effectiveProductos],
@@ -1842,7 +1854,7 @@ export function CotizacionUnificadaWizard({
                         setMedida: (v: string) => {
                           setMedidaEspesorUI(v);
                           const espIn = toInches(Number(v) || 0, unidadEspesorUI);
-                          syncCurrentPiezaToDetalle({ espesor: round2(espIn) });
+                          syncCurrentPiezaToDetalle({ espesor: espIn });
                         },
                       },
                       {
@@ -1853,7 +1865,7 @@ export function CotizacionUnificadaWizard({
                         setMedida: (v: string) => {
                           setMedidaAnchoUI(v);
                           const ancIn = toInches(Number(v) || 0, unidadAnchoUI);
-                          syncCurrentPiezaToDetalle({ ancho: round2(ancIn) });
+                          syncCurrentPiezaToDetalle({ ancho: ancIn });
                         },
                       },
                       {
@@ -1864,7 +1876,7 @@ export function CotizacionUnificadaWizard({
                         setMedida: (v: string) => {
                           setMedidaLargoUI(v);
                           const larFt = toFeet(Number(v) || 0, unidadLargoUI);
-                          syncCurrentPiezaToDetalle({ largo: round2(larFt) });
+                          syncCurrentPiezaToDetalle({ largo: larFt });
                         },
                       },
                     ] as const
@@ -3305,7 +3317,16 @@ export function CotizacionUnificadaWizard({
                       <button
                         type="button"
                         className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
-                        onClick={() => loadCotizacion(c)}
+                        onClick={() => {
+                          loadCotizacion(c);
+                          router.push(`/cotizacion?editar=${c.id}`);
+                          setTimeout(() => {
+                            const element = document.getElementById("cotizacion-wizard");
+                            if (element) {
+                              element.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }
+                          }, 50);
+                        }}
                       >
                         Editar
                       </button>

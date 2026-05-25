@@ -1127,6 +1127,8 @@ export async function createClienteCotizacionRapida(input: {
         documento: input.documento.trim() || null,
         telefono: input.telefono.trim() || null,
         direccion: input.direccion.trim() || null,
+        tipo_persona: input.tipoPersona,
+        ruc: input.tipoPersona === "empresa" ? (input.documento.trim() || null) : null,
       })
       .select("id")
       .single();
@@ -3814,7 +3816,11 @@ export async function createVentaMaderaCortada(formData: FormData) {
     inventarioProductoId: formData.get("inventario_producto_id"),
   });
   if (!parsed.success) {
-    throw new Error("Datos de venta de madera cortada inválidos.");
+    console.error("[createVentaMaderaCortada] Validation failed:", parsed.error.format());
+    const fieldErrors = Object.entries(parsed.error.flatten().fieldErrors)
+      .map(([field, errs]) => `${field}: ${errs?.join(", ")}`)
+      .join(" | ");
+    throw new Error(`Datos de venta de madera cortada inválidos: ${fieldErrors}`);
   }
 
   if (!hasSupabaseEnv()) {

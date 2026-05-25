@@ -60,7 +60,7 @@ export function CubicajeInput({
   onChange,
 }: CubicajeInputProps) {
   const [piezas, setPiezas] = useState<Pieza[]>(
-    defaultPiezas && defaultPiezas.length > 0
+    defaultPiezas !== undefined
       ? defaultPiezas
       : [{ id: 1, cantidad: 1, espesor: 2, ancho: 6, largo: 8, descripcion: "" }],
   );
@@ -142,69 +142,77 @@ export function CubicajeInput({
             </tr>
           </thead>
           <tbody>
-            {piezasConSubtotal.map((p) => (
-              <tr key={p.id} className="border-t border-[var(--color-border)]">
-                <td className="px-2 py-1.5">
-                  <input
-                    className={inputClass}
-                    value={p.descripcion}
-                    placeholder="Tabla, listón…"
-                    onChange={(e) => actualizar(p.id, { descripcion: e.target.value })}
-                  />
-                </td>
-                <td className="px-2 py-1.5">
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    className={`${inputClass} text-right`}
-                    value={p.cantidad}
-                    onChange={(e) => actualizar(p.id, { cantidad: Number(e.target.value) || 0 })}
-                  />
-                </td>
-                <td className="px-2 py-1.5">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className={`${inputClass} text-right`}
-                    value={p.espesor}
-                    onChange={(e) => actualizar(p.id, { espesor: Number(e.target.value) || 0 })}
-                  />
-                </td>
-                <td className="px-2 py-1.5">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className={`${inputClass} text-right`}
-                    value={p.ancho}
-                    onChange={(e) => actualizar(p.id, { ancho: Number(e.target.value) || 0 })}
-                  />
-                </td>
-                <td className="px-2 py-1.5">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className={`${inputClass} text-right`}
-                    value={p.largo}
-                    onChange={(e) => actualizar(p.id, { largo: Number(e.target.value) || 0 })}
-                  />
-                </td>
-                <td className="px-2 py-1.5 text-right font-semibold">{p.subtotalPT.toFixed(2)}</td>
-                <td className="px-1 py-1.5 text-center">
-                  <button
-                    type="button"
-                    onClick={() => eliminar(p.id)}
-                    className="rounded-lg p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-soft)]/40 hover:text-[var(--color-danger)]"
-                    aria-label="Eliminar pieza"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+            {piezasConSubtotal.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-6 text-center text-xs text-[var(--color-text-secondary)] italic">
+                  Calculadora vacía. Selecciona un producto arriba o haz clic en "Agregar pieza" para empezar.
                 </td>
               </tr>
-            ))}
+            ) : (
+              piezasConSubtotal.map((p) => (
+                <tr key={p.id} className="border-t border-[var(--color-border)]">
+                  <td className="px-2 py-1.5">
+                    <input
+                      className={inputClass}
+                      value={p.descripcion}
+                      placeholder="Tabla, listón…"
+                      onChange={(e) => actualizar(p.id, { descripcion: e.target.value })}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      className={`${inputClass} text-right`}
+                      value={p.cantidad}
+                      onChange={(e) => actualizar(p.id, { cantidad: Number(e.target.value) || 0 })}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className={`${inputClass} text-right`}
+                      value={p.espesor}
+                      onChange={(e) => actualizar(p.id, { espesor: Number(e.target.value) || 0 })}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className={`${inputClass} text-right`}
+                      value={p.ancho}
+                      onChange={(e) => actualizar(p.id, { ancho: Number(e.target.value) || 0 })}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className={`${inputClass} text-right`}
+                      value={p.largo}
+                      onChange={(e) => actualizar(p.id, { largo: Number(e.target.value) || 0 })}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-semibold">{p.subtotalPT.toFixed(2)}</td>
+                  <td className="px-1 py-1.5 text-center">
+                    <button
+                      type="button"
+                      onClick={() => eliminar(p.id)}
+                      className="rounded-lg p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-soft)]/40 hover:text-[var(--color-danger)]"
+                      aria-label="Eliminar pieza"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { MaderaCortadaPanel } from "@/components/sales/madera-cortada-panel";
-import { VentaMaderaPanel } from "@/components/sales/venta-madera-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
@@ -18,7 +17,7 @@ import { formatDate, formatPen } from "@/lib/utils";
 export default async function MaderaCortadaPage() {
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
-  const [clientes, choferes, productos, ventas, zonas] = await Promise.all([
+  const [clientes, choferes, productos, zonas, ventas] = await Promise.all([
     getClientesRows(),
     getChoferesRows(),
     getInventarioProductosRows(),
@@ -50,11 +49,6 @@ export default async function MaderaCortadaPage() {
         </div>
         {canMutate ? (
           <div className="flex flex-wrap gap-2">
-            <VentaMaderaPanel
-              clientes={clientes}
-              productos={productosMadera}
-              mockData={comboMock}
-            />
             <MaderaCortadaPanel
               clientes={clientes}
               choferes={choferes}

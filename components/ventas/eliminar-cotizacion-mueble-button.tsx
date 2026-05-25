@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { deleteCotizacionMueblePersonalizada } from "@/app/actions";
+import { deleteCotizacionMueblePersonalizada, deleteCotizacionUnificada } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
@@ -11,9 +11,10 @@ type EliminarCotizacionMuebleButtonProps = {
   id: string;
   correlativo: string | null;
   clienteId: string;
+  tipo?: "legacy" | "unificada";
 };
 
-export function EliminarCotizacionMuebleButton({ id, correlativo, clienteId }: EliminarCotizacionMuebleButtonProps) {
+export function EliminarCotizacionMuebleButton({ id, correlativo, clienteId, tipo = "legacy" }: EliminarCotizacionMuebleButtonProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
@@ -38,7 +39,9 @@ export function EliminarCotizacionMuebleButton({ id, correlativo, clienteId }: E
         onOpenChange={setOpen}
         title="Eliminar cotización"
         onConfirm={async () => {
-          const res = await deleteCotizacionMueblePersonalizada(id);
+          const res = tipo === "unificada"
+            ? await deleteCotizacionUnificada(id)
+            : await deleteCotizacionMueblePersonalizada(id);
           if (!res.ok) {
             if (res.error.toLowerCase().includes("activo")) {
               showToast({ message: res.error, variant: "error" });
