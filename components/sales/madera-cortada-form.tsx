@@ -441,20 +441,9 @@ export function MaderaCortadaForm({
             Define el tipo de corte y calcula el volumen total de pies tablares (PT) de madera.
           </p>
           <div className="grid gap-3 md:grid-cols-2">
-            <SelectField
-              name="tipo_corte"
-              label="Tipo de corte"
-              value={tipoCorte}
-              onChange={(e) => setTipoCorte(e.target.value)}
-            >
-              {tiposCorte.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </SelectField>
+            <input type="hidden" name="tipo_corte" value={tipoCorte} />
 
-            <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
+            <label className="md:col-span-2 flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
               <span>Producto en inventario (opcional)</span>
               <Combobox
                 options={productoComboOptions}
@@ -653,10 +642,7 @@ export function MaderaCortadaForm({
                 <strong>Fecha:</strong> {fecha}
               </p>
 
-              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider mt-4">Detalles del Corte</h4>
-              <p className="text-sm capitalize">
-                <strong>Tipo de corte:</strong> {tipoCorte}
-              </p>
+              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider mt-4">Detalles del Cubicaje</h4>
               <p className="text-sm">
                 <strong>Volumen Pies Tablares:</strong> {totalPt.toFixed(2)} PT
               </p>

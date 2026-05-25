@@ -102,7 +102,7 @@ export function CubicajeInput({
   function agregar() {
     setPiezas((prev) => [
       ...prev,
-      { id: (prev.at(-1)?.id ?? 0) + 1, cantidad: 1, espesor: 2, ancho: 6, largo: 8, descripcion: "" },
+      { id: (prev.at(-1)?.id ?? 0) + 1, cantidad: 1, espesor: 0, ancho: 0, largo: 0, descripcion: "" },
     ]);
   }
 
