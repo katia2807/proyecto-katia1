@@ -49,6 +49,7 @@ export function VentaMaderaForm({
   const [productoId, setProductoId] = useState("");
   const [cantidad, setCantidad] = useState<number | "">("");
   const [precioUnitario, setPrecioUnitario] = useState<number | "">("");
+  const [tipoComprobante, setTipoComprobante] = useState<"boleta" | "factura">("boleta");
 
   // Payment states
   const [adelanto, setAdelanto] = useState<number | "">("");
@@ -70,6 +71,12 @@ export function VentaMaderaForm({
 
   const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
   const clientesCombo = useMemo(() => liteClientesToCompleto(todosLosClientes), [todosLosClientes]);
+  const selectedCliente = useMemo(() => {
+    return todosLosClientes.find((c) => c.id === clienteId);
+  }, [clienteId, todosLosClientes]);
+  const selectedClienteRuc = (selectedCliente as any)?.ruc || "";
+  const selectedClienteDoc = (selectedCliente as any)?.documento || "";
+  const hasRuc = !!(selectedClienteRuc && selectedClienteRuc.trim().length === 11);
 
   const effectiveProductos = useMemo((): Producto[] => {
     if (!mockData) return productos;
@@ -117,8 +124,8 @@ export function VentaMaderaForm({
   const stepErrors = useMemo(() => {
     const errors: Record<number, boolean> = {};
 
-    // Paso 1: Cliente y Fecha
-    errors[1] = !clienteId || !fecha;
+    // Paso 1: Cliente y Fecha (si es factura, RUC obligatorio de 11 dígitos)
+    errors[1] = !clienteId || !fecha || (tipoComprobante === "factura" && !hasRuc);
 
     // Paso 2: Producto, Cantidad y Precio
     errors[2] =
@@ -219,8 +226,38 @@ export function VentaMaderaForm({
       {/* PASO 1: DATOS DEL CLIENTE */}
       <div style={{ display: step === 1 ? "block" : "none" }} className="space-y-4">
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 1: Datos del cliente</h3>
-          
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 1: Datos del cliente y comprobante</h3>
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            Elige el tipo de comprobante de pago y busca o registra al cliente.
+          </p>
+
+          {/* Tipo de Comprobante */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+              Comprobante *
+            </p>
+            <div className="flex gap-2">
+              {[
+                { value: "boleta", label: "Boleta" },
+                { value: "factura", label: "Factura" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setTipoComprobante(opt.value as any)}
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    tipoComprobante === opt.value
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
+                      : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <input type="hidden" name="tipo_comprobante" value={tipoComprobante} />
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               {modoCliente === "buscar" ? (
@@ -237,8 +274,13 @@ export function VentaMaderaForm({
                     label="Cliente *"
                     placeholder="Buscar cliente…"
                     inputAriaLabel="Cliente para venta de madera clásica"
-                    className={touchedSteps[1] && !clienteId ? "!border-[var(--color-danger)]" : ""}
+                    className={touchedSteps[1] && (!clienteId || (tipoComprobante === "factura" && !hasRuc)) ? "!border-[var(--color-danger)]" : ""}
                   />
+                  {tipoComprobante === "factura" && !hasRuc && clienteId && (
+                    <p className="text-xs font-semibold text-red-500 mt-1">
+                      ⚠️ El cliente seleccionado no tiene un RUC de 11 dígitos válido.
+                    </p>
+                  )}
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -513,10 +555,23 @@ export function VentaMaderaForm({
           <div className="grid gap-4 md:grid-cols-2">
             {/* Resumen del Cliente */}
             <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
-              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cliente & Condiciones</h4>
+              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cliente & Comprobante</h4>
               <p className="text-sm">
                 <strong>Cliente:</strong> {todosLosClientes.find((c) => c.id === clienteId)?.nombre ?? "No seleccionado"}
               </p>
+              <p className="text-sm">
+                <strong>Comprobante:</strong> <span className="capitalize">{tipoComprobante}</span>
+              </p>
+              {tipoComprobante === "factura" && (
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  · RUC: {selectedClienteRuc || <span className="text-red-500 font-semibold">Falta RUC</span>}
+                </p>
+              )}
+              {tipoComprobante === "boleta" && (
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  · DNI/Doc: {selectedClienteDoc || "Opcional"}
+                </p>
+              )}
               <p className="text-sm">
                 <strong>Fecha:</strong> {fecha}
               </p>

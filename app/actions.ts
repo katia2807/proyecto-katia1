@@ -3855,8 +3855,9 @@ export async function createVentaMaderaCortada(formData: FormData) {
       if (!prod) {
         throw new Error("Producto de inventario no encontrado.");
       }
-      if (Number(prod.stock_actual) < parsed.data.totalPt) {
-        throw new Error("Stock insuficiente para la cantidad vendida.");
+      const piesCubicosRequeridos = parsed.data.totalPt / 12;
+      if (Number(prod.stock_actual) < piesCubicosRequeridos) {
+        throw new Error(`Stock insuficiente para la cantidad vendida. Se requieren ${piesCubicosRequeridos.toFixed(2)} ft³ pero solo hay ${Number(prod.stock_actual).toFixed(2)} ft³ disponibles.`);
       }
     }
 
@@ -3928,13 +3929,14 @@ export async function createVentaMaderaCortada(formData: FormData) {
     }
 
     if (productoId) {
+      const piesCubicosRequeridos = parsed.data.totalPt / 12;
       const { error: movErr } = await supabase.from("inventario_movimientos").insert({
         organization_id: DEFAULT_ORG_ID,
         producto_id: productoId,
         fecha: parsed.data.fecha,
         tipo: "salida_venta",
-        cantidad: parsed.data.totalPt,
-        costo_unitario: parsed.data.precioPorPt,
+        cantidad: piesCubicosRequeridos,
+        costo_unitario: parsed.data.precioPorPt * 12,
         referencia: `venta_madera_cortada:${venta.id}`,
       });
       if (movErr) {

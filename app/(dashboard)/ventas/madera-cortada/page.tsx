@@ -28,6 +28,7 @@ export default async function MaderaCortadaPage() {
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
   const clientesById = new Map(clientes.map((c) => [c.id, c.nombre]));
+  const clientesMap = new Map(clientes.map((c) => [c.id, c]));
 
   const productosMadera = productos.filter((p) =>
     p.categoria.toLowerCase().includes("madera"),
@@ -122,18 +123,23 @@ export default async function MaderaCortadaPage() {
                   <TD className="capitalize">{venta.estado}</TD>
                   <TD className="text-right font-semibold">{formatPen(Number(venta.total))}</TD>
                   <TD>
-                    <Link
-                      href={
-                        venta.correlativo !== null
-                          ? `/ventas/comprobante/venta-madera/${venta.id}`
-                          : `/ventas/comprobante/madera/${venta.id}`
-                      }
-                      target="_blank"
-                      className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
-                      title="Imprimir comprobante"
-                    >
-                      🖨️
-                    </Link>
+                    {(() => {
+                      const cli = clientesMap.get(venta.cliente_id);
+                      const hasRuc = !!(cli?.ruc && cli.ruc.trim().length === 11);
+                      const printUrl = (venta.correlativo !== null
+                        ? `/ventas/comprobante/venta-madera/${venta.id}`
+                        : `/ventas/comprobante/madera/${venta.id}`) + `?tipoComprobante=${hasRuc ? "factura" : "boleta"}`;
+                      return (
+                        <Link
+                          href={printUrl}
+                          target="_blank"
+                          className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                          title="Imprimir comprobante"
+                        >
+                          🖨️
+                        </Link>
+                      );
+                    })()}
                   </TD>
                 </TRow>
               ))}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPen } from "@/lib/utils";
@@ -27,6 +27,8 @@ type CubicajeInputProps = {
   totalPtName?: string;
   /** Nombre del campo oculto que reporta el volumen total en m³. */
   totalM3Name?: string;
+  /** Callback opcional para notificar cambios de valores al padre */
+  onChange?: (data: { totalPT: number; totalPC: number; precioPorPT: number; totalSoles: number; piezas: Pieza[] }) => void;
 };
 
 /**
@@ -55,6 +57,7 @@ export function CubicajeInput({
   defaultPrecioPorPT = "0",
   totalPtName = "total_pt",
   totalM3Name = "total_m3",
+  onChange,
 }: CubicajeInputProps) {
   const [piezas, setPiezas] = useState<Pieza[]>(
     defaultPiezas && defaultPiezas.length > 0
@@ -73,11 +76,28 @@ export function CubicajeInput({
     [piezasConSubtotal],
   );
 
+  const totalPC = useMemo(() => totalPT / 12, [totalPT]);
   const totalM3 = useMemo(() => ptAM3(totalPT), [totalPT]);
   const precioActivo = precioEditable
     ? Number.parseFloat(precioInput.replace(",", ".")) || 0
     : (precioPorPT ?? 0);
   const totalSoles = totalPT * precioActivo;
+
+  // Notificar al padre cuando cambien los valores calculados
+  useEffect(() => {
+    if (onChange) {
+      onChange({
+        totalPT,
+        totalPC,
+        precioPorPT: precioActivo,
+        totalSoles,
+        piezas: piezasConSubtotal.map(p => ({
+          ...p,
+          descripcion: p.descripcion || ""
+        })),
+      });
+    }
+  }, [totalPT, totalPC, precioActivo, totalSoles, piezasConSubtotal, onChange]);
 
   function agregar() {
     setPiezas((prev) => [
@@ -197,8 +217,8 @@ export function CubicajeInput({
           <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5">
             Total PT: <span className="font-bold">{totalPT.toFixed(2)}</span>
           </span>
-          <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5">
-            Volumen: <span className="font-bold">{totalM3.toFixed(4)} m³</span>
+          <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 bg-[var(--color-primary-soft)]/20 text-[var(--color-primary)]">
+            Total Pie Cúbico: <span className="font-bold">{totalPC.toFixed(2)} ft³</span>
           </span>
         </div>
       </div>

@@ -3012,8 +3012,8 @@ export function demoCreateVentaMaderaCortada(input: {
       producto_id: input.inventario_producto_id,
       fecha: input.fecha,
       tipo: "salida_venta",
-      cantidad: input.total_pt,
-      costo_unitario: input.precio_por_pt,
+      cantidad: input.total_pt / 12,
+      costo_unitario: input.precio_por_pt * 12,
       referencia: `venta_madera_cortada:${venta.id}`,
     });
   }

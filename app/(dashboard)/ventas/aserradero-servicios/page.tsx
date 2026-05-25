@@ -22,6 +22,7 @@ export default async function AserraderoServiciosPage() {
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
   const clientesById = new Map(clientes.map((c) => [c.id, c.nombre]));
+  const clientesMap = new Map(clientes.map((c) => [c.id, c]));
 
   const totalIngresos = servicios.reduce((acc, s) => acc + Number(s.precio_cobrado), 0);
   const totalUtilidad = servicios.reduce((acc, s) => acc + Number(s.utilidad), 0);
@@ -100,16 +101,23 @@ export default async function AserraderoServiciosPage() {
                   <TD className="text-right text-[var(--color-success)]">
                     {formatPen(Number(s.utilidad))}
                   </TD>
-                  <TD>
-                    <Link
-                      href={`/ventas/comprobante/aserradero/${s.id}`}
-                      target="_blank"
-                      className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
-                      title="Imprimir comprobante"
-                    >
-                      🖨️
-                    </Link>
-                  </TD>
+                   <TD>
+                    {(() => {
+                      const cli = clientesMap.get(s.cliente_id);
+                      const hasRuc = !!(cli?.ruc && cli.ruc.trim().length === 11);
+                      const printUrl = `/ventas/comprobante/aserradero/${s.id}?tipoComprobante=${hasRuc ? "factura" : "boleta"}`;
+                      return (
+                        <Link
+                          href={printUrl}
+                          target="_blank"
+                          className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                          title="Imprimir comprobante"
+                        >
+                          🖨️
+                        </Link>
+                      );
+                    })()}
+                   </TD>
                 </TRow>
               ))}
               {servicios.length === 0 ? (

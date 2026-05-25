@@ -1,7 +1,7 @@
 "use client";
 
 import { submitCreateVentaMaderaCortadaForm } from "@/app/actions";
-import { useMemo, useState, useEffect, useActionState } from "react";
+import { useMemo, useState, useEffect, useActionState, useCallback } from "react";
 import { EntregaFormFields } from "@/components/sales/entrega-form-fields";
 import { PagoFormFields } from "@/components/sales/pago-form-fields";
 import { NuevoClienteInlinePanel } from "@/components/sales/nuevo-cliente-inline-panel";
@@ -14,6 +14,7 @@ import { formatPen } from "@/lib/utils";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import type { ZonaEntregaRow } from "@/lib/demo-store";
 import { useToast } from "@/components/ui/toast";
+import { CubicajeInput } from "@/components/sales/cubicaje-input";
 
 type Cliente = { id: string; nombre: string };
 type Chofer = { id: string; nombre: string; telefono?: string | null; placa?: string | null };
@@ -67,30 +68,26 @@ export function MaderaCortadaForm({
   const [clientesLocales, setClientesLocales] = useState<Cliente[]>([]);
   const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
 
+  // Paso 1 Comprobante
+  const [tipoComprobante, setTipoComprobante] = useState<"boleta" | "factura">("boleta");
+
   // Paso 2 States
   const [tipoCorte, setTipoCorte] = useState("tabla");
   const [productoId, setProductoId] = useState("");
-  const [cantidad, setCantidad] = useState<number | "">("");
-  const [espesor, setEspesor] = useState<number | "">("");
-  const [ancho, setAncho] = useState<number | "">("");
-  const [largo, setLargo] = useState<number | "">("");
-  const [precioPorPt, setPrecioPorPt] = useState<number | "">("");
+  const [totalPt, setTotalPt] = useState<number>(0);
+  const [totalPC, setTotalPC] = useState<number>(0);
+  const [precioPorPt, setPrecioPorPt] = useState<number>(0);
+  const [totalSolesCalculado, setTotalSolesCalculado] = useState<number>(0);
 
   // Paso 3 States
   const [totalManual, setTotalManual] = useState<string>("");
 
-  const totalPt = useMemo(() => {
-    const cant = cantidad === "" ? 0 : cantidad;
-    const esp = espesor === "" ? 0 : espesor;
-    const anc = ancho === "" ? 0 : ancho;
-    const lar = largo === "" ? 0 : largo;
-    return calcularPT(cant, esp, anc, lar);
-  }, [cantidad, espesor, ancho, largo]);
-
-  const totalSolesCalculado = useMemo(() => {
-    const price = precioPorPt === "" ? 0 : precioPorPt;
-    return totalPt * price;
-  }, [totalPt, precioPorPt]);
+  const handleCubicajeChange = useCallback((data: { totalPT: number; totalPC: number; precioPorPT: number; totalSoles: number }) => {
+    setTotalPt(data.totalPT);
+    setTotalPC(data.totalPC);
+    setPrecioPorPt(data.precioPorPT);
+    setTotalSolesCalculado(data.totalSoles);
+  }, []);
 
   const totalFinal = totalManual !== "" ? (Number(totalManual) || 0) : totalSolesCalculado;
 
@@ -103,11 +100,11 @@ export function MaderaCortadaForm({
       // Limpiar estados de la calculadora y formulario
       setClienteId("");
       setFecha(hoy);
-      setCantidad("");
-      setEspesor("");
-      setAncho("");
-      setLargo("");
-      setPrecioPorPt("");
+      setTipoComprobante("boleta");
+      setTotalPt(0);
+      setTotalPC(0);
+      setPrecioPorPt(0);
+      setTotalSolesCalculado(0);
       setProductoId("");
       setTotalManual("");
       
@@ -150,8 +147,8 @@ export function MaderaCortadaForm({
   const stockDisponible = productoSeleccionado ? Number(productoSeleccionado.stock_actual) : 0;
   const sinStock = productoSeleccionado && stockDisponible <= 0;
 
-  function handleClienteCreado(id: string, nombre: string) {
-    setClientesLocales((prev) => [...prev, { id, nombre }]);
+  function handleClienteCreado(id: string, nombre: string, documento?: string, ruc?: string) {
+    setClientesLocales((prev) => [...prev, { id, nombre, documento, ruc }]);
     setClienteId(id);
     setModoCliente("buscar");
   }
@@ -161,32 +158,31 @@ export function MaderaCortadaForm({
     setStep(targetStep);
   }
 
+  const selectedCliente = useMemo(() => {
+    return todosLosClientes.find((c) => c.id === clienteId);
+  }, [clienteId, todosLosClientes]);
+  const selectedClienteRuc = (selectedCliente as any)?.ruc || "";
+  const selectedClienteDoc = (selectedCliente as any)?.documento || "";
+  const hasRuc = !!(selectedClienteRuc && selectedClienteRuc.trim().length === 11);
+
   // Dynamic Validation indicators per step
   const stepErrors = useMemo(() => {
     const errors: Record<number, boolean> = {};
 
-    // Paso 1: Cliente y Fecha
-    errors[1] = !clienteId || !fecha;
+    // Paso 1: Cliente y Fecha (si es factura, RUC obligatorio de 11 dígitos)
+    errors[1] = !clienteId || !fecha || (tipoComprobante === "factura" && !hasRuc);
 
     // Paso 2: Detalles de Corte y Calculadora
     errors[2] =
-      cantidad === "" ||
-      cantidad <= 0 ||
-      espesor === "" ||
-      espesor <= 0 ||
-      ancho === "" ||
-      ancho <= 0 ||
-      largo === "" ||
-      largo <= 0 ||
-      precioPorPt === "" ||
-      precioPorPt < 0 ||
-      (productoSeleccionado !== undefined && cantidad > stockDisponible);
+      totalPt <= 0 ||
+      precioPorPt <= 0 ||
+      (productoSeleccionado !== undefined && totalPC > stockDisponible);
 
     // Paso 3: Resumen y Cobro (si es totalManual menor a cero, por ejemplo)
     errors[3] = totalFinal < 0;
 
     return errors;
-  }, [clienteId, fecha, cantidad, espesor, ancho, largo, precioPorPt, totalFinal, productoSeleccionado, stockDisponible]);
+  }, [clienteId, fecha, tipoComprobante, hasRuc, totalPt, precioPorPt, totalPC, stockDisponible, productoSeleccionado, totalFinal]);
 
   const anyValidationError = stepErrors[1] || stepErrors[2] || stepErrors[3];
 
@@ -257,10 +253,41 @@ export function MaderaCortadaForm({
       {/* ── PASO 1: DATOS DEL CLIENTE ── */}
       <div style={{ display: step === 1 ? "block" : "none" }} className="space-y-4">
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 1: Datos del cliente</h3>
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 1: Datos del cliente y comprobante</h3>
           <p className="text-xs text-[var(--color-text-secondary)]">
-            Busca un cliente existente o registra uno nuevo para la venta de madera cortada.
+            Elige el tipo de comprobante de pago y busca o registra al cliente.
           </p>
+
+          {/* Tipo de Comprobante */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+              Comprobante *
+            </p>
+            <div className="flex gap-2">
+              {[
+                { value: "boleta", label: "Boleta" },
+                { value: "factura", label: "Factura" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setTipoComprobante(opt.value as any);
+                    setTouchedSteps((prev) => ({ ...prev, 1: true }));
+                  }}
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    tipoComprobante === opt.value
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
+                      : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <input type="hidden" name="tipo_comprobante" value={tipoComprobante} />
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               {modoCliente === "buscar" ? (
@@ -277,8 +304,13 @@ export function MaderaCortadaForm({
                     label="Cliente *"
                     placeholder="Buscar cliente…"
                     inputAriaLabel="Cliente para venta de madera cortada"
-                    className={touchedSteps[1] && !clienteId ? "!border-[var(--color-danger)]" : ""}
+                    className={touchedSteps[1] && (!clienteId || (tipoComprobante === "factura" && !hasRuc)) ? "!border-[var(--color-danger)]" : ""}
                   />
+                  {tipoComprobante === "factura" && !hasRuc && clienteId && (
+                    <p className="text-xs font-semibold text-[var(--color-danger)] pt-1">
+                      ⚠️ El cliente seleccionado no tiene un RUC de 11 dígitos válido. Por favor edítalo o selecciona un cliente con RUC para emitir Factura.
+                    </p>
+                  )}
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -374,66 +406,18 @@ export function MaderaCortadaForm({
 
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-4 space-y-3">
             <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
-              Calculadora de pies tablares
+              Calculadora de cubicaje
             </p>
-            <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
-              <Field
-                label="Cantidad *"
-                type="number"
-                min="0"
-                step="1"
-                value={cantidad}
-                onChange={(e) => {
-                  setCantidad(e.target.value === "" ? "" : (Number(e.target.value) || 0));
-                  setTouchedSteps((prev) => ({ ...prev, 2: true }));
-                }}
-                className={
-                  touchedSteps[2] && (cantidad === "" || cantidad <= 0 || (productoSeleccionado && cantidad > stockDisponible))
-                    ? "!border-[var(--color-danger)]"
-                    : ""
-                }
-              />
-              <Field
-                label="Espesor (in) *"
-                type="number"
-                min="0"
-                step="0.01"
-                value={espesor}
-                onChange={(e) => {
-                  setEspesor(e.target.value === "" ? "" : (Number(e.target.value) || 0));
-                  setTouchedSteps((prev) => ({ ...prev, 2: true }));
-                }}
-                className={touchedSteps[2] && (espesor === "" || espesor <= 0) ? "!border-[var(--color-danger)]" : ""}
-              />
-              <Field
-                label="Ancho (in) *"
-                type="number"
-                min="0"
-                step="0.01"
-                value={ancho}
-                onChange={(e) => {
-                  setAncho(e.target.value === "" ? "" : (Number(e.target.value) || 0));
-                  setTouchedSteps((prev) => ({ ...prev, 2: true }));
-                }}
-                className={touchedSteps[2] && (ancho === "" || ancho <= 0) ? "!border-[var(--color-danger)]" : ""}
-              />
-              <Field
-                label="Largo (ft) *"
-                type="number"
-                min="0"
-                step="0.01"
-                value={largo}
-                onChange={(e) => {
-                  setLargo(e.target.value === "" ? "" : (Number(e.target.value) || 0));
-                  setTouchedSteps((prev) => ({ ...prev, 2: true }));
-                }}
-                className={touchedSteps[2] && (largo === "" || largo <= 0) ? "!border-[var(--color-danger)]" : ""}
-              />
-            </div>
 
-            {productoSeleccionado && cantidad !== "" && cantidad > stockDisponible ? (
+            <CubicajeInput
+              name="lineas_cubicaje"
+              onChange={handleCubicajeChange}
+              defaultPrecioPorPT={precioPorPt > 0 ? String(precioPorPt) : "0"}
+            />
+
+            {productoSeleccionado && totalPC > stockDisponible ? (
               <p className="text-xs font-semibold text-[var(--color-danger)] pt-1">
-                ⚠️ La cantidad ingresada ({cantidad}) excede el stock disponible ({stockDisponible} {productoSeleccionado.unidad}).
+                ⚠️ El volumen total en pies cúbicos ({totalPC.toFixed(2)} ft³) excede el stock disponible ({stockDisponible} {productoSeleccionado.unidad}).
               </p>
             ) : null}
 
@@ -442,33 +426,6 @@ export function MaderaCortadaForm({
                 ⚠️ El producto seleccionado no tiene stock disponible en inventario.
               </p>
             ) : null}
-
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
-              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
-                <p className="text-xs text-[var(--color-text-secondary)]">Total PT volumen</p>
-                <p className="text-xl font-bold">{totalPt.toFixed(2)} ft²</p>
-              </div>
-              
-              <Field
-                label="Precio por PT (S/) *"
-                type="number"
-                min="0"
-                step="0.01"
-                value={precioPorPt}
-                onChange={(e) => {
-                  setPrecioPorPt(e.target.value === "" ? "" : (Number(e.target.value) || 0));
-                  setTouchedSteps((prev) => ({ ...prev, 2: true }));
-                }}
-                className={touchedSteps[2] && (precioPorPt === "" || precioPorPt < 0) ? "!border-[var(--color-danger)]" : ""}
-              />
-              
-              <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/40 p-2">
-                <p className="text-xs text-[var(--color-text-secondary)]">Costo sugerido</p>
-                <p className="text-2xl font-black text-[var(--color-text-primary)]">
-                  {formatPen(totalSolesCalculado)}
-                </p>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -582,10 +539,23 @@ export function MaderaCortadaForm({
           <div className="grid gap-4 md:grid-cols-2">
             {/* Resumen Cliente y Corte */}
             <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
-              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cliente & Fecha</h4>
+              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cliente & Comprobante</h4>
               <p className="text-sm">
                 <strong>Cliente:</strong> {todosLosClientes.find((c) => c.id === clienteId)?.nombre ?? "No seleccionado"}
               </p>
+              <p className="text-sm">
+                <strong>Comprobante:</strong> <span className="capitalize">{tipoComprobante}</span>
+              </p>
+              {tipoComprobante === "factura" && (
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  · RUC: {selectedClienteRuc || <span className="text-red-500 font-semibold">Falta RUC</span>}
+                </p>
+              )}
+              {tipoComprobante === "boleta" && (
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  · DNI/Doc: {selectedClienteDoc || "Opcional"}
+                </p>
+              )}
               <p className="text-sm">
                 <strong>Fecha:</strong> {fecha}
               </p>
@@ -595,13 +565,13 @@ export function MaderaCortadaForm({
                 <strong>Tipo de corte:</strong> {tipoCorte}
               </p>
               <p className="text-sm">
-                <strong>Volumen:</strong> {totalPt.toFixed(2)} PT
+                <strong>Volumen Pies Tablares:</strong> {totalPt.toFixed(2)} PT
+              </p>
+              <p className="text-sm">
+                <strong>Volumen Pies Cúbicos:</strong> {totalPC.toFixed(2)} ft³
               </p>
               <p className="text-sm">
                 <strong>Costo por PT:</strong> {formatPen(Number(precioPorPt) || 0)}
-              </p>
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                Dimensiones: {cantidad || 0} pzs ({espesor || 0}{"\""} x {ancho || 0}{"\""} x {largo || 0}{"'"})
               </p>
             </div>
 

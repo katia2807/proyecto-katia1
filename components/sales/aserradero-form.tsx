@@ -48,8 +48,9 @@ export function AserraderoForm({
   const { showToast } = useToast();
   const hoy = new Date().toISOString().slice(0, 10);
   const [clienteId, setClienteId] = useState("");
-  const [clientesLocales, setClientesLocales] = useState<{ id: string; nombre: string }[]>([]);
+  const [clientesLocales, setClientesLocales] = useState<{ id: string; nombre: string; documento?: string; ruc?: string }[]>([]);
   const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
+  const [tipoComprobante, setTipoComprobante] = useState<"boleta" | "factura">("boleta");
   const [costoPorPieCubico, setCostoPorPieCubico] = useState(defaultCostoPorPieCubico);
   const [piezasJson, setPiezasJson] = useState<string>(DEFAULT_LINEAS_CUBICAJE_JSON);
   const [step, setStep] = useState(1);
@@ -96,7 +97,15 @@ export function AserraderoForm({
     [piezas],
   );
   const piesCubicos = useMemo(() => totalPT * PIE_TABLAR_A_PIE_CUBICO, [totalPT]);
-  const hasStep1Warning = !clienteId;
+  const selectedCliente = useMemo(() => {
+    const all = [...clientes, ...clientesLocales];
+    return all.find((c) => c.id === clienteId);
+  }, [clienteId, clientes, clientesLocales]);
+  const selectedClienteRuc = (selectedCliente as any)?.ruc || "";
+  const selectedClienteDoc = (selectedCliente as any)?.documento || "";
+  const hasRuc = !!(selectedClienteRuc && selectedClienteRuc.trim().length === 11);
+
+  const hasStep1Warning = !clienteId || (tipoComprobante === "factura" && !hasRuc);
   const hasStep2Warning = piezas.length === 0 || totalPT === 0;
   const costoCubicaje = useMemo(
     () => piesCubicos * costoPorPieCubico,
@@ -224,10 +233,38 @@ export function AserraderoForm({
       {/* ── PASO 1: DATOS DEL CLIENTE ── */}
       <div style={{ display: step === 1 ? "block" : "none" }} className="space-y-4">
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 1: Datos del cliente</h3>
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 1: Datos del cliente y comprobante</h3>
           <p className="text-xs text-[var(--color-text-secondary)]">
-            Busca un cliente existente o registra uno nuevo.
+            Elige el tipo de comprobante de pago y busca o registra al cliente.
           </p>
+
+          {/* Tipo de Comprobante */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+              Comprobante *
+            </p>
+            <div className="flex gap-2">
+              {[
+                { value: "boleta", label: "Boleta" },
+                { value: "factura", label: "Factura" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setTipoComprobante(opt.value as any)}
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    tipoComprobante === opt.value
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
+                      : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <input type="hidden" name="tipo_comprobante" value={tipoComprobante} />
+          </div>
+
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2">
               {modoCliente === "buscar" ? (
@@ -243,7 +280,12 @@ export function AserraderoForm({
                     inputAriaLabel="Cliente para servicio de aserradero"
                     className={hasStep1Warning ? "[&_input]:!border-red-500/80 [&_input]:focus:!border-red-500 [&_input]:focus:!ring-red-500 [&_input]:shadow-[0_0_0_1px_rgba(239,68,68,0.2)]" : ""}
                   />
-                  {hasStep1Warning && (
+                  {tipoComprobante === "factura" && !hasRuc && clienteId && (
+                    <p className="text-xs font-semibold text-red-500 mt-1">
+                      ⚠️ El cliente seleccionado no tiene un RUC de 11 dígitos válido.
+                    </p>
+                  )}
+                  {hasStep1Warning && !clienteId && (
                     <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
                       ⚠️ Debe seleccionar un cliente antes de confirmar el registro.
                     </p>
@@ -298,7 +340,10 @@ export function AserraderoForm({
             Ingresa las piezas, cantidades y dimensiones para realizar el cubicaje rápido.
           </p>
           <div className={`mt-2 rounded-xl p-1 transition-all duration-300 ${hasStep2Warning ? "border border-red-500/30 bg-red-500/5 shadow-[0_0_0_1px_rgba(239,68,68,0.1)]" : ""}`}>
-            <CubicajeInput precioEditable={false} />
+            <CubicajeInput
+              precioEditable={false}
+              onChange={(data) => setPiezasJson(JSON.stringify(data.piezas))}
+            />
           </div>
           {hasStep2Warning && (
             <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
@@ -552,8 +597,14 @@ export function AserraderoForm({
             <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-red-600 dark:text-red-400 space-y-1">
               <p className="text-sm font-bold">⚠️ Faltan datos obligatorios para registrar el servicio</p>
               <ul className="list-disc list-inside text-xs space-y-0.5 font-medium">
-                {hasStep1Warning && <li>Debes seleccionar un cliente en el Paso 1.</li>}
-                {hasStep2Warning && <li>Debes agregar al menos una pieza en el Paso 2.</li>}
+                 {hasStep1Warning && (
+                   <li>
+                     {!clienteId 
+                       ? "Debes seleccionar un cliente en el Paso 1."
+                       : "El cliente seleccionado no tiene RUC de 11 dígitos para emitir Factura."}
+                   </li>
+                 )}
+                 {hasStep2Warning && <li>Debes agregar al menos una pieza en el Paso 2.</li>}
               </ul>
               <p className="text-[11px] text-red-500/80 pt-1">
                 Por favor, regresa a los pasos correspondientes usando los botones de navegación para completar la información antes de guardar.
@@ -567,15 +618,28 @@ export function AserraderoForm({
           )}
 
           <div className="grid gap-4 md:grid-cols-2">
-            {/* Resumen Cliente y Cubicaje */}
-            <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
-              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cliente & Fecha</h4>
-              <p className="text-sm">
-                <strong>Cliente:</strong> {todosLosClientes.find((c) => c.id === clienteId)?.nombre ?? "No seleccionado"}
-              </p>
-              <p className="text-sm">
-                <strong>Fecha de Registro:</strong> {hoy}
-              </p>
+             {/* Resumen Cliente y Cubicaje */}
+             <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
+               <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cliente & Comprobante</h4>
+               <p className="text-sm">
+                 <strong>Cliente:</strong> {todosLosClientes.find((c) => c.id === clienteId)?.nombre ?? "No seleccionado"}
+               </p>
+               <p className="text-sm">
+                 <strong>Comprobante:</strong> <span className="capitalize">{tipoComprobante}</span>
+               </p>
+               {tipoComprobante === "factura" && (
+                 <p className="text-xs text-[var(--color-text-secondary)]">
+                   · RUC: {selectedClienteRuc || <span className="text-red-500 font-semibold">Falta RUC</span>}
+                 </p>
+               )}
+               {tipoComprobante === "boleta" && (
+                 <p className="text-xs text-[var(--color-text-secondary)]">
+                   · DNI/Doc: {selectedClienteDoc || "Opcional"}
+                 </p>
+               )}
+               <p className="text-sm">
+                 <strong>Fecha de Registro:</strong> {hoy}
+               </p>
               
               <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider mt-4">Detalle de Cubicaje</h4>
               <p className="text-sm">
