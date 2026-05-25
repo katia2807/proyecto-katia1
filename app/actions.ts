@@ -3848,7 +3848,45 @@ export async function createVentaMaderaCortada(formData: FormData) {
         ? parsed.data.inventarioProductoId
         : null;
 
-    if (productoId) {
+    // Parse detailed pieces for multi-product stock verification
+    const lineasRaw = formData.get("lineas_cubicaje");
+    let lineas: any[] = [];
+    if (typeof lineasRaw === "string" && lineasRaw.trim().length > 0) {
+      try {
+        lineas = JSON.parse(lineasRaw);
+      } catch (err) {
+        console.error("[createVentaMaderaCortada] Failed to parse lineas_cubicaje:", err);
+      }
+    }
+
+    const productPtMap = new Map<string, number>();
+    for (const linea of lineas) {
+      const pId = linea.inventario_producto_id;
+      if (pId && pId !== "manual" && pId.trim().length > 0) {
+        const currentPt = productPtMap.get(pId) ?? 0;
+        productPtMap.set(pId, currentPt + (linea.subtotalPT || 0));
+      }
+    }
+
+    if (productPtMap.size > 0) {
+      // Verify stock for each product in the pieces list
+      for (const [pId, ptVal] of productPtMap.entries()) {
+        const { data: prod, error: prodErr } = await supabase
+          .from("inventario_productos")
+          .select("id, nombre, stock_actual")
+          .eq("id", pId)
+          .eq("organization_id", DEFAULT_ORG_ID)
+          .maybeSingle();
+        if (prodErr || !prod) {
+          throw new Error(`Producto de inventario no encontrado: ${pId}`);
+        }
+        const pcRequeridos = ptVal / 12;
+        if (Number(prod.stock_actual) < pcRequeridos) {
+          throw new Error(`Stock insuficiente para "${prod.nombre}". Se requieren ${pcRequeridos.toFixed(2)} ft³ pero solo hay ${Number(prod.stock_actual).toFixed(2)} ft³ disponibles.`);
+        }
+      }
+    } else if (productoId) {
+      // Fallback verification for single global product
       const { data: prod, error: prodErr } = await supabase
         .from("inventario_productos")
         .select("id, stock_actual")
@@ -3934,7 +3972,27 @@ export async function createVentaMaderaCortada(formData: FormData) {
       cajaRegistrado = true;
     }
 
-    if (productoId) {
+    let movErrGlobal: string | null = null;
+    if (productPtMap.size > 0) {
+      // Record stock outputs for each product in the pieces list
+      for (const [pId, ptVal] of productPtMap.entries()) {
+        const pcRequeridos = ptVal / 12;
+        const { error: movErr } = await supabase.from("inventario_movimientos").insert({
+          organization_id: DEFAULT_ORG_ID,
+          producto_id: pId,
+          fecha: parsed.data.fecha,
+          tipo: "salida_venta",
+          cantidad: pcRequeridos,
+          costo_unitario: parsed.data.precioPorPt * 12,
+          referencia: `venta_madera_cortada:${venta.id}`,
+        });
+        if (movErr) {
+          movErrGlobal = `Error registrando movimiento para el producto ${pId}: ${movErr.message}`;
+          break;
+        }
+      }
+    } else if (productoId) {
+      // Fallback single global product movement recording
       const piesCubicosRequeridos = parsed.data.totalPt / 12;
       const { error: movErr } = await supabase.from("inventario_movimientos").insert({
         organization_id: DEFAULT_ORG_ID,
@@ -3946,17 +4004,21 @@ export async function createVentaMaderaCortada(formData: FormData) {
         referencia: `venta_madera_cortada:${venta.id}`,
       });
       if (movErr) {
-        if (cajaRegistrado) {
-          await supabase
-            .from("movimientos_caja")
-            .delete()
-            .eq("referencia_id", venta.id)
-            .eq("organization_id", DEFAULT_ORG_ID)
-            .eq("modulo_origen", "ventas_madera_cortada");
-        }
-        await supabase.from("ventas_madera_cortada").delete().eq("id", venta.id);
-        throw new Error(movErr.message);
+        movErrGlobal = movErr.message;
       }
+    }
+
+    if (movErrGlobal) {
+      if (cajaRegistrado) {
+        await supabase
+          .from("movimientos_caja")
+          .delete()
+          .eq("referencia_id", venta.id)
+          .eq("organization_id", DEFAULT_ORG_ID)
+          .eq("modulo_origen", "ventas_madera_cortada");
+      }
+      await supabase.from("ventas_madera_cortada").delete().eq("id", venta.id);
+      throw new Error(movErrGlobal);
     }
   }
   revalidatePath("/ventas");

@@ -129,11 +129,13 @@ export function MaderaCortadaForm({
   // Paso 3 States
   const [totalManual, setTotalManual] = useState<string>("");
 
-  const handleCubicajeChange = useCallback((data: { totalPT: number; totalPC: number; precioPorPT: number; totalSoles: number }) => {
+  const handleCubicajeChange = useCallback((data: { totalPT: number; totalPC: number; precioPorPT: number; totalSoles: number; piezas: any[] }) => {
     setTotalPt(data.totalPT);
     setTotalPC(data.totalPC);
     setPrecioPorPt(data.precioPorPT);
     setTotalSolesCalculado(data.totalSoles);
+    const firstProd = data.piezas.find((p) => p.inventario_producto_id)?.inventario_producto_id || "";
+    setProductoId(firstProd);
   }, []);
 
   const totalFinal = totalManual !== "" ? (Number(totalManual) || 0) : totalSolesCalculado;
@@ -442,40 +444,7 @@ export function MaderaCortadaForm({
           </p>
           <div className="grid gap-3 md:grid-cols-2">
             <input type="hidden" name="tipo_corte" value={tipoCorte} />
-
-            <label className="md:col-span-2 flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
-              <span>Producto en inventario (opcional)</span>
-              <Combobox
-                options={productoComboOptions}
-                value={productoId}
-                onChange={(val) => {
-                  setProductoId(val);
-                  setTouchedSteps((prev) => ({ ...prev, 2: true }));
-                }}
-                hiddenInputName="inventario_producto_id"
-                placeholder="Buscar producto o dejar sin inventario…"
-                inputAriaLabel="Producto de inventario para descontar stock"
-              />
-            </label>
-
-            {productoSeleccionado ? (
-              <div className="md:col-span-2 mt-1 flex flex-wrap items-center gap-3 bg-[var(--color-primary-soft)]/10 p-3 rounded-lg border border-[var(--color-border)] text-xs text-[var(--color-text-secondary)] shadow-inner animate-in fade-in duration-200">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-[var(--color-text-secondary)]">Stock en inventario:</span>
-                  <span className={`px-2 py-0.5 rounded font-bold ${stockDisponible > 0 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"}`}>
-                    {stockDisponible} {productoSeleccionado.unidad}s disponibles
-                  </span>
-                </div>
-                {productoSeleccionado.costo_unitario ? (
-                  <div className="flex items-center gap-1.5 border-l border-[var(--color-border)] pl-3">
-                    <span className="font-semibold text-[var(--color-text-secondary)]">Costo unitario sugerido:</span>
-                    <span className="font-bold text-[var(--color-text-primary)]">
-                      {formatPen(Number(productoSeleccionado.costo_unitario))} por PT
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+            <input type="hidden" name="inventario_producto_id" value={productoId} />
           </div>
 
           <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-4 space-y-3">
@@ -484,30 +453,14 @@ export function MaderaCortadaForm({
             </p>
 
             <CubicajeInput
-              key={productoId || "empty"}
               name="lineas_cubicaje"
+              totalPtName="total_pt_calc"
+              totalM3Name="total_m3_calc"
               onChange={handleCubicajeChange}
-              defaultPiezas={defaultPiezasParaCalculadora}
-              defaultPrecioPorPT={
-                productoSeleccionado && productoSeleccionado.costo_unitario
-                  ? String(productoSeleccionado.costo_unitario)
-                  : precioPorPt > 0
-                    ? String(precioPorPt)
-                    : "0"
-              }
+              defaultPiezas={[]}
+              productos={effectiveProductos}
+              defaultPrecioPorPT={precioPorPt > 0 ? String(precioPorPt) : "0"}
             />
-
-            {productoSeleccionado && totalPC > stockDisponible ? (
-              <p className="text-xs font-semibold text-[var(--color-danger)] pt-1">
-                ⚠️ El volumen total en pies cúbicos ({totalPC.toFixed(2)} ft³) excede el stock disponible ({stockDisponible} {productoSeleccionado.unidad}).
-              </p>
-            ) : null}
-
-            {sinStock ? (
-              <p className="text-xs font-semibold text-[var(--color-danger)] pt-1">
-                ⚠️ El producto seleccionado no tiene stock disponible en inventario.
-              </p>
-            ) : null}
           </div>
         </div>
 
