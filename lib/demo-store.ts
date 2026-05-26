@@ -1827,6 +1827,24 @@ export function demoDeleteOneById(category: string, id: string): { eliminados: n
   return { eliminados: 1 };
 }
 
+/** Marca un movimiento de caja como anulado (voided) sin eliminarlo.
+ * Permite mantener el registro histórico en caja mientras se excluye de
+ * los listados activos (igual que el filtro voided_at IS NULL en Supabase). */
+export function demoVoidCajaMov(id: string, reason: string): void {
+  const row = store.caja.find((c) => c.id === id);
+  if (row) {
+    row.voided_at = new Date().toISOString();
+    row.void_reason = reason;
+    row.descripcion = `[ANULADO] ${row.descripcion ?? ""}`.trim();
+  }
+}
+
+export function demoCajaRows() {
+  return [...store.caja]
+    .filter((r) => r.voided_at === null)
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+}
+
 export function demoSnapshot() {
   const now = new Date();
   const utilidadRows = demoUtilidad();
@@ -1834,7 +1852,7 @@ export function demoSnapshot() {
     (u) => u.anio === now.getFullYear() && u.mes === now.getMonth() + 1,
   );
   return {
-    caja: [...store.caja].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 8),
+    caja: [...store.caja].filter((r) => r.voided_at === null).sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 8),
     ventas: [...store.ventas].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 8),
     alquileres: [...store.alquileres].sort((a, b) => b.fecha_inicio.localeCompare(a.fecha_inicio)).slice(0, 8),
     empleados: [...store.empleados],
@@ -1843,10 +1861,6 @@ export function demoSnapshot() {
     ingresosMesActual: Number(mesRow?.ingresos ?? 0),
     egresosMesActual: Number(mesRow?.egresos ?? 0),
   };
-}
-
-export function demoCajaRows() {
-  return [...store.caja].sort((a, b) => b.fecha.localeCompare(a.fecha));
 }
 export function demoVentasRows() {
   return [...store.ventas].sort((a, b) => b.fecha.localeCompare(a.fecha));

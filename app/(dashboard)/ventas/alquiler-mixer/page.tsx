@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { ContextActionPanel } from "@/components/context-action-panel";
-import { CierreContratoForm } from "@/components/sales/cierre-contrato-form";
-import { ContratoAlquilerPanel } from "@/components/sales/contrato-alquiler-panel";
+import { AlquilerMixerContextPanels } from "@/components/ventas/alquiler-mixer-context-panels";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
@@ -58,17 +56,12 @@ export default async function AlquilerMixerPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {canMutate ? (
-            <>
-              <ContratoAlquilerPanel clientes={clientes} maquinas={maquinas} mockData={comboMock} />
-
-              <ContextActionPanel
-                triggerLabel="Cerrar contrato"
-                title="Cierre de contrato"
-                description="Aplica penalidades por retraso, devolución tardía o daños."
-              >
-                <CierreContratoForm contratos={abiertos} />
-              </ContextActionPanel>
-            </>
+            <AlquilerMixerContextPanels
+              clientes={clientes}
+              maquinas={maquinas}
+              contratosAbiertos={abiertos}
+              mockData={comboMock}
+            />
           ) : (
             <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
               Tu rol es de solo lectura.

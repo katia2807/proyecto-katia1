@@ -63,6 +63,12 @@ export function AserraderoForm({
   const [extrasMadera, setExtrasMadera] = useState<Array<{ id: number; descripcion: string; cantidad: number }>>([]);
   const [notasInternas, setNotasInternas] = useState<string>("");
 
+  // Campos de pago
+  const [metodoPago, setMetodoPago] = useState("efectivo");
+  const [modalidadPago, setModalidadPago] = useState("contado");
+  const [adelanto, setAdelanto] = useState("");
+  const [fechaPagoCredito, setFechaPagoCredito] = useState("");
+
   const [state, formAction] = useActionState(submitCreateServicioAserraderoForm, mutationFormInitialState);
 
   useEffect(() => {
@@ -725,6 +731,65 @@ export function AserraderoForm({
             />
           </div>
 
+          {/* ── Condición de pago ── */}
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3 mt-4">
+            <h4 className="text-sm font-bold text-[var(--color-text-primary)]">Condición de pago</h4>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Método de pago</label>
+                <select
+                  value={metodoPago}
+                  onChange={(e) => setMetodoPago(e.target.value)}
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                >
+                  <option value="efectivo">Efectivo</option>
+                  <option value="yape">Yape</option>
+                  <option value="transferencia">Transferencia</option>
+                  <option value="billetera_digital">Billetera digital</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Modalidad</label>
+                <select
+                  value={modalidadPago}
+                  onChange={(e) => setModalidadPago(e.target.value)}
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                >
+                  <option value="contado">Contado</option>
+                  <option value="adelanto">Adelanto + saldo</option>
+                  <option value="credito">Crédito</option>
+                </select>
+              </div>
+            </div>
+            {modalidadPago === "adelanto" && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Adelanto cobrado (S/) — opcional</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={adelanto}
+                  onChange={(e) => setAdelanto(e.target.value)}
+                  placeholder="0.00"
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                />
+                <p className="text-xs text-[var(--color-text-secondary)]">Si pones un monto &gt; 0, se asienta como ingreso parcial en caja.</p>
+              </div>
+            )}
+            {modalidadPago === "credito" && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Fecha límite de pago</label>
+                <input
+                  type="date"
+                  value={fechaPagoCredito}
+                  onChange={(e) => setFechaPagoCredito(e.target.value)}
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                />
+              </div>
+            )}
+          </div>
+
           <div className="grid gap-3 md:grid-cols-2 mt-4 pt-2">
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
               <p className="text-xs uppercase text-[var(--color-text-secondary)]">Utilidad estimada</p>
@@ -915,6 +980,10 @@ export function AserraderoForm({
       <input type="hidden" name="costo_cubicaje" value={costoCubicaje.toFixed(2)} />
       <input type="hidden" name="precio_cobrado" value={precioCobrado.toFixed(2)} />
       <input type="hidden" name="lineas_json" value={JSON.stringify(lineasPayload)} />
+      <input type="hidden" name="metodo_pago" value={metodoPago} />
+      <input type="hidden" name="modalidad_pago" value={modalidadPago} />
+      <input type="hidden" name="adelanto" value={adelanto || "0"} />
+      {fechaPagoCredito && <input type="hidden" name="fecha_pago_credito" value={fechaPagoCredito} />}
     </form>
   );
 }

@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { MaderaCortadaPanel } from "@/components/sales/madera-cortada-panel";
+import { VentaMaderaCortadaTable } from "@/components/sales/venta-madera-cortada-table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import {
   getChoferesRows,
@@ -98,54 +97,21 @@ export default async function MaderaCortadaPage() {
         <CardDescription>
           {ventas.length} ventas en el módulo (incluyendo otros canales).
         </CardDescription>
-        <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
-          <Table>
-            <THead>
-              <TRow>
-                <TH>Fecha</TH>
-                <TH>Cliente</TH>
-                <TH>Estado</TH>
-                <TH className="text-right">Total</TH>
-                <TH />
-              </TRow>
-            </THead>
-            <tbody>
-              {ventas.slice(0, 20).map((venta) => (
-                <TRow key={venta.id}>
-                  <TD>{formatDate(venta.fecha)}</TD>
-                  <TD>{clientesById.get(venta.cliente_id) ?? "—"}</TD>
-                  <TD className="capitalize">{venta.estado}</TD>
-                  <TD className="text-right font-semibold">{formatPen(Number(venta.total))}</TD>
-                  <TD>
-                    {(() => {
-                      const cli = clientesMap.get(venta.cliente_id);
-                      const hasRuc = !!(cli?.ruc && cli.ruc.trim().length === 11);
-                      const printUrl = (venta.correlativo !== null
-                        ? `/ventas/comprobante/venta-madera/${venta.id}`
-                        : `/ventas/comprobante/madera/${venta.id}`) + `?tipoComprobante=${hasRuc ? "factura" : "boleta"}`;
-                      return (
-                        <Link
-                          href={printUrl}
-                          target="_blank"
-                          className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
-                          title="Imprimir comprobante"
-                        >
-                          🖨️
-                        </Link>
-                      );
-                    })()}
-                  </TD>
-                </TRow>
-              ))}
-              {ventas.length === 0 ? (
-                <TRow>
-                  <TD colSpan={4} className="text-center text-[var(--color-text-secondary)]">
-                    Aún no hay ventas registradas.
-                  </TD>
-                </TRow>
-              ) : null}
-            </tbody>
-          </Table>
+        <div className="mt-3">
+          <VentaMaderaCortadaTable
+            ventas={ventas.map((v) => ({
+              id: v.id,
+              cliente_id: v.cliente_id,
+              fecha: v.fecha,
+              estado: v.estado,
+              total: Number(v.total),
+              correlativo: v.correlativo ?? null,
+              tipo_corte: (v as any).tipo_corte ?? null,
+            }))}
+            clientesById={Object.fromEntries(clientesById)}
+            clientesMap={Object.fromEntries(clientesMap)}
+            canMutate={canMutate}
+          />
         </div>
       </Card>
     </div>

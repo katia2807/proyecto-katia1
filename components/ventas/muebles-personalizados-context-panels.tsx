@@ -218,16 +218,18 @@ export function MueblesPersonalizadosContextPanels({
 
   return (
     <>
+      {/* Botón principal: ir al cotizador inteligente */}
       <Link href="/cotizacion">
         <Button type="button" variant="primary">
-          Nueva cotización
+          🧠 Cotizador inteligente
         </Button>
       </Link>
 
+      {/* Botón 2: Formulario rápido de cotización simple */}
       <ContextActionPanel
-        triggerLabel="Crear cotización rápida"
-        title="Crear cotización rápida"
-        description="Registra una cotización simple directamente en el sistema."
+        triggerLabel="Cotización rápida"
+        title="Nueva cotización rápida"
+        description="Registro simplificado: solo cliente, especie, precio calculado y acordado. Para cotizaciones con muebles diseñados externamente."
         open={openCreate}
         onOpenChange={(next) => {
           setOpenCreate(next);
@@ -237,10 +239,11 @@ export function MueblesPersonalizadosContextPanels({
         <CrearCotizacionRapidaFormFields key={createKey} clienteOptions={clienteOptions} formAction={actionCreate} />
       </ContextActionPanel>
 
+      {/* Botón 3: Aprobar cotización → crear orden de producción + registrar adelanto */}
       <ContextActionPanel
-        triggerLabel="Aceptar (orden + adelanto)"
-        title="Aceptar cotización confirmada"
-        description="En un solo paso: crea la orden de producción y registra el adelanto en caja."
+        triggerLabel="Aprobar → Orden + Adelanto"
+        title="Aprobar cotización confirmada"
+        description="En un solo paso: crea la orden de producción y registra el adelanto en caja. Solo aplica a cotizaciones con estado 'Confirmada'."
         open={openApr}
         onOpenChange={(next) => {
           setOpenApr(next);

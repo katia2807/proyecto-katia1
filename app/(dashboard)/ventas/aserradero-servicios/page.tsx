@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AserraderoPanel } from "@/components/sales/aserradero-panel";
+import { AserraderoContextPanels } from "@/components/ventas/aserradero-context-panels";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { AserraderoServiciosTable } from "@/components/sales/aserradero-servicios-table";
@@ -41,7 +41,7 @@ export default async function AserraderoServiciosPage() {
           <CardDescription>Nuevo servicio con cubicaje base y procesos extra.</CardDescription>
         </div>
         {canMutate ? (
-          <AserraderoPanel
+          <AserraderoContextPanels
             clientes={clientes}
             serviciosEspeciales={tarifas}
             mockData={comboMock}

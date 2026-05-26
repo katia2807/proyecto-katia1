@@ -288,6 +288,10 @@ const servicioAserraderoSchema = z.object({
   costoCubicaje: z.coerce.number().nonnegative(),
   precioCobrado: z.coerce.number().positive(),
   lineas: z.string().optional(), // JSON con desglose si aplica
+  metodoPago: z.string().optional().default("efectivo"),
+  modalidadPago: z.string().optional().default("contado"),
+  fechaPagoCredito: z.string().optional(),
+  adelanto: z.coerce.number().nonnegative().optional().default(0),
 });
 
 const proveedorSchema = z.object({
@@ -4350,6 +4354,10 @@ export async function createServicioAserradero(formData: FormData) {
     costoCubicaje: formData.get("costo_cubicaje"),
     precioCobrado: formData.get("precio_cobrado"),
     lineas: formData.get("lineas_json"),
+    metodoPago: formData.get("metodo_pago") || "efectivo",
+    modalidadPago: formData.get("modalidad_pago") || "contado",
+    fechaPagoCredito: formData.get("fecha_pago_credito") || undefined,
+    adelanto: formData.get("adelanto") || 0,
   });
   if (!parsed.success) {
     throw new Error("Datos de servicio inválidos.");
@@ -4431,6 +4439,10 @@ export async function createServicioAserradero(formData: FormData) {
         utilidad,
         lineas_json: lineasPayload,
         correlativo,
+        metodo_pago: parsed.data.metodoPago ?? "efectivo",
+        modalidad_pago: parsed.data.modalidadPago ?? "contado",
+        fecha_pago_credito: parsed.data.fechaPagoCredito ?? null,
+        adelanto: parsed.data.adelanto ?? 0,
         created_by: actor.userId,
       })
       .select("id")
@@ -5280,16 +5292,16 @@ export async function deleteServicioAserradero(
     }
 
     if (!hasSupabaseEnv()) {
-      const { demoServiciosAserraderoRows, demoDeleteOneById, demoCajaRows, persistStore } = await import("@/lib/demo-store");
+      const { demoServiciosAserraderoRows, demoDeleteOneById, demoVoidCajaMov, demoCajaRows, persistStore } = await import("@/lib/demo-store");
       const service = demoServiciosAserraderoRows().find((x) => x.id === id);
       if (!service) {
         return { ok: false, error: "Servicio no encontrado." };
       }
 
-      // Revert associated cash movements
+      // Anular movimientos de caja (NO eliminar — quedan como historial con estado anulado)
       const cajaMovs = demoCajaRows().filter((c) => c.referencia_id === id && (c.modulo_origen === "ventas_aserradero" || c.modulo_origen === "aserradero"));
       for (const m of cajaMovs) {
-        demoDeleteOneById("caja", m.id);
+        demoVoidCajaMov(m.id, "Servicio de aserradero eliminado");
       }
 
       demoDeleteOneById("serviciosAserradero", id);
@@ -5301,12 +5313,23 @@ export async function deleteServicioAserradero(
     }
 
     const supabase = getSupabaseServerClient();
-    
-    // Call transaction RPC
-    const { error } = await supabase.rpc("delete_servicio_aserradero_transaccional", {
-      p_id: id,
-      p_org_id: DEFAULT_ORG_ID,
-    });
+
+    // Anular movimientos de caja asociados (NO eliminar — quedan como historial)
+    await supabase
+      .from("movimientos_caja")
+      .update({
+        voided_at: new Date().toISOString(),
+        void_reason: "Servicio de aserradero eliminado",
+      })
+      .eq("referencia_id", id)
+      .in("modulo_origen", ["ventas_aserradero", "aserradero"]);
+
+    // Eliminar el servicio del registro de ventas
+    const { error } = await supabase
+      .from("servicios_aserradero")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", DEFAULT_ORG_ID);
 
     if (error) {
       return { ok: false, error: error.message };
@@ -5332,16 +5355,16 @@ export async function deleteAlquilerContrato(
     }
 
     if (!hasSupabaseEnv()) {
-      const { demoAlquilerRows, demoDeleteOneById, demoCajaRows, persistStore } = await import("@/lib/demo-store");
+      const { demoAlquilerRows, demoDeleteOneById, demoVoidCajaMov, demoCajaRows, persistStore } = await import("@/lib/demo-store");
       const contrato = demoAlquilerRows().find((x) => x.id === id);
       if (!contrato) {
         return { ok: false, error: "Contrato no encontrado." };
       }
 
-      // Revert associated cash movements
+      // Anular movimientos de caja (NO eliminar — quedan como historial con estado anulado)
       const cajaMovs = demoCajaRows().filter((c) => c.referencia_id === id && (c.modulo_origen === "ventas_alquiler" || c.modulo_origen === "alquiler"));
       for (const m of cajaMovs) {
-        demoDeleteOneById("caja", m.id);
+        demoVoidCajaMov(m.id, "Contrato de alquiler eliminado");
       }
 
       demoDeleteOneById("alquileres", id);
@@ -5353,12 +5376,23 @@ export async function deleteAlquilerContrato(
     }
 
     const supabase = getSupabaseServerClient();
-    
-    // Call transaction RPC
-    const { error } = await supabase.rpc("delete_alquiler_contrato_transaccional", {
-      p_id: id,
-      p_org_id: DEFAULT_ORG_ID,
-    });
+
+    // Anular movimientos de caja asociados (NO eliminar — quedan como historial)
+    await supabase
+      .from("movimientos_caja")
+      .update({
+        voided_at: new Date().toISOString(),
+        void_reason: "Contrato de alquiler eliminado",
+      })
+      .eq("referencia_id", id)
+      .in("modulo_origen", ["ventas_alquiler", "alquiler"]);
+
+    // Eliminar el contrato del registro
+    const { error } = await supabase
+      .from("alquileres")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", DEFAULT_ORG_ID);
 
     if (error) {
       return { ok: false, error: error.message };
@@ -5567,5 +5601,65 @@ export async function submitUpdateServicioAserraderoForm(
   }
 }
 
-
-
+export async function deleteVentaMaderaCortada(
+  id: string,
+): Promise<{ ok: boolean; error: string }> {
+  try {
+    const actor = await requireMutationAccess(ventasRoles);
+    if (!hasSupabaseEnv()) {
+      // Modo demo: anular caja y eliminar venta del listado
+      const { demoVentasRows, demoDeleteOneById, demoVoidCajaMov, demoCajaRows, demoInventarioMovimientosRows, persistStore } = await import("@/lib/demo-store");
+      const venta = demoVentasRows().find((v) => v.id === id);
+      if (!venta) {
+        return { ok: false, error: "Venta no encontrada." };
+      }
+      // Anular movimientos de caja (NO eliminar — quedan como historial con estado anulado)
+      const cajaMovs = demoCajaRows().filter(
+        (c) => c.referencia_id === id && c.modulo_origen === "ventas_madera_cortada",
+      );
+      for (const m of cajaMovs) {
+        demoVoidCajaMov(m.id, "Venta de madera cortada eliminada");
+      }
+      // Revertir movimientos de inventario asociados
+      const invMovs = demoInventarioMovimientosRows().filter(
+        (m: any) => String(m.referencia ?? "").includes(id),
+      );
+      for (const m of invMovs) {
+        demoDeleteOneById("inventarioMovimientos", m.id);
+      }
+      demoDeleteOneById("ventas", id);
+      persistStore();
+    } else {
+      const supabase = getSupabaseServerClient();
+      // Anular movimientos de caja (NO eliminar — quedan como historial)
+      await supabase
+        .from("movimientos_caja")
+        .update({
+          voided_at: new Date().toISOString(),
+          void_reason: "Venta de madera cortada eliminada",
+        })
+        .eq("referencia_id", id)
+        .eq("modulo_origen", "ventas_madera_cortada");
+      // Revertir movimientos de inventario
+      await supabase
+        .from("inventario_movimientos")
+        .delete()
+        .eq("referencia_id", id);
+      // Eliminar la venta
+      const { error } = await supabase
+        .from("ventas_madera_cortada")
+        .delete()
+        .eq("id", id)
+        .eq("organization_id", DEFAULT_ORG_ID);
+      if (error) throw new Error(error.message);
+    }
+    revalidatePath("/ventas/madera-cortada");
+    revalidatePath("/ventas");
+    revalidatePath("/caja");
+    revalidatePath("/");
+    return { ok: true, error: "" };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Error al eliminar la venta.";
+    return { ok: false, error: msg };
+  }
+}
