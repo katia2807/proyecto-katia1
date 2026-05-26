@@ -6,14 +6,18 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
-import { getAlquilerRows, getClientesRows } from "@/lib/data";
+import { getAlquilerRows, getClientesRows, getInventarioProductosRows } from "@/lib/data";
 import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 
 export default async function AlquilerMixerPage() {
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
-  const [clientes, alquilerResult] = await Promise.all([getClientesRows(), getAlquilerRows()]);
+  const [clientes, alquilerResult, inventarioProductos] = await Promise.all([
+    getClientesRows(),
+    getAlquilerRows(),
+    getInventarioProductosRows(true),
+  ]);
   const contratos = alquilerResult.rows;
   const alquilerLoadWarning = alquilerResult.loadWarning;
   const role = await getCurrentUserRole();
@@ -25,6 +29,18 @@ export default async function AlquilerMixerPage() {
     (acc, c) => acc + (c.deposito_30 ?? 0),
     0,
   );
+
+  const maquinasFiltradas = inventarioProductos
+    .filter((p) => p.activo && p.categoria && p.categoria.toLowerCase().replace("á", "a").includes("maquina"))
+    .map((p) => ({
+      id: p.id,
+      nombre: p.nombre,
+      categoria: p.categoria,
+    }));
+
+  const maquinas = maquinasFiltradas.length > 0 ? maquinasFiltradas : [
+    { id: "bomba-mixer-default", nombre: "Bomba Mixer Standard", categoria: "Maquina" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -43,7 +59,7 @@ export default async function AlquilerMixerPage() {
         <div className="flex flex-wrap gap-2">
           {canMutate ? (
             <>
-              <ContratoAlquilerPanel clientes={clientes} mockData={comboMock} />
+              <ContratoAlquilerPanel clientes={clientes} maquinas={maquinas} mockData={comboMock} />
 
               <ContextActionPanel
                 triggerLabel="Cerrar contrato"

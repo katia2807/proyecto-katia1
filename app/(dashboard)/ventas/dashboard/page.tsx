@@ -8,6 +8,7 @@ import {
   getClientesRows,
   getCobrosVencidos,
   getCotizacionesRows,
+  getCotizacionesUnificadasRows,
   getMueblesCatalogoRows,
   getOrdenesProduccionRows,
   getServiciosAserraderoRows,
@@ -15,6 +16,8 @@ import {
   getVentasRows,
 } from "@/lib/data";
 import { formatPen } from "@/lib/utils";
+import { computeEconomiaInterna } from "@/lib/cotizacion-calculos";
+
 
 function inMes(fecha: string, anio: number, mes: number) {
   const d = new Date(fecha);
@@ -34,6 +37,7 @@ export default async function VentasDashboardPage() {
     alquilerBundle,
     aserradero,
     cotizaciones,
+    cotizacionesUnificadas,
     catalogo,
     clientes,
     cobrosVencidos,
@@ -44,6 +48,7 @@ export default async function VentasDashboardPage() {
     getAlquilerRows(),
     getServiciosAserraderoRows(),
     getCotizacionesRows(),
+    getCotizacionesUnificadasRows(),
     getMueblesCatalogoRows(),
     getClientesRows(),
     getCobrosVencidos(),
@@ -80,7 +85,9 @@ export default async function VentasDashboardPage() {
     contratosMes.length +
     aserraderoMes.length;
 
-  const margenes = cotizacionesMes
+  const cotizacionesUnificadasMes = cotizacionesUnificadas.filter((c) => inMes(c.fecha, anio, mes));
+
+  const margenesClasicos = cotizacionesMes
     .map((c) => {
       const total = Number(c.precio_acordado);
       const costo = Number(c.costo_estimado ?? 0);
@@ -88,9 +95,20 @@ export default async function VentasDashboardPage() {
       return ((total - costo) / total) * 100;
     })
     .filter((x): x is number => x != null);
+
+  const margenesUnificados = cotizacionesUnificadasMes
+    .map((c) => {
+      const econ = computeEconomiaInterna(c.detalle as any);
+      return econ.margenPct;
+    })
+    .filter((x): x is number => x != null);
+
+  const margenes = [...margenesClasicos, ...margenesUnificados];
+
   const margenPromedio = margenes.length > 0
     ? margenes.reduce((a, b) => a + b, 0) / margenes.length
     : 0;
+
 
   const muebleVentas = new Map<string, { qty: number; ingreso: number }>();
   for (const v of ventasMueblesMes) {

@@ -114,7 +114,7 @@ export function CubicajeInput({
   const [piezas, setPiezas] = useState<Pieza[]>(
     defaultPiezas !== undefined
       ? defaultPiezas
-      : [{ id: 1, cantidad: 1, espesor: 0, ancho: 0, largo: 0, descripcion: "", inventario_producto_id: null }],
+      : [{ id: 1, cantidad: 1, espesor: 2, ancho: 6, largo: 8, descripcion: "Tabla", inventario_producto_id: null }],
   );
   const [precioInput, setPrecioInput] = useState(defaultPrecioPorPT);
 

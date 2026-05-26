@@ -14,9 +14,11 @@ import { contratoClientesToCompleto } from "@/lib/combobox-mocks";
 import { formatPen } from "@/lib/utils";
 
 type Cliente = { id: string; nombre: string; ruc?: string | null };
+type Maquina = { id: string; nombre: string; categoria: string };
 
 type ContratoAlquilerFormProps = {
   clientes: Cliente[];
+  maquinas: Maquina[];
   mockData?: boolean;
   /** Acción enlazada con `useActionState` (submit + toast + cierre en el panel). */
   panelAction: FormActionProp;
@@ -38,6 +40,7 @@ function labelCantidad(tarifaUnidad: string): string {
 
 export function ContratoAlquilerForm({
   clientes,
+  maquinas,
   mockData = false,
   panelAction,
 }: ContratoAlquilerFormProps) {
@@ -51,7 +54,7 @@ export function ContratoAlquilerForm({
   const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
 
   // Paso 2 State
-  const [activo, setActivo] = useState("");
+  const [activo, setActivo] = useState(maquinas[0]?.nombre ?? "");
   const [representante, setRepresentante] = useState("");
   const [rucEmpresa, setRucEmpresa] = useState("");
   const [direccionEjecucion, setDireccionEjecucion] = useState("");
@@ -66,6 +69,11 @@ export function ContratoAlquilerForm({
   );
   const [montoAdelanto, setMontoAdelanto] = useState("");
 
+  // Penalidades editables
+  const [retrasoPct, setRetrasoPct] = useState(3);
+  const [devolucionPct, setDevolucionPct] = useState(3);
+  const [daniosPct, setDaniosPct] = useState(3);
+
   const montoTotal = useMemo(() => {
     const tarifaCents = Math.round(tarifa * 100);
     return (tarifaCents * dias) / 100;
@@ -76,6 +84,10 @@ export function ContratoAlquilerForm({
     const depCents = Math.round((totalCents * 30) / 100);
     return depCents / 100;
   }, [montoTotal]);
+
+  const montoRetraso = useMemo(() => Number(((montoTotal * retrasoPct) / 100).toFixed(2)), [montoTotal, retrasoPct]);
+  const montoDevolucion = useMemo(() => Number(((montoTotal * devolucionPct) / 100).toFixed(2)), [montoTotal, devolucionPct]);
+  const montoDanios = useMemo(() => Number(((montoTotal * daniosPct) / 100).toFixed(2)), [montoTotal, daniosPct]);
 
   const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
   const clientesCombo = useMemo(() => contratoClientesToCompleto(todosLosClientes), [todosLosClientes]);
@@ -240,19 +252,30 @@ export function ContratoAlquilerForm({
             Ingresa la información del equipo en alquiler, del representante y la dirección donde se ejecutará la obra.
           </p>
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1">
-              <Field
+            <div className="space-y-1 flex flex-col">
+              <label className="text-xs font-semibold text-[var(--color-text-secondary)] mb-1">
+                Activo / equipo (Máquinas del Inventario) *
+              </label>
+              <select
                 name="activo"
-                label="Activo / equipo"
-                placeholder="Bomba Mixer"
-                required
                 value={activo}
                 onChange={(e) => setActivo(e.target.value)}
-                className={hasStep2Warning ? "!border-red-500/80 focus-visible:!border-red-500 focus-visible:!ring-red-500/40" : ""}
-              />
+                required
+                className={`h-10 rounded-xl border bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+                  hasStep2Warning
+                    ? "border-red-500/80 focus-visible:border-red-500 focus-visible:ring-red-500/40"
+                    : "border-[var(--color-border)]"
+                }`}
+              >
+                {maquinas.map((m) => (
+                  <option key={m.id} value={m.nombre}>
+                    {m.nombre}
+                  </option>
+                ))}
+              </select>
               {hasStep2Warning && (
                 <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
-                  ⚠️ Debe ingresar el activo o equipo.
+                  ⚠️ Debe seleccionar el activo o equipo.
                 </p>
               )}
             </div>
@@ -408,6 +431,62 @@ export function ContratoAlquilerForm({
             <input type="hidden" name="monto_total" value={montoTotal.toFixed(2)} />
           </div>
 
+          <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-surface)] space-y-4">
+            <p className="text-xs uppercase tracking-wide font-bold text-[var(--color-text-secondary)]">
+              Porcentajes de Penalidades (%)
+            </p>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Configura los porcentajes aplicados al total del contrato por retraso, daños o devolución tardía.
+            </p>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">Retraso en pago (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={retrasoPct}
+                  onChange={(e) => setRetrasoPct(Number(e.target.value) || 0)}
+                  className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                />
+                <span className="text-[10px] text-[var(--color-text-secondary)] block font-medium mt-0.5">
+                  Est: {formatPen(montoRetraso)}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">Devolución tardía (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={devolucionPct}
+                  onChange={(e) => setDevolucionPct(Number(e.target.value) || 0)}
+                  className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                />
+                <span className="text-[10px] text-[var(--color-text-secondary)] block font-medium mt-0.5">
+                  Est: {formatPen(montoDevolucion)}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">Daños al equipo (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={daniosPct}
+                  onChange={(e) => setDaniosPct(Number(e.target.value) || 0)}
+                  className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                />
+                <span className="text-[10px] text-[var(--color-text-secondary)] block font-medium mt-0.5">
+                  Est: {formatPen(montoDanios)}
+                </span>
+              </div>
+            </div>
+            <input type="hidden" name="penalidad_retraso_pago_pct" value={retrasoPct.toFixed(2)} />
+            <input type="hidden" name="penalidad_devolucion_tardia_pct" value={devolucionPct.toFixed(2)} />
+            <input type="hidden" name="penalidad_danios_pct" value={daniosPct.toFixed(2)} />
+          </div>
+
           <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-surface)] space-y-3">
             <p className="text-xs uppercase tracking-wide font-bold text-[var(--color-text-secondary)]">
               Datos de pago
@@ -521,7 +600,7 @@ export function ContratoAlquilerForm({
               </div>
 
               <div className="border-t border-[var(--color-border)] pt-3 space-y-2">
-                <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cálculo de Tarifas</h4>
+                <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cálculo de Tarifas & Penalidades</h4>
                 <div className="flex justify-between text-sm">
                   <span className="text-[var(--color-text-secondary)]">Tarifa ({tarifas.find(t => t.value === tarifaUnidad)?.label}):</span>
                   <span className="font-semibold">{formatPen(tarifa)}</span>
@@ -529,6 +608,18 @@ export function ContratoAlquilerForm({
                 <div className="flex justify-between text-sm">
                   <span className="text-[var(--color-text-secondary)]">{labelCantidad(tarifaUnidad)}:</span>
                   <span className="font-semibold">{dias}</span>
+                </div>
+                <div className="flex justify-between text-xs text-[var(--color-text-secondary)] border-t border-dashed border-[var(--color-border)] pt-1.5 mt-1">
+                  <span>Penalidad retraso de pago ({retrasoPct.toFixed(1)}%):</span>
+                  <span className="font-medium">{formatPen(montoRetraso)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-[var(--color-text-secondary)]">
+                  <span>Penalidad dev. tardía ({devolucionPct.toFixed(1)}%):</span>
+                  <span className="font-medium">{formatPen(montoDevolucion)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-[var(--color-text-secondary)]">
+                  <span>Penalidad daños al equipo ({daniosPct.toFixed(1)}%):</span>
+                  <span className="font-medium">{formatPen(montoDanios)}</span>
                 </div>
                 <div className="flex justify-between text-base font-black border-t border-[var(--color-border)] pt-2 text-[var(--color-primary)]">
                   <span>MONTO TOTAL:</span>

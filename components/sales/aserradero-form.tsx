@@ -54,7 +54,14 @@ export function AserraderoForm({
   const [costoPorPieCubico, setCostoPorPieCubico] = useState(defaultCostoPorPieCubico);
   const [piezasJson, setPiezasJson] = useState<string>(DEFAULT_LINEAS_CUBICAJE_JSON);
   const [step, setStep] = useState(1);
-  const [precioCobradoManual, setPrecioCobradoManual] = useState<string>("");
+  const [precioCobradoManual, setPrecioCobradoManual] = useState<string>(
+    "",
+  );
+  const [costoCubicajeManual, setCostoCubicajeManual] = useState<string>("");
+
+  const [manoDeObra, setManoDeObra] = useState<number>(0);
+  const [extrasMadera, setExtrasMadera] = useState<Array<{ id: number; descripcion: string; cantidad: number }>>([]);
+  const [notasInternas, setNotasInternas] = useState<string>("");
 
   const [state, formAction] = useActionState(submitCreateServicioAserraderoForm, mutationFormInitialState);
 
@@ -107,21 +114,28 @@ export function AserraderoForm({
 
   const hasStep1Warning = !clienteId || (tipoComprobante === "factura" && !hasRuc);
   const hasStep2Warning = piezas.length === 0 || totalPT === 0;
-  const costoCubicaje = useMemo(
-    () => piesCubicos * costoPorPieCubico,
+
+  const costoCubicajeSugerido = useMemo(
+    () => Number((piesCubicos * costoPorPieCubico).toFixed(2)),
     [piesCubicos, costoPorPieCubico],
   );
 
+  const costoCubicaje = (costoCubicajeManual !== "" && !isNaN(Number(costoCubicajeManual)))
+    ? Number(Number(costoCubicajeManual).toFixed(2))
+    : costoCubicajeSugerido;
+
   const totalServiciosEspeciales = useMemo(() => {
-    return Object.entries(seleccionados).reduce((acc, [, val]) => {
+    const sum = Object.entries(seleccionados).reduce((acc, [, val]) => {
       if (!val.activo) return acc;
       return acc + val.cantidad * val.tarifa;
     }, 0);
+    return Number(sum.toFixed(2));
   }, [seleccionados]);
 
-  const precioCalculado = costoCubicaje + totalServiciosEspeciales;
-  const precioCobrado = precioCobradoManual !== "" ? (Number(precioCobradoManual) || 0) : precioCalculado;
-  const utilidad = precioCobrado - costoCubicaje;
+  const precioCalculado = Number((costoCubicaje + totalServiciosEspeciales + manoDeObra).toFixed(2));
+  const precioCobrado = (precioCobradoManual !== "" && !isNaN(Number(precioCobradoManual))) ? Number(Number(precioCobradoManual).toFixed(2)) : precioCalculado;
+  const costoTotalAserradero = Number((costoCubicaje + manoDeObra).toFixed(2));
+  const utilidad = Number((precioCobrado - costoTotalAserradero).toFixed(2));
 
   const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
   const clientesCombo = useMemo(() => liteClientesToCompleto(todosLosClientes), [todosLosClientes]);
@@ -133,21 +147,64 @@ export function AserraderoForm({
   }
 
   const lineasPayload = useMemo(
-    () =>
-      Object.entries(seleccionados)
+    () => {
+      const list = Object.entries(seleccionados)
         .filter(([, v]) => v.activo)
         .map(([id, v]) => {
           const servicio = serviciosEspeciales.find((s) => s.id === id);
           return {
             id,
+            tipo: "servicio_especial",
             codigo: servicio?.codigo ?? id,
             nombre: servicio?.nombre ?? id,
             cantidad: v.cantidad,
             tarifa: v.tarifa,
             subtotal: Number((v.cantidad * v.tarifa).toFixed(2)),
           };
-        }),
-    [seleccionados, serviciosEspeciales],
+        });
+
+      if (manoDeObra > 0) {
+        list.push({
+          id: "mano-de-obra-aserradero",
+          tipo: "mano_de_obra",
+          codigo: "MANO-OBRA",
+          nombre: "Mano de obra (Aserradero)",
+          cantidad: 1,
+          tarifa: manoDeObra,
+          subtotal: manoDeObra,
+        });
+      }
+
+      for (const item of extrasMadera) {
+        if (item.descripcion.trim()) {
+          list.push({
+            id: `extra-madera-${item.id}`,
+            tipo: "extra_madera_cliente",
+            codigo: "EXT-MADERA",
+            nombre: `Madera cliente: ${item.descripcion.trim()}`,
+            cantidad: item.cantidad,
+            tarifa: 0,
+            subtotal: 0,
+          });
+        }
+      }
+
+      if (notasInternas.trim()) {
+        list.push({
+          id: "nota-interna-aserradero",
+          tipo: "nota_interna",
+          codigo: "NOTA-INT",
+          nombre: "Nota interna",
+          cantidad: 1,
+          tarifa: 0,
+          subtotal: 0,
+          observaciones: notasInternas.trim(),
+        } as any);
+      }
+
+      return list;
+    },
+    [seleccionados, serviciosEspeciales, manoDeObra, extrasMadera, notasInternas],
   );
 
   function handleSaltarServicios() {
@@ -186,7 +243,11 @@ export function AserraderoForm({
             const isActive = step === item.n;
             const hasWarning = (item.n === 1 && hasStep1Warning) || (item.n === 2 && hasStep2Warning);
             return (
-              <div key={item.n} className="flex flex-1 items-center">
+              <div
+                key={item.n}
+                className="flex flex-1 items-center cursor-pointer select-none"
+                onClick={() => setStep(item.n)}
+              >
                 <div className="flex flex-col items-center flex-1">
                   <div
                     className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-bold transition-all duration-300 ${
@@ -363,9 +424,22 @@ export function AserraderoForm({
               <p className="text-xs text-[var(--color-text-secondary)]">Pies cúbicos</p>
               <p className="text-xl font-bold">{piesCubicos.toFixed(2)}</p>
             </div>
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/40 p-3">
-              <p className="text-xs text-[var(--color-text-secondary)]">Costo cubicaje</p>
-              <p className="text-2xl font-bold">{formatPen(costoCubicaje)}</p>
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/40 p-3 flex flex-col justify-between">
+              <label className="text-xs text-[var(--color-text-secondary)] font-semibold block mb-0.5">
+                Costo cubicaje (S/)
+              </label>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-bold text-[var(--color-text-secondary)]">S/.</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={costoCubicajeManual}
+                  placeholder={costoCubicajeSugerido.toFixed(2)}
+                  onChange={(e) => setCostoCubicajeManual(e.target.value)}
+                  className="w-full rounded border-0 bg-transparent p-0 text-xl font-bold text-[var(--color-text-primary)] focus:ring-0 focus:outline-none"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -467,6 +541,75 @@ export function AserraderoForm({
               );
             })}
           </div>
+
+          {/* Mano de Obra y Extras */}
+          <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)] space-y-4 mt-4">
+            <p className="text-xs uppercase tracking-wide font-bold text-[var(--color-text-secondary)]">Mano de Obra & Extras</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">Mano de obra (S/)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={manoDeObra || ""}
+                  onChange={(e) => setManoDeObra(Number(e.target.value) || 0)}
+                  placeholder="0.00"
+                  className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                />
+                <span className="text-[10px] text-[var(--color-text-secondary)] block mt-0.5">
+                  Mano de obra cargada al cliente.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)] space-y-3 mt-4">
+            <p className="text-xs uppercase tracking-wide font-bold text-[var(--color-text-secondary)]">Madera del cliente (Extras)</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              Agrega materiales o piezas traídas por el cliente para control propio.
+            </p>
+            <div className="space-y-2">
+              {extrasMadera.map((item) => (
+                <div key={item.id} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={item.descripcion}
+                    placeholder="Ej. Madera Cedro 2x4x10"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setExtrasMadera((prev) => prev.map((x) => (x.id === item.id ? { ...x, descripcion: val } : x)));
+                    }}
+                    className="flex-1 h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm outline-none"
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    value={item.cantidad}
+                    onChange={(e) => {
+                      const val = Number(e.target.value) || 1;
+                      setExtrasMadera((prev) => prev.map((x) => (x.id === item.id ? { ...x, cantidad: val } : x)));
+                    }}
+                    className="w-20 h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-right outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setExtrasMadera((prev) => prev.filter((x) => x.id !== item.id))}
+                    className="text-xs text-red-500 font-semibold px-2 hover:underline"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setExtrasMadera((prev) => [...prev, { id: Date.now() + Math.random(), descripcion: "", cantidad: 1 }])}
+                className="text-xs font-semibold text-[var(--color-accent)] hover:underline mt-1 block"
+              >
+                + Agregar pieza del cliente
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-between pt-4 mt-4 flex-wrap gap-2">
@@ -521,15 +664,26 @@ export function AserraderoForm({
               <div className="flex justify-between py-2.5">
                 <div>
                   <p className="font-semibold text-sm">Servicios Especiales</p>
-                  {lineasPayload.length === 0 ? (
+                  {Object.entries(seleccionados).filter(([, v]) => v.activo).length === 0 ? (
                     <p className="text-xs text-[var(--color-text-secondary)]">Ninguno seleccionado</p>
                   ) : (
                     <p className="text-xs text-[var(--color-text-secondary)]">
-                      {lineasPayload.map(s => `${s.nombre} (x${s.cantidad})`).join(', ')}
+                      {Object.entries(seleccionados)
+                        .filter(([, v]) => v.activo)
+                        .map(([id]) => serviciosEspeciales.find(s => s.id === id)?.nombre)
+                        .join(', ')}
                     </p>
                   )}
                 </div>
                 <p className="font-bold text-sm">{formatPen(totalServiciosEspeciales)}</p>
+              </div>
+
+              <div className="flex justify-between py-2.5">
+                <div>
+                  <p className="font-semibold text-sm">Mano de Obra</p>
+                  <p className="text-xs text-[var(--color-text-secondary)]">Adicional del servicio</p>
+                </div>
+                <p className="font-bold text-sm">{formatPen(manoDeObra)}</p>
               </div>
 
               <div className="flex justify-between py-3 text-[var(--color-primary)]">
@@ -541,7 +695,7 @@ export function AserraderoForm({
 
           <div className="space-y-2">
             <label htmlFor="precio-cobrado-input" className="text-sm font-semibold text-[var(--color-text-primary)]">
-              Precio Cobrado Final (S/)
+              Precio Cobrado Final (S/) *
             </label>
             <input
               id="precio-cobrado-input"
@@ -554,8 +708,21 @@ export function AserraderoForm({
               className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5 text-lg font-bold text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
             />
             <p className="text-xs text-[var(--color-text-secondary)]">
-              Deja en blanco para usar el costo total sugerido ({formatPen(precioCalculado)}).
+              Deja en blanco para usar el costo total sugerido ({formatPen(precioCalculado)}). El precio es completamente editable.
             </p>
+          </div>
+
+          <div className="space-y-2 mt-4">
+            <label className="text-sm font-semibold text-[var(--color-text-primary)]">
+              Notas internas (Solo para control propio)
+            </label>
+            <textarea
+              value={notasInternas}
+              onChange={(e) => setNotasInternas(e.target.value)}
+              rows={2}
+              className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
+              placeholder="Estas notas son de carácter interno y NO se imprimirán en el comprobante del cliente..."
+            />
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 mt-4 pt-2">
@@ -564,7 +731,7 @@ export function AserraderoForm({
               <p className="text-2xl font-black text-[var(--color-success)]">{formatPen(utilidad)}</p>
             </div>
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3 flex flex-col justify-center">
-              <MargenIndicator costo={costoCubicaje} precio={precioCobrado} label="Margen del servicio" />
+              <MargenIndicator costo={costoTotalAserradero} precio={precioCobrado} label="Margen del servicio" />
             </div>
           </div>
         </div>
@@ -658,46 +825,69 @@ export function AserraderoForm({
                   </div>
                 ))}
               </div>
-            </div>
+             </div>
 
-            {/* Resumen Servicios y Cobro */}
-            <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
-              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Servicios Especiales</h4>
-              {lineasPayload.length === 0 ? (
-                <p className="text-xs text-[var(--color-text-secondary)]">Ningún servicio especial seleccionado.</p>
-              ) : (
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {lineasPayload.map((s) => (
-                    <div key={s.id} className="flex justify-between text-sm">
-                      <span>{s.nombre} <span className="text-xs text-[var(--color-text-secondary)]">(x{s.cantidad})</span></span>
-                      <span className="font-semibold">{formatPen(s.subtotal)}</span>
+             {/* Resumen Servicios y Cobro */}
+             <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
+               <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Servicios Especiales & Extras</h4>
+               <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                 {lineasPayload
+                   .filter((s) => s.tipo !== "nota_interna" && s.tipo !== "extra_madera_cliente")
+                   .map((s) => (
+                     <div key={s.id} className="flex justify-between text-sm">
+                       <span>{s.nombre} <span className="text-xs text-[var(--color-text-secondary)]">(x{s.cantidad})</span></span>
+                       <span className="font-semibold">{formatPen(s.subtotal)}</span>
+                     </div>
+                   ))}
+                 {extrasMadera.length > 0 && (
+                   <div className="border-t border-dashed border-[var(--color-border)] pt-1.5 mt-1.5">
+                     <span className="text-xs font-bold text-[var(--color-text-secondary)]">Madera del Cliente:</span>
+                     {extrasMadera.map((em) => (
+                       <div key={em.id} className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+                         • {em.descripcion} ({em.cantidad} pzs)
+                       </div>
+                     ))}
+                   </div>
+                 )}
+               </div>
+
+               <div className="border-t border-[var(--color-border)] pt-3 space-y-2">
+                 <div className="flex justify-between text-sm">
+                   <span className="text-[var(--color-text-secondary)]">Subtotal Cubicaje:</span>
+                   <span>{formatPen(costoCubicaje)}</span>
+                 </div>
+                 <div className="flex justify-between text-sm">
+                   <span className="text-[var(--color-text-secondary)]">Mano de Obra:</span>
+                   <span>{formatPen(manoDeObra)}</span>
+                 </div>
+                 <div className="flex justify-between text-sm">
+                   <span className="text-[var(--color-text-secondary)]">Subtotal Servicios:</span>
+                   <span>{formatPen(totalServiciosEspeciales)}</span>
+                 </div>
+                  <div className="flex justify-between items-center text-base font-black border-t border-[var(--color-border)] pt-2 text-[var(--color-primary)]">
+                    <span>PRECIO FINAL COBRADO:</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm font-bold text-[var(--color-text-secondary)]">S/.</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={precioCobradoManual}
+                        placeholder={precioCalculado.toFixed(2)}
+                        onChange={(e) => setPrecioCobradoManual(e.target.value)}
+                        className="w-28 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-sm font-black text-right text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] focus:outline-none"
+                      />
                     </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="border-t border-[var(--color-border)] pt-3 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-[var(--color-text-secondary)]">Subtotal Cubicaje:</span>
-                  <span>{formatPen(costoCubicaje)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-[var(--color-text-secondary)]">Subtotal Servicios:</span>
-                  <span>{formatPen(totalServiciosEspeciales)}</span>
-                </div>
-                <div className="flex justify-between text-base font-black border-t border-[var(--color-border)] pt-2 text-[var(--color-primary)]">
-                  <span>PRECIO FINAL COBRADO:</span>
-                  <span>{formatPen(precioCobrado)}</span>
-                </div>
-                <div className="flex justify-between text-xs text-[var(--color-success)] font-bold">
-                  <span>Utilidad Estimada:</span>
-                  <span>{formatPen(utilidad)}</span>
-                </div>
-                <div className="pt-1">
-                  <MargenIndicator costo={costoCubicaje} precio={precioCobrado} label="Margen Final" />
-                </div>
-              </div>
-            </div>
+                  </div>
+                 <div className="flex justify-between text-xs text-[var(--color-success)] font-bold">
+                   <span>Utilidad Estimada:</span>
+                   <span>{formatPen(utilidad)}</span>
+                 </div>
+                 <div className="pt-1">
+                   <MargenIndicator costo={costoTotalAserradero} precio={precioCobrado} label="Margen Final" />
+                 </div>
+               </div>
+             </div>
           </div>
         </div>
 

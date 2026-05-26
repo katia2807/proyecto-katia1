@@ -265,6 +265,9 @@ const contratoAlquilerSchema = z.object({
   fechaPagoCredito: z.string().optional().or(z.literal("")),
   adelanto: z.coerce.number().nonnegative().optional().default(0),
   montoCredito: z.coerce.number().nonnegative().optional().default(0),
+  penalidadRetrasoPagoPct: z.coerce.number().nonnegative().optional().default(3),
+  penalidadDevolucionTardiaPct: z.coerce.number().nonnegative().optional().default(3),
+  penalidadDaniosPct: z.coerce.number().nonnegative().optional().default(3),
 });
 
 const cerrarContratoSchema = z.object({
@@ -4067,6 +4070,9 @@ export async function createContratoAlquiler(formData: FormData) {
     fechaPagoCredito: formData.get("fecha_pago_credito"),
     adelanto: formData.get("adelanto"),
     montoCredito: formData.get("monto_credito"),
+    penalidadRetrasoPagoPct: formData.get("penalidad_retraso_pago_pct"),
+    penalidadDevolucionTardiaPct: formData.get("penalidad_devolucion_tardia_pct"),
+    penalidadDaniosPct: formData.get("penalidad_danios_pct"),
   });
   if (!parsed.success) {
     throw new Error("Datos de contrato inválidos.");
@@ -4119,6 +4125,9 @@ export async function createContratoAlquiler(formData: FormData) {
       metodo_pago: parsed.data.metodoPago,
       modalidad_pago: parsed.data.modalidadPago,
       fecha_pago_credito: parsed.data.fechaPagoCredito || null,
+      penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct,
+      penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct,
+      penalidad_danios_pct: parsed.data.penalidadDaniosPct,
       confirmaIngreso: false,
     });
     if (deposito30 > 0) {
@@ -4162,9 +4171,9 @@ export async function createContratoAlquiler(formData: FormData) {
         tarifa_unidad: parsed.data.tarifaUnidad,
         monto_total: montoTotal,
         deposito_30: deposito30,
-        penalidad_retraso_pago_pct: PENALIDAD_ALQUILER_PCT_DEFAULT,
-        penalidad_devolucion_tardia_pct: PENALIDAD_ALQUILER_PCT_DEFAULT,
-        penalidad_danios_pct: PENALIDAD_ALQUILER_PCT_DEFAULT,
+        penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct,
+        penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct,
+        penalidad_danios_pct: parsed.data.penalidadDaniosPct,
         metodo_pago: parsed.data.metodoPago,
         modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
         fecha_pago_credito: fechaCredito,
@@ -4360,9 +4369,13 @@ export async function createServicioAserradero(formData: FormData) {
     }
   }
 
+  const manoDeObraItem = lineasJson.find((l) => l.tipo === "mano_de_obra");
+  const manoDeObra = Number(manoDeObraItem?.subtotal ?? 0);
+  const costoTotal = Number((parsed.data.costoCubicaje + manoDeObra).toFixed(2));
   const utilidad = Number(
-    (parsed.data.precioCobrado - parsed.data.costoCubicaje).toFixed(2),
+    (parsed.data.precioCobrado - costoTotal).toFixed(2),
   );
+
 
   // Obtener nombre de cliente para la descripción de caja
   let clienteNombre = "Cliente Desconocido";

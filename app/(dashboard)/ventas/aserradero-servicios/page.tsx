@@ -92,7 +92,28 @@ export default async function AserraderoServiciosPage() {
               {servicios.map((s) => (
                 <TRow key={s.id}>
                   <TD>{formatDate(s.fecha)}</TD>
-                  <TD>{clientesById.get(s.cliente_id) ?? "—"}</TD>
+                  <TD>
+                    <div className="font-medium">{clientesById.get(s.cliente_id) ?? "—"}</div>
+                    {(() => {
+                      try {
+                        const lineas = Array.isArray(s.lineas_json)
+                          ? s.lineas_json
+                          : typeof s.lineas_json === "string"
+                          ? JSON.parse(s.lineas_json)
+                          : [];
+                        const nota = lineas?.find((l: any) => l?.tipo === "nota_interna");
+                        if (nota?.observaciones) {
+                          return (
+                            <div className="mt-1 max-w-[200px] truncate text-[11px] font-semibold text-amber-600 dark:text-amber-400" title={nota.observaciones}>
+                              📝 {nota.observaciones}
+                            </div>
+                          );
+                        }
+                      } catch (e) {}
+                      return null;
+                    })()}
+                  </TD>
+
                   <TD className="text-right">{Number(s.pies_cubicos).toFixed(2)}</TD>
                   <TD className="text-right">{formatPen(Number(s.costo_cubicaje))}</TD>
                   <TD className="text-right font-semibold">

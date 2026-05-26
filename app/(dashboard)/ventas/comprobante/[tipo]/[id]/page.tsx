@@ -544,27 +544,77 @@ export default async function ComprobantePage({
                     </tr>
                   </thead>
                   <tbody>
-                    {aserraderoLineasEspeciales.map((linea, i) => (
-                      <tr key={linea.id} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-left">{linea.nombre}</td>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{linea.cantidad}</td>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{formatPen(linea.tarifa)}</td>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right font-semibold">{formatPen(linea.subtotal)}</td>
-                      </tr>
-                    ))}
-                    {aserraderoLineasEspeciales.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="voucher-td py-2 text-sm text-center text-[var(--color-text-secondary,#64748b)]">Ningún servicio especial aplicado.</td>
-                      </tr>
-                    ) : null}
+                    {(() => {
+                      const lineasEfectivas = aserraderoLineasEspeciales.filter(
+                        (linea: any) => linea.tipo !== "nota_interna" && linea.tipo !== "extra_madera_cliente"
+                      );
+                      
+                      return (
+                        <>
+                          {lineasEfectivas.map((linea, i) => (
+                            <tr key={linea.id || i} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
+                              <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-left">{linea.nombre}</td>
+                              <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{linea.cantidad}</td>
+                              <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{formatPen(linea.tarifa)}</td>
+                              <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right font-semibold">{formatPen(linea.subtotal)}</td>
+                            </tr>
+                          ))}
+                          {lineasEfectivas.length === 0 && (
+                            <tr>
+                              <td colSpan={4} className="voucher-td py-2 text-sm text-center text-[var(--color-text-secondary,#64748b)]">Ningún servicio especial aplicado.</td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })()}
                   </tbody>
                 </table>
               </div>
+
+              {/* Madera del Cliente (Extras) */}
+              {(() => {
+                const extrasCliente = aserraderoLineasEspeciales.filter(
+                  (linea: any) => linea.tipo === "extra_madera_cliente"
+                );
+                if (extrasCliente.length === 0) return null;
+                return (
+                  <div className="voucher-section mt-4 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4 bg-slate-50/50">
+                    <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">
+                      Madera del cliente (Adicionales / Extras)
+                    </p>
+                    <table className="w-full">
+                      <thead>
+                        <tr>
+                          <th className="voucher-th w-2/3 border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-left">Descripción / Material</th>
+                          <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Cant.</th>
+                          <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Costo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {extrasCliente.map((linea: any, i) => (
+                          <tr key={linea.id || i} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.01))]" : ""}>
+                            <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-left">{linea.nombre?.replace("Madera cliente: ", "") || linea.nombre}</td>
+                            <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{linea.cantidad}</td>
+                            <td className="voucher-td py-2 text-sm text-[var(--color-text-secondary,#94a3b8)] text-right italic font-medium">S/. 0.00 (Propio)</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
 
               {/* Resumen financiero detallado */}
               <div className="mt-4 flex justify-between gap-4">
                 <div className="text-[11px] text-[var(--color-text-secondary,#64748b)] p-3 rounded-lg border border-[var(--color-border,#e2e8f0)] bg-[var(--color-primary-soft,rgba(0,0,0,0.02))]">
                   <p><strong>Costo de Cubicaje (Base):</strong> {formatPen(Number(aserraderoServicio.costo_cubicaje))}</p>
+                  {(() => {
+                    const manoObraItem = aserraderoLineasEspeciales.find((linea: any) => linea.tipo === "mano_de_obra");
+                    if (manoObraItem) {
+                      return <p className="mt-1"><strong>Mano de Obra:</strong> {formatPen(Number(manoObraItem.subtotal))}</p>;
+                    }
+                    return null;
+                  })()}
                   <p className="text-[var(--color-success,#10b981)] font-semibold mt-1"><strong>Utilidad estimada:</strong> {formatPen(Number(aserraderoServicio.utilidad))}</p>
                 </div>
                 <div className="w-64">

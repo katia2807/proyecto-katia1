@@ -138,6 +138,20 @@ export function KanbanOrdenes({ ordenes, canMutate }: KanbanOrdenesProps) {
                       {orden.notas}
                     </p>
                   ) : null}
+                  {canMutate ? (
+                    <div className="mt-2.5 border-t border-[var(--color-border)] pt-2 flex items-center justify-between gap-1">
+                      <span className="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase">Estado:</span>
+                      <select
+                        value={orden.estado}
+                        onChange={(e) => moverOrden(orden.id, e.target.value as Estado)}
+                        className="text-[11px] font-semibold bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md px-1.5 py-0.5 outline-none cursor-pointer text-[var(--color-text-primary)]"
+                      >
+                        <option value="en_produccion">En producción</option>
+                        <option value="terminado">Terminado</option>
+                        <option value="entregado">Entregado</option>
+                      </select>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

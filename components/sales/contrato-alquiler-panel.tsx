@@ -9,12 +9,19 @@ import { useEffect, useState, useActionState } from "react";
 
 type Cliente = { id: string; nombre: string; ruc?: string | null };
 
+type Maquina = { id: string; nombre: string; categoria: string };
+
 type ContratoAlquilerPanelProps = {
   clientes: Cliente[];
+  maquinas: Maquina[];
   mockData?: boolean;
 };
 
-export function ContratoAlquilerPanel({ clientes, mockData = false }: ContratoAlquilerPanelProps) {
+export function ContratoAlquilerPanel({
+  clientes,
+  maquinas,
+  mockData = false,
+}: ContratoAlquilerPanelProps) {
   const [open, setOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
   const { showToast } = useToast();
@@ -44,6 +51,7 @@ export function ContratoAlquilerPanel({ clientes, mockData = false }: ContratoAl
       <ContratoAlquilerForm
         key={formKey}
         clientes={clientes}
+        maquinas={maquinas}
         mockData={mockData}
         panelAction={formAction}
       />
