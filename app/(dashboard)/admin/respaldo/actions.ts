@@ -27,21 +27,45 @@ export async function resetDatabaseAction(confirmacion: string) {
 
   // 4. Tablas en el orden exacto solicitado (respetando foreign keys)
   const tables = [
-    "inventario_movimientos",
-    "ventas_madera_cortada",
-    "ordenes_produccion",
-    "movimientos_caja",
+    // 1. Tablas transaccionales/operativas hijas (deben borrarse primero)
+    "compras_madera",
     "ventas_mueble_terminado",
-    "cotizaciones_unificadas",
+    "ventas_madera_cortada",
+    "servicios_aserradero",
+    "alquileres",
+    "ordenes_produccion",
+    "sueldos",
+    "adelantos",
+    "movimientos_caja",
     "registros_generales",
     "alertas_operativas",
-    "servicios_aserradero",
+    "notifications",
+
+    // 2. Tablas transaccionales padres e inventarios
+    "ventas_madera",
+    "cotizaciones_mueble",
+    "cotizaciones_unificadas",
+    "inventario_movimientos",
+
+    // 3. Tablas maestras secundarias
+    "registro_categorias",
+    "security_control_items",
+    "servicios_especiales_tarifa",
+    "zonas_entrega",
+    "unidades_medida",
+
+    // 4. Tablas maestras principales (padres absolutos)
     "clientes",
-    "choferes",
     "proveedores",
+    "choferes",
+    "empleados",
+    "periodos_nomina",
     "muebles_catalogo",
     "inventario_productos",
-    "correlativos"
+    "productos_madera",
+    "cierres_mensuales",
+    "correlativos",
+    "audit_logs"
   ] as const;
 
   try {

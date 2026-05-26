@@ -1741,6 +1741,7 @@ export function demoResetStore(): { eliminados: number } {
     snapshot.caja.length +
     snapshot.clientes.length +
     snapshot.proveedores.length +
+    snapshot.registroCategorias.length +
     snapshot.ventas.length +
     snapshot.alquileres.length +
     snapshot.cotizaciones.length +
