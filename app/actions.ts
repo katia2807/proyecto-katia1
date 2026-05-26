@@ -5663,3 +5663,109 @@ export async function deleteVentaMaderaCortada(
     return { ok: false, error: msg };
   }
 }
+
+const updateVentaMaderaCortadaSchema = z.object({
+  id: z.string().uuid(),
+  clienteId: z.string().uuid(),
+  fecha: z.string().min(1),
+  tipoCorte: z.enum(["tabla", "liston", "cuarton", "poste"]),
+  totalPt: z.coerce.number().positive(),
+  precioPorPt: z.coerce.number().nonnegative(),
+  total: z.coerce.number().nonnegative(),
+  metodoPago: metodoPagoEnum.default("efectivo"),
+  modalidadPago: modalidadPagoEnum.default("contado"),
+});
+
+export async function updateVentaMaderaCortada(formData: FormData) {
+  const actor = await requireMutationAccess(ventasRoles);
+  const parsed = updateVentaMaderaCortadaSchema.safeParse({
+    id: formData.get("id"),
+    clienteId: formData.get("cliente_id"),
+    fecha: formData.get("fecha"),
+    tipoCorte: formData.get("tipo_corte"),
+    totalPt: formData.get("total_pt"),
+    precioPorPt: formData.get("precio_por_pt"),
+    total: formData.get("total"),
+    metodoPago: formData.get("metodo_pago"),
+    modalidadPago: formData.get("modalidad_pago"),
+  });
+  if (!parsed.success) {
+    const fieldErrors = Object.entries(parsed.error.flatten().fieldErrors)
+      .map(([field, errs]) => `${field}: ${errs?.join(", ")}`)
+      .join(" | ");
+    throw new Error(`Datos inválidos: ${fieldErrors}`);
+  }
+  const { id, clienteId, fecha, tipoCorte, totalPt, precioPorPt, total, metodoPago, modalidadPago } = parsed.data;
+
+  if (!hasSupabaseEnv()) {
+    const { demoVentasRows, demoCajaRows, persistStore } = await import("@/lib/demo-store");
+    const venta = (demoVentasRows() as any[]).find((v: any) => v.id === id);
+    if (venta) {
+      venta.cliente_id = clienteId;
+      venta.fecha = fecha;
+      venta.total = total;
+    }
+    const cajaRow = demoCajaRows().find((c) => c.referencia_id === id && c.modulo_origen === "ventas_madera_cortada");
+    if (cajaRow) {
+      (cajaRow as any).monto = total;
+      (cajaRow as any).fecha = fecha;
+    }
+    persistStore();
+  } else {
+    const supabase = getSupabaseServerClient();
+
+    const { error: ventaErr } = await supabase
+      .from("ventas_madera_cortada")
+      .update({
+        cliente_id: clienteId,
+        fecha,
+        tipo_corte: tipoCorte,
+        total_pt: totalPt,
+        precio_por_pt: precioPorPt,
+        total,
+        metodo_pago: metodoPago,
+        modalidad_pago: modalidadPago,
+      })
+      .eq("id", id)
+      .eq("organization_id", DEFAULT_ORG_ID);
+
+    if (ventaErr) throw new Error(ventaErr.message);
+
+    // Sincronizar movimiento de caja existente si aplica
+    const { data: existingCaja } = await supabase
+      .from("movimientos_caja")
+      .select("id")
+      .eq("referencia_id", id)
+      .eq("modulo_origen", "ventas_madera_cortada")
+      .maybeSingle();
+
+    if (existingCaja && total > 0) {
+      await supabase
+        .from("movimientos_caja")
+        .update({ fecha, monto: total, medio: mapMetodoPagoVentaToMedioCaja(metodoPago) })
+        .eq("id", existingCaja.id)
+        .eq("organization_id", DEFAULT_ORG_ID);
+    }
+  }
+
+  revalidatePath("/ventas/madera-cortada");
+  revalidatePath("/ventas");
+  revalidatePath("/caja");
+}
+
+export async function submitUpdateVentaMaderaCortadaForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await updateVentaMaderaCortada(formData);
+    return { success: true, error: null, message: "Venta actualizada con éxito." };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Error desconocido.",
+      message: null,
+    };
+  }
+}
+

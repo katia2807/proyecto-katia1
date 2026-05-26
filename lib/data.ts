@@ -1075,6 +1075,22 @@ export async function getServicioAserraderoById(id: string): Promise<ServicioAse
   return rows.find((r) => r.id === id) ?? null;
 }
 
+export async function getVentaMaderaCortadaById(id: string) {
+  if (!hasSupabaseEnv()) {
+    const rows = demoVentasRows();
+    return rows.find((r) => r.id === id) ?? null;
+  }
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("ventas_madera_cortada")
+    .select("*")
+    .eq("id", id)
+    .eq("organization_id", DEFAULT_ORG_ID)
+    .maybeSingle();
+  if (error) return null;
+  return data ?? null;
+}
+
 export async function getServiciosEspecialesTarifaRows(): Promise<ServicioEspecialTarifaRow[]> {
   if (!hasSupabaseEnv()) {
     return demoServiciosEspecialesTarifaRows();
