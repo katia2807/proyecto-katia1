@@ -477,6 +477,12 @@ export async function getAlquilerRows(): Promise<AlquilerRowsResult> {
   }
 }
 
+export async function getAlquilerById(id: string) {
+  const result = await getAlquilerRows();
+  return result.rows.find((x) => x.id === id) ?? null;
+}
+
+
 export async function getPersonalRows() {
   if (!hasSupabaseEnv()) {
     return demoPersonalRows();
@@ -828,6 +834,7 @@ export async function getInventarioRobustoData() {
     stock_actual: Number(p.stock_actual),
     stock_minimo: Number(p.stock_minimo),
     sugerido_reponer: Math.max(Number(p.stock_minimo) * 2 - Number(p.stock_actual), 0),
+    unidad: p.unidad,
   }));
 
   return {
@@ -1061,6 +1068,11 @@ export async function getServiciosAserraderoRows() {
       .limit(200);
     return data ?? fallback.serviciosAserradero;
   }, fallback.serviciosAserradero);
+}
+
+export async function getServicioAserraderoById(id: string): Promise<ServicioAserraderoRow | null> {
+  const rows = await getServiciosAserraderoRows();
+  return rows.find((r) => r.id === id) ?? null;
 }
 
 export async function getServiciosEspecialesTarifaRows(): Promise<ServicioEspecialTarifaRow[]> {

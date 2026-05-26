@@ -11,6 +11,7 @@ export type ProductoParetoInput = {
   stock_minimo: number;
   vendido: number;
   costo_unitario_promedio: number;
+  unidad?: string;
 };
 
 export type ParetoInventarioMode = "unidades" | "valor_costo";

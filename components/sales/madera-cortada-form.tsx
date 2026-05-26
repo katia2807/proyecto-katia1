@@ -187,7 +187,12 @@ export function MaderaCortadaForm({
       ...effectiveProductos.map((p) => ({
         value: p.id,
         label: p.nombre,
-        sublabel: `stock ${Number(p.stock_actual).toFixed(2)} ${p.unidad}`,
+        sublabel: `stock ${(() => {
+          const u = (p.unidad ?? "").trim().toLowerCase();
+          const val = Number(p.stock_actual);
+          if (u === "unidad" || u === "u" || u === "u." || u === "pzs" || u === "pieza" || u === "piezas") return Math.round(val);
+          return Number(val.toFixed(2));
+        })()} ${p.unidad}`,
       })),
     ],
     [effectiveProductos],

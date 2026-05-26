@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AserraderoPanel } from "@/components/sales/aserradero-panel";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
+import { AserraderoServiciosTable } from "@/components/sales/aserradero-servicios-table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import {
   getClientesRows,
@@ -21,8 +22,6 @@ export default async function AserraderoServiciosPage() {
   ]);
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
-  const clientesById = new Map(clientes.map((c) => [c.id, c.nombre]));
-  const clientesMap = new Map(clientes.map((c) => [c.id, c]));
 
   const totalIngresos = servicios.reduce((acc, s) => acc + Number(s.precio_cobrado), 0);
   const totalUtilidad = servicios.reduce((acc, s) => acc + Number(s.utilidad), 0);
@@ -75,81 +74,13 @@ export default async function AserraderoServiciosPage() {
       <Card>
         <CardTitle>Servicios registrados</CardTitle>
         <CardDescription>Histórico de servicios facturados.</CardDescription>
-        <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
-          <Table>
-            <THead>
-              <TRow>
-                <TH>Fecha</TH>
-                <TH>Cliente</TH>
-                <TH className="text-right">Pies cúbicos</TH>
-                <TH className="text-right">Costo</TH>
-                <TH className="text-right">Cobrado</TH>
-                <TH className="text-right">Utilidad</TH>
-                <TH />
-              </TRow>
-            </THead>
-            <tbody>
-              {servicios.map((s) => (
-                <TRow key={s.id}>
-                  <TD>{formatDate(s.fecha)}</TD>
-                  <TD>
-                    <div className="font-medium">{clientesById.get(s.cliente_id) ?? "—"}</div>
-                    {(() => {
-                      try {
-                        const lineas = Array.isArray(s.lineas_json)
-                          ? s.lineas_json
-                          : typeof s.lineas_json === "string"
-                          ? JSON.parse(s.lineas_json)
-                          : [];
-                        const nota = lineas?.find((l: any) => l?.tipo === "nota_interna");
-                        if (nota?.observaciones) {
-                          return (
-                            <div className="mt-1 max-w-[200px] truncate text-[11px] font-semibold text-amber-600 dark:text-amber-400" title={nota.observaciones}>
-                              📝 {nota.observaciones}
-                            </div>
-                          );
-                        }
-                      } catch (e) {}
-                      return null;
-                    })()}
-                  </TD>
-
-                  <TD className="text-right">{Number(s.pies_cubicos).toFixed(2)}</TD>
-                  <TD className="text-right">{formatPen(Number(s.costo_cubicaje))}</TD>
-                  <TD className="text-right font-semibold">
-                    {formatPen(Number(s.precio_cobrado))}
-                  </TD>
-                  <TD className="text-right text-[var(--color-success)]">
-                    {formatPen(Number(s.utilidad))}
-                  </TD>
-                   <TD>
-                    {(() => {
-                      const cli = clientesMap.get(s.cliente_id);
-                      const hasRuc = !!(cli?.ruc && cli.ruc.trim().length === 11);
-                      const printUrl = `/ventas/comprobante/aserradero/${s.id}?tipoComprobante=${hasRuc ? "factura" : "boleta"}`;
-                      return (
-                        <Link
-                          href={printUrl}
-                          target="_blank"
-                          className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
-                          title="Imprimir comprobante"
-                        >
-                          🖨️
-                        </Link>
-                      );
-                    })()}
-                   </TD>
-                </TRow>
-              ))}
-              {servicios.length === 0 ? (
-                <TRow>
-                  <TD colSpan={7} className="text-center text-[var(--color-text-secondary)]">
-                    Aún no hay servicios registrados.
-                  </TD>
-                </TRow>
-              ) : null}
-            </tbody>
-          </Table>
+        <div className="mt-3">
+          <AserraderoServiciosTable
+            servicios={servicios}
+            clientesById={Object.fromEntries(clientes.map((c) => [c.id, c.nombre]))}
+            clientesMap={Object.fromEntries(clientes.map((c) => [c.id, c]))}
+            canMutate={canMutate}
+          />
         </div>
       </Card>
 

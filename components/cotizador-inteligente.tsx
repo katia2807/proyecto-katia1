@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { MargenIndicator } from "@/components/sales/margen-indicator";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { formatPen } from "@/lib/utils";
+import { formatPen, roundMoney } from "@/lib/utils";
 
 const catalogoPlantillas = {
   puerta_contraplacada: {
@@ -37,7 +37,7 @@ function toNumber(value: string) {
 }
 
 function round2(value: number) {
-  return Math.round(value * 100) / 100;
+  return roundMoney(value);
 }
 
 function calcularPieTablar(cantidad: number, espesor: number, ancho: number, largo: number) {

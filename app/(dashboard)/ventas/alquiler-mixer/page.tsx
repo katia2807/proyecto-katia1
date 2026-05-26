@@ -5,6 +5,7 @@ import { ContratoAlquilerPanel } from "@/components/sales/contrato-alquiler-pane
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
+import { AlquilerMixerTable } from "@/components/sales/alquiler-mixer-table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import { getAlquilerRows, getClientesRows, getInventarioProductosRows } from "@/lib/data";
 import { canMutateVentas } from "@/lib/permissions";
@@ -23,7 +24,6 @@ export default async function AlquilerMixerPage() {
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
 
-  const clientesById = new Map(clientes.map((c) => [c.id, c.nombre]));
   const abiertos = contratos.filter((c) => c.estado === "abierto");
   const totalDepositos = abiertos.reduce(
     (acc, c) => acc + (c.deposito_30 ?? 0),
@@ -108,72 +108,12 @@ export default async function AlquilerMixerPage() {
             {alquilerLoadWarning}
           </p>
         ) : null}
-        <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
-          <Table>
-            <THead>
-              <TRow>
-                <TH>Código</TH>
-                <TH>Inicio</TH>
-                <TH>Cliente</TH>
-                <TH>Equipo</TH>
-                <TH>Estado</TH>
-                <TH className="text-right">Monto</TH>
-                <TH className="text-right">Depósito</TH>
-                <TH className="text-right">Penalidad</TH>
-                <TH className="text-right">Acciones</TH>
-              </TRow>
-            </THead>
-            <tbody>
-              {contratos.map((c) => (
-                <TRow key={c.id}>
-                  <TD className="font-mono text-xs">{c.codigo ?? `—`}</TD>
-                  <TD>{formatDate(c.fecha_inicio)}</TD>
-                  <TD>{clientesById.get(c.cliente_id) ?? "—"}</TD>
-                  <TD>{c.activo}</TD>
-                  <TD>
-                    <Badge variant={c.estado === "abierto" ? "warning" : "success"}>
-                      {c.estado}
-                    </Badge>
-                  </TD>
-                  <TD className="text-right">
-                    {c.monto_total != null ? formatPen(c.monto_total) : "—"}
-                  </TD>
-                  <TD className="text-right">
-                    {c.deposito_30 != null ? formatPen(c.deposito_30) : "—"}
-                  </TD>
-                  <TD className="text-right font-semibold">
-                    {formatPen(Number(c.penalidad ?? 0))}
-                  </TD>
-                  <TD className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link
-                        href={`/ventas/alquiler-mixer/${c.id}/pdf`}
-                        target="_blank"
-                        className="text-xs font-semibold text-[var(--color-accent)] underline"
-                      >
-                        Imprimir
-                      </Link>
-                      {canMutate && c.estado === "abierto" ? (
-                        <Link
-                          href={`/ventas/alquiler-mixer/${c.id}/editar`}
-                          className="text-xs font-semibold text-[var(--color-text-secondary)] underline hover:text-[var(--color-text-primary)]"
-                        >
-                          Editar
-                        </Link>
-                      ) : null}
-                    </div>
-                  </TD>
-                </TRow>
-              ))}
-              {contratos.length === 0 ? (
-                <TRow>
-                  <TD colSpan={9} className="text-center text-[var(--color-text-secondary)]">
-                    Aún no hay contratos. Crea uno con &quot;Nuevo contrato&quot;.
-                  </TD>
-                </TRow>
-              ) : null}
-            </tbody>
-          </Table>
+        <div className="mt-3">
+          <AlquilerMixerTable
+            contratos={contratos}
+            clientesById={Object.fromEntries(clientes.map((c) => [c.id, c.nombre]))}
+            canMutate={canMutate}
+          />
         </div>
       </Card>
     </div>

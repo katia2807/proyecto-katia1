@@ -95,7 +95,12 @@ export function VentaMaderaForm({
       ...effectiveProductos.map((p) => ({
         value: p.id,
         label: p.nombre,
-        sublabel: `Stock: ${Number(p.stock_actual).toFixed(2)} ${p.unidad}`,
+        sublabel: `Stock: ${(() => {
+          const u = (p.unidad ?? "").trim().toLowerCase();
+          const val = Number(p.stock_actual);
+          if (u === "unidad" || u === "u" || u === "u." || u === "pzs" || u === "pieza" || u === "piezas") return Math.round(val);
+          return Number(val.toFixed(2));
+        })()} ${p.unidad}`,
       })),
     ],
     [effectiveProductos],
@@ -382,7 +387,11 @@ export function VentaMaderaForm({
               />
               {productoSeleccionado && (
                 <span className="text-xs font-semibold text-[var(--color-accent)] mt-1">
-                  Stock actual: {Number(stockDisponible).toFixed(2)} {selectedUnit}
+                  Stock actual: {(() => {
+                    const u = (selectedUnit ?? "").trim().toLowerCase();
+                    if (u === "unidad" || u === "u" || u === "u." || u === "pzs" || u === "pieza" || u === "piezas") return Math.round(stockDisponible);
+                    return Number(stockDisponible.toFixed(2));
+                  })()} {selectedUnit}
                 </span>
               )}
             </div>

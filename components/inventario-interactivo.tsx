@@ -28,6 +28,16 @@ import { DetailDrawer, DetailField } from "@/components/ui/detail-drawer";
 import { Field, SelectField } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 
+function formatStockQty(value: number | string | null | undefined, unidad: string | null | undefined): string {
+  const n = Number(value);
+  const safe = Number.isFinite(n) ? n : 0;
+  const u = (unidad ?? "").trim().toLowerCase();
+  if (u === "unidad" || u === "u" || u === "u." || u === "pzs" || u === "pieza" || u === "piezas") {
+    return String(Math.round(safe));
+  }
+  return String(Number(safe.toFixed(2)));
+}
+
 type ProductoEnriched = {
   id: string;
   codigo: string;
@@ -72,6 +82,7 @@ type RankingRow = {
   stock_actual: number;
   stock_minimo: number;
   sugerido_reponer: number;
+  unidad?: string;
 };
 
 type InventarioData = {
@@ -479,7 +490,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                 <div className="min-w-0">
                   <span className="font-semibold">{item.nombre}</span>
                   <span className="block text-xs text-[var(--color-text-secondary)]">
-                    Stock {item.stock_actual} / mín. {item.stock_minimo}
+                    Stock {formatStockQty(item.stock_actual, item.unidad)} / mín. {formatStockQty(item.stock_minimo, item.unidad)}
                   </span>
                 </div>
                 <Button
@@ -705,7 +716,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
 
                     {/* Stock badge */}
                     <div className="absolute right-2 bottom-2 rounded-lg bg-black/60 backdrop-blur-sm px-2 py-0.5 text-[10px] font-semibold text-white">
-                      Stock: {row.stock_actual}
+                      Stock: {formatStockQty(row.stock_actual, row.unidad)}
                     </div>
 
                     {/* Categoría badge */}
@@ -804,7 +815,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-[var(--color-text-primary)]">{row.nombre}</p>
                     <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-                      {row.codigo} · {row.categoria} · {row.unidad} · Mín. {row.stock_minimo} · Costo unit. promedio: S/ {Number(row.costo_unitario_promedio ?? 0).toFixed(2)} · Stock {row.stock_actual} · Valor: S/ {Number(row.valor_stock ?? 0).toFixed(2)}
+                      {row.codigo} · {row.categoria} · {row.unidad} · Mín. {formatStockQty(row.stock_minimo, row.unidad)} · Costo unit. promedio: S/ {Number(row.costo_unitario_promedio ?? 0).toFixed(2)} · Stock {formatStockQty(row.stock_actual, row.unidad)} · Valor: S/ {Number(row.valor_stock ?? 0).toFixed(2)}
                       {Number(row.costo_unitario_promedio ?? 0) === 0 && Number(row.stock_actual) > 0 ? (
                         <span className="ml-1 text-[var(--color-text-secondary)] opacity-70">(sin costo registrado)</span>
                       ) : null}
@@ -1012,9 +1023,9 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                             <TD className="text-right">{row.pctTotal.toFixed(1)}%</TD>
                             <TD className="text-right font-medium">{row.pctAcum.toFixed(1)}%</TD>
                             <TD className={cn("text-right", bajo && "text-amber-800 font-semibold")}>
-                              {p.stock_actual}
+                              {formatStockQty(p.stock_actual, p.unidad)}
                             </TD>
-                            <TD className="text-right">{p.stock_minimo}</TD>
+                            <TD className="text-right">{formatStockQty(p.stock_minimo, p.unidad)}</TD>
                             <TD className="text-right">
                               {bajo && canMutate ? (
                                 <Button
@@ -1131,7 +1142,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                     }}
                     className="w-full rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-soft)] px-4 py-3 text-left text-sm text-[var(--color-warning-strong)] transition hover:brightness-95"
                   >
-                    <span className="font-semibold">{item.nombre}</span> ({item.stock_actual}/{item.stock_minimo})
+                    <span className="font-semibold">{item.nombre}</span> ({formatStockQty(item.stock_actual, item.unidad)}/{formatStockQty(item.stock_minimo, item.unidad)})
                   </button>
                 ))}
               </div>
@@ -1239,9 +1250,9 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                     <TD>
                       <ProductoIrAEdicion nombre={row.nombre} productoId={row.id} onGo={goToProductoEditor} />
                     </TD>
-                    <TD className="text-right">{row.stock_actual}</TD>
-                    <TD className="text-right">{row.stock_minimo}</TD>
-                    <TD className="text-right font-semibold">{row.sugerido_reponer}</TD>
+                    <TD className="text-right">{formatStockQty(row.stock_actual, row.unidad)}</TD>
+                    <TD className="text-right">{formatStockQty(row.stock_minimo, row.unidad)}</TD>
+                    <TD className="text-right font-semibold">{formatStockQty(row.sugerido_reponer, row.unidad)}</TD>
                   </TRow>
                 ))}
               </tbody>
@@ -1479,8 +1490,8 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
         {selectedProduct ? (
           <div className="space-y-4">
             <div className="grid gap-2">
-              <DetailField label="Stock actual" value={`${selectedProduct.stock_actual} ${selectedProduct.unidad}`} />
-              <DetailField label="Stock minimo" value={`${selectedProduct.stock_minimo} ${selectedProduct.unidad}`} />
+              <DetailField label="Stock actual" value={`${formatStockQty(selectedProduct.stock_actual, selectedProduct.unidad)} ${selectedProduct.unidad}`} />
+              <DetailField label="Stock minimo" value={`${formatStockQty(selectedProduct.stock_minimo, selectedProduct.unidad)} ${selectedProduct.unidad}`} />
               <DetailField
                 label="Valorización"
                 value={

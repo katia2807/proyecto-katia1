@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field, SelectField } from "@/components/ui/field";
 import { contratoClientesToCompleto } from "@/lib/combobox-mocks";
-import { formatPen } from "@/lib/utils";
+import { formatPen, roundMoney } from "@/lib/utils";
 
 type Cliente = { id: string; nombre: string; ruc?: string | null };
 type Maquina = { id: string; nombre: string; categoria: string };
@@ -22,6 +22,7 @@ type ContratoAlquilerFormProps = {
   mockData?: boolean;
   /** Acción enlazada con `useActionState` (submit + toast + cierre en el panel). */
   panelAction: FormActionProp;
+  contrato?: any;
 };
 
 const tarifas = [
@@ -43,51 +44,49 @@ export function ContratoAlquilerForm({
   maquinas,
   mockData = false,
   panelAction,
+  contrato,
 }: ContratoAlquilerFormProps) {
   const hoy = new Date().toISOString().slice(0, 10);
   const [step, setStep] = useState(1);
 
   // Paso 1 State
-  const [clienteId, setClienteId] = useState("");
-  const [codigo, setCodigo] = useState("");
+  const [clienteId, setClienteId] = useState(contrato?.cliente_id ?? "");
+  const [codigo, setCodigo] = useState(contrato?.codigo ?? "");
   const [clientesLocales, setClientesLocales] = useState<{ id: string; nombre: string; ruc?: string | null }[]>([]);
   const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
 
   // Paso 2 State
-  const [activo, setActivo] = useState(maquinas[0]?.nombre ?? "");
-  const [representante, setRepresentante] = useState("");
-  const [rucEmpresa, setRucEmpresa] = useState("");
-  const [direccionEjecucion, setDireccionEjecucion] = useState("");
+  const [activo, setActivo] = useState(contrato?.activo ?? (maquinas[0]?.nombre ?? ""));
+  const [representante, setRepresentante] = useState(contrato?.representante ?? "");
+  const [rucEmpresa, setRucEmpresa] = useState(contrato?.ruc_empresa ?? "");
+  const [direccionEjecucion, setDireccionEjecucion] = useState(contrato?.direccion_ejecucion ?? "");
 
   // Paso 3 State
-  const [fechaInicio, setFechaInicio] = useState(hoy);
-  const [fechaTermino, setFechaTermino] = useState("");
-  const [tarifa, setTarifa] = useState(0);
-  const [dias, setDias] = useState(1);
+  const [fechaInicio, setFechaInicio] = useState(contrato?.fecha_inicio ?? hoy);
+  const [fechaTermino, setFechaTermino] = useState(contrato?.fecha_termino ?? "");
+  const [tarifa, setTarifa] = useState(contrato?.tarifa ?? 0);
+  const [dias, setDias] = useState(contrato?.dias_alquiler ?? 1);
   const [tarifaUnidad, setTarifaUnidad] = useState<(typeof tarifas)[number]["value"]>(
-    "hora_maquina",
+    contrato?.tarifa_unidad ?? "hora_maquina"
   );
-  const [montoAdelanto, setMontoAdelanto] = useState("");
+  const [montoAdelanto, setMontoAdelanto] = useState(contrato?.deposito_30 ? String(contrato.deposito_30) : "");
 
   // Penalidades editables
-  const [retrasoPct, setRetrasoPct] = useState(3);
-  const [devolucionPct, setDevolucionPct] = useState(3);
-  const [daniosPct, setDaniosPct] = useState(3);
+  const [retrasoPct, setRetrasoPct] = useState(contrato?.penalidad_retraso_pago_pct ?? 3);
+  const [devolucionPct, setDevolucionPct] = useState(contrato?.penalidad_devolucion_tardia_pct ?? 3);
+  const [daniosPct, setDaniosPct] = useState(contrato?.penalidad_danios_pct ?? 3);
 
   const montoTotal = useMemo(() => {
-    const tarifaCents = Math.round(tarifa * 100);
-    return (tarifaCents * dias) / 100;
+    return roundMoney(tarifa * dias);
   }, [tarifa, dias]);
 
   const deposito30 = useMemo(() => {
-    const totalCents = Math.round(montoTotal * 100);
-    const depCents = Math.round((totalCents * 30) / 100);
-    return depCents / 100;
+    return roundMoney(montoTotal * 0.3);
   }, [montoTotal]);
 
-  const montoRetraso = useMemo(() => Number(((montoTotal * retrasoPct) / 100).toFixed(2)), [montoTotal, retrasoPct]);
-  const montoDevolucion = useMemo(() => Number(((montoTotal * devolucionPct) / 100).toFixed(2)), [montoTotal, devolucionPct]);
-  const montoDanios = useMemo(() => Number(((montoTotal * daniosPct) / 100).toFixed(2)), [montoTotal, daniosPct]);
+  const montoRetraso = useMemo(() => roundMoney((montoTotal * retrasoPct) / 100), [montoTotal, retrasoPct]);
+  const montoDevolucion = useMemo(() => roundMoney((montoTotal * devolucionPct) / 100), [montoTotal, devolucionPct]);
+  const montoDanios = useMemo(() => roundMoney((montoTotal * daniosPct) / 100), [montoTotal, daniosPct]);
 
   const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
   const clientesCombo = useMemo(() => contratoClientesToCompleto(todosLosClientes), [todosLosClientes]);
@@ -105,6 +104,7 @@ export function ContratoAlquilerForm({
 
   return (
     <form action={panelAction} noValidate className="space-y-6">
+      {contrato?.id && <input type="hidden" name="id" value={contrato.id} />}
       {/* ── STEPPER DE WIZARD ── */}
       <div className="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
         <div className="flex items-center justify-between">
@@ -493,7 +493,9 @@ export function ContratoAlquilerForm({
             </p>
             <PagoFormFields
               key={`${montoTotal}-${deposito30}`}
-              defaultModalidadPago="adelanto"
+              defaultMetodoPago={contrato?.metodo_pago ?? "efectivo"}
+              defaultModalidadPago={contrato?.modalidad_pago ?? "adelanto"}
+              defaultFechaPagoCredito={contrato?.fecha_pago_credito ?? ""}
               defaultAdelanto={montoAdelanto !== "" ? montoAdelanto : String(deposito30)}
               onChangeAdelanto={setMontoAdelanto}
             />

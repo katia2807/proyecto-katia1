@@ -23,7 +23,7 @@ import {
 } from "@/lib/data";
 import { canAccessGerencial } from "@/lib/permissions";
 import { deleteCliente, forzarEliminarClienteCompleto } from "@/app/actions";
-import { formatDate, formatPen } from "@/lib/utils";
+import { formatDate, formatPen, roundMoney, safeDivide } from "@/lib/utils";
 import { GerencialClienteSearchSelect } from "@/components/gerencial/cliente-search-select";
 import { ClienteEstadoForm } from "@/components/gerencial/cliente-estado-form";
 import { ClientesMasivoTable } from "@/components/gerencial/clientes-masivo-table";
@@ -85,13 +85,13 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
   const currentKey = monthKey();
   const prevKey = previousMonthKey();
   const cajaEmpresa = caja.filter((row) => !row.es_personal);
-  const ingresosMes = cajaEmpresa.filter((row) => row.fecha.startsWith(currentKey) && row.tipo === "ingreso").reduce((acc, row) => acc + Number(row.monto), 0);
-  const ingresosPrev = cajaEmpresa.filter((row) => row.fecha.startsWith(prevKey) && row.tipo === "ingreso").reduce((acc, row) => acc + Number(row.monto), 0);
-  const egresosMes = cajaEmpresa.filter((row) => row.fecha.startsWith(currentKey) && row.tipo === "egreso").reduce((acc, row) => acc + Number(row.monto), 0);
-  const egresosPrev = cajaEmpresa.filter((row) => row.fecha.startsWith(prevKey) && row.tipo === "egreso").reduce((acc, row) => acc + Number(row.monto), 0);
-  const utilidad = ingresosMes - egresosMes;
+  const ingresosMes = cajaEmpresa.filter((row) => row.fecha.startsWith(currentKey) && row.tipo === "ingreso").reduce((acc, row) => roundMoney(acc + roundMoney(Number(row.monto))), 0);
+  const ingresosPrev = cajaEmpresa.filter((row) => row.fecha.startsWith(prevKey) && row.tipo === "ingreso").reduce((acc, row) => roundMoney(acc + roundMoney(Number(row.monto))), 0);
+  const egresosMes = cajaEmpresa.filter((row) => row.fecha.startsWith(currentKey) && row.tipo === "egreso").reduce((acc, row) => roundMoney(acc + roundMoney(Number(row.monto))), 0);
+  const egresosPrev = cajaEmpresa.filter((row) => row.fecha.startsWith(prevKey) && row.tipo === "egreso").reduce((acc, row) => roundMoney(acc + roundMoney(Number(row.monto))), 0);
+  const utilidad = roundMoney(ingresosMes - egresosMes);
   const cotPendientes = cotizacionesUnificadas.filter((row) => row.estado_flujo !== "cobrada");
-  const totalCotPendientes = cotPendientes.reduce((acc, row) => acc + Number(row.total), 0);
+  const totalCotPendientes = cotPendientes.reduce((acc, row) => roundMoney(acc + roundMoney(Number(row.total))), 0);
 
   // Datos para "Hoy"
   const nowDate = new Date();
@@ -99,8 +99,8 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
   const yesterdayDate = new Date(nowDate);
   yesterdayDate.setDate(nowDate.getDate() - 1);
   const yesterday = yesterdayDate.toISOString().slice(0, 10);
-  const ingresosHoy = cajaEmpresa.filter((r) => r.fecha === today && r.tipo === "ingreso").reduce((acc, r) => acc + Number(r.monto), 0);
-  const ingresosAyer = cajaEmpresa.filter((r) => r.fecha === yesterday && r.tipo === "ingreso").reduce((acc, r) => acc + Number(r.monto), 0);
+  const ingresosHoy = cajaEmpresa.filter((r) => r.fecha === today && r.tipo === "ingreso").reduce((acc, r) => roundMoney(acc + roundMoney(Number(r.monto))), 0);
+  const ingresosAyer = cajaEmpresa.filter((r) => r.fecha === yesterday && r.tipo === "ingreso").reduce((acc, r) => roundMoney(acc + roundMoney(Number(r.monto))), 0);
 
   const stockBajo = inventario.stockBajo.length;
   const ventasBorrador = ventasMadera.filter((v) => v.estado === "borrador").length;
@@ -122,8 +122,14 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
   for (const r of paretoData.rows) claseCount[r.clase]++;
   const topABC = paretoData.rows.slice(0, 5);
   const totalPorCliente = new Map<string, number>();
-  for (const row of ventasMuebles) totalPorCliente.set(row.cliente_id, (totalPorCliente.get(row.cliente_id) ?? 0) + Number(row.total));
-  for (const row of ventasMadera) totalPorCliente.set(row.cliente_id, (totalPorCliente.get(row.cliente_id) ?? 0) + Number(row.total));
+  for (const row of ventasMuebles) {
+    const prevTotal = totalPorCliente.get(row.cliente_id) ?? 0;
+    totalPorCliente.set(row.cliente_id, roundMoney(prevTotal + roundMoney(Number(row.total))));
+  }
+  for (const row of ventasMadera) {
+    const prevTotal = totalPorCliente.get(row.cliente_id) ?? 0;
+    totalPorCliente.set(row.cliente_id, roundMoney(prevTotal + roundMoney(Number(row.total))));
+  }
   const topClientes = [...totalPorCliente.entries()]
     .map(([clienteId, total]) => ({ cliente: clientes.find((c) => c.id === clienteId)?.nombre ?? "Cliente", total }))
     .sort((a, b) => b.total - a.total)
@@ -147,8 +153,11 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
     const fecha = d.toISOString().slice(0, 10);
     const saldo = cajaEmpresa
       .filter((row) => row.fecha <= fecha)
-      .reduce((acc, row) => acc + (row.tipo === "ingreso" ? Number(row.monto) : row.tipo === "egreso" ? -Number(row.monto) : 0), 0);
-    return { fecha: fecha.slice(5), saldo: Number(saldo.toFixed(2)) };
+      .reduce((acc, row) => {
+        const val = row.tipo === "ingreso" ? Number(row.monto) : row.tipo === "egreso" ? -Number(row.monto) : 0;
+        return roundMoney(acc + roundMoney(val));
+      }, 0);
+    return { fecha: fecha.slice(5), saldo: roundMoney(saldo) };
   });
 
   // Datos "Clientes 360"
@@ -415,7 +424,16 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                   ? ventasMesProductos.map((p) => (
                       <p key={p.id} className="text-sm text-[var(--katia-text-primary)]">
                         {p.nombre}:{" "}
-                        <strong className="font-semibold">{p.vendido} u.</strong>
+                        <strong className="font-semibold">
+                          {(() => {
+                            const u = (p.unidad ?? "u.").trim().toLowerCase();
+                            const val = Number(p.vendido);
+                            if (u === "unidad" || u === "u" || u === "u." || u === "pzs" || u === "pieza" || u === "piezas") {
+                              return `${Math.round(val)} ${p.unidad ?? "u."}`;
+                            }
+                            return `${Number(val.toFixed(2))} ${p.unidad ?? "u."}`;
+                          })()}
+                        </strong>
                       </p>
                     ))
                   : <p className="text-sm text-[var(--katia-text-secondary)]">Sin datos de ventas.</p>}

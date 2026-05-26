@@ -11,7 +11,7 @@ import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { liteClientesToCompleto } from "@/lib/combobox-mocks";
-import { formatPen } from "@/lib/utils";
+import { formatPen, roundMoney } from "@/lib/utils";
 
 type Cliente = { id: string; nombre: string };
 type ServicioEspecial = {
@@ -116,26 +116,26 @@ export function AserraderoForm({
   const hasStep2Warning = piezas.length === 0 || totalPT === 0;
 
   const costoCubicajeSugerido = useMemo(
-    () => Number((piesCubicos * costoPorPieCubico).toFixed(2)),
+    () => roundMoney(piesCubicos * costoPorPieCubico),
     [piesCubicos, costoPorPieCubico],
   );
 
   const costoCubicaje = (costoCubicajeManual !== "" && !isNaN(Number(costoCubicajeManual)))
-    ? Number(Number(costoCubicajeManual).toFixed(2))
+    ? roundMoney(Number(costoCubicajeManual))
     : costoCubicajeSugerido;
 
   const totalServiciosEspeciales = useMemo(() => {
     const sum = Object.entries(seleccionados).reduce((acc, [, val]) => {
       if (!val.activo) return acc;
-      return acc + val.cantidad * val.tarifa;
+      return roundMoney(acc + roundMoney(val.cantidad * val.tarifa));
     }, 0);
-    return Number(sum.toFixed(2));
+    return roundMoney(sum);
   }, [seleccionados]);
 
-  const precioCalculado = Number((costoCubicaje + totalServiciosEspeciales + manoDeObra).toFixed(2));
-  const precioCobrado = (precioCobradoManual !== "" && !isNaN(Number(precioCobradoManual))) ? Number(Number(precioCobradoManual).toFixed(2)) : precioCalculado;
-  const costoTotalAserradero = Number((costoCubicaje + manoDeObra).toFixed(2));
-  const utilidad = Number((precioCobrado - costoTotalAserradero).toFixed(2));
+  const precioCalculado = roundMoney(costoCubicaje + totalServiciosEspeciales + manoDeObra);
+  const precioCobrado = (precioCobradoManual !== "" && !isNaN(Number(precioCobradoManual))) ? roundMoney(Number(precioCobradoManual)) : precioCalculado;
+  const costoTotalAserradero = roundMoney(costoCubicaje + manoDeObra);
+  const utilidad = roundMoney(precioCobrado - costoTotalAserradero);
 
   const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
   const clientesCombo = useMemo(() => liteClientesToCompleto(todosLosClientes), [todosLosClientes]);

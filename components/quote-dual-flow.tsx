@@ -7,7 +7,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/Combobox";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { MOCK_QUOTE_TEMPLATES } from "@/lib/combobox-mocks";
-import { formatPen } from "@/lib/utils";
+import { formatPen, roundMoney } from "@/lib/utils";
 
 type QuoteRow = {
   id: string;
@@ -71,7 +71,7 @@ function cmToIn(cm: number) {
 }
 
 function round2(value: number) {
-  return Math.round(value * 100) / 100;
+  return roundMoney(value);
 }
 
 function buildRopero2PuertasPieces(inputs: ParametricInputs): ParametricPiece[] {

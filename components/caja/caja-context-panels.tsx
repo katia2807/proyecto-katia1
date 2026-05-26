@@ -83,6 +83,12 @@ function CajaMovimientoForm({
         value={medio === "otro" && customMedio.trim() ? `[Medio: ${customMedio.trim()}] ${descripcion}` : descripcion}
       />
 
+      <SelectField name="tipo_comprobante" label="Tipo de Comprobante" defaultValue="ninguno" required>
+        <option value="ninguno">Ninguno (No)</option>
+        <option value="factura">Factura</option>
+        <option value="boleta">Boleta</option>
+      </SelectField>
+
       <div className="md:col-span-2">
         <FotoUpload
           bucket="caja"

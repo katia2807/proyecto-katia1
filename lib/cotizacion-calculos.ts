@@ -1,7 +1,8 @@
+import { roundMoney } from "@/lib/utils";
 import type { CotizacionDetalleV1, MuebleLineaMadera } from "@/lib/cotizacion-unificada-payload";
 
 export function round2(n: number) {
-  return Math.round(n * 100) / 100;
+  return roundMoney(n);
 }
 
 /** PT (pies-tablar): mismas reglas que el cotizador de muebles (espesor×ancho×largo en pulgadas, largo en pies). */

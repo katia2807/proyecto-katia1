@@ -5,7 +5,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import { getCajaRows } from "@/lib/data";
 import { canMutateCaja } from "@/lib/permissions";
-import { formatPen } from "@/lib/utils";
+import { formatPen, roundMoney } from "@/lib/utils";
 
 type CajaPageProps = {
   searchParams?: Promise<{ vista?: string | string[] }>;
@@ -31,8 +31,13 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
 
   const totalEmpresa = allRows
     .filter((r) => !r.es_personal)
-    .reduce((acc, r) => acc + (r.tipo === "ingreso" ? Number(r.monto) : -Number(r.monto)), 0);
-  const totalPersonal = allRows.filter((r) => r.es_personal).reduce((acc, r) => acc + Number(r.monto), 0);
+    .reduce((acc, r) => {
+      const term = r.tipo === "ingreso" ? Number(r.monto) : -Number(r.monto);
+      return roundMoney(acc + roundMoney(term));
+    }, 0);
+  const totalPersonal = allRows
+    .filter((r) => r.es_personal)
+    .reduce((acc, r) => roundMoney(acc + roundMoney(Number(r.monto))), 0);
 
   const tabs: { value: typeof vista; label: string; hint: string }[] = [
     { value: "todos", label: "Todos", hint: `${allRows.length} movimientos` },

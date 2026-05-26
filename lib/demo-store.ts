@@ -41,6 +41,7 @@ type CajaRow = {
   voided_at: string | null;
   voided_by: string | null;
   void_reason: string | null;
+  tipo_comprobante: "boleta" | "factura" | "ninguno" | null;
 };
 
 type ClienteRow = {
@@ -1329,6 +1330,7 @@ function seedCajaIniciales(): CajaRow[] {
     periodo_cerrado: periodoCerrado,
     es_personal: false,
     url_comprobante: null,
+    tipo_comprobante: "ninguno",
     created_at: nowIso(),
     created_by: null,
     updated_at: nowIso(),
@@ -1367,6 +1369,7 @@ function seedGastosExcel(): CajaRow[] {
     periodo_cerrado: false,
     es_personal: esPersonal,
     url_comprobante: null,
+    tipo_comprobante: "ninguno",
     created_at: nowIso(),
     created_by: null,
     updated_at: nowIso(),
@@ -1431,6 +1434,9 @@ function normalizeCaja(raw: unknown): CajaRow {
     periodo_cerrado: Boolean(r.periodo_cerrado ?? false),
     es_personal: Boolean(r.es_personal ?? false),
     url_comprobante: r.url_comprobante != null ? String(r.url_comprobante) : null,
+    tipo_comprobante: (r.tipo_comprobante === "factura" || r.tipo_comprobante === "boleta" || r.tipo_comprobante === "ninguno"
+      ? r.tipo_comprobante
+      : "ninguno") as CajaRow["tipo_comprobante"],
     created_at: String(r.created_at ?? nowIso()),
     created_by: r.created_by != null ? String(r.created_by) : null,
     updated_at: String(r.updated_at ?? nowIso()),
@@ -1694,7 +1700,7 @@ function loadPersistedStore(): DemoStore {
 
 const store: DemoStore = loadPersistedStore();
 
-function persistStore() {
+export function persistStore() {
   writeStoreToDisk(store);
 }
 
@@ -2028,10 +2034,12 @@ type DemoCreateCajaInput = Omit<
   | "referencia_id"
   | "es_personal"
   | "url_comprobante"
+  | "tipo_comprobante"
 > & {
   referencia_id?: string | null;
   es_personal?: boolean;
   url_comprobante?: string | null;
+  tipo_comprobante?: "boleta" | "factura" | "ninguno" | null;
 };
 
 export function demoCreateCaja(input: DemoCreateCajaInput) {
@@ -2048,7 +2056,15 @@ export function demoCreateCaja(input: DemoCreateCajaInput) {
     referencia_id: input.referencia_id ?? null,
     es_personal: input.es_personal ?? false,
     url_comprobante: input.url_comprobante ?? null,
-    ...input,
+    tipo_comprobante: input.tipo_comprobante ?? "ninguno",
+    organization_id: input.organization_id,
+    fecha: input.fecha,
+    tipo: input.tipo,
+    medio: input.medio,
+    categoria: input.categoria,
+    monto: input.monto,
+    descripcion: input.descripcion,
+    modulo_origen: input.modulo_origen,
   };
   store.caja.unshift(row);
   persistStore();
@@ -2774,6 +2790,7 @@ export function demoCreateServicioAserradero(
     });
   }
   persistStore();
+  return newRow;
 }
 
 export function demoServiciosEspecialesTarifaRows() {
