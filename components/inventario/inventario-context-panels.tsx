@@ -16,7 +16,7 @@ import { MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { IconArrowsLeftRight, IconCirclePlus, IconShoppingCart } from "@tabler/icons-react";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { CodigoProductoPreview } from "@/components/inventario/codigo-producto-preview";
 import { FotoUpload } from "@/components/sales/foto-upload";
 
@@ -50,6 +50,7 @@ export function InventarioContextPanels({
   unidadesExtra = [],
 }: InventarioContextPanelsProps) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [productoMovId, setProductoMovId] = useState("");
   const [productoCompraId, setProductoCompraId] = useState("");
 
@@ -245,10 +246,11 @@ export function InventarioContextPanels({
       setCompraErrors({});
       setShowCubicaje(false);
       setCantidadCubicada("");
+      router.refresh();
     } else if (compraState.error) {
       showToast({ variant: "error", message: compraState.error });
     }
-  }, [compraState, showToast]);
+  }, [compraState, showToast, router]);
 
   useEffect(() => {
     if (productoState.success && productoState.message) {
@@ -259,10 +261,11 @@ export function InventarioContextPanels({
       setSelectedUnidad("");
       setStockInicial("");
       setCostoUnitario("");
+      router.refresh();
     } else if (productoState.error) {
       showToast({ variant: "error", message: productoState.error });
     }
-  }, [productoState, showToast]);
+  }, [productoState, showToast, router]);
 
   useEffect(() => {
     if (movimientoState.success && movimientoState.message) {
@@ -271,10 +274,11 @@ export function InventarioContextPanels({
       setMovimientoFormKey((k) => k + 1);
       setProductoMovId("");
       setMovimientoErrors({});
+      router.refresh();
     } else if (movimientoState.error) {
       showToast({ variant: "error", message: movimientoState.error });
     }
-  }, [movimientoState, showToast]);
+  }, [movimientoState, showToast, router]);
 
   function handleAgregarCategoria() {
     const valor = nuevaCategoriaInput.trim();

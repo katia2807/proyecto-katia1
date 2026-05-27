@@ -3,6 +3,7 @@ export type MutationFormState = {
   success: boolean;
   error: string | null;
   message: string | null;
+  id?: string;
 };
 
 export const mutationFormInitialState: MutationFormState = {

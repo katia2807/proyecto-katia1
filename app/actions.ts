@@ -71,6 +71,14 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole, Json } from "@/lib/supabase/types";
 import { roundMoney, safeDivide } from "@/lib/utils";
 
+const preprocessDecimal = (v: unknown) => {
+  if (typeof v === "string") {
+    const cleaned = v.trim().replace(",", ".");
+    return cleaned === "" ? undefined : cleaned;
+  }
+  return v;
+};
+
 const cajaSchema = z.object({
   fecha: z.string().min(1),
   tipo: z.enum(["ingreso", "egreso", "transferencia"]),
@@ -109,8 +117,8 @@ const cotizacionSchema = z.object({
   tipo: z.enum(["mueble_personalizado", "servicio_corte"]),
   especieMadera: z.string().min(2),
   unidadMedida: z.enum(["cm", "in", "otro"]),
-  precioCalculado: z.coerce.number().nonnegative(),
-  precioAcordado: z.coerce.number().positive(),
+  precioCalculado: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative()),
+  precioAcordado: z.preprocess(preprocessDecimal, z.coerce.number().positive()),
   motivoAjuste: z.string().optional(),
   estado: z.enum(["borrador", "confirmada"]).default("borrador"),
 });
@@ -234,14 +242,14 @@ const ventaMaderaCortadaSchema = z.object({
   clienteId: z.string().uuid(),
   fecha: z.string().min(1),
   tipoCorte: z.enum(["tabla", "liston", "cuarton", "poste"]),
-  totalPt: z.coerce.number().positive(),
-  precioPorPt: z.coerce.number().nonnegative(),
-  total: z.coerce.number().nonnegative(),
+  totalPt: z.preprocess(preprocessDecimal, z.coerce.number().positive()),
+  precioPorPt: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative()),
+  total: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative()),
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("contado"),
   fechaPagoCredito: z.string().optional().or(z.literal("")),
-  adelanto: z.coerce.number().nonnegative().optional().default(0),
-  montoCredito: z.coerce.number().nonnegative().optional().default(0),
+  adelanto: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative().optional().default(0)),
+  montoCredito: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative().optional().default(0)),
   choferId: z.string().uuid().optional().or(z.literal("")),
   tipoEntrega: tipoEntregaEnum.default("envio"),
   direccionEntrega: z.string().optional(),
@@ -281,17 +289,18 @@ const cerrarContratoSchema = z.object({
   danios: z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean()).default(false),
 });
 
+
 const servicioAserraderoSchema = z.object({
   clienteId: z.string().uuid(),
   fecha: z.string().min(1),
-  piesCubicos: z.coerce.number().positive(),
-  costoCubicaje: z.coerce.number().nonnegative(),
-  precioCobrado: z.coerce.number().positive(),
+  piesCubicos: z.preprocess(preprocessDecimal, z.coerce.number().positive()),
+  costoCubicaje: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative()),
+  precioCobrado: z.preprocess(preprocessDecimal, z.coerce.number().positive()),
   lineas: z.string().optional(), // JSON con desglose si aplica
   metodoPago: z.string().optional().default("efectivo"),
   modalidadPago: z.string().optional().default("contado"),
   fechaPagoCredito: z.string().optional(),
-  adelanto: z.coerce.number().nonnegative().optional().default(0),
+  adelanto: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative().optional().default(0)),
 });
 
 const proveedorSchema = z.object({
@@ -335,9 +344,12 @@ const inventarioMovimientoSchema = z.object({
 
 const inventarioCompraRapidaSchema = z.object({
   productoId: z.string().uuid(),
-  cantidad: z.coerce.number().positive(),
+  cantidad: z.preprocess(preprocessDecimal, z.coerce.number().positive()),
   costoUnitario: z.preprocess(
-    (value) => (value === "" || value === null ? undefined : value),
+    (value) => {
+      const processed = preprocessDecimal(value);
+      return (processed === "" || processed === null || processed === undefined) ? undefined : processed;
+    },
     z.coerce.number().nonnegative().optional(),
   ),
   proveedor: z.string().optional(),
@@ -2016,7 +2028,10 @@ export async function createCotizacion(formData: FormData) {
   });
 
   if (!parsed.success) {
-    throw new Error("Datos de cotización inválidos.");
+    const errorDetails = parsed.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join(", ");
+    throw new Error(`Datos de cotización inválidos. Errores: ${errorDetails}`);
   }
 
   if (!hasSupabaseEnv()) {
@@ -3830,8 +3845,9 @@ export async function createVentaMaderaCortada(formData: FormData) {
     throw new Error(`Datos de venta de madera cortada inválidos: ${fieldErrors}`);
   }
 
+  let createdId = "";
   if (!hasSupabaseEnv()) {
-    demoCreateVentaMaderaCortada({
+    const row = demoCreateVentaMaderaCortada({
       organization_id: DEFAULT_ORG_ID,
       cliente_id: parsed.data.clienteId,
       fecha: parsed.data.fecha,
@@ -3848,6 +3864,7 @@ export async function createVentaMaderaCortada(formData: FormData) {
       estado_entrega: parsed.data.estadoEntrega,
       inventario_producto_id: parsed.data.inventarioProductoId || null,
     });
+    createdId = row?.id ?? "";
   } else {
     const supabase = getSupabaseServerClient();
     const productoId =
@@ -4027,10 +4044,12 @@ export async function createVentaMaderaCortada(formData: FormData) {
       await supabase.from("ventas_madera_cortada").delete().eq("id", venta.id);
       throw new Error(movErrGlobal);
     }
+    createdId = venta.id;
   }
   revalidatePath("/ventas");
   revalidatePath("/ventas/madera-cortada");
   revalidatePath("/caja");
+  return createdId;
 }
 
 /** Wrapper con MutationFormState para useActionState (cierre automático del modal). */
@@ -4039,8 +4058,8 @@ export async function submitCreateVentaMaderaCortadaForm(
   formData: FormData,
 ): Promise<MutationFormState> {
   try {
-    await createVentaMaderaCortada(formData);
-    return { success: true, error: null, message: "Venta registrada correctamente." };
+    const id = await createVentaMaderaCortada(formData);
+    return { success: true, error: null, message: "Venta registrada correctamente.", id };
   } catch (e) {
     return {
       success: false,

@@ -117,6 +117,7 @@ export function CubicajeInput({
       : [{ id: 1, cantidad: 1, espesor: 2, ancho: 6, largo: 8, descripcion: "Tabla", inventario_producto_id: null }],
   );
   const [precioInput, setPrecioInput] = useState(defaultPrecioPorPT);
+  const [focusRowId, setFocusRowId] = useState<number | null>(null);
 
   const piezasConSubtotal = useMemo(
     () => piezas.map((p) => ({ ...p, subtotalPT: calcularPT(p) })),
@@ -152,11 +153,20 @@ export function CubicajeInput({
     }
   }, [totalPT, totalPC, precioActivo, totalSoles, piezasConSubtotal, onChange]);
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      agregar();
+    }
+  };
+
   function agregar() {
+    const nextId = (piezas.at(-1)?.id ?? 0) + 1;
     setPiezas((prev) => [
       ...prev,
-      { id: (prev.at(-1)?.id ?? 0) + 1, cantidad: 1, espesor: 0, ancho: 0, largo: 0, descripcion: "", inventario_producto_id: null },
+      { id: nextId, cantidad: 1, espesor: 0, ancho: 0, largo: 0, descripcion: "", inventario_producto_id: null },
     ]);
+    setFocusRowId(nextId);
   }
 
   function eliminar(id: number) {
@@ -269,10 +279,17 @@ export function CubicajeInput({
                       </select>
                     ) : null}
                     <input
+                      ref={(el) => {
+                        if (el && focusRowId === p.id) {
+                          el.focus();
+                          setFocusRowId(null);
+                        }
+                      }}
                       className={inputClass}
                       value={p.descripcion}
                       placeholder="Tabla, listón, especie…"
                       onChange={(e) => actualizar(p.id, { descripcion: e.target.value })}
+                      onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
                   </td>
@@ -284,6 +301,7 @@ export function CubicajeInput({
                       className={`${inputClass} text-right`}
                       value={p.cantidad === 0 ? "" : p.cantidad}
                       onChange={(e) => actualizar(p.id, { cantidad: Number(e.target.value) || 0 })}
+                      onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
                   </td>
@@ -295,6 +313,7 @@ export function CubicajeInput({
                       className={`${inputClass} text-right`}
                       value={p.espesor === 0 ? "" : p.espesor}
                       onChange={(e) => actualizar(p.id, { espesor: Number(e.target.value) || 0 })}
+                      onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
                   </td>
@@ -306,6 +325,7 @@ export function CubicajeInput({
                       className={`${inputClass} text-right`}
                       value={p.ancho === 0 ? "" : p.ancho}
                       onChange={(e) => actualizar(p.id, { ancho: Number(e.target.value) || 0 })}
+                      onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
                   </td>
@@ -317,6 +337,7 @@ export function CubicajeInput({
                       className={`${inputClass} text-right`}
                       value={p.largo === 0 ? "" : p.largo}
                       onChange={(e) => actualizar(p.id, { largo: Number(e.target.value) || 0 })}
+                      onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
                   </td>

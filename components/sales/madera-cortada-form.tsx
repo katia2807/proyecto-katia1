@@ -140,12 +140,29 @@ export function MaderaCortadaForm({
 
   const totalFinal = totalManual !== "" ? (Number(totalManual) || 0) : totalSolesCalculado;
 
+  const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
+
+  const selectedCliente = useMemo(() => {
+    return todosLosClientes.find((c) => c.id === clienteId);
+  }, [clienteId, todosLosClientes]);
+  const selectedClienteRuc = (selectedCliente as { ruc?: string })?.ruc || "";
+  const selectedClienteDoc = (selectedCliente as { documento?: string })?.documento || "";
+  const hasRuc = !!(selectedClienteRuc && selectedClienteRuc.trim().length === 11);
+
   // useActionState para detectar éxito y cerrar automáticamente
   const [state, formAction] = useActionState(submitCreateVentaMaderaCortadaForm, mutationFormInitialState);
 
   useEffect(() => {
     if (state?.success && state?.message) {
       showToast({ variant: "success", message: state.message });
+      
+      // Open print ticket automatically
+      if (state.id) {
+        const isFactura = tipoComprobante === "factura" && hasRuc;
+        const printUrl = `/ventas/comprobante/venta-madera/${state.id}?tipoComprobante=${isFactura ? "factura" : "boleta"}`;
+        window.open(printUrl, "_blank");
+      }
+
       // Limpiar estados de la calculadora y formulario
       setClienteId("");
       setFecha(hoy);
@@ -163,9 +180,9 @@ export function MaderaCortadaForm({
     } else if (state?.error) {
       showToast({ variant: "error", message: state.error });
     }
-  }, [state, showToast, onSuccess, hoy]);
+  }, [state, showToast, onSuccess, hoy, tipoComprobante, hasRuc]);
 
-  const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
+
 
   const effectiveProductos = useMemo((): Producto[] => {
     if (!mockData) return productos;
@@ -231,12 +248,7 @@ export function MaderaCortadaForm({
     setStep(targetStep);
   }
 
-  const selectedCliente = useMemo(() => {
-    return todosLosClientes.find((c) => c.id === clienteId);
-  }, [clienteId, todosLosClientes]);
-  const selectedClienteRuc = (selectedCliente as any)?.ruc || "";
-  const selectedClienteDoc = (selectedCliente as any)?.documento || "";
-  const hasRuc = !!(selectedClienteRuc && selectedClienteRuc.trim().length === 11);
+
 
   // Dynamic Validation indicators per step
   const stepErrors = useMemo(() => {
