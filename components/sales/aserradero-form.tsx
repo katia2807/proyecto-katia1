@@ -54,10 +54,9 @@ export function AserraderoForm({
   const [costoPorPieCubico, setCostoPorPieCubico] = useState(defaultCostoPorPieCubico);
   const [piezasJson, setPiezasJson] = useState<string>(DEFAULT_LINEAS_CUBICAJE_JSON);
   const [step, setStep] = useState(1);
-  const [precioCobradoManual, setPrecioCobradoManual] = useState<string>(
-    "",
-  );
+  const [precioCobradoManual, setPrecioCobradoManual] = useState<string>("");
   const [costoCubicajeManual, setCostoCubicajeManual] = useState<string>("");
+  const [tipoRedondeo, setTipoRedondeo] = useState<"ninguno" | "normal" | "abajo" | "arriba">("normal");
 
   const [manoDeObra, setManoDeObra] = useState<number>(0);
   const [extrasMadera, setExtrasMadera] = useState<Array<{ id: number; descripcion: string; cantidad: number }>>([]);
@@ -110,6 +109,21 @@ export function AserraderoForm({
     [piezas],
   );
   const piesCubicos = useMemo(() => totalPT * PIE_TABLAR_A_PIE_CUBICO, [totalPT]);
+  
+  const piesCubicosComercial = useMemo(() => {
+    switch (tipoRedondeo) {
+      case "normal":
+        return Math.round(piesCubicos);
+      case "abajo":
+        return Math.floor(piesCubicos);
+      case "arriba":
+        return Math.ceil(piesCubicos);
+      case "ninguno":
+      default:
+        return piesCubicos;
+    }
+  }, [piesCubicos, tipoRedondeo]);
+
   const selectedCliente = useMemo(() => {
     const all = [...clientes, ...clientesLocales];
     return all.find((c) => c.id === clienteId);
@@ -122,8 +136,8 @@ export function AserraderoForm({
   const hasStep2Warning = piezas.length === 0 || totalPT === 0;
 
   const costoCubicajeSugerido = useMemo(
-    () => roundMoney(piesCubicos * costoPorPieCubico),
-    [piesCubicos, costoPorPieCubico],
+    () => roundMoney(piesCubicosComercial * costoPorPieCubico),
+    [piesCubicosComercial, costoPorPieCubico],
   );
 
   const costoCubicaje = (costoCubicajeManual !== "" && !isNaN(Number(costoCubicajeManual)))
@@ -417,7 +431,7 @@ export function AserraderoForm({
               ⚠️ Debe agregar al menos una pieza antes de confirmar el registro.
             </p>
           )}
-          <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <div className="mt-3 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Field
               label="Costo por pie cúbico (S/)"
               type="number"
@@ -426,13 +440,49 @@ export function AserraderoForm({
               value={costoPorPieCubico}
               onChange={(e) => setCostoPorPieCubico(Number(e.target.value) || 0)}
             />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase">
+                Redondeo Comercial
+              </label>
+              <select
+                value={tipoRedondeo}
+                onChange={(e) => setTipoRedondeo(e.target.value as any)}
+                className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+              >
+                <option value="ninguno">Ninguno (Real)</option>
+                <option value="normal">Normal (Math.round)</option>
+                <option value="abajo">Hacia abajo (Math.floor)</option>
+                <option value="arriba">Hacia arriba (Math.ceil)</option>
+              </select>
+            </div>
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-              <p className="text-xs text-[var(--color-text-secondary)]">Pies cúbicos</p>
-              <p className="text-xl font-bold">{piesCubicos.toFixed(2)}</p>
+              <p className="text-xs text-[var(--color-text-secondary)]">Pie cúbico real</p>
+              <p className="text-xl font-bold">{piesCubicos.toFixed(4)} <span className="text-xs font-normal">ft³</span></p>
+              <p className="text-[10px] text-[var(--color-text-secondary)] italic">
+                Total PT: {totalPT.toFixed(2)} PT
+              </p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-3">
+              <p className="text-xs text-[var(--color-text-secondary)]">Pie cúbico comercial</p>
+              <p className="text-xl font-bold text-[var(--color-primary)]">
+                {piesCubicosComercial.toFixed(4)} <span className="text-xs font-normal">ft³</span>
+              </p>
+              <p className="text-[10px] text-[var(--color-text-secondary)] italic">
+                Redondeo: {tipoRedondeo === "ninguno" ? "Ninguno" : tipoRedondeo === "abajo" ? "Hacia abajo" : tipoRedondeo === "arriba" ? "Hacia arriba" : "Normal"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3 flex flex-col justify-center">
+              <p className="text-xs text-[var(--color-text-secondary)] font-semibold uppercase">Fórmula de costo</p>
+              <p className="text-sm font-medium mt-1">
+                {piesCubicosComercial.toFixed(4)} ft³ × S/. {costoPorPieCubico.toFixed(2)} = <span className="text-[var(--color-primary)] font-bold">S/. {costoCubicajeSugerido.toFixed(2)}</span>
+              </p>
             </div>
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/40 p-3 flex flex-col justify-between">
               <label className="text-xs text-[var(--color-text-secondary)] font-semibold block mb-0.5">
-                Costo cubicaje (S/)
+                Costo cubicaje final (S/)
               </label>
               <div className="flex items-center gap-1">
                 <span className="text-sm font-bold text-[var(--color-text-secondary)]">S/.</span>
