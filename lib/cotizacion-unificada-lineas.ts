@@ -36,12 +36,15 @@ export function buildLineasResumen(detalle: CotizacionDetalleV1, margenGananciaP
 
     totalCantidad = Math.max(1, totalCantidad);
 
-    // Descripción visible al cliente: usa el campo editable si existe, sino genera texto limpio
-    const descCliente = (detalle.descripcion_cliente ?? "").trim();
+    // Descripción visible al cliente: usa el campo editable si existe (incluso si está vacío), sino genera texto limpio
+    const hasManualDesc = detalle.descripcion_cliente !== undefined && detalle.descripcion_cliente !== null;
     const bullets: string[] = [];
-    if (descCliente) {
-      // Katia escribió una descripción personalizada → mostrarla tal cual
-      bullets.push(descCliente);
+    if (hasManualDesc) {
+      const descCliente = (detalle.descripcion_cliente ?? "").trim();
+      if (descCliente) {
+        // Katia escribió una descripción personalizada → mostrarla tal cual
+        bullets.push(descCliente);
+      }
     } else {
       // Generación automática: solo nombres de piezas, sin datos técnicos internos
       const piezasLabels: string[] = [];

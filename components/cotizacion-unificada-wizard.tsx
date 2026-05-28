@@ -1499,8 +1499,13 @@ export function CotizacionUnificadaWizard({
     setTipoCliente(row.tipo_cliente);
     setFecha(row.fecha);
     setDetalle(d);
-    setDescripcionManual(d.descripcion_cliente ?? "");
-    setIsDescriptionInitialized(true);
+    if (d.descripcion_cliente !== undefined && d.descripcion_cliente !== null) {
+      setDescripcionManual(d.descripcion_cliente);
+      setIsDescriptionInitialized(true);
+    } else {
+      setDescripcionManual("");
+      setIsDescriptionInitialized(false);
+    }
     setClienteId(row.cliente_id);
     const cl = effectiveClientes.find((c) => c.id === row.cliente_id);
     setNombreCliente(cl?.nombre ?? "");

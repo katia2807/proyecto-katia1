@@ -122,7 +122,7 @@ export const cotizacionDetalleV1Schema = z.object({
   costoManoObra: z.number().nonnegative().optional().default(0),
   muebles_lineas: z.array(lineaMaderaSchema),
   notas_generales: z.string().optional().default(""),
-  descripcion_cliente: z.string().optional().default(""),
+  descripcion_cliente: z.string().optional(),
   aserradero: aserraderoSchema,
   alquiler: alquilerSchema,
 });
@@ -136,7 +136,7 @@ export function defaultCotizacionDetalleV1(): CotizacionDetalleV1 {
     costoManoObra: 0,
     muebles_lineas: [],
     notas_generales: "",
-    descripcion_cliente: "",
+    descripcion_cliente: undefined,
     aserradero: {
       modo: "hora",
       precioHora: 0,
