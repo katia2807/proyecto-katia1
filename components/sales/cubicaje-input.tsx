@@ -227,39 +227,41 @@ export function CubicajeInput({
   }, [piezasConSubtotal, productos]);
 
   return (
-    <div className="space-y-3">
-      <div className="overflow-x-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-        <table className="w-full text-sm">
+    <div className="space-y-3 w-full">
+      <div className="overflow-x-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] w-full">
+        <table className="min-w-[760px] w-full text-sm table-layout-fixed">
           <thead className="bg-[var(--color-primary-soft)]/30">
             <tr>
-              <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[220px]">
+              <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[180px]">
                 Producto / Descripción
               </th>
-              <th className="px-2 py-2 text-right text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] w-20">
+              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[80px]">
                 Cant.
               </th>
-              <th className="px-2 py-2 text-right text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] w-20">
+              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[80px]">
                 Esp. (in)
               </th>
-              <th className="px-2 py-2 text-right text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] w-20">
+              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[80px]">
                 Anch. (in)
               </th>
-              <th className="px-2 py-2 text-right text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] w-20">
+              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[80px]">
                 Largo (ft)
               </th>
-              <th className="px-2 py-2 text-right text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] w-24">
+              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[100px]">
                 PT Real (u / tot)
               </th>
-              <th className="px-2 py-2 text-right text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] w-24 text-[var(--color-primary)]">
+              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[110px] text-[var(--color-primary)]">
                 PT Com (u / tot)
               </th>
-              <th className="w-10" />
+              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[48px]">
+                Acciones
+              </th>
             </tr>
           </thead>
           <tbody>
             {piezasConSubtotal.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-xs text-[var(--color-text-secondary)] italic">
+                <td colSpan={8} className="px-3 py-6 text-center text-xs text-[var(--color-text-secondary)] italic">
                   Calculadora vacía. Haz clic en "Agregar pieza" o selecciona un producto de inventario en la fila para empezar.
                 </td>
               </tr>
@@ -326,60 +328,60 @@ export function CubicajeInput({
                       autoComplete="off"
                     />
                   </td>
-                  <td className="px-2 py-1.5">
+                  <td className="px-2 py-1.5 text-center">
                     <input
                       type="number"
                       min="0"
                       step="1"
-                      className={`${inputClass} text-right`}
+                      className={`${inputClass} text-center`}
                       value={p.cantidad === 0 ? "" : p.cantidad}
                       onChange={(e) => actualizar(p.id, { cantidad: Number(e.target.value) || 0 })}
                       onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
                   </td>
-                  <td className="px-2 py-1.5">
+                  <td className="px-2 py-1.5 text-center">
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      className={`${inputClass} text-right`}
+                      className={`${inputClass} text-center`}
                       value={p.espesor === 0 ? "" : p.espesor}
                       onChange={(e) => actualizar(p.id, { espesor: Number(e.target.value) || 0 })}
                       onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
                   </td>
-                  <td className="px-2 py-1.5">
+                  <td className="px-2 py-1.5 text-center">
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      className={`${inputClass} text-right`}
+                      className={`${inputClass} text-center`}
                       value={p.ancho === 0 ? "" : p.ancho}
                       onChange={(e) => actualizar(p.id, { ancho: Number(e.target.value) || 0 })}
                       onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
                   </td>
-                  <td className="px-2 py-1.5">
+                  <td className="px-2 py-1.5 text-center">
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      className={`${inputClass} text-right`}
+                      className={`${inputClass} text-center`}
                       value={p.largo === 0 ? "" : p.largo}
                       onChange={(e) => actualizar(p.id, { largo: Number(e.target.value) || 0 })}
                       onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
                   </td>
-                  <td className="px-2 py-1.5 text-right font-medium text-xs">
+                  <td className="px-2 py-1.5 text-center font-medium text-xs whitespace-nowrap">
                     <span className="text-[var(--color-text-secondary)]">{p.ptUnitarioReal.toFixed(2)}</span>
                     <span className="mx-1 text-[var(--color-border)]">/</span>
                     <span className="font-bold text-[var(--color-text-primary)]">{p.ptTotalReal.toFixed(2)}</span>
                   </td>
-                  <td className="px-2 py-1.5 text-right font-medium text-xs">
+                  <td className="px-2 py-1.5 text-center font-medium text-xs whitespace-nowrap">
                     <span className="text-[var(--color-text-secondary)]">{p.ptUnitarioComercial}</span>
                     <span className="mx-1 text-[var(--color-border)]">/</span>
                     <span className="font-bold text-[var(--color-primary)]">{p.ptTotalComercial}</span>
