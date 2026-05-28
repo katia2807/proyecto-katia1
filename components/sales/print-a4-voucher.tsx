@@ -1,0 +1,498 @@
+import { notFound } from "next/navigation";
+import Image from "next/image";
+import { getEmpresaConfig } from "@/lib/company-config";
+import { getClientesRows, getChoferesRows } from "@/lib/data";
+import { formatPen } from "@/lib/utils";
+import { resolveSaleDocument, getProductoMaderaById, getAdelantoFromCaja, getMuebleNombre } from "@/lib/print-helpers";
+import { PrintButton } from "@/components/ui/print-button";
+import { PrintSelector } from "@/components/ui/print-selector";
+
+type PrintA4VoucherProps = {
+  id: string;
+  docType: "boleta" | "factura";
+  searchTipo?: string;
+};
+
+function fmt(date: string) {
+  try {
+    return new Date(date).toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" });
+  } catch {
+    return date;
+  }
+}
+
+export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4VoucherProps) {
+  const { tipo, data: saleRecord } = await resolveSaleDocument(id, searchTipo);
+  if (!saleRecord) {
+    notFound();
+  }
+
+  const [empresa, clientes, choferes] = await Promise.all([
+    getEmpresaConfig(),
+    getClientesRows(),
+    getChoferesRows(),
+  ]);
+
+  const clienteMap = new Map(clientes.map((c) => [c.id, c]));
+  const choferMap  = new Map(choferes.map((c) => [c.id, c.nombre]));
+
+  let correlativo = "—";
+  let fechaVenta  = "—";
+  let clienteNombre = "—";
+  let clienteDoc    = "—";
+  let items: Array<{ desc: string; qty: string; unitario: string; total: string }> = [];
+  let totalSoles    = 0;
+  let modalidad     = "—";
+  let metodo        = "—";
+  let entrega       = "—";
+
+  let aserraderoServicio: any = null;
+  let aserraderoLineasEspeciales: Array<{ id: string; codigo: string; nombre: string; cantidad: number; tarifa: number; subtotal: number; tipo?: string }> = [];
+  const ventaMaderaLineasResueltas: Array<{ desc: string; qty: string; unidad: string; unitario: string; total: string }> = [];
+
+  if (tipo === "aserradero") {
+    aserraderoServicio = saleRecord;
+    correlativo = aserraderoServicio.correlativo ?? aserraderoServicio.id.slice(0, 8).toUpperCase();
+    fechaVenta  = fmt(aserraderoServicio.fecha);
+    totalSoles  = Number(aserraderoServicio.precio_cobrado);
+    modalidad   = "Contado";
+    metodo      = "efectivo";
+    entrega     = "recojo";
+
+    const cli     = clienteMap.get(aserraderoServicio.cliente_id);
+    clienteNombre = cli?.nombre ?? "—";
+    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
+
+    if (aserraderoServicio.lineas_json) {
+      try {
+        const parsed = typeof aserraderoServicio.lineas_json === "string"
+          ? JSON.parse(aserraderoServicio.lineas_json)
+          : aserraderoServicio.lineas_json;
+        if (Array.isArray(parsed)) {
+          aserraderoLineasEspeciales = parsed;
+        }
+      } catch (e) {
+        console.error("Error parsing lineas_json", e);
+      }
+    }
+  } else if (tipo === "venta-madera") {
+    const ventaMadera = saleRecord;
+    correlativo = ventaMadera.correlativo ?? ventaMadera.id.slice(0, 8).toUpperCase();
+    fechaVenta  = fmt(ventaMadera.fecha);
+    totalSoles  = Number(ventaMadera.total);
+    modalidad   = ventaMadera.estado === "confirmada" ? "contado" : "—";
+    metodo      = "efectivo";
+    entrega     = "entrega local";
+
+    const cli     = clienteMap.get(ventaMadera.cliente_id);
+    clienteNombre = cli?.nombre ?? "—";
+    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
+
+    for (const linea of ventaMadera.lineas) {
+      let desc = "Venta de madera";
+      let unidad = "pies3";
+      if (linea.item_id) {
+        const prod = await getProductoMaderaById(linea.item_id);
+        if (prod) {
+          desc = prod.nombre + (prod.especie ? ` (${prod.especie})` : "");
+          unidad = prod.unidad_base || "pies3";
+        }
+      }
+      ventaMaderaLineasResueltas.push({
+        desc,
+        qty: String(linea.cantidad),
+        unidad,
+        unitario: formatPen(Number(linea.precio_unitario)),
+        total: formatPen(Number(linea.cantidad * linea.precio_unitario)),
+      });
+    }
+  } else if (tipo === "madera") {
+    const venta = saleRecord;
+    correlativo    = venta.correlativo ?? venta.id.slice(0, 8).toUpperCase();
+    fechaVenta     = fmt(venta.fecha);
+    totalSoles     = Number(venta.total);
+    modalidad      = venta.modalidad_pago ?? "—";
+    metodo         = venta.metodo_pago ?? "—";
+    entrega        = venta.tipo_entrega ?? "—";
+
+    const cli      = clienteMap.get(venta.cliente_id);
+    clienteNombre  = cli?.nombre ?? "—";
+    clienteDoc     = cli?.ruc ?? cli?.documento ?? "—";
+
+    const pt       = Number(venta.total_pt ?? 0).toFixed(2);
+    const ppt      = Number(venta.precio_por_pt ?? 0);
+    const tipoCorte = (venta.tipo_corte ?? "madera").replace(/_/g, " ");
+    items = [
+      {
+        desc: `Venta de madera cortada — ${tipoCorte}`,
+        qty: `${pt} PT`,
+        unitario: formatPen(ppt) + "/PT",
+        total: formatPen(totalSoles),
+      },
+    ];
+    if (venta.costo_envio && Number(venta.costo_envio) > 0) {
+      items.push({
+        desc: "Costo de envío",
+        qty: "1",
+        unitario: formatPen(Number(venta.costo_envio)),
+        total: formatPen(Number(venta.costo_envio)),
+      });
+    }
+    if (venta.tipo_entrega && venta.tipo_entrega !== "recojo" && venta.direccion_entrega) {
+      entrega = `${venta.tipo_entrega} — ${venta.direccion_entrega}`;
+    }
+  } else {
+    const venta = saleRecord;
+    correlativo   = venta.correlativo ?? venta.id.slice(0, 8).toUpperCase();
+    fechaVenta    = fmt(venta.fecha);
+    totalSoles    = Number(venta.total);
+    modalidad     = venta.modalidad_pago ?? "—";
+    metodo        = venta.metodo_pago ?? "—";
+    entrega       = venta.tipo_entrega ?? "—";
+
+    const cli     = clienteMap.get(venta.cliente_id);
+    clienteNombre = cli?.nombre ?? "—";
+    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
+
+    const muebleNombre = venta.mueble_catalogo_id
+      ? ((await getMuebleNombre(venta.mueble_catalogo_id)) ?? "Mueble")
+      : "Mueble";
+    items = [
+      {
+        desc: muebleNombre,
+        qty: String(venta.cantidad),
+        unitario: formatPen(Number(venta.precio_unitario)),
+        total: formatPen(totalSoles),
+      },
+    ];
+  }
+
+  let montoAdelanto = 0;
+  if (modalidad === "adelanto") {
+    montoAdelanto = await getAdelantoFromCaja(id);
+  }
+
+  const docTitle = docType === "factura" ? "FACTURA DE VENTA" : "BOLETA DE VENTA";
+
+  return (
+    <>
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { background: white !important; color: #000 !important; font-family: 'Inter', BlinkMacSystemFont, 'Segoe UI', sans-serif !important; }
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+          .a4-print-container {
+            max-width: 100% !important;
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+        }
+        body { background: #f8fafc; color: #0f172a; }
+      `}</style>
+
+      {/* Toolbar */}
+      <div className="no-print sticky top-0 z-50 flex items-center justify-between gap-4 bg-[#1e293b] border-b border-[#334155] px-6 py-3 shadow">
+        <a href="/ventas" className="text-sm text-[#94a3b8] hover:text-white transition-colors">
+          ← Volver
+        </a>
+        <div className="flex items-center gap-4">
+          <PrintSelector
+            id={id}
+            currentFormat="a4"
+            docType={docType}
+            tipoSale={tipo}
+          />
+          <PrintButton />
+        </div>
+      </div>
+
+      {/* Document page layout A4 */}
+      <div className="a4-print-container mx-auto my-6 max-w-4xl rounded-2xl bg-white text-black p-10 shadow-lg border border-[#e2e8f0]">
+        
+        {/* Header */}
+        <div className="flex items-start justify-between border-b-2 border-black pb-6">
+          <div className="flex-1">
+            {empresa.logo_url ? (
+              <Image
+                src={empresa.logo_url}
+                alt={empresa.nombre}
+                width={160}
+                height={64}
+                className="mb-3 object-contain"
+                unoptimized
+              />
+            ) : null}
+            <h1 className="text-xl font-black uppercase tracking-wider">{empresa.nombre}</h1>
+            <p className="text-xs text-gray-600 mt-1"><strong>RUC:</strong> {empresa.ruc}</p>
+            {empresa.direccion && <p className="text-xs text-gray-600"><strong>Dir:</strong> {empresa.direccion}</p>}
+            {empresa.telefono && <p className="text-xs text-gray-600"><strong>Tel:</strong> {empresa.telefono}</p>}
+          </div>
+
+          <div className="rounded-xl border-2 border-black p-5 text-center min-w-[240px] bg-slate-50">
+            <h2 className="text-base font-extrabold uppercase tracking-widest text-gray-700">{docTitle}</h2>
+            <p className="mt-2 text-2xl font-black text-black">N° {correlativo}</p>
+            <p className="mt-1 text-xs font-semibold text-gray-500">{fechaVenta}</p>
+          </div>
+        </div>
+
+        {/* Customer Data */}
+        <div className="mt-6 rounded-xl border border-gray-300 p-4 bg-slate-50/50">
+          <h3 className="text-xs font-black uppercase tracking-wider text-gray-600 mb-3">Datos del Cliente</h3>
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <span className="text-[10px] font-bold text-gray-500 uppercase">Nombre / Razón Social</span>
+              <p className="text-sm font-semibold mt-0.5">{clienteNombre}</p>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-gray-500 uppercase">Documento (DNI / RUC)</span>
+              <p className="text-sm font-semibold mt-0.5">{clienteDoc}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Detail rendering based on tipo */}
+        {tipo === "aserradero" && aserraderoServicio && (
+          <div className="mt-6 space-y-6">
+            {/* Cubicaje Base */}
+            <div className="rounded-xl border border-gray-300 p-4">
+              <h3 className="text-xs font-black uppercase tracking-wider text-gray-600 mb-3">Servicio de Cubicaje Base</h3>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-400 bg-slate-100">
+                    <th className="text-left py-2 font-bold uppercase">Descripción</th>
+                    <th className="text-right py-2 font-bold uppercase">Volumen</th>
+                    <th className="text-right py-2 font-bold uppercase">Equiv. PT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="py-2.5 text-sm">Servicio de aserradero / cubicaje ({Number(aserraderoServicio.pies_cubicos).toFixed(2)} ft³)</td>
+                    <td className="text-right py-2.5 text-sm">{Number(aserraderoServicio.pies_cubicos).toFixed(2)} ft³</td>
+                    <td className="text-right py-2.5 text-sm font-bold">{(Number(aserraderoServicio.pies_cubicos) * 12).toFixed(2)} PT</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Servicios Especiales */}
+            <div className="rounded-xl border border-gray-300 p-4">
+              <h3 className="text-xs font-black uppercase tracking-wider text-gray-600 mb-3">Servicios Especiales Aplicados</h3>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-400 bg-slate-100">
+                    <th className="text-left py-2 font-bold uppercase">Servicio</th>
+                    <th className="text-right py-2 font-bold uppercase">Cantidad</th>
+                    <th className="text-right py-2 font-bold uppercase">Tarifa</th>
+                    <th className="text-right py-2 font-bold uppercase">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const lineasEfectivas = aserraderoLineasEspeciales.filter(
+                      (linea) => linea.tipo !== "nota_interna" && linea.tipo !== "extra_madera_cliente"
+                    );
+                    if (lineasEfectivas.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={4} className="text-center py-4 text-gray-500 italic">Ningún servicio especial aplicado.</td>
+                        </tr>
+                      );
+                    }
+                    return lineasEfectivas.map((linea, i) => (
+                      <tr key={linea.id || i} className="border-b border-gray-200">
+                        <td className="py-2.5 text-sm">{linea.nombre}</td>
+                        <td className="text-right py-2.5 text-sm">{linea.cantidad}</td>
+                        <td className="text-right py-2.5 text-sm">{formatPen(linea.tarifa)}</td>
+                        <td className="text-right py-2.5 text-sm font-bold">{formatPen(linea.subtotal)}</td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Extras */}
+            {(() => {
+              const extrasCliente = aserraderoLineasEspeciales.filter(
+                (linea) => linea.tipo === "extra_madera_cliente"
+              );
+              if (extrasCliente.length === 0) return null;
+              return (
+                <div className="rounded-xl border border-gray-300 p-4 bg-slate-50">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-gray-600 mb-3">Madera Propia de Cliente (Extras)</h3>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-400 bg-slate-200">
+                        <th className="text-left py-2 font-bold uppercase">Descripción / Tipo de Madera</th>
+                        <th className="text-right py-2 font-bold uppercase">Cantidad</th>
+                        <th className="text-right py-2 font-bold uppercase">Costo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {extrasCliente.map((linea, i) => (
+                        <tr key={linea.id || i} className="border-b border-gray-200">
+                          <td className="py-2.5 text-sm">{linea.nombre?.replace("Madera cliente: ", "") || linea.nombre}</td>
+                          <td className="text-right py-2.5 text-sm">{linea.cantidad}</td>
+                          <td className="text-right py-2.5 text-sm text-gray-500 italic">Propio (S/ 0.00)</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+
+            {/* Cost Summary */}
+            <div className="mt-6 flex justify-between items-start gap-6 border-t border-gray-300 pt-4">
+              <div className="text-xs text-gray-500 space-y-1">
+                <p><strong>Costo Cubicaje Base:</strong> {formatPen(Number(aserraderoServicio.costo_cubicaje))}</p>
+                {(() => {
+                  const mo = aserraderoLineasEspeciales.find((l) => l.tipo === "mano_de_obra");
+                  return mo ? <p><strong>Mano de Obra:</strong> {formatPen(Number(mo.subtotal))}</p> : null;
+                })()}
+              </div>
+              <div className="w-80 rounded-xl border border-black p-4 bg-slate-50 text-right">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Monto Total Cobrado</span>
+                <p className="text-2xl font-black text-black mt-1">{formatPen(totalSoles)}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tipo === "venta-madera" && (
+          <div className="mt-6">
+            <h3 className="text-xs font-black uppercase tracking-wider text-gray-600 mb-3">Detalle de Productos</h3>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-400 bg-slate-100">
+                  <th className="text-left py-2 font-bold uppercase">Descripción del Producto</th>
+                  <th className="text-right py-2 font-bold uppercase">Cant.</th>
+                  <th className="text-right py-2 font-bold uppercase">Unidad</th>
+                  <th className="text-right py-2 font-bold uppercase">Precio Unit.</th>
+                  <th className="text-right py-2 font-bold uppercase">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ventaMaderaLineasResueltas.map((linea, i) => (
+                  <tr key={i} className="border-b border-gray-200">
+                    <td className="py-2.5 text-sm font-semibold">{linea.desc}</td>
+                    <td className="text-right py-2.5 text-sm">{linea.qty}</td>
+                    <td className="text-right py-2.5 text-sm uppercase text-gray-500">{linea.unidad}</td>
+                    <td className="text-right py-2.5 text-sm">{linea.unitario}</td>
+                    <td className="text-right py-2.5 text-sm font-bold">{linea.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Totales */}
+            <div className="mt-6 flex justify-end">
+              <div className="w-80 rounded-xl border border-black p-4 bg-slate-50 text-right space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-gray-500">Monto Total:</span>
+                  <span className="text-lg font-black">{formatPen(totalSoles)}</span>
+                </div>
+                {modalidad === "adelanto" && (
+                  <>
+                    <div className="flex justify-between items-center text-emerald-600 border-t border-dashed border-gray-300 pt-2">
+                      <span className="text-xs font-bold">Adelanto (Pagado):</span>
+                      <span className="text-sm font-bold">{formatPen(montoAdelanto)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-red-600 border-t border-gray-300 pt-2">
+                      <span className="text-xs font-bold">Saldo Pendiente:</span>
+                      <span className="text-base font-black">{formatPen(totalSoles - montoAdelanto)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {["madera", "mueble"].includes(tipo || "") && (
+          <div className="mt-6">
+            <h3 className="text-xs font-black uppercase tracking-wider text-gray-600 mb-3">Detalle de Venta</h3>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-400 bg-slate-100">
+                  <th className="text-left py-2 font-bold uppercase">Descripción</th>
+                  <th className="text-right py-2 font-bold uppercase">Cant.</th>
+                  <th className="text-right py-2 font-bold uppercase">Precio Unit.</th>
+                  <th className="text-right py-2 font-bold uppercase">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, i) => (
+                  <tr key={i} className="border-b border-gray-200">
+                    <td className="py-2.5 text-sm font-semibold">{item.desc}</td>
+                    <td className="text-right py-2.5 text-sm">{item.qty}</td>
+                    <td className="text-right py-2.5 text-sm">{item.unitario}</td>
+                    <td className="text-right py-2.5 text-sm font-bold">{item.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Totales */}
+            <div className="mt-6 flex justify-end">
+              <div className="w-80 rounded-xl border border-black p-4 bg-slate-50 text-right space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-gray-500">Monto Total:</span>
+                  <span className="text-lg font-black">{formatPen(totalSoles)}</span>
+                </div>
+                {modalidad === "adelanto" && (
+                  <>
+                    <div className="flex justify-between items-center text-emerald-600 border-t border-dashed border-gray-300 pt-2">
+                      <span className="text-xs font-bold">Adelanto (Pagado):</span>
+                      <span className="text-sm font-bold">{formatPen(montoAdelanto)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-red-600 border-t border-gray-300 pt-2">
+                      <span className="text-xs font-bold">Saldo Pendiente:</span>
+                      <span className="text-base font-black">{formatPen(totalSoles - montoAdelanto)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Extra details (Payment/Delivery method) */}
+        <div className="mt-8 grid grid-cols-3 gap-6 border-t border-gray-300 pt-6 text-xs">
+          <div>
+            <span className="text-[10px] font-bold text-gray-500 uppercase">Modalidad de Pago</span>
+            <p className="text-sm font-semibold mt-1 capitalize">{modalidad}</p>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-gray-500 uppercase">Método de Pago</span>
+            <p className="text-sm font-semibold mt-1 capitalize">{metodo}</p>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-gray-500 uppercase">Tipo de Entrega</span>
+            <p className="text-sm font-semibold mt-1 capitalize">{entrega}</p>
+          </div>
+        </div>
+
+        {/* Corporate Signatures */}
+        <div className="mt-16 grid grid-cols-2 gap-12 text-center text-xs">
+          <div className="flex flex-col items-center">
+            <div className="w-48 border-b border-gray-400 h-16 mb-2"></div>
+            <p className="font-bold uppercase">{clienteNombre}</p>
+            <p className="text-gray-500">Cliente</p>
+          </div>
+          <div className="flex flex-col items-center">
+            <div className="w-48 border-b border-gray-400 h-16 mb-2"></div>
+            <p className="font-bold uppercase">Katia Lizzet Meneses Taype</p>
+            <p className="text-gray-500">Gerente</p>
+          </div>
+        </div>
+
+      </div>
+    </>
+  );
+}

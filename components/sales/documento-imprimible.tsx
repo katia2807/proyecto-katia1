@@ -3,11 +3,15 @@
 import { useEffect } from "react";
 import { EmpresaLogoMark } from "@/components/sales/empresa-logo-mark";
 import type { EmpresaConfig } from "@/lib/company-config";
+import { PrintSelector } from "@/components/ui/print-selector";
 
 type DocumentoImprimibleProps = {
   /** Si es true, dispara window.print() automáticamente al cargar. */
   autoPrint?: boolean;
   children: React.ReactNode;
+  id?: string;
+  docType?: "cotizacion" | "contrato";
+  currentFormat?: "a4" | "ticket" | "cotizacion" | "contrato";
 };
 
 /**
@@ -15,7 +19,13 @@ type DocumentoImprimibleProps = {
  * Aplica estilos optimizados para impresión y permite descargar como PDF
  * desde el diálogo nativo del navegador (Ctrl+P → Guardar como PDF).
  */
-export function DocumentoImprimible({ autoPrint = false, children }: DocumentoImprimibleProps) {
+export function DocumentoImprimible({
+  autoPrint = false,
+  children,
+  id,
+  docType,
+  currentFormat,
+}: DocumentoImprimibleProps) {
   useEffect(() => {
     if (autoPrint) {
       const t = setTimeout(() => window.print(), 400);
@@ -45,18 +55,28 @@ export function DocumentoImprimible({ autoPrint = false, children }: DocumentoIm
         .doc-paper th { background: #f4f4f5; text-transform: uppercase; font-size: 10px; }
       `}</style>
       <div className="doc-paper mx-auto my-6 max-w-3xl rounded-xl border border-[var(--color-border)] p-8 shadow">
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="no-print mb-4 inline-flex h-10 items-center justify-center rounded-xl bg-[var(--color-primary)] px-4 text-sm font-semibold text-white"
-        >
-          Imprimir / guardar como PDF
-        </button>
+        <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 pb-4">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-[var(--color-primary)] px-4 text-sm font-semibold text-white"
+          >
+            🖨️ Imprimir / guardar como PDF
+          </button>
+          {id && docType && (
+            <PrintSelector
+              id={id}
+              docType={docType}
+              currentFormat={currentFormat || docType}
+            />
+          )}
+        </div>
         {children}
       </div>
     </>
   );
 }
+
 
 type DocumentoHeaderProps = {
   empresa: EmpresaConfig;

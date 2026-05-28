@@ -7,6 +7,8 @@ import { getClientesRows, getChoferesRows } from "@/lib/data";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { formatPen } from "@/lib/utils";
 import { PrintButton } from "@/components/ui/print-button";
+import { PrintSelector } from "@/components/ui/print-selector";
+
 
 type Params = { tipo: string; id: string };
 
@@ -442,11 +444,18 @@ export default async function ComprobantePage({
         <a href="/ventas" className="text-sm text-[var(--color-text-secondary,#94a3b8)] hover:text-[var(--color-text-primary,#f8fafc)] transition-colors">
           ← Volver
         </a>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          <PrintSelector
+            id={id}
+            currentFormat="default"
+            docType={docType.includes("BOLETA") ? "boleta" : "factura"}
+            tipoSale={tipo}
+          />
           <span className="text-xs text-[var(--color-text-secondary,#94a3b8)]">Comprobante #{correlativo}</span>
           <PrintButton />
         </div>
       </div>
+
 
       {/* Voucher */}
       <div className="mx-auto max-w-[680px] p-8 font-sans text-[13px]">

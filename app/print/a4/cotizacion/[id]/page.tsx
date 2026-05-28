@@ -9,7 +9,7 @@ import { getCotizacionUnificadaById, getClientesRows } from "@/lib/data";
 
 type PdfPageProps = { params: Promise<{ id: string }> };
 
-export default async function CotizacionUnificadaPdfPage({ params }: PdfPageProps) {
+export default async function A4CotizacionPage({ params }: PdfPageProps) {
   const { id } = await params;
   const [cot, clientes, empresa] = await Promise.all([
     getCotizacionUnificadaById(id),
@@ -26,8 +26,7 @@ export default async function CotizacionUnificadaPdfPage({ params }: PdfPageProp
   const total = computeResumenMargen(detalle, empresa.margen_ganancia_default_pct).precioSugerido;
 
   return (
-    <DocumentoImprimible id={id} docType="cotizacion" currentFormat="cotizacion">
-
+    <DocumentoImprimible id={id} docType="cotizacion" currentFormat="a4">
       <CotizacionResumenFormal
         correlativoLabel={cot.correlativo ?? `N°${id.slice(0, 8)}`}
         fechaISO={cot.fecha}

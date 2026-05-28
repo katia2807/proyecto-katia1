@@ -6,7 +6,7 @@ import { formatDate, formatPen } from "@/lib/utils";
 
 type PageProps = { params: Promise<{ id: string }> };
 
-export default async function ContratoPdfPage({ params }: PageProps) {
+export default async function A4ContratoPage({ params }: PageProps) {
   const { id } = await params;
   const [alquilerResult, clientes, empresa] = await Promise.all([
     getAlquilerRows(),
@@ -19,8 +19,7 @@ export default async function ContratoPdfPage({ params }: PageProps) {
   const cliente = clientes.find((c) => c.id === contrato.cliente_id);
 
   return (
-    <DocumentoImprimible id={id} docType="contrato" currentFormat="contrato">
-
+    <DocumentoImprimible id={id} docType="contrato" currentFormat="a4">
       <DocumentoHeader empresa={empresa} />
 
       <h2 style={{ fontSize: 16, marginBottom: 4 }}>
@@ -101,16 +100,6 @@ export default async function ContratoPdfPage({ params }: PageProps) {
           {contrato.modalidad_pago ?? "—"} · Método: {contrato.metodo_pago ?? "—"}
         </p>
       </section>
-
-      <footer style={{ marginTop: 60, fontSize: 11, color: "#666" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 50 }}>
-          <div style={{ borderTop: "1px solid #333", paddingTop: 4, width: 220 }}>Cliente</div>
-          <div style={{ borderTop: "1px solid #333", paddingTop: 4, width: 220 }}>
-            <p style={{ margin: 0, fontWeight: "bold", color: "#111" }}>{empresa.firmante}</p>
-            <p style={{ margin: 0, color: "#666" }}>{empresa.firmante_cargo}</p>
-          </div>
-        </div>
-      </footer>
     </DocumentoImprimible>
   );
 }
