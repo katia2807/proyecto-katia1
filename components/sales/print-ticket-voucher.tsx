@@ -173,20 +173,59 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { background: white !important; color: black !important; font-family: monospace !important; margin: 0 !important; padding: 0 !important; }
+          
+          html,
+          body {
+            width: 80mm !important;
+            height: auto !important;
+            min-height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            background: white !important;
+          }
+
           @page {
             size: 80mm auto;
             margin: 0;
           }
+
+          body * {
+            visibility: hidden;
+          }
+
+          .ticket-container,
+          .ticket-container * {
+            visibility: visible;
+          }
+
           .ticket-container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 72mm !important;
+            margin: 0 !important;
+            padding: 2mm !important;
             box-shadow: none !important;
             border: none !important;
-            padding: 2mm !important;
-            margin: 0 !important;
-            width: 72mm !important;
+            min-height: auto !important;
+            height: auto !important;
           }
         }
-        body { background: #1e293b; color: white; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; font-family: monospace; }
+        
+        /* Screen View Styles only */
+        @media screen {
+          body {
+            background: #1e293b;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            font-family: monospace;
+          }
+        }
       `}</style>
 
       {/* Toolbar */}
