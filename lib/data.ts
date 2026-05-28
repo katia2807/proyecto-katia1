@@ -958,7 +958,7 @@ export async function getMueblesCatalogoRows(includeInactive = false) {
           codigo: p.codigo || `MUEB-${p.id.slice(0, 4)}`,
           nombre: p.nombre,
           descripcion: "Producto importado del inventario",
-          precio_lista: 0,
+          precio_lista: p.costo_unitario ? Number(p.costo_unitario) : 0,
           foto_url: p.foto_url || null,
           stock_disponible: p.stock_actual,
           activo: p.activo,
@@ -980,6 +980,12 @@ export async function getMueblesCatalogoRows(includeInactive = false) {
         needsCatalogUpdate = true;
       } else if (match.foto_url && !p.foto_url) {
         needsInventoryUpdate = true;
+      }
+
+      // Sincronizar precio
+      if (p.costo_unitario !== null && match.precio_lista !== Number(p.costo_unitario)) {
+        updates.precio_lista = Number(p.costo_unitario);
+        needsCatalogUpdate = true;
       }
 
       if (needsCatalogUpdate) {

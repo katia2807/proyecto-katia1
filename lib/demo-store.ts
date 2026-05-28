@@ -2572,7 +2572,7 @@ export function demoMueblesCatalogoRows() {
           codigo: p.codigo,
           nombre: p.nombre,
           descripcion: "Producto importado del inventario",
-          precio_lista: 0,
+          precio_lista: p.costo_unitario ? Number(p.costo_unitario) : 0,
           foto_url: p.foto_url || null,
           stock_disponible: p.stock_actual,
           activo: p.activo,
@@ -2585,6 +2585,10 @@ export function demoMueblesCatalogoRows() {
           match.foto_url = p.foto_url;
         } else if (match.foto_url && !p.foto_url) {
           p.foto_url = match.foto_url;
+        }
+        // Sincronizar precio
+        if (p.costo_unitario !== null) {
+          match.precio_lista = p.costo_unitario;
         }
       }
     }
@@ -2625,7 +2629,7 @@ export function demoCreateMuebleCatalogo(
     activo: input.activo ?? true,
     created_at: nowIso(),
     foto_url: input.foto_url ?? null,
-    costo_unitario: null,
+    costo_unitario: input.precio_lista ?? 0,
   });
 
   persistStore();
@@ -2658,6 +2662,7 @@ export function demoUpdateMuebleCatalogo(
       invRow.foto_url = patch.foto_url;
     }
     invRow.activo = row.activo;
+    invRow.costo_unitario = patch.precio_lista;
   }
 
   persistStore();

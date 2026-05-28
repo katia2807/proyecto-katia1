@@ -2719,13 +2719,14 @@ export async function updateInventarioProducto(formData: FormData) {
       .eq("organization_id", DEFAULT_ORG_ID);
     if (error) throw new Error(error.message);
 
-    // Sincronizar foto_url y stock hacia muebles_catalogo si es categoría "Muebles"
+    // Sincronizar foto_url, stock y precio hacia muebles_catalogo si es categoría "Muebles"
     if (parsed.data.categoria === "Muebles") {
       const filterStr = `id.eq.${parsed.data.id},codigo.eq.${parsed.data.codigo || "NONE_VALUE"},nombre.ilike.${parsed.data.nombre}`;
       const catUpdates: {
         foto_url: string | null;
         codigo: string;
         nombre: string;
+        precio_lista?: number;
         stock_disponible?: number;
       } = {
         foto_url: parsed.data.fotoUrl ?? null,
@@ -2734,6 +2735,9 @@ export async function updateInventarioProducto(formData: FormData) {
       };
       if (parsed.data.stockActual !== undefined) {
         catUpdates.stock_disponible = parsed.data.stockActual;
+      }
+      if (parsed.data.costoUnitario !== undefined && parsed.data.costoUnitario !== null) {
+        catUpdates.precio_lista = parsed.data.costoUnitario;
       }
       await supabase
         .from("muebles_catalogo")
@@ -3177,13 +3181,14 @@ export async function updateMuebleCatalogo(formData: FormData) {
       .eq("organization_id", DEFAULT_ORG_ID);
     if (error) throw new Error(error.message);
 
-    // Sincronizar foto_url hacia inventario_productos
+    // Sincronizar foto_url y costo_unitario hacia inventario_productos
     if (currentMueble) {
       const filterStr = `id.eq.${parsed.data.id},codigo.eq.${currentMueble.codigo || "NONE_VALUE"},nombre.ilike.${currentMueble.nombre}`;
       await supabase
         .from("inventario_productos")
         .update({
           foto_url: parsed.data.fotoUrl?.trim() || null,
+          costo_unitario: parsed.data.precioLista,
         })
         .or(filterStr)
         .eq("organization_id", DEFAULT_ORG_ID);
