@@ -1,7 +1,7 @@
 import { CotizacionUnificadaWizard } from "@/components/cotizacion-unificada-wizard";
 import { CotizacionMasterDetail } from "@/components/cotizacion-master-detail";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { getEmpresaConfig } from "@/lib/company-config";
+import { DEFAULT_EMPRESA_CONFIG, getEmpresaConfig } from "@/lib/company-config";
 import {
   getClientesRows,
   getCotizacionesUnificadasRows,
@@ -40,14 +40,7 @@ export default async function CotizacionPage() {
     }),
     getEmpresaConfig().catch((error) => {
       console.error("[cotizacion/page] getEmpresaConfig failed:", error);
-      return {
-        nombre: "KATIA LIZZET MENESES TAYPE",
-        ruc: "10739957520",
-        telefono: "987 654 321",
-        direccion: "Lima, Peru",
-        firmante: "Katia Lizzet Meneses Taype",
-        logo_url: null,
-      };
+      return DEFAULT_EMPRESA_CONFIG;
     }),
   ]);
   const correlativoPreview = await previewCorrelativo("cotizacion").catch((error) => {

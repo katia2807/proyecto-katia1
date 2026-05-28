@@ -141,7 +141,10 @@ export default async function ConfiguracionPage({ searchParams }: ConfiguracionP
               {tarifas.length} servicios disponibles en el formulario de aserradero.
             </CardDescription>
             <div className="mt-4">
-              <TarifasSettingsForm inicialTarifas={tarifas} />
+              <TarifasSettingsForm
+                inicialTarifas={tarifas}
+                margenGananciaDefaultPct={empresa.margen_ganancia_default_pct}
+              />
             </div>
           </Card>
         </div>

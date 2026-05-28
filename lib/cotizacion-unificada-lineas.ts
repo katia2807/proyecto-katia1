@@ -1,4 +1,5 @@
 import {
+  calcularPrecioConMargen,
   computeTotalesDetalle,
   round2,
 } from "@/lib/cotizacion-calculos";
@@ -14,22 +15,20 @@ export type LineaFormal = {
 };
 
 /** Arma las filas tipo documento comercial (ítem, cant., descripción con viñetas, unitario, total). */
-export function buildLineasResumen(detalle: CotizacionDetalleV1): LineaFormal[] {
+export function buildLineasResumen(detalle: CotizacionDetalleV1, margenGananciaPct = 0): LineaFormal[] {
   const lineas: LineaFormal[] = [];
 
   if (detalle.rubros.muebles && detalle.muebles_lineas.length > 0) {
     // Calcular total de todas las líneas de madera juntas para mostrar un solo ítem
     let totalMonto = 0;
     let totalCantidad = 0;
-    const des = Math.max(0, detalle.desperdicioPctMuebles);
 
     for (const linea of detalle.muebles_lineas) {
       const ptNet = linea.piezas.reduce((acc, p) => {
         // PT = (espesor_in × ancho_in × largo_ft) / 12
         return acc + (p.cantidad * p.espesor * p.ancho * p.largo) / 12;
       }, 0);
-      const ptCompra = ptNet * (1 + des / 100);
-      const montoLinea = round2(ptCompra * Math.max(0, linea.precioPorPt));
+      const montoLinea = round2(ptNet * Math.max(0, linea.precioPorPt));
       const cantLinea = Math.max(1, linea.piezas.reduce((acc, p) => acc + p.cantidad, 0));
       totalMonto += montoLinea;
       totalCantidad += cantLinea;
@@ -63,31 +62,34 @@ export function buildLineasResumen(detalle: CotizacionDetalleV1): LineaFormal[] 
     const primeraEspecie = detalle.muebles_lineas[0]?.especie_label?.trim().toUpperCase();
     const titulo = primeraEspecie || "MUEBLE PERSONALIZADO";
 
+    const totalMontoConMargen = calcularPrecioConMargen(totalMonto, margenGananciaPct);
     lineas.push({
       cantidad: totalCantidad,
       titulo,
       bullets,
-      precioUnit: round2(totalMonto / totalCantidad),
-      precioTotal: round2(totalMonto),
+      precioUnit: round2(totalMontoConMargen / totalCantidad),
+      precioTotal: round2(totalMontoConMargen),
     });
 
     if (detalle.costoAcabadoSoles > 0) {
+      const precioAcabadoConMargen = calcularPrecioConMargen(detalle.costoAcabadoSoles, margenGananciaPct);
       lineas.push({
         cantidad: 1,
         titulo: "ACABADO Y TERMINACIÓN",
         bullets: ["Costo de laca, barniz o pintura aplicada."],
-        precioUnit: detalle.costoAcabadoSoles,
-        precioTotal: detalle.costoAcabadoSoles,
+        precioUnit: precioAcabadoConMargen,
+        precioTotal: precioAcabadoConMargen,
       });
     }
 
     if (detalle.costoManoObra > 0) {
+      const precioManoObraConMargen = calcularPrecioConMargen(detalle.costoManoObra, margenGananciaPct);
       lineas.push({
         cantidad: 1,
         titulo: "MANO DE OBRA",
         bullets: ["Costo de fabricación, armado o mano de obra."],
-        precioUnit: detalle.costoManoObra,
-        precioTotal: detalle.costoManoObra,
+        precioUnit: precioManoObraConMargen,
+        precioTotal: precioManoObraConMargen,
       });
     }
   }
@@ -96,7 +98,7 @@ export function buildLineasResumen(detalle: CotizacionDetalleV1): LineaFormal[] 
 
   if (detalle.rubros.aserradero && detalle.aserradero) {
     const a = detalle.aserradero;
-    const tot = totRubros.aserradero;
+    const tot = calcularPrecioConMargen(totRubros.aserradero, margenGananciaPct);
     const bullets: string[] = [];
     const desc = (a.descripcion ?? "").trim();
     if (desc) {
@@ -118,7 +120,7 @@ export function buildLineasResumen(detalle: CotizacionDetalleV1): LineaFormal[] 
 
   if (detalle.rubros.alquiler && detalle.alquiler) {
     const al = detalle.alquiler;
-    const base = totRubros.alquiler_base;
+    const base = calcularPrecioConMargen(totRubros.alquiler_base, margenGananciaPct);
     const cant = Math.max(1, al.unidades_tiempo || 1);
     const nombre = (al.nombre_maquinaria || "Maquinaria").trim().toUpperCase();
     const bullets: string[] = [
@@ -140,8 +142,8 @@ export function buildLineasResumen(detalle: CotizacionDetalleV1): LineaFormal[] 
         cantidad: 1,
         titulo: "GARANTÍA / POSIBLES DAÑOS",
         bullets: ["Monto referencial asociado al uso del equipo."],
-        precioUnit: totRubros.garantia,
-        precioTotal: totRubros.garantia,
+        precioUnit: calcularPrecioConMargen(totRubros.garantia, margenGananciaPct),
+        precioTotal: calcularPrecioConMargen(totRubros.garantia, margenGananciaPct),
       });
     }
   }

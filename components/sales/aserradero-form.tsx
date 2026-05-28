@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { liteClientesToCompleto } from "@/lib/combobox-mocks";
 import { formatPen, roundMoney } from "@/lib/utils";
+import { calcularGananciaPorMargen, calcularPrecioConMargen, DEFAULT_MARGEN_GANANCIA_PCT } from "@/lib/cotizacion-calculos";
 
 type Cliente = { id: string; nombre: string };
 type ServicioEspecial = {
@@ -26,6 +27,7 @@ type AserraderoFormProps = {
   serviciosEspeciales: ServicioEspecial[];
   /** Costo en S/ por pie cúbico para cubicaje base. */
   defaultCostoPorPieCubico?: number;
+  margenGananciaDefaultPct?: number;
   /** Lista mock para ClienteCombobox sin Supabase. */
   mockData?: boolean;
   onSuccess?: () => void;
@@ -42,6 +44,7 @@ export function AserraderoForm({
   clientes,
   serviciosEspeciales,
   defaultCostoPorPieCubico = 0.5,
+  margenGananciaDefaultPct = DEFAULT_MARGEN_GANANCIA_PCT,
   mockData = false,
   onSuccess,
 }: AserraderoFormProps) {
@@ -96,6 +99,10 @@ export function AserraderoForm({
             ancho?: number;
             largo?: number;
             descripcion?: string;
+            ptUnitarioReal?: number;
+            ptTotalReal?: number;
+            ptUnitarioComercial?: number;
+            ptTotalComercial?: number;
             subtotalPT?: number;
           }[])
         : [];
@@ -105,13 +112,20 @@ export function AserraderoForm({
   }, [piezasJson]);
 
   const totalPT = useMemo(
-    () => piezas.reduce((acc, p) => acc + (Number(p.subtotalPT) || 0), 0),
+    () => piezas.reduce((acc, p) => acc + (p.ptTotalReal !== undefined ? p.ptTotalReal : (Number(p.subtotalPT) || 0)), 0),
     [piezas],
   );
   const piesCubicos = useMemo(() => totalPT * PIE_TABLAR_A_PIE_CUBICO, [totalPT]);
   
   const totalPTComercial = useMemo(() => {
-    return piezas.reduce((acc, p) => acc + Math.floor(Number(p.subtotalPT) || 0), 0);
+    return piezas.reduce((acc, p) => {
+      if (p.ptTotalComercial !== undefined) {
+        return acc + p.ptTotalComercial;
+      }
+      // Fallback si no tiene ptTotalComercial
+      const unitReal = (Number(p.espesor) || 0) * (Number(p.ancho) || 0) * (Number(p.largo) || 0) / 12;
+      return acc + (Math.floor(unitReal) * (Number(p.cantidad) || 0));
+    }, 0);
   }, [piezas]);
 
   const selectedCliente = useMemo(() => {
@@ -142,7 +156,9 @@ export function AserraderoForm({
     return roundMoney(sum);
   }, [seleccionados]);
 
-  const precioCalculado = roundMoney(costoCubicaje + totalServiciosEspeciales + manoDeObra);
+  const costoProduccion = roundMoney(costoCubicaje + totalServiciosEspeciales + manoDeObra);
+  const gananciaSugerida = calcularGananciaPorMargen(costoProduccion, margenGananciaDefaultPct);
+  const precioCalculado = calcularPrecioConMargen(costoProduccion, margenGananciaDefaultPct);
   const precioCobrado = (precioCobradoManual !== "" && !isNaN(Number(precioCobradoManual.replace(",", ".")))) ? roundMoney(Number(precioCobradoManual.replace(",", "."))) : precioCalculado;
   const costoTotalAserradero = roundMoney(costoCubicaje + manoDeObra);
   const utilidad = roundMoney(precioCobrado - costoTotalAserradero);
@@ -471,15 +487,17 @@ export function AserraderoForm({
                   </thead>
                   <tbody className="divide-y divide-[var(--color-border)]/40">
                     {piezas.map((p, i) => {
-                      const subReal = Number(p.subtotalPT) || 0;
-                      const subCom = Math.floor(subReal);
+                      const subReal = p.ptTotalReal !== undefined ? p.ptTotalReal : (Number(p.subtotalPT) || 0);
+                      const subCom = p.ptTotalComercial !== undefined ? p.ptTotalComercial : 0;
+                      const unitReal = p.ptUnitarioReal !== undefined ? p.ptUnitarioReal : (subReal / (p.cantidad || 1));
+                      const unitCom = p.ptUnitarioComercial !== undefined ? p.ptUnitarioComercial : Math.floor(unitReal);
                       return (
                         <tr key={i} className="hover:bg-[var(--color-surface)]/40 text-[var(--color-text-secondary)]">
                           <td className="py-1.5 font-medium">
                             {p.cantidad ?? 0} pzs ({p.espesor ?? 0}{"\""} x {p.ancho ?? 0}{"\""} x {p.largo ?? 0}{"'"}) {p.descripcion || "Madera"}
                           </td>
-                          <td className="py-1.5 text-right font-mono">{subReal.toFixed(2)} PT</td>
-                          <td className="py-1.5 text-right font-mono text-[var(--color-text-primary)] font-bold">{subCom} PT</td>
+                          <td className="py-1.5 text-right font-mono">{unitReal.toFixed(2)} / <span className="font-bold text-[var(--color-text-primary)]">{subReal.toFixed(2)} PT</span></td>
+                          <td className="py-1.5 text-right font-mono text-[var(--color-primary)] font-bold">{unitCom} / <span className="font-bold text-[var(--color-primary)]">{subCom} PT</span></td>
                         </tr>
                       );
                     })}
@@ -763,7 +781,17 @@ export function AserraderoForm({
               </div>
 
               <div className="flex justify-between py-3 text-[var(--color-primary)]">
-                <span className="font-bold text-base">Costo Total Sugerido</span>
+                <span className="font-bold text-base">Costo de produccion</span>
+                <span className="font-black text-base">{formatPen(costoProduccion)}</span>
+              </div>
+
+              <div className="flex justify-between py-2.5 text-[var(--color-primary)]">
+                <span className="font-semibold text-sm">Margen de ganancia ({margenGananciaDefaultPct.toFixed(1)}%)</span>
+                <span className="font-bold text-sm">{formatPen(gananciaSugerida)}</span>
+              </div>
+
+              <div className="flex justify-between py-3 text-[var(--color-primary)]">
+                <span className="font-bold text-base">Precio sugerido</span>
                 <span className="font-black text-base">{formatPen(precioCalculado)}</span>
               </div>
             </div>
@@ -957,13 +985,17 @@ export function AserraderoForm({
               </p>
               
               <div className="text-xs border-t border-[var(--color-border)] pt-2 mt-2 max-h-32 overflow-y-auto space-y-1">
-                <span className="font-semibold text-[var(--color-text-secondary)]">Piezas ingresadas:</span>
-                {piezas.map((p, i) => (
-                  <div key={i} className="flex justify-between text-[var(--color-text-secondary)]">
-                    <span>{p.cantidad ?? 0} pzs ({p.espesor ?? 0}{"\""} x {p.ancho ?? 0}{"\""} x {p.largo ?? 0}{"'"})</span>
-                    <span>{p.subtotalPT ?? 0} PT</span>
-                  </div>
-                ))}
+                <span className="font-semibold text-[var(--color-text-secondary)]">Piezas ingresadas (Real / Comercial):</span>
+                {piezas.map((p, i) => {
+                  const r = p.ptTotalReal !== undefined ? p.ptTotalReal : (Number(p.subtotalPT) || 0);
+                  const c = p.ptTotalComercial !== undefined ? p.ptTotalComercial : Math.floor(r);
+                  return (
+                    <div key={i} className="flex justify-between text-[var(--color-text-secondary)]">
+                      <span>{p.cantidad ?? 0} pzs ({p.espesor ?? 0}{"\""} x {p.ancho ?? 0}{"\""} x {p.largo ?? 0}{"'"})</span>
+                      <span>{r.toFixed(2)} PT / <span className="font-bold text-[var(--color-primary)]">{c} PT</span></span>
+                    </div>
+                  );
+                })}
               </div>
              </div>
 

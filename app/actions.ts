@@ -79,6 +79,10 @@ const preprocessDecimal = (v: unknown) => {
   return v;
 };
 
+const margenGananciaConfigSchema = z.object({
+  margenGananciaDefaultPct: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative()),
+});
+
 const cajaSchema = z.object({
   fecha: z.string().min(1),
   tipo: z.enum(["ingreso", "egreso", "transferencia"]),
@@ -4997,6 +5001,55 @@ export async function updateServicioEspecialTarifa(id: string, nombre: string, t
   return { success: true };
 }
 
+export async function updateMargenGananciaPredeterminado(margenGananciaDefaultPct: string | number) {
+  await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
+
+  const parsed = margenGananciaConfigSchema.safeParse({ margenGananciaDefaultPct });
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message || "El margen debe ser un numero positivo.");
+  }
+
+  const margen = roundMoney(parsed.data.margenGananciaDefaultPct);
+
+  if (!hasSupabaseEnv()) {
+    revalidatePath("/configuracion");
+    revalidatePath("/cotizacion");
+    return { ok: true as const, margenGananciaDefaultPct: margen };
+  }
+
+  const supabase = getSupabaseServerClient();
+  const { data: existing } = await supabase
+    .from("configuracion_empresa")
+    .select("nombre,ruc,telefono,direccion,firmante,logo_url")
+    .eq("organization_id", DEFAULT_ORG_ID)
+    .maybeSingle();
+
+  const payload = {
+    organization_id: DEFAULT_ORG_ID,
+    nombre: String(existing?.nombre ?? "KATIA LIZZET MENESES TAYPE"),
+    ruc: String(existing?.ruc ?? "10739957520"),
+    telefono: String(existing?.telefono ?? "987 654 321"),
+    direccion: String(existing?.direccion ?? "Lima, Peru"),
+    firmante: String(existing?.firmante ?? "Katia Lizzet Meneses Taype"),
+    logo_url: typeof existing?.logo_url === "string" && existing.logo_url.trim() !== "" ? existing.logo_url.trim() : null,
+    margen_ganancia_default_pct: margen,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from("configuracion_empresa")
+    .upsert(payload, { onConflict: "organization_id" });
+
+  if (error) {
+    throw new Error("No se pudo guardar el margen de ganancia.");
+  }
+
+  revalidatePath("/configuracion");
+  revalidatePath("/cotizacion");
+
+  return { ok: true as const, margenGananciaDefaultPct: margen };
+}
+
 export async function deleteCajaMovimiento(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -5792,4 +5845,3 @@ export async function submitUpdateVentaMaderaCortadaForm(
     };
   }
 }
-

@@ -1,8 +1,32 @@
 import { roundMoney } from "@/lib/utils";
 import type { CotizacionDetalleV1, MuebleLineaMadera } from "@/lib/cotizacion-unificada-payload";
 
+export const DEFAULT_MARGEN_GANANCIA_PCT = 30;
+
 export function round2(n: number) {
   return roundMoney(n);
+}
+
+export function parseMargenGananciaInput(value: unknown, fallback = DEFAULT_MARGEN_GANANCIA_PCT): number {
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(",", ".");
+    if (normalized === "") return fallback;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  }
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) return value;
+  return fallback;
+}
+
+export function calcularGananciaPorMargen(costoProduccion: number, margenPct: number): number {
+  const costo = Math.max(0, Number.isFinite(costoProduccion) ? costoProduccion : 0);
+  const margen = Math.max(0, Number.isFinite(margenPct) ? margenPct : 0);
+  return round2((costo * margen) / 100);
+}
+
+export function calcularPrecioConMargen(costoProduccion: number, margenPct: number): number {
+  const costo = round2(Math.max(0, Number.isFinite(costoProduccion) ? costoProduccion : 0));
+  return round2(costo + calcularGananciaPorMargen(costo, margenPct));
 }
 
 /** PT (pies-tablar): mismas reglas que el cotizador de muebles (espesor×ancho×largo en pulgadas, largo en pies). */
@@ -18,6 +42,13 @@ export type TotalesRubros = {
   garantia: number;
 };
 
+export type ResumenMargen = {
+  costoProduccion: number;
+  margenPct: number;
+  ganancia: number;
+  precioSugerido: number;
+};
+
 export function totalPtLinea(
   piezas: { cantidad: number; espesor: number; ancho: number; largo: number }[],
 ): number {
@@ -26,12 +57,10 @@ export function totalPtLinea(
 
 export function computeTotalesDetalle(detalle: CotizacionDetalleV1): TotalesRubros {
   let muebles = 0;
-  const des = Math.max(0, detalle.desperdicioPctMuebles);
   if (detalle.rubros.muebles && detalle.muebles_lineas.length > 0) {
     for (const linea of detalle.muebles_lineas) {
       const ptNeto = totalPtLinea(linea.piezas);
-      const ptCompra = ptNeto * (1 + des / 100);
-      muebles += ptCompra * Math.max(0, linea.precioPorPt);
+      muebles += ptNeto * Math.max(0, linea.precioPorPt);
     }
   }
   // Costo fijo de acabado (S/) y mano de obra (S/) para el rubro muebles.
@@ -72,6 +101,18 @@ export function computeTotalesDetalle(detalle: CotizacionDetalleV1): TotalesRubr
 export function totalGeneralDetalle(detalle: CotizacionDetalleV1): number {
   const t = computeTotalesDetalle(detalle);
   return round2(t.muebles + t.aserradero + t.alquiler);
+}
+
+export function computeResumenMargen(detalle: CotizacionDetalleV1, margenPct: number): ResumenMargen {
+  const costoProduccion = totalGeneralDetalle(detalle);
+  const margen = parseMargenGananciaInput(margenPct);
+  const ganancia = calcularGananciaPorMargen(costoProduccion, margen);
+  return {
+    costoProduccion,
+    margenPct: margen,
+    ganancia,
+    precioSugerido: round2(costoProduccion + ganancia),
+  };
 }
 
 /** PT de compra por línea (con desperdicio), mismo criterio que el precio de venta del rubro muebles. */

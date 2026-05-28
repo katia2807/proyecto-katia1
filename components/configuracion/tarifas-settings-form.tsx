@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateServicioEspecialTarifa } from "@/app/actions";
+import { updateMargenGananciaPredeterminado, updateServicioEspecialTarifa } from "@/app/actions";
 import { formatPen } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -15,10 +15,17 @@ type ServicioEspecialTarifaRow = {
 
 type TarifasSettingsFormProps = {
   inicialTarifas: ServicioEspecialTarifaRow[];
+  margenGananciaDefaultPct: number;
 };
 
-export function TarifasSettingsForm({ inicialTarifas }: TarifasSettingsFormProps) {
+function parseDecimalInput(value: string) {
+  const parsed = Number(value.trim().replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+export function TarifasSettingsForm({ inicialTarifas, margenGananciaDefaultPct }: TarifasSettingsFormProps) {
   const [tarifas, setTarifas] = useState<ServicioEspecialTarifaRow[]>(inicialTarifas);
+  const [margenInput, setMargenInput] = useState(String(margenGananciaDefaultPct));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNombre, setEditNombre] = useState<string>("");
   const [editTarifa, setEditTarifa] = useState<string>("");
@@ -43,7 +50,7 @@ export function TarifasSettingsForm({ inicialTarifas }: TarifasSettingsFormProps
   const handleSave = async () => {
     if (!editingId) return;
     const cleanNombre = editNombre.trim();
-    const cleanTarifa = parseFloat(editTarifa);
+    const cleanTarifa = parseDecimalInput(editTarifa);
 
     if (!cleanNombre) {
       setError("El nombre del servicio no puede estar vacío.");
@@ -79,6 +86,27 @@ export function TarifasSettingsForm({ inicialTarifas }: TarifasSettingsFormProps
     });
   };
 
+  const handleSaveMargen = async () => {
+    const cleanMargen = parseDecimalInput(margenInput);
+    if (isNaN(cleanMargen) || cleanMargen < 0) {
+      setError("El margen debe ser un numero valido mayor o igual a 0.");
+      return;
+    }
+
+    setSuccess(null);
+    setError(null);
+
+    startTransition(async () => {
+      try {
+        const res = await updateMargenGananciaPredeterminado(margenInput);
+        setMargenInput(String(res.margenGananciaDefaultPct));
+        setSuccess("Margen de ganancia actualizado correctamente.");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Error al actualizar el margen.");
+      }
+    });
+  };
+
   return (
     <div className="space-y-4">
       {/* Alert Notification Success/Error */}
@@ -106,6 +134,34 @@ export function TarifasSettingsForm({ inicialTarifas }: TarifasSettingsFormProps
           </button>
         </div>
       )}
+
+      <div className="rounded-xl border border-[var(--katia-border-subtle,#e2e8f0)] bg-[var(--katia-bg-elevated,#ffffff)] p-4">
+        <div className="grid gap-3 md:grid-cols-[1fr_180px_auto] md:items-end">
+          <div>
+            <p className="text-sm font-bold text-[var(--katia-text-primary,#0f172a)]">
+              Margen de ganancia predeterminado (%)
+            </p>
+            <p className="mt-1 text-xs text-[var(--katia-text-secondary,#64748b)]">
+              Se usa para calcular el precio sugerido interno en cotizaciones. No aparece en boletas, facturas ni PDFs del cliente.
+            </p>
+          </div>
+          <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--katia-text-secondary,#64748b)]">
+            Margen (%)
+            <input
+              type="text"
+              inputMode="decimal"
+              className="h-10 rounded-[var(--katia-radius-sm,6px)] border border-[var(--katia-border-subtle,#e2e8f0)] bg-[var(--katia-bg-base,#ffffff)] px-3 text-sm text-[var(--katia-text-primary,#0f172a)] outline-none focus:border-[var(--katia-primary,#3b82f6)] focus:ring-1 focus:ring-[var(--katia-primary,#3b82f6)]"
+              value={margenInput}
+              onChange={(e) => setMargenInput(e.target.value)}
+              disabled={isPending}
+              placeholder="30"
+            />
+          </label>
+          <Button type="button" variant="primary" onClick={handleSaveMargen} disabled={isPending}>
+            {isPending ? "Guardando..." : "Guardar margen"}
+          </Button>
+        </div>
+      </div>
 
       {/* Grid of Special Services Rates */}
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

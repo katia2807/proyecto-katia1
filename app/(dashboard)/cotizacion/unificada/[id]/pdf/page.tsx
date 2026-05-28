@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { CotizacionResumenFormal } from "@/components/sales/cotizacion-resumen-formal";
 import { DocumentoImprimible } from "@/components/sales/documento-imprimible";
 import { getEmpresaConfig } from "@/lib/company-config";
-import { totalGeneralDetalle } from "@/lib/cotizacion-calculos";
+import { computeResumenMargen } from "@/lib/cotizacion-calculos";
 import { buildLineasResumen } from "@/lib/cotizacion-unificada-lineas";
 import { parseCotizacionDetalle } from "@/lib/cotizacion-unificada-payload";
 import { getCotizacionUnificadaById, getClientesRows } from "@/lib/data";
@@ -22,8 +22,8 @@ export default async function CotizacionUnificadaPdfPage({ params }: PdfPageProp
   const cliente = clientes.find((c) => c.id === cot.cliente_id);
   const detalle = parseCotizacionDetalle(cot.detalle as unknown);
 
-  const lineas = buildLineasResumen(detalle);
-  const total = totalGeneralDetalle(detalle);
+  const lineas = buildLineasResumen(detalle, empresa.margen_ganancia_default_pct);
+  const total = computeResumenMargen(detalle, empresa.margen_ganancia_default_pct).precioSugerido;
 
   return (
     <DocumentoImprimible>

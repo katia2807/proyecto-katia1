@@ -68,7 +68,7 @@ export async function updateEmpresaConfig(
   const supabase = getSupabaseServerClient();
   const { data: existing } = await supabase
     .from("configuracion_empresa")
-    .select("logo_url")
+    .select("logo_url,margen_ganancia_default_pct")
     .eq("organization_id", DEFAULT_ORG_ID)
     .maybeSingle();
 
@@ -86,6 +86,7 @@ export async function updateEmpresaConfig(
     firmante: parsed.data.firmante,
     updated_at: new Date().toISOString(),
     logo_url: logoUrlPersist,
+    margen_ganancia_default_pct: existing?.margen_ganancia_default_pct ?? 30,
   };
 
   const { error } = await supabase

@@ -11,14 +11,16 @@ import {
 } from "@/lib/data";
 import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
+import { getEmpresaConfig } from "@/lib/company-config";
 
 export default async function AserraderoServiciosPage() {
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
-  const [clientes, servicios, tarifas] = await Promise.all([
+  const [clientes, servicios, tarifas, empresa] = await Promise.all([
     getClientesRows(),
     getServiciosAserraderoRows(),
     getServiciosEspecialesTarifaRows(),
+    getEmpresaConfig(),
   ]);
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
@@ -44,6 +46,7 @@ export default async function AserraderoServiciosPage() {
           <AserraderoContextPanels
             clientes={clientes}
             serviciosEspeciales={tarifas}
+            margenGananciaDefaultPct={empresa.margen_ganancia_default_pct}
             mockData={comboMock}
           />
         ) : (

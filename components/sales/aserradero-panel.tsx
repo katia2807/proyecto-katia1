@@ -16,12 +16,14 @@ type ServicioEspecial = {
 type AserraderoPanelProps = {
   clientes: Cliente[];
   serviciosEspeciales: ServicioEspecial[];
+  margenGananciaDefaultPct?: number;
   mockData?: boolean;
 };
 
 export function AserraderoPanel({
   clientes,
   serviciosEspeciales,
+  margenGananciaDefaultPct,
   mockData = false,
 }: AserraderoPanelProps) {
   const [open, setOpen] = useState(false);
@@ -49,6 +51,7 @@ export function AserraderoPanel({
         key={formKey}
         clientes={clientes}
         serviciosEspeciales={serviciosEspeciales}
+        margenGananciaDefaultPct={margenGananciaDefaultPct}
         mockData={mockData}
         onSuccess={handleSuccess}
       />

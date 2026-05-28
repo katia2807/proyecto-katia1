@@ -13,9 +13,11 @@ import {
 } from "@/app/actions";
 import {
   computeEconomiaInterna,
+  computeResumenMargen,
   computeTotalesDetalle,
   economiaLineaMueble,
   round2,
+  totalPtLinea,
   totalGeneralDetalle,
 } from "@/lib/cotizacion-calculos";
 import {
@@ -202,6 +204,20 @@ function toInches(value: number, unit: "" | "mm" | "cm" | "m" | "in" | "ft") {
   if (unit === "m") return value * 39.37007874;
   if (unit === "ft") return value * 12;
   return value;
+}
+
+function parseDecimalInput(value: string) {
+  const normalized = value.replace(",", ".").trim();
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function ptUnitarioPieza(pieza: Pick<MuebleLineaPieza, "espesor" | "ancho" | "largo">) {
+  return (pieza.espesor * pieza.ancho * pieza.largo) / 12;
+}
+
+function ptTotalPieza(pieza: Pick<MuebleLineaPieza, "cantidad" | "espesor" | "ancho" | "largo">) {
+  return ptUnitarioPieza(pieza) * pieza.cantidad;
 }
 
 function toFeet(value: number, unit: "" | "mm" | "cm" | "m" | "in" | "ft") {
@@ -621,28 +637,37 @@ export function CotizacionUnificadaWizard({
   const effectiveStepIndex = Math.min(stepIndex, Math.max(0, steps.length - 1));
   const currentStepId = steps[effectiveStepIndex] ?? "cliente";
 
+  const margenGananciaPct = empresa.margen_ganancia_default_pct;
   const totales = useMemo(() => computeTotalesDetalle(detalle), [detalle]);
-  const totalGral = useMemo(() => totalGeneralDetalle(detalle), [detalle]);
+  const resumenMargen = useMemo(
+    () => computeResumenMargen(detalle, margenGananciaPct),
+    [detalle, margenGananciaPct],
+  );
+  const totalGral = resumenMargen.precioSugerido;
   const totalGralSafe = Number.isFinite(totalGral) ? totalGral : 0;
   const economiaInterna = useMemo(() => computeEconomiaInterna(detalle), [detalle]);
   const conversionMedidasUI = useMemo(() => {
-    const esp = Number(medidaEspesorUI) || 0;
-    const anc = Number(medidaAnchoUI) || 0;
-    const lar = Number(medidaLargoUI) || 0;
+    const esp = parseDecimalInput(medidaEspesorUI);
+    const anc = parseDecimalInput(medidaAnchoUI);
+    const lar = parseDecimalInput(medidaLargoUI);
     const espIn = toInches(esp, unidadEspesorUI);
     const ancIn = toInches(anc, unidadAnchoUI);
     const larFt = toFeet(lar, unidadLargoUI);
     const pt = round2((espIn * ancIn * larFt) / 12);
     return { espIn, ancIn, larFt, pt };
   }, [medidaAnchoUI, medidaEspesorUI, medidaLargoUI, unidadAnchoUI, unidadEspesorUI, unidadLargoUI]);
+  const totalPtMueblesActual = useMemo(
+    () => totalPtLinea(detalle.muebles_lineas[0]?.piezas ?? []),
+    [detalle.muebles_lineas],
+  );
   const totalMaderaProyectado = useMemo(() => {
-    const precioPt = Number(precioVentaPtUI) || 0;
-    return round2(conversionMedidasUI.pt * precioPt);
-  }, [conversionMedidasUI.pt, precioVentaPtUI]);
+    const precioPt = parseDecimalInput(precioVentaPtUI);
+    return round2(totalPtMueblesActual * precioPt);
+  }, [precioVentaPtUI, totalPtMueblesActual]);
   const conversionAserraderoUI = useMemo(() => {
-    const esp = Number(asrMedidaEspesorUI) || 0;
-    const anc = Number(asrMedidaAnchoUI) || 0;
-    const lar = Number(asrMedidaLargoUI) || 0;
+    const esp = parseDecimalInput(asrMedidaEspesorUI);
+    const anc = parseDecimalInput(asrMedidaAnchoUI);
+    const lar = parseDecimalInput(asrMedidaLargoUI);
     const espIn = toInches(esp, asrUnidadEspesorUI);
     const ancIn = toInches(anc, asrUnidadAnchoUI);
     const larFt = toFeet(lar, asrUnidadLargoUI);
@@ -780,7 +805,7 @@ export function CotizacionUnificadaWizard({
    * de cada campo de medida.
    */
   const syncCurrentPiezaToDetalle = useCallback(
-    (updates: Partial<{ espesor: number; ancho: number; largo: number }>) => {
+    (updates: Partial<{ cantidad: number; espesor: number; ancho: number; largo: number }>) => {
       setDetalle((d) => {
         if (!(d.rubros.muebles)) return d;
         const lineas = d.muebles_lineas.length > 0 ? [...d.muebles_lineas] : [emptyLineaMadera()];
@@ -923,8 +948,8 @@ export function CotizacionUnificadaWizard({
       setCostoManoObraUI(selected.costoManoObraUI ?? "0");
       setDetalle((d) => ({
         ...d,
-        costoAcabadoSoles: Number(selected.costoAcabadoSolesUI) || 0,
-        costoManoObra: Number(selected.costoManoObraUI) || 0,
+        costoAcabadoSoles: parseDecimalInput(selected.costoAcabadoSolesUI),
+        costoManoObra: parseDecimalInput(selected.costoManoObraUI ?? "0"),
       }));
       setPagoMetodoUI(selected.pagoMetodoUI);
       setPagoModalidadUI(selected.pagoModalidadUI);
@@ -1088,8 +1113,8 @@ export function CotizacionUnificadaWizard({
     setCostoManoObraUI(draft.costoManoObraUI ?? "0");
     setDetalle((d) => ({
       ...d,
-      costoAcabadoSoles: Number(draft.costoAcabadoSolesUI) || 0,
-      costoManoObra: Number(draft.costoManoObraUI) || 0,
+      costoAcabadoSoles: parseDecimalInput(draft.costoAcabadoSolesUI),
+      costoManoObra: parseDecimalInput(draft.costoManoObraUI ?? "0"),
     }));
     setPagoMetodoUI(draft.pagoMetodoUI);
     setPagoModalidadUI(draft.pagoModalidadUI);
@@ -1187,7 +1212,10 @@ export function CotizacionUnificadaWizard({
     return d;
   }, [detalle]);
 
-  const lineasFormal = useMemo(() => buildLineasResumen(detalleParaLineas), [detalleParaLineas]);
+  const lineasFormal = useMemo(
+    () => buildLineasResumen(detalleParaLineas, margenGananciaPct),
+    [detalleParaLineas, margenGananciaPct],
+  );
   const lineasFormalSafe = useMemo(
     () =>
       lineasFormal.map((linea) => ({
@@ -1853,7 +1881,7 @@ export function CotizacionUnificadaWizard({
                         medida: medidaEspesorUI,
                         setMedida: (v: string) => {
                           setMedidaEspesorUI(v);
-                          const espIn = toInches(Number(v) || 0, unidadEspesorUI);
+                          const espIn = toInches(parseDecimalInput(v), unidadEspesorUI);
                           syncCurrentPiezaToDetalle({ espesor: espIn });
                         },
                       },
@@ -1864,7 +1892,7 @@ export function CotizacionUnificadaWizard({
                         medida: medidaAnchoUI,
                         setMedida: (v: string) => {
                           setMedidaAnchoUI(v);
-                          const ancIn = toInches(Number(v) || 0, unidadAnchoUI);
+                          const ancIn = toInches(parseDecimalInput(v), unidadAnchoUI);
                           syncCurrentPiezaToDetalle({ ancho: ancIn });
                         },
                       },
@@ -1875,7 +1903,7 @@ export function CotizacionUnificadaWizard({
                         medida: medidaLargoUI,
                         setMedida: (v: string) => {
                           setMedidaLargoUI(v);
-                          const larFt = toFeet(Number(v) || 0, unidadLargoUI);
+                          const larFt = toFeet(parseDecimalInput(v), unidadLargoUI);
                           syncCurrentPiezaToDetalle({ largo: larFt });
                         },
                       },
@@ -1885,7 +1913,8 @@ export function CotizacionUnificadaWizard({
                       <span className="block text-xs font-bold text-[var(--color-text-secondary)]">{label}</span>
                       <div className="flex rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--color-accent)]/50 transition-all">
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           className="w-full border-none bg-transparent h-10 px-3 text-sm focus:outline-none focus:ring-0 text-[var(--color-text-primary)]"
                           value={medida}
                           onChange={(e) => setMedida(e.target.value)}
@@ -1903,15 +1932,15 @@ export function CotizacionUnificadaWizard({
                           onChange={(e) => {
                             const newUnit = e.target.value as "" | "mm" | "cm" | "m" | "in" | "ft";
                             if (label === "Espesor") {
-                              const valIn = toInches(Number(medidaEspesorUI) || 0, unidadEspesorUI);
+                              const valIn = toInches(parseDecimalInput(medidaEspesorUI), unidadEspesorUI);
                               setUnidadEspesorUI(newUnit);
                               setMedidaEspesorUI(inchesToUI(valIn, newUnit));
                             } else if (label === "Ancho") {
-                              const valIn = toInches(Number(medidaAnchoUI) || 0, unidadAnchoUI);
+                              const valIn = toInches(parseDecimalInput(medidaAnchoUI), unidadAnchoUI);
                               setUnidadAnchoUI(newUnit);
                               setMedidaAnchoUI(inchesToUI(valIn, newUnit));
                             } else {
-                              const valFt = toFeet(Number(medidaLargoUI) || 0, unidadLargoUI);
+                              const valFt = toFeet(parseDecimalInput(medidaLargoUI), unidadLargoUI);
                               setUnidadLargoUI(newUnit);
                               setMedidaLargoUI(feetToUI(valFt, newUnit));
                             }
@@ -1928,6 +1957,50 @@ export function CotizacionUnificadaWizard({
                     </div>
                   ))}
                 </div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_2fr]">
+                  <label className="space-y-1">
+                    <span className="block text-xs font-bold text-[var(--color-text-secondary)]">Cantidad por pieza</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      className={`${inputClass} h-10 text-center`}
+                      value={String(piezasMuebleActual[selectedPiezaIndexSafe]?.cantidad ?? 1)}
+                      onChange={(e) => {
+                        const cantidad = Math.max(0, parseDecimalInput(e.target.value));
+                        syncCurrentPiezaToDetalle({ cantidad });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addPiezaDesdeDimensiones();
+                        }
+                      }}
+                      placeholder="1"
+                    />
+                  </label>
+                  <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-xs text-[var(--color-text-secondary)]">
+                    <div className="grid gap-1 sm:grid-cols-3">
+                      <span>
+                        PT unitario:{" "}
+                        <strong className="text-[var(--color-text-primary)]">
+                          {ptUnitarioPieza(piezasMuebleActual[selectedPiezaIndexSafe] ?? emptyPieza()).toFixed(2)}
+                        </strong>
+                      </span>
+                      <span>
+                        Cantidad:{" "}
+                        <strong className="text-[var(--color-text-primary)]">
+                          {piezasMuebleActual[selectedPiezaIndexSafe]?.cantidad ?? 1}
+                        </strong>
+                      </span>
+                      <span>
+                        PT total:{" "}
+                        <strong className="text-[var(--color-accent)]">
+                          {ptTotalPieza(piezasMuebleActual[selectedPiezaIndexSafe] ?? emptyPieza()).toFixed(2)}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+                </div>
                 <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/10 p-3 space-y-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-bold text-[var(--color-text-secondary)]">
@@ -1943,7 +2016,7 @@ export function CotizacionUnificadaWizard({
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {(piezasMuebleActual.length > 0 ? piezasMuebleActual : [emptyPieza()]).map((pieza, idx) => {
-                      const ptPieza = (pieza.cantidad * pieza.espesor * pieza.ancho * pieza.largo) / 12;
+                      const ptPieza = ptTotalPieza(pieza);
                       return (
                         <div
                           key={`pieza-pos-${idx}`}
@@ -1990,10 +2063,12 @@ export function CotizacionUnificadaWizard({
                   <div className="rounded-lg border border-[var(--color-accent)]/30 bg-[var(--color-primary-soft)]/20 p-2 space-y-1">
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5">
                       {piezasMuebleActual.map((p, i) => {
-                        const pt = (p.cantidad * p.espesor * p.ancho * p.largo) / 12;
+                        const ptUnit = ptUnitarioPieza(p);
+                        const pt = ptTotalPieza(p);
                         return (
                           <span key={i} className="text-[11px] text-[var(--color-text-secondary)]">
-                            P{i + 1}: <strong className="text-[var(--color-text-primary)]">{pt.toFixed(2)}</strong>
+                            P{i + 1}: <strong className="text-[var(--color-text-primary)]">{pt.toFixed(2)}</strong>{" "}
+                            <span className="opacity-75">({ptUnit.toFixed(2)} x {p.cantidad})</span>
                           </span>
                         );
                       })}
@@ -2001,7 +2076,7 @@ export function CotizacionUnificadaWizard({
                     <p className="text-xs font-bold text-[var(--color-accent)]">
                       PT TOTAL ({piezasMuebleActual.length} pieza{piezasMuebleActual.length !== 1 ? "s" : ""}):{" "}
                       <strong>
-                        {piezasMuebleActual.reduce((acc, p) => acc + (p.cantidad * p.espesor * p.ancho * p.largo) / 12, 0).toFixed(2)} PT
+                        {totalPtMueblesActual.toFixed(2)} PT
                       </strong>
                     </p>
                   </div>
@@ -2012,14 +2087,14 @@ export function CotizacionUnificadaWizard({
                   <label className="space-y-1 text-left">
                     <span className="block text-[11px] font-bold text-[var(--color-text-secondary)]">Precio por Pie (S/)</span>
                     <input
-                      type="number"
-                      min={0}
+                      type="text"
+                      inputMode="decimal"
                       className={`${inputClass} h-10 text-center`}
                       value={precioVentaPtUI}
                       onChange={(e) => {
                         const val = e.target.value;
                         setPrecioVentaPtUI(val);
-                        const precioPt = Number(val) || 0;
+                        const precioPt = parseDecimalInput(val);
                         setDetalle((d) => {
                           if (!d.rubros.muebles || d.muebles_lineas.length === 0) return d;
                           const lineas = [...d.muebles_lineas];
@@ -2033,14 +2108,14 @@ export function CotizacionUnificadaWizard({
                   <label className="space-y-1 text-left">
                     <span className="block text-[11px] font-bold text-[var(--color-text-secondary)]">Mano de Obra (S/)</span>
                     <input
-                      type="number"
-                      min={0}
+                      type="text"
+                      inputMode="decimal"
                       className={`${inputClass} h-10 text-center`}
                       value={costoManoObraUI}
                       onChange={(e) => {
                         const val = e.target.value;
                         setCostoManoObraUI(val);
-                        const manoObra = Number(val) || 0;
+                        const manoObra = parseDecimalInput(val);
                         setDetalle((d) => ({ ...d, costoManoObra: manoObra }));
                       }}
                       placeholder="S/ mano obra"
@@ -2048,7 +2123,7 @@ export function CotizacionUnificadaWizard({
                   </label>
                 </div>
                 
-                {Number(precioVentaPtUI) > 0 && (
+                {parseDecimalInput(precioVentaPtUI) > 0 && (
                   <p className="mt-2 text-[11px] text-left text-[var(--color-text-secondary)]">
                     Madera proyectada: <strong className="text-[var(--color-text-primary)]">{formatPen(totalMaderaProyectado)}</strong>
                   </p>
@@ -2114,14 +2189,14 @@ export function CotizacionUnificadaWizard({
                   <label className="space-y-1 pb-0.5">
                     <span className="block text-[11px] font-bold text-[var(--color-text-secondary)]">Costo (S/)</span>
                     <input
-                      type="number"
-                      min={0}
+                      type="text"
+                      inputMode="decimal"
                       className={`${inputClass} h-11 w-[150px] text-center`}
                       value={costoAcabadoSolesUI}
                       onChange={(e) => {
                         const raw = e.target.value;
                         setCostoAcabadoSolesUI(raw);
-                        setDetalle((d) => ({ ...d, costoAcabadoSoles: Number(raw) || 0 }));
+                        setDetalle((d) => ({ ...d, costoAcabadoSoles: parseDecimalInput(raw) }));
                       }}
                       placeholder="0"
                     />
@@ -2499,12 +2574,12 @@ export function CotizacionUnificadaWizard({
                 <div className="flex items-center justify-between">
                   <span className="text-[var(--color-text-secondary)]">Volumen de Madera (PT):</span>
                   <strong className="text-[var(--color-accent)] font-extrabold">
-                    {(conversionMedidasUI.pt * (1 + detalle.desperdicioPctMuebles / 100)).toFixed(2)} PT
+                    {totalPtMueblesActual.toFixed(2)} PT
                   </strong>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[var(--color-text-secondary)]">Precio por Pie (S/):</span>
-                  <strong>{formatPen(Number(precioVentaPtUI) || 0)}</strong>
+                  <strong>{formatPen(parseDecimalInput(precioVentaPtUI))}</strong>
                 </div>
               </div>
             </div>
@@ -2523,24 +2598,34 @@ export function CotizacionUnificadaWizard({
                     <span>Madera Proyectada:</span>
                     <strong>{formatPen(totalMaderaProyectado)}</strong>
                   </div>
-                  {Number(costoManoObraUI) > 0 && (
+                  {parseDecimalInput(costoManoObraUI) > 0 && (
                     <div className="flex items-center justify-between">
                       <span>Mano de Obra:</span>
-                      <strong>{formatPen(Number(costoManoObraUI))}</strong>
+                      <strong>{formatPen(parseDecimalInput(costoManoObraUI))}</strong>
                     </div>
                   )}
-                  {Number(costoAcabadoSolesUI) > 0 && (
+                  {parseDecimalInput(costoAcabadoSolesUI) > 0 && (
                     <div className="flex items-center justify-between">
                       <span>Acabado / Terminación:</span>
-                      <strong>{formatPen(Number(costoAcabadoSolesUI))}</strong>
+                      <strong>{formatPen(parseDecimalInput(costoAcabadoSolesUI))}</strong>
                     </div>
                   )}
+                  <div className="border-t border-[var(--color-border)] pt-3">
+                    <div className="flex items-center justify-between">
+                      <span>Costo de producciÃ³n:</span>
+                      <strong>{formatPen(resumenMargen.costoProduccion)}</strong>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span>Margen de ganancia ({resumenMargen.margenPct.toFixed(1)}%):</span>
+                      <strong>{formatPen(resumenMargen.ganancia)}</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-center">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">Precio Total Mueble</p>
-                <p className="mt-1 text-4xl font-black text-[var(--color-accent)]">{formatPen(totales.muebles)}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">Precio sugerido final</p>
+                <p className="mt-1 text-4xl font-black text-[var(--color-accent)]">{formatPen(resumenMargen.precioSugerido)}</p>
                 {tipoMuebleVista && (
                   <p className="mt-2 text-xs font-medium text-[var(--color-text-secondary)]">
                     Tipo de mueble: {selectedTipoMuebleLabel}
@@ -2565,7 +2650,7 @@ export function CotizacionUnificadaWizard({
                 </p>
                 <div className="grid grid-cols-2 gap-4 rounded-xl bg-[var(--color-surface)] p-3 text-xs text-[var(--color-text-secondary)] border border-[var(--color-border)] mb-3">
                   <div>
-                    Pies Tablares Netos: <strong className="text-[var(--color-text-primary)]">{conversionMedidasUI.pt.toFixed(2)} PT</strong>
+                    Pies Tablares Netos: <strong className="text-[var(--color-text-primary)]">{totalPtMueblesActual.toFixed(2)} PT</strong>
                   </div>
                   <div>
                     Desperdicio de Madera: <strong className="text-[var(--color-text-primary)]">{detalle.desperdicioPctMuebles}%</strong>
@@ -3028,11 +3113,11 @@ export function CotizacionUnificadaWizard({
             <dl className="grid gap-2 sm:grid-cols-2">
               <div className="flex justify-between gap-3 rounded-lg bg-[var(--color-primary-soft)]/20 px-3 py-2">
                 <dt className="text-[var(--color-text-secondary)]">Costo total estimado</dt>
-                <dd className="font-semibold tabular-nums">{formatPen(economiaInterna.costoTotalEstimado)}</dd>
+                <dd className="font-semibold tabular-nums">{formatPen(resumenMargen.costoProduccion)}</dd>
               </div>
               <div className="flex justify-between gap-3 rounded-lg bg-[var(--color-primary-soft)]/20 px-3 py-2">
                 <dt className="text-[var(--color-text-secondary)]">Precio total (cotización)</dt>
-                <dd className="font-semibold tabular-nums">{formatPen(economiaInterna.precioTotal)}</dd>
+                <dd className="font-semibold tabular-nums">{formatPen(resumenMargen.precioSugerido)}</dd>
               </div>
               <div
                 className={`flex justify-between gap-3 rounded-lg px-3 py-2 sm:col-span-2 ${economiaInterna.gananciaEstimada < 0
@@ -3043,7 +3128,7 @@ export function CotizacionUnificadaWizard({
                 <dt className={economiaInterna.gananciaEstimada < 0 ? "" : "text-[var(--color-text-secondary)]"}>
                   Ganancia estimada
                 </dt>
-                <dd className="tabular-nums">{formatPen(economiaInterna.gananciaEstimada)}</dd>
+                <dd className="tabular-nums">{formatPen(resumenMargen.ganancia)}</dd>
               </div>
               <div
                 className={`flex justify-between gap-3 rounded-lg px-3 py-2 sm:col-span-2 ${(economiaInterna.margenPct ?? 0) < 0

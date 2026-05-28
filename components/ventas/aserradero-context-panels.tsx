@@ -16,12 +16,14 @@ type ServicioEspecial = {
 type AserraderoContextPanelsProps = {
   clientes: Cliente[];
   serviciosEspeciales: ServicioEspecial[];
+  margenGananciaDefaultPct?: number;
   mockData?: boolean;
 };
 
 export function AserraderoContextPanels({
   clientes,
   serviciosEspeciales,
+  margenGananciaDefaultPct,
   mockData = false,
 }: AserraderoContextPanelsProps) {
   const [open, setOpen] = useState(false);
@@ -49,6 +51,7 @@ export function AserraderoContextPanels({
         key={formKey}
         clientes={clientes}
         serviciosEspeciales={serviciosEspeciales}
+        margenGananciaDefaultPct={margenGananciaDefaultPct}
         mockData={mockData}
         onSuccess={handleSuccess}
       />
