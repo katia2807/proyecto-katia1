@@ -40,7 +40,7 @@ import {
 } from "@/lib/combobox-mocks";
 import type { EmpresaConfig } from "@/lib/company-config";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
-import { formatPen } from "@/lib/utils";
+import { formatPen, parseDecimal } from "@/lib/utils";
 import type { Database } from "@/lib/supabase/types";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 
@@ -207,9 +207,7 @@ function toInches(value: number, unit: "" | "mm" | "cm" | "m" | "in" | "ft") {
 }
 
 function parseDecimalInput(value: string) {
-  const normalized = value.replace(",", ".").trim();
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : 0;
+  return parseDecimal(value);
 }
 
 function ptUnitarioPieza(pieza: Pick<MuebleLineaPieza, "espesor" | "ancho" | "largo">) {

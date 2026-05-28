@@ -69,14 +69,13 @@ import { hasSupabaseEnv } from "@/lib/runtime";
 import type { MutationFormState } from "@/lib/mutation-form-state";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole, Json } from "@/lib/supabase/types";
-import { roundMoney, safeDivide } from "@/lib/utils";
+import { roundMoney, safeDivide, parseDecimal } from "@/lib/utils";
 
 const preprocessDecimal = (v: unknown) => {
-  if (typeof v === "string") {
-    const cleaned = v.trim().replace(",", ".");
-    return cleaned === "" ? undefined : cleaned;
+  if (v === null || v === undefined || v === "") {
+    return undefined;
   }
-  return v;
+  return parseDecimal(v as string | number | null | undefined);
 };
 
 const margenGananciaConfigSchema = z.object({
@@ -352,7 +351,7 @@ const inventarioCompraRapidaSchema = z.object({
   costoUnitario: z.preprocess(
     (value) => {
       const processed = preprocessDecimal(value);
-      return (processed === "" || processed === null || processed === undefined) ? undefined : processed;
+      return (processed === null || processed === undefined) ? undefined : processed;
     },
     z.coerce.number().nonnegative().optional(),
   ),

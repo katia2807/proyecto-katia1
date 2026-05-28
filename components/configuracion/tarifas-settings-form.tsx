@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateMargenGananciaPredeterminado, updateServicioEspecialTarifa } from "@/app/actions";
-import { formatPen } from "@/lib/utils";
+import { formatPen, parseDecimal } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 type ServicioEspecialTarifaRow = {
@@ -19,8 +19,7 @@ type TarifasSettingsFormProps = {
 };
 
 function parseDecimalInput(value: string) {
-  const parsed = Number(value.trim().replace(",", "."));
-  return Number.isFinite(parsed) ? parsed : Number.NaN;
+  return parseDecimal(value);
 }
 
 export function TarifasSettingsForm({ inicialTarifas, margenGananciaDefaultPct }: TarifasSettingsFormProps) {
