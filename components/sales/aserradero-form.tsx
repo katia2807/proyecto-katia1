@@ -11,7 +11,7 @@ import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { liteClientesToCompleto } from "@/lib/combobox-mocks";
-import { formatPen, roundMoney } from "@/lib/utils";
+import { formatPen, roundMoney, parseDecimal } from "@/lib/utils";
 import { calcularGananciaPorMargen, calcularPrecioConMargen, DEFAULT_MARGEN_GANANCIA_PCT } from "@/lib/cotizacion-calculos";
 
 type Cliente = { id: string; nombre: string };
@@ -64,8 +64,8 @@ export function AserraderoForm({
   const [manoDeObra, setManoDeObra] = useState<number>(0);
   const [extrasMadera, setExtrasMadera] = useState<Array<{ id: number; descripcion: string; cantidad: number }>>([]);
   const [notasInternas, setNotasInternas] = useState<string>("");
+  const [serviciosPersonalizados, setServiciosPersonalizados] = useState<Array<{ id: number; nombre: string; cantidad: string; tarifa: string }>>([]);
 
-  // Campos de pago
   const [metodoPago, setMetodoPago] = useState("efectivo");
   const [modalidadPago, setModalidadPago] = useState("contado");
   const [adelanto, setAdelanto] = useState("");
@@ -149,12 +149,17 @@ export function AserraderoForm({
     : costoCubicajeSugerido;
 
   const totalServiciosEspeciales = useMemo(() => {
-    const sum = Object.entries(seleccionados).reduce((acc, [, val]) => {
+    const sumConfig = Object.entries(seleccionados).reduce((acc, [, val]) => {
       if (!val.activo) return acc;
       return roundMoney(acc + roundMoney(val.cantidad * val.tarifa));
     }, 0);
-    return roundMoney(sum);
-  }, [seleccionados]);
+    const sumCustom = serviciosPersonalizados.reduce((acc, item) => {
+      const q = parseDecimal(item.cantidad);
+      const t = parseDecimal(item.tarifa);
+      return roundMoney(acc + roundMoney(q * t));
+    }, 0);
+    return roundMoney(sumConfig + sumCustom);
+  }, [seleccionados, serviciosPersonalizados]);
 
   const costoProduccion = roundMoney(costoCubicaje + totalServiciosEspeciales + manoDeObra);
   const gananciaSugerida = calcularGananciaPorMargen(costoProduccion, margenGananciaDefaultPct);
@@ -188,6 +193,22 @@ export function AserraderoForm({
             subtotal: Number((v.cantidad * v.tarifa).toFixed(2)),
           };
         });
+
+      for (const item of serviciosPersonalizados) {
+        if (item.nombre.trim()) {
+          const q = parseDecimal(item.cantidad);
+          const t = parseDecimal(item.tarifa);
+          list.push({
+            id: `custom-servicio-${item.id}`,
+            tipo: "servicio_especial",
+            codigo: "SERV-ESP",
+            nombre: item.nombre.trim(),
+            cantidad: q,
+            tarifa: t,
+            subtotal: Number((q * t).toFixed(2)),
+          });
+        }
+      }
 
       if (manoDeObra > 0) {
         list.push({
@@ -230,7 +251,7 @@ export function AserraderoForm({
 
       return list;
     },
-    [seleccionados, serviciosEspeciales, manoDeObra, extrasMadera, notasInternas],
+    [seleccionados, serviciosEspeciales, serviciosPersonalizados, manoDeObra, extrasMadera, notasInternas],
   );
 
   function handleSaltarServicios() {
@@ -241,6 +262,7 @@ export function AserraderoForm({
       }
       return reset;
     });
+    setServiciosPersonalizados([]);
     setStep(4);
   }
 
@@ -636,6 +658,86 @@ export function AserraderoForm({
             })}
           </div>
 
+          {/* Sección de Servicios Especiales Aplicados Personalizados */}
+          <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)] space-y-3 mt-4">
+            <p className="text-xs uppercase tracking-wide font-bold text-[var(--color-text-secondary)]">Servicios especiales aplicados (Manual)</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              ¿No está en la lista de arriba? Escribe servicios de cepillado, corte especial u otros aplicados a esta orden.
+            </p>
+            <div className="space-y-2">
+              {serviciosPersonalizados.map((item) => {
+                const qtyVal = parseDecimal(item.cantidad);
+                const tarifVal = parseDecimal(item.tarifa);
+                const sub = roundMoney(qtyVal * tarifVal);
+                return (
+                  <div key={item.id} className="grid gap-2 items-end rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]/30 p-2 grid-cols-[2fr_1fr_1fr_1fr_auto]">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-[var(--color-text-secondary)]">Descripción del Servicio</span>
+                      <input
+                        type="text"
+                        value={item.nombre}
+                        placeholder="Ej. Cepillado de cara y canto"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setServiciosPersonalizados((prev) => prev.map((x) => (x.id === item.id ? { ...x, nombre: val } : x)));
+                        }}
+                        className="h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs outline-none"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-[var(--color-text-secondary)]">Cant.</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={item.cantidad}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setServiciosPersonalizados((prev) => prev.map((x) => (x.id === item.id ? { ...x, cantidad: val } : x)));
+                        }}
+                        className="h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs text-center outline-none"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-[var(--color-text-secondary)]">Tarifa S/</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={item.tarifa}
+                        placeholder="0.00"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setServiciosPersonalizados((prev) => prev.map((x) => (x.id === item.id ? { ...x, tarifa: val } : x)));
+                        }}
+                        className="h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs text-center outline-none"
+                      />
+                    </div>
+                    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-right self-stretch flex flex-col justify-center">
+                      <p className="text-[9px] uppercase text-[var(--color-text-secondary)]">Total</p>
+                      <p className="text-xs font-bold font-mono">
+                        {formatPen(sub)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setServiciosPersonalizados((prev) => prev.filter((x) => x.id !== item.id))}
+                      className="text-xs text-red-500 font-semibold p-2 hover:underline h-9 flex items-center justify-center"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setServiciosPersonalizados((prev) => [...prev, { id: Date.now() + Math.random(), nombre: "", cantidad: "1", tarifa: "" }])}
+                className="text-xs font-semibold text-[var(--color-accent)] hover:underline mt-1 block"
+              >
+                + Agregar servicio manual
+              </button>
+            </div>
+          </div>
+
           {/* Mano de Obra y Extras */}
           <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)] space-y-4 mt-4">
             <p className="text-xs uppercase tracking-wide font-bold text-[var(--color-text-secondary)]">Mano de Obra & Extras</p>
@@ -758,14 +860,18 @@ export function AserraderoForm({
               <div className="flex justify-between py-2.5">
                 <div>
                   <p className="font-semibold text-sm">Servicios Especiales</p>
-                  {Object.entries(seleccionados).filter(([, v]) => v.activo).length === 0 ? (
+                  {Object.entries(seleccionados).filter(([, v]) => v.activo).length === 0 && serviciosPersonalizados.filter(s => s.nombre.trim()).length === 0 ? (
                     <p className="text-xs text-[var(--color-text-secondary)]">Ninguno seleccionado</p>
                   ) : (
                     <p className="text-xs text-[var(--color-text-secondary)]">
-                      {Object.entries(seleccionados)
-                        .filter(([, v]) => v.activo)
-                        .map(([id]) => serviciosEspeciales.find(s => s.id === id)?.nombre)
-                        .join(', ')}
+                      {[
+                        ...Object.entries(seleccionados)
+                          .filter(([, v]) => v.activo)
+                          .map(([id]) => serviciosEspeciales.find(s => s.id === id)?.nombre),
+                        ...serviciosPersonalizados
+                          .filter(s => s.nombre.trim())
+                          .map(s => s.nombre.trim())
+                      ].join(', ')}
                     </p>
                   )}
                 </div>
