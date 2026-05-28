@@ -369,7 +369,16 @@ export function InventarioContextPanels({
                 onClick={() => {
                   const ptInput = document.querySelector<HTMLInputElement>('input[name="cubicaje_total_pt"]');
                   const pt = ptInput?.value ?? "";
-                  setCantidadCubicada(pt);
+                  if (pt) {
+                    const parsedVal = parseFloat(pt);
+                    if (!isNaN(parsedVal)) {
+                      setCantidadCubicada(Number(parsedVal.toFixed(2)).toString());
+                    } else {
+                      setCantidadCubicada("");
+                    }
+                  } else {
+                    setCantidadCubicada("");
+                  }
                 }}
                 className="mt-2 rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs font-semibold text-white"
               >

@@ -153,9 +153,10 @@ export function CubicajeInput({
     }
   }, [totalPT, totalPC, precioActivo, totalSoles, piezasConSubtotal, onChange]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
+      e.stopPropagation();
       agregar();
     }
   };
@@ -243,6 +244,12 @@ export function CubicajeInput({
                   <td className="px-2 py-1.5 space-y-1.5">
                     {productos && productos.length > 0 ? (
                       <select
+                        ref={(el) => {
+                          if (el && focusRowId === p.id) {
+                            el.focus();
+                            setFocusRowId(null);
+                          }
+                        }}
                         value={p.inventario_producto_id || "manual"}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -268,6 +275,7 @@ export function CubicajeInput({
                             }
                           }
                         }}
+                        onKeyDown={handleKeyDown}
                         className="h-8 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-1 text-xs font-semibold outline-none"
                       >
                         <option value="manual">✏️ Escribir manual (sin inventario)</option>
@@ -280,7 +288,7 @@ export function CubicajeInput({
                     ) : null}
                     <input
                       ref={(el) => {
-                        if (el && focusRowId === p.id) {
+                        if (el && focusRowId === p.id && (!productos || productos.length === 0)) {
                           el.focus();
                           setFocusRowId(null);
                         }
