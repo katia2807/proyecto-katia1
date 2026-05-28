@@ -171,6 +171,47 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
   return (
     <>
       <style>{`
+        .ticket-container {
+          width: 76mm !important;
+          max-width: 76mm !important;
+          padding: 3mm 2.5mm 3mm 2.5mm !important;
+          margin: 0 auto !important;
+          background: white !important;
+          color: black !important;
+          font-family: Arial, Helvetica, sans-serif !important;
+          font-size: 14px !important;
+          line-height: 1.35 !important;
+          box-shadow: none !important;
+          border: none !important;
+        }
+
+        .ticket-title {
+          font-size: 20px !important;
+          font-weight: 700 !important;
+          text-align: center !important;
+        }
+
+        .ticket-subtitle {
+          font-size: 15px !important;
+          text-align: center !important;
+        }
+
+        .ticket-total {
+          font-size: 22px !important;
+          font-weight: 800 !important;
+        }
+
+        .ticket-table {
+          width: 100% !important;
+          border-collapse: collapse !important;
+        }
+
+        .ticket-table td,
+        .ticket-table th {
+          font-size: 13px !important;
+          padding: 2px 0 !important;
+        }
+
         @media print {
           .no-print { display: none !important; }
           
@@ -181,8 +222,8 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
             min-height: auto !important;
             margin: 0 !important;
             padding: 0 !important;
-            overflow: hidden !important;
             background: white !important;
+            overflow: hidden !important;
           }
 
           @page {
@@ -203,13 +244,10 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
             position: absolute;
             left: 0;
             top: 0;
-            width: 72mm !important;
-            margin: 0 !important;
-            padding: 2mm !important;
-            box-shadow: none !important;
-            border: none !important;
+            width: 76mm !important;
             min-height: auto !important;
             height: auto !important;
+            margin: 0 !important;
           }
         }
         
@@ -223,7 +261,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
             align-items: center;
             justify-content: flex-start;
             min-height: 100vh;
-            font-family: monospace;
+            font-family: Arial, Helvetica, sans-serif;
           }
         }
       `}</style>
@@ -245,26 +283,26 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
       </div>
 
       {/* 80mm Thermal Ticket Design */}
-      <div className="ticket-container bg-white text-black p-4 my-6 w-[72mm] text-xs font-mono shadow-md border border-gray-200">
+      <div className="ticket-container">
         
         {/* Header (Company info) */}
         <div className="text-center space-y-1">
-          <p className="font-bold text-sm uppercase">{empresa.nombre}</p>
-          <p className="text-[10px]">RUC: {empresa.ruc}</p>
-          {empresa.direccion && <p className="text-[9px]">{empresa.direccion}</p>}
-          {empresa.telefono && <p className="text-[9px]">TEL: {empresa.telefono}</p>}
+          <p className="ticket-title uppercase">{empresa.nombre}</p>
+          <p className="ticket-subtitle">RUC: {empresa.ruc}</p>
+          {empresa.direccion && <p className="text-xs text-center">{empresa.direccion}</p>}
+          {empresa.telefono && <p className="text-xs text-center">TEL: {empresa.telefono}</p>}
           <p className="border-b border-dashed border-black my-2"></p>
         </div>
 
         {/* Document type + number */}
-        <div className="text-center font-bold my-1 text-[11px]">
+        <div className="text-center font-bold my-1 text-sm">
           <p>{docTitle}</p>
           <p>N° {correlativo}</p>
         </div>
         <p className="border-b border-dashed border-black my-2"></p>
 
         {/* Date & Customer Info */}
-        <div className="space-y-0.5 text-[10px]">
+        <div className="space-y-0.5 text-xs">
           <p><strong>FECHA:</strong> {fechaVenta}</p>
           <p><strong>ADQUIRIENTE:</strong> {clienteNombre}</p>
           <p><strong>DOC ID:</strong> {clienteDoc}</p>
@@ -273,69 +311,60 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
         <p className="border-b border-black my-2"></p>
 
         {/* Items Table */}
-        <div className="text-[10px]">
-          <div className="grid grid-cols-[1fr_50px_70px] font-bold pb-1 border-b border-gray-300">
-            <span>CANT/DESCRIPCION</span>
-            <span className="text-right">P.UNIT</span>
-            <span className="text-right">IMPORTE</span>
-          </div>
+        <div className="text-xs">
+          <table className="ticket-table">
+            <thead>
+              <tr className="border-b border-gray-300 font-bold">
+                <th className="text-left">CANT/DESCRIPCION</th>
+                <th className="text-right" style={{ width: "60px" }}>P.UNIT</th>
+                <th className="text-right" style={{ width: "80px" }}>IMPORTE</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Dynamic Items */}
+              {tipo === "aserradero" && aserraderoServicio && (
+                <>
+                  <tr className="border-b border-dashed border-gray-200">
+                    <td className="py-1.5 font-bold">1 x Aserradero base ({Number(aserraderoServicio.pies_cubicos).toFixed(2)} ft³)</td>
+                    <td className="text-right">—</td>
+                    <td className="text-right">{formatPen(Number(aserraderoServicio.costo_cubicaje))}</td>
+                  </tr>
 
-          <div className="pt-1.5 space-y-2">
-            {/* Dynamic Items */}
-            {tipo === "aserradero" && aserraderoServicio && (
-              <>
-                <div className="border-b border-dashed border-gray-200 pb-1">
-                  <div className="font-bold">1 x Aserradero base ({Number(aserraderoServicio.pies_cubicos).toFixed(2)} ft³)</div>
-                  <div className="grid grid-cols-[1fr_50px_70px] text-gray-700 mt-0.5">
-                    <span>—</span>
-                    <span className="text-right">—</span>
-                    <span className="text-right">{formatPen(Number(aserraderoServicio.costo_cubicaje))}</span>
-                  </div>
-                </div>
+                  {aserraderoLineasEspeciales
+                    .filter((l) => l.tipo !== "nota_interna" && l.tipo !== "extra_madera_cliente")
+                    .map((linea, idx) => (
+                      <tr key={idx} className="border-b border-dashed border-gray-200">
+                        <td className="py-1.5 font-bold">{linea.cantidad} x {linea.nombre}</td>
+                        <td className="text-right">{formatPen(linea.tarifa)}</td>
+                        <td className="text-right">{formatPen(linea.subtotal)}</td>
+                      </tr>
+                    ))}
+                </>
+              )}
 
-                {aserraderoLineasEspeciales
-                  .filter((l) => l.tipo !== "nota_interna" && l.tipo !== "extra_madera_cliente")
-                  .map((linea, idx) => (
-                    <div key={idx} className="border-b border-dashed border-gray-200 pb-1">
-                      <div className="font-bold">{linea.cantidad} x {linea.nombre}</div>
-                      <div className="grid grid-cols-[1fr_50px_70px] text-gray-700 mt-0.5">
-                        <span>—</span>
-                        <span className="text-right">{formatPen(linea.tarifa)}</span>
-                        <span className="text-right">{formatPen(linea.subtotal)}</span>
-                      </div>
-                    </div>
-                  ))}
-              </>
-            )}
+              {tipo === "venta-madera" && ventaMaderaLineasResueltas.map((linea, idx) => (
+                <tr key={idx} className="border-b border-dashed border-gray-200">
+                  <td className="py-1.5 font-bold">{linea.qty} {linea.unidad} x {linea.desc}</td>
+                  <td className="text-right">{linea.unitario}</td>
+                  <td className="text-right">{linea.total}</td>
+                </tr>
+              ))}
 
-            {tipo === "venta-madera" && ventaMaderaLineasResueltas.map((linea, idx) => (
-              <div key={idx} className="border-b border-dashed border-gray-200 pb-1">
-                <div className="font-bold">{linea.qty} {linea.unidad} x {linea.desc}</div>
-                <div className="grid grid-cols-[1fr_50px_70px] text-gray-700 mt-0.5">
-                  <span>—</span>
-                  <span className="text-right">{linea.unitario}</span>
-                  <span className="text-right">{linea.total}</span>
-                </div>
-              </div>
-            ))}
-
-            {["madera", "mueble"].includes(tipo || "") && items.map((item, idx) => (
-              <div key={idx} className="border-b border-dashed border-gray-200 pb-1">
-                <div className="font-bold">{item.qty} x {item.desc}</div>
-                <div className="grid grid-cols-[1fr_50px_70px] text-gray-700 mt-0.5">
-                  <span>—</span>
-                  <span className="text-right">{item.unitario}</span>
-                  <span className="text-right">{item.total}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              {["madera", "mueble"].includes(tipo || "") && items.map((item, idx) => (
+                <tr key={idx} className="border-b border-dashed border-gray-200">
+                  <td className="py-1.5 font-bold">{item.qty} x {item.desc}</td>
+                  <td className="text-right">{item.unitario}</td>
+                  <td className="text-right">{item.total}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         <p className="border-b border-black my-2"></p>
 
         {/* Financial Breakdown / Totals */}
-        <div className="space-y-1 text-right text-[11px] font-bold">
-          <div className="flex justify-between">
+        <div className="space-y-1 text-right text-xs font-bold">
+          <div className="flex justify-between ticket-total">
             <span>TOTAL A PAGAR:</span>
             <span>{formatPen(totalSoles)}</span>
           </div>
@@ -356,7 +385,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
         <p className="border-b border-dashed border-black my-2"></p>
 
         {/* Metadata and QR Mock */}
-        <div className="text-[10px] space-y-1">
+        <div className="text-xs space-y-1">
           <p><strong>MODALIDAD:</strong> {modalidad}</p>
           <p><strong>METODO PAGO:</strong> {metodo}</p>
           <p><strong>ENTREGA:</strong> {entrega}</p>
@@ -372,7 +401,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
             </div>
           </div>
           <p className="text-[9px] mt-2 font-bold">Representación impresa autorizada de comprobante electrónico.</p>
-          <p className="text-[10px] font-bold tracking-wider mt-1">¡GRACIAS POR SU PREFERENCIA!</p>
+          <p className="text-xs font-bold tracking-wider mt-1 text-center">¡GRACIAS POR SU PREFERENCIA!</p>
         </div>
 
       </div>
