@@ -431,6 +431,21 @@ export function InventarioContextPanels({
 
           <Field name="fecha" type="date" label="Fecha" required defaultValue={new Date().toISOString().split("T")[0]} />
           <Field className="md:col-span-2" name="nota" label="Nota (opcional)" placeholder="Observación de la compra" />
+          
+          <SelectField name="tipo_comprobante" label="Tipo de Comprobante" defaultValue="ninguno" required>
+            <option value="ninguno">Ninguno (No)</option>
+            <option value="factura">Factura</option>
+            <option value="boleta">Boleta</option>
+          </SelectField>
+
+          <div className="md:col-span-2">
+            <FotoUpload
+              bucket="comprobantes"
+              name="url_comprobante"
+              label="Adjuntar comprobante (PNG/JPG/PDF, opcional)"
+            />
+          </div>
+
           <div className="md:col-span-2">
             <Button>Guardar compra</Button>
           </div>

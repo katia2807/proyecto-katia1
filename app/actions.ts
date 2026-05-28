@@ -104,6 +104,8 @@ const ventaSchema = z.object({
     (value) => (value === "" || value === null ? undefined : value),
     z.coerce.number().positive().optional(),
   ),
+  tipoComprobante: z.enum(["factura", "boleta", "ninguno"]).optional().default("ninguno"),
+  urlComprobante: z.string().optional().nullable(),
 });
 
 const alquilerSchema = z.object({
@@ -212,6 +214,8 @@ const ventaMuebleTerminadoSchema = z.object({
   fechaPagoCredito: z.string().optional().or(z.literal("")),
   adelanto: z.coerce.number().nonnegative().optional().default(0),
   montoCredito: z.coerce.number().nonnegative().optional().default(0),
+  tipoComprobante: z.enum(["factura", "boleta", "ninguno"]).optional().default("ninguno"),
+  urlComprobante: z.string().optional().nullable(),
 });
 
 const ventaPdfSchema = z.object({
@@ -258,6 +262,8 @@ const ventaMaderaCortadaSchema = z.object({
   direccionEntrega: z.string().optional(),
   estadoEntrega: estadoEntregaEnum.default("pendiente"),
   inventarioProductoId: z.string().uuid().optional().or(z.literal("")),
+  tipoComprobante: z.enum(["factura", "boleta", "ninguno"]).optional().default("ninguno"),
+  urlComprobante: z.string().optional().nullable(),
 });
 
 const contratoAlquilerSchema = z.object({
@@ -304,6 +310,8 @@ const servicioAserraderoSchema = z.object({
   modalidadPago: z.string().optional().default("contado"),
   fechaPagoCredito: z.string().optional(),
   adelanto: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative().optional().default(0)),
+  tipoComprobante: z.enum(["factura", "boleta", "ninguno"]).optional().default("ninguno"),
+  urlComprobante: z.string().optional().nullable(),
 });
 
 const proveedorSchema = z.object({
@@ -358,6 +366,8 @@ const inventarioCompraRapidaSchema = z.object({
   proveedor: z.string().optional(),
   fecha: z.string().min(1),
   nota: z.string().optional(),
+  tipoComprobante: z.enum(["factura", "boleta", "ninguno"]).optional().default("ninguno"),
+  urlComprobante: z.string().optional().nullable(),
 });
 
 const inventarioProductoUpdateSchema = z.object({
@@ -897,6 +907,8 @@ export async function createVentaMadera(formData: FormData) {
     estado: formData.get("estado"),
     productoInventarioId: formData.get("inventario_producto_id"),
     cantidadProducto: formData.get("cantidad_producto"),
+    tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
+    urlComprobante: formData.get("url_comprobante"),
   });
 
   if (!parsed.success) {
@@ -1018,6 +1030,8 @@ export async function createVentaMadera(formData: FormData) {
         descripcion: `Venta de madera - ${clienteNombre}`,
         modulo_origen: "ventas_madera",
         referencia_id: data.id,
+        tipo_comprobante: parsed.data.tipoComprobante,
+        url_comprobante: parsed.data.urlComprobante ?? null,
         created_by: actor.userId,
         updated_by: actor.userId,
       });
@@ -2001,6 +2015,8 @@ export async function createCompraMadera(formData: FormData) {
               : "Egreso por compra de madera al contado",
           modulo_origen: "compras_madera",
           referencia_id: data.id,
+          tipo_comprobante: parsed.data.urlComprobante ? "boleta" : "ninguno", // If file uploaded, assume boleta/factura or default boleta as voucher present
+          url_comprobante: parsed.data.urlComprobante || null,
           created_by: actor.userId,
           updated_by: actor.userId,
         });
@@ -2594,6 +2610,8 @@ export async function createInventarioCompraRapida(formData: FormData) {
     proveedor: formData.get("proveedor"),
     fecha: formData.get("fecha"),
     nota: formData.get("nota"),
+    tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
+    urlComprobante: formData.get("url_comprobante"),
   });
   if (!parsed.success) {
     throw new Error("Datos de compra inválidos.");
@@ -2624,6 +2642,8 @@ export async function createInventarioCompraRapida(formData: FormData) {
         monto: montoCompra,
         descripcion: referencia ? `Compra de inventario: ${referencia}` : "Compra de inventario",
         modulo_origen: "inventario",
+        tipo_comprobante: parsed.data.tipoComprobante,
+        url_comprobante: parsed.data.urlComprobante ?? null,
       });
     }
   } else {
@@ -2663,6 +2683,8 @@ export async function createInventarioCompraRapida(formData: FormData) {
         descripcion: `Compra de inventario: ${producto.nombre}`,
         modulo_origen: "inventario",
         referencia_id: movimiento.id,
+        tipo_comprobante: parsed.data.tipoComprobante,
+        url_comprobante: parsed.data.urlComprobante ?? null,
         created_by: actor.userId,
         updated_by: actor.userId,
       });
@@ -3284,6 +3306,8 @@ export async function createVentaMuebleTerminado(formData: FormData) {
     fechaPagoCredito: formData.get("fecha_pago_credito"),
     adelanto: formData.get("adelanto"),
     montoCredito: formData.get("monto_credito"),
+    tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
+    urlComprobante: formData.get("url_comprobante"),
   });
   if (!parsed.success) {
     throw new Error("Datos de venta de mueble inválidos.");
@@ -3416,6 +3440,8 @@ export async function createVentaMuebleTerminado(formData: FormData) {
         descripcion: `Venta de mueble - ${clienteNombre}`,
         modulo_origen: "ventas_muebles_terminados",
         referencia_id: venta.id,
+        tipo_comprobante: parsed.data.tipoComprobante,
+        url_comprobante: parsed.data.urlComprobante ?? null,
         created_by: actor.userId,
         updated_by: actor.userId,
       });
@@ -3844,6 +3870,8 @@ export async function createVentaMaderaCortada(formData: FormData) {
     direccionEntrega: formData.get("direccion_entrega"),
     estadoEntrega: formData.get("estado_entrega"),
     inventarioProductoId: formData.get("inventario_producto_id"),
+    tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
+    urlComprobante: formData.get("url_comprobante"),
   });
   if (!parsed.success) {
     console.error("[createVentaMaderaCortada] Validation failed:", parsed.error.format());
@@ -3994,6 +4022,8 @@ export async function createVentaMaderaCortada(formData: FormData) {
         descripcion: `${descripcionBase}${descripcionModalidad}`,
         modulo_origen: "ventas_madera_cortada",
         referencia_id: venta.id,
+        tipo_comprobante: parsed.data.tipoComprobante,
+        url_comprobante: parsed.data.urlComprobante ?? null,
         created_by: actor.userId,
         updated_by: actor.userId,
       });
@@ -4390,6 +4420,8 @@ export async function createServicioAserradero(formData: FormData) {
     modalidadPago: formData.get("modalidad_pago") || "contado",
     fechaPagoCredito: formData.get("fecha_pago_credito") || undefined,
     adelanto: formData.get("adelanto") || 0,
+    tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
+    urlComprobante: formData.get("url_comprobante"),
   });
   if (!parsed.success) {
     throw new Error("Datos de servicio inválidos.");
@@ -4495,6 +4527,8 @@ export async function createServicioAserradero(formData: FormData) {
         descripcion: `Servicio de aserradero - ${clienteNombre}`,
         modulo_origen: "ventas_aserradero",
         referencia_id: servicio.id,
+        tipo_comprobante: parsed.data.tipoComprobante,
+        url_comprobante: parsed.data.urlComprobante ?? null,
         created_by: actor.userId,
         updated_by: actor.userId,
       });

@@ -115,11 +115,26 @@ export function CajaMasterDetail({
                 </TD>
                 <TD>{row.es_personal ? "Personal" : "Empresa"}</TD>
                 <TD>
-                  {row.tipo_comprobante === "factura"
-                    ? "Factura"
-                    : row.tipo_comprobante === "boleta"
-                      ? "Boleta"
-                      : "No"}
+                  {(() => {
+                    const tipo = row.tipo_comprobante;
+                    const desc = (row.descripcion || "").toLowerCase();
+                    const mod = (row.modulo_origen || "").toLowerCase();
+                    
+                    if (tipo === "factura") return "Factura";
+                    if (tipo === "boleta") return "Boleta";
+                    
+                    // Si no tiene tipo_comprobante pero tiene url_comprobante, es Sí
+                    if (row.url_comprobante) {
+                      return "Sí";
+                    }
+                    
+                    // Si es una compra de inventario/madera, verificar si la nota o descripción infiere boleta/factura
+                    if (desc.includes("factura") || desc.includes("f001")) return "Factura";
+                    if (desc.includes("boleta") || desc.includes("b001")) return "Boleta";
+                    if (desc.includes("comprobante") || desc.includes("recibo") || desc.includes("r001")) return "Recibo";
+                    
+                    return "No";
+                  })()}
                 </TD>
                 <TD className="text-right font-semibold">{formatPen(Number(row.monto))}</TD>
                 {userRole === "owner_admin" && (
@@ -168,13 +183,17 @@ export function CajaMasterDetail({
             <DetailField label="Modulo origen" value={selected.modulo_origen ?? "Manual"} />
             <DetailField
               label="Comprobante"
-              value={
-                selected.tipo_comprobante === "factura"
-                  ? "Factura"
-                  : selected.tipo_comprobante === "boleta"
-                    ? "Boleta"
-                    : "Ninguno"
-              }
+              value={(() => {
+                const tipo = selected.tipo_comprobante;
+                const desc = (selected.descripcion || "").toLowerCase();
+                if (tipo === "factura") return "Factura";
+                if (tipo === "boleta") return "Boleta";
+                if (selected.url_comprobante) return "Sí";
+                if (desc.includes("factura") || desc.includes("f001")) return "Factura";
+                if (desc.includes("boleta") || desc.includes("b001")) return "Boleta";
+                if (desc.includes("comprobante") || desc.includes("recibo") || desc.includes("r001")) return "Recibo";
+                return "Ninguno";
+              })()}
             />
             {selected.url_comprobante ? (
               <DetailField
