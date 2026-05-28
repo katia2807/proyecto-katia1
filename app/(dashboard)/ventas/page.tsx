@@ -186,8 +186,6 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
         </div>
       </div>
 
-      <VentasPdfImport clientes={clientes.map(c => ({ id: c.id, nombre: c.nombre }))} />
-
       {cobrosVencidos.length > 0 ? (
         <Card className="border-[var(--color-danger)] bg-red-50">
           <div className="flex items-center justify-between gap-3">
@@ -299,6 +297,8 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
           </Card>
         </div>
       </div>
+
+      <VentasPdfImport clientes={clientes.map(c => ({ id: c.id, nombre: c.nombre }))} />
 
       <Card>
         <CardTitle>Resumen de catálogos disponibles</CardTitle>
