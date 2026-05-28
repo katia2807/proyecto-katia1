@@ -1225,6 +1225,25 @@ export function CotizacionUnificadaWizard({
       })),
     [lineasFormal],
   );
+  const descripcionComercialSugerida = useMemo(() => {
+    const parts = lineasFormalSafe.flatMap((linea) => [
+      linea.titulo,
+      ...linea.bullets,
+    ]);
+    return parts
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .filter((part, index, arr) => arr.indexOf(part) === index)
+      .join("\n");
+  }, [lineasFormalSafe]);
+
+  useEffect(() => {
+    if (!descripcionComercialSugerida) return;
+    setDetalle((d) => {
+      if ((d.descripcion_cliente ?? "").trim()) return d;
+      return { ...d, descripcion_cliente: descripcionComercialSugerida };
+    });
+  }, [descripcionComercialSugerida]);
 
   const correlativoMostrar = useMemo(() => {
     if (guardadaId) {
@@ -1238,16 +1257,12 @@ export function CotizacionUnificadaWizard({
 
   const counts = useMemo(() => {
     let pend = 0;
-    let lista = 0;
-    let prod = 0;
-    let cob = 0;
+    let aceptadas = 0;
     for (const c of cotizacionesGuardadas) {
       if (c.estado_flujo === "pendiente") pend += 1;
-      else if (c.estado_flujo === "lista_produccion") lista += 1;
-      else if (c.estado_flujo === "en_produccion") prod += 1;
-      else if (c.estado_flujo === "cobrada") cob += 1;
+      else aceptadas += 1;
     }
-    return { pend, lista, prod, cob };
+    return { pend, aceptadas };
   }, [cotizacionesGuardadas]);
 
   const guardadaRow = useMemo(
@@ -1256,8 +1271,7 @@ export function CotizacionUnificadaWizard({
   );
   const puedeRegistrarCobro = Boolean(
     guardadaRow &&
-    (guardadaRow.estado_flujo === "lista_produccion" ||
-      guardadaRow.estado_flujo === "en_produccion"),
+    guardadaRow.estado_flujo !== "pendiente",
   );
   const stepLabels: Record<string, string> = useMemo(
     () => ({
@@ -1279,9 +1293,8 @@ export function CotizacionUnificadaWizard({
     const q = filterText.trim().toLowerCase();
     return cotizacionesGuardadas.filter((c) => {
       if (filterEstado !== "todos") {
-        const esperado =
-          filterEstado === "produccion" ? "en_produccion" : filterEstado;
-        if (c.estado_flujo !== esperado) return false;
+        if (filterEstado === "pendiente" && c.estado_flujo !== "pendiente") return false;
+        if (filterEstado === "lista_produccion" && c.estado_flujo === "pendiente") return false;
       }
       if (filterFechaDesde) {
         const fecha = String(c.fecha ?? "");
@@ -1296,12 +1309,15 @@ export function CotizacionUnificadaWizard({
       const clienteNombre = (cliente?.nombre ?? "").toLowerCase();
       const correlativo = (c.correlativo ?? "").toLowerCase();
       const estado = String(c.estado_flujo ?? "").toLowerCase();
+      const detalle = parseCotizacionDetalle(c.detalle as unknown);
+      const descripcion = `${detalle.descripcion_cliente ?? ""} ${detalle.notas_generales ?? ""}`.toLowerCase();
       const fechaStr = String(c.fecha ?? "");
       const idStr = String(c.id ?? "");
       return (
         correlativo.includes(q) ||
         fechaStr.includes(q) ||
         estado.includes(q) ||
+        descripcion.includes(q) ||
         clienteNombre.includes(q) ||
         idStr.toLowerCase().includes(q)
       );
@@ -1413,13 +1429,9 @@ export function CotizacionUnificadaWizard({
   }, [clienteId, direccion, documento, nombreCliente, telefono, tipoCliente]);
 
   const handleGuardar = useCallback(
-    async (estadoFlujo: "pendiente" | "lista_produccion", imprimir?: boolean) => {
+    async (estadoFlujo: "pendiente" | "lista_produccion" = "pendiente", imprimir?: boolean) => {
       if (!canSave) {
         setError("Tu rol no puede guardar cotizaciones.");
-        return;
-      }
-      if (tipoCotizacionPreset === "muebles" && estadoFlujo === "lista_produccion") {
-        setError("Para mueble personalizado, la cotizacion debe guardarse como pendiente.");
         return;
       }
       setError("");
@@ -1463,7 +1475,7 @@ export function CotizacionUnificadaWizard({
         window.open(`/cotizacion/unificada/${res.id}/pdf`, "_blank");
       }
     },
-    [canSave, clearDraft, detalle, ensureCliente, fecha, guardadaId, router, tipoCliente, tipoCotizacionPreset, totalGral],
+    [canSave, clearDraft, detalle, ensureCliente, fecha, guardadaId, router, tipoCliente, totalGral],
   );
 
   const loadCotizacion = useCallback((row: CotizacionUnificadaRow) => {
@@ -1540,7 +1552,7 @@ export function CotizacionUnificadaWizard({
   return (
     <div id="cotizacion-wizard" className="space-y-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 md:p-6">
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2">
         <Card className="p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
             Pendientes
@@ -1552,21 +1564,21 @@ export function CotizacionUnificadaWizard({
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
             Listas para producción
           </p>
-          <p className="text-2xl font-bold text-[var(--color-accent)]">{counts.lista}</p>
+          <p className="text-2xl font-bold text-[var(--color-accent)]">{counts.aceptadas}</p>
           <p className="text-xs text-[var(--color-text-secondary)]">Listas para pasar a taller.</p>
         </Card>
-        <Card className="p-4">
+        <Card className="hidden p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
             En producción
           </p>
-          <p className="text-2xl font-bold text-[var(--color-success)]">{counts.prod}</p>
+          <p className="text-2xl font-bold text-[var(--color-success)]">0</p>
           <p className="text-xs text-[var(--color-text-secondary)]">Ya registradas como orden.</p>
         </Card>
-        <Card className="p-4">
+        <Card className="hidden p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
             Cobradas
           </p>
-          <p className="text-2xl font-bold text-teal-700 dark:text-teal-400">{counts.cob}</p>
+          <p className="text-2xl font-bold text-teal-700 dark:text-teal-400">0</p>
           <p className="text-xs text-[var(--color-text-secondary)]">Ingreso registrado en caja.</p>
         </Card>
       </div>
@@ -3082,7 +3094,7 @@ export function CotizacionUnificadaWizard({
               documentoCliente={documento.trim() || null}
               lineas={lineasFormalSafe}
               notasGenerales={(() => {
-                const base = detalle.notas_generales;
+                const base = "";
                 if (pagoModalidadUI === "adelanto" && montoAdelantoUI && Number(montoAdelantoUI) > 0) {
                   const adelanto = Number(montoAdelantoUI);
                   const saldo = Math.max(0, totalGralSafe - adelanto);
@@ -3153,14 +3165,14 @@ export function CotizacionUnificadaWizard({
           <div className="space-y-2 border-t border-[var(--color-border)] px-5 py-4">
             <label className="block space-y-1">
               <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
-                Notas al pie del documento (una por línea aparece como viñeta bajo NOTA:)
+                Descripción / notas comerciales
               </span>
               <textarea
                 className={`${inputClass} min-h-[88px] py-2`}
                 placeholder="Ej: Acabado barniz natural. Incluye instalación en obra. No incluye bisagras ni cerraduras..."
-                value={detalle.notas_generales}
+                value={detalle.descripcion_cliente ?? ""}
                 onChange={(e) =>
-                  setDetalle((d) => ({ ...d, notas_generales: e.target.value }))
+                  setDetalle((d) => ({ ...d, descripcion_cliente: e.target.value }))
                 }
               />
             </label>
@@ -3173,15 +3185,15 @@ export function CotizacionUnificadaWizard({
               onClick={() => handleGuardar("pendiente")}
               className="h-10 rounded-xl bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-on-accent)] disabled:opacity-50"
             >
-              Guardar pendiente
+              Guardar cotizacion
             </button>
             <button
               type="button"
-              disabled={!canSave || busy || tipoCotizacionPreset === "muebles"}
+              disabled={!canSave || busy}
               onClick={() => handleGuardar("lista_produccion")}
               className="h-10 rounded-xl border border-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent)] disabled:opacity-50"
             >
-              Guardar lista para producción
+              Marcar cotización aceptada
             </button>
             <button
               type="button"
@@ -3189,7 +3201,7 @@ export function CotizacionUnificadaWizard({
               onClick={() => handleGuardar("pendiente", true)}
               className="h-10 rounded-xl border border-[var(--color-border)] px-4 text-sm font-semibold disabled:opacity-50"
             >
-              Guardar + PDF
+              Guardar e imprimir cotizacion
             </button>
             <button
               type="button"
@@ -3197,7 +3209,23 @@ export function CotizacionUnificadaWizard({
               onClick={() => guardadaId && window.open(`/cotizacion/unificada/${guardadaId}/pdf`, "_blank")}
               className="h-10 rounded-xl border border-[var(--color-border)] px-4 text-sm font-semibold disabled:opacity-50"
             >
-              Solo PDF (cotización guardada)
+              Imprimir cotización
+            </button>
+            <button
+              type="button"
+              disabled={!guardadaId || !canSave || busy || guardadaRow?.estado_flujo === "pendiente"}
+              onClick={async () => {
+                if (!guardadaId) return;
+                if (!confirm("Convertir esta cotizacion aceptada a venta y registrar el ingreso en caja?")) return;
+                setBusy(true);
+                const r = await registrarCobroCotizacionUnificada(guardadaId);
+                setBusy(false);
+                if (!r.ok) setError(r.error);
+                else window.location.reload();
+              }}
+              className="h-10 rounded-xl bg-[var(--color-success)] px-4 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              Convertir a venta
             </button>
             {tipoCotizacionPreset === "muebles" ? (
               <p className="w-full pt-1 text-xs text-[var(--color-text-secondary)]">
@@ -3207,7 +3235,7 @@ export function CotizacionUnificadaWizard({
           </div>
 
           {guardadaId ? (
-            <div className="flex flex-wrap gap-2 border-t border-[var(--color-border)] px-5 pt-4">
+            <div className="hidden flex-wrap gap-2 border-t border-[var(--color-border)] px-5 pt-4">
               {guardadaRow?.estado_flujo !== "cobrada" ? (
                 <>
                   <button
@@ -3311,13 +3339,7 @@ export function CotizacionUnificadaWizard({
             >
               <option value="todos">Todos</option>
               <option value="pendiente">Pendiente</option>
-              <option value="lista_produccion">Lista producción</option>
-              <option value="produccion">En producción</option>
-              <option value="terminado">Terminado</option>
-              <option value="entregado">Entregado</option>
-              <option value="cobrada">Cobrada</option>
-              <option value="inactivo">Inactivo</option>
-              <option value="deudor">Deudor (Mora)</option>
+              <option value="lista_produccion">Cotización aceptada</option>
             </select>
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -3387,13 +3409,7 @@ export function CotizacionUnificadaWizard({
                       }`}
                   >
                     <option value="pendiente">Pendiente</option>
-                    <option value="lista_produccion">Lista producción</option>
-                    <option value="en_produccion">En producción</option>
-                    <option value="terminado">Terminado</option>
-                    <option value="entregado">Entregado</option>
-                    <option value="cobrada">Cobrada</option>
-                    <option value="inactivo">Inactivo</option>
-                    <option value="deudor">Deudor (Mora)</option>
+                    <option value="lista_produccion">Cotización aceptada</option>
                   </select>
                 </td>
                 <td className="px-3 py-2">
@@ -3441,7 +3457,7 @@ export function CotizacionUnificadaWizard({
                           else window.location.reload();
                         }}
                       >
-                        Cobrar
+                        Convertir a venta
                       </button>
                     ) : null}
                     {c.estado_flujo !== "cobrada" && canSave ? (
