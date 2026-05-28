@@ -9,6 +9,8 @@ import {
 } from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { ClienteFormFields } from "@/components/sales/cliente-form-fields";
+import { ProveedorFormFields } from "@/components/ventas/registrar-proveedor-inline";
+import { ChoferFormFields } from "@/components/ventas/registrar-chofer-inline";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -119,12 +121,10 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
         }}
         replacePathOnClose="/ventas"
       >
-        <form key={proveedorFormKey} action={proveedorFormAction} className="grid gap-3 md:grid-cols-2">
-          <Field name="nombre" label="Proveedor" required />
-          <Field name="documento" label="RUC o DNI" />
-          <Field name="telefono" label="Celular" />
+        <form key={proveedorFormKey} action={proveedorFormAction} className="flex flex-col gap-3">
+          <ProveedorFormFields prefixDatalist="hub-proveedor" />
           <input type="hidden" name="return_to" value="/ventas" />
-          <div className="md:col-span-2">
+          <div>
             <Button>Guardar proveedor</Button>
           </div>
         </form>
@@ -143,17 +143,10 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
         }}
         replacePathOnClose="/ventas/clientes?tab=base_datos"
       >
-        <form key={choferFormKey} action={choferFormAction} className="grid gap-3 md:grid-cols-2">
-          <Field name="nombre" label="Nombre del chofer" required />
-          <Field name="telefono" label="Teléfono" inputMode="tel" />
-          <Field
-            name="placa"
-            label="Placa de vehículo"
-            placeholder="ABC-123"
-            className="md:col-span-2"
-          />
+        <form key={choferFormKey} action={choferFormAction} className="flex flex-col gap-3">
+          <ChoferFormFields prefixDatalist="hub-chofer" />
           <input type="hidden" name="return_to" value="/ventas/clientes?tab=base_datos" />
-          <div className="md:col-span-2">
+          <div>
             <Button>Guardar chofer</Button>
           </div>
         </form>

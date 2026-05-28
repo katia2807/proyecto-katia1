@@ -6,6 +6,61 @@ import { Field } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { TRow, TD } from "@/components/ui/table";
 
+export function ProveedorFormFields({
+  tiposExistentes = [],
+  defaultNombre = "",
+  defaultDocumento = "",
+  defaultTelefono = "",
+  defaultTipoProveedor = "",
+  prefixDatalist = "proveedor",
+}: {
+  tiposExistentes?: string[];
+  defaultNombre?: string;
+  defaultDocumento?: string;
+  defaultTelefono?: string;
+  defaultTipoProveedor?: string;
+  prefixDatalist?: string;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 w-full">
+      <Field
+        name="nombre"
+        label="Nombre / Razón social *"
+        placeholder="Proveedor de madera SAC"
+        defaultValue={defaultNombre}
+        required
+        className="sm:col-span-2"
+      />
+      <Field
+        name="documento"
+        label="RUC / DNI"
+        placeholder="20123456789"
+        defaultValue={defaultDocumento}
+      />
+      <Field
+        name="telefono"
+        label="Teléfono"
+        placeholder="999 000 000"
+        defaultValue={defaultTelefono}
+      />
+      <div className="sm:col-span-2">
+        <Field
+          name="tipo_proveedor"
+          label="Tipo de proveedor"
+          placeholder="Madera, insumos, servicios, etc."
+          defaultValue={defaultTipoProveedor}
+          list={`${prefixDatalist}-tipos-list`}
+        />
+        <datalist id={`${prefixDatalist}-tipos-list`}>
+          {tiposExistentes.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+      </div>
+    </div>
+  );
+}
+
 export function RegistrarProveedorInline({ tiposExistentes = [] }: { tiposExistentes?: string[] }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -43,20 +98,10 @@ export function RegistrarProveedorInline({ tiposExistentes = [] }: { tiposExiste
         <p className="text-sm font-semibold text-[var(--katia-text-primary)]">Nuevo proveedor</p>
         <button type="button" onClick={() => { setOpen(false); setError(null); }} className="text-xs text-[var(--katia-text-tertiary)] hover:text-[var(--katia-text-primary)]">Cancelar</button>
       </div>
-      <form action={handleSubmit} className="grid gap-3 sm:grid-cols-2">
-        <Field name="nombre" label="Nombre / Razón social *" placeholder="Proveedor de madera SAC" required className="sm:col-span-2" />
-        <Field name="documento" label="RUC / DNI" placeholder="20123456789" />
-        <Field name="telefono" label="Teléfono" placeholder="999 000 000" />
-        <div className="sm:col-span-2">
-          <Field name="tipo_proveedor" label="Tipo de proveedor" placeholder="Madera, insumos, servicios, etc." list="proveedor-tipos-list" />
-          <datalist id="proveedor-tipos-list">
-            {tiposExistentes.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
-        </div>
-        {error && <p className="sm:col-span-2 text-xs text-red-500">{error}</p>}
-        <div className="sm:col-span-2 flex justify-end gap-2">
+      <form action={handleSubmit} className="flex flex-col gap-3">
+        <ProveedorFormFields tiposExistentes={tiposExistentes} prefixDatalist="inline-proveedor" />
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={() => { setOpen(false); setError(null); }}>Cancelar</Button>
           <Button type="submit" size="sm" disabled={loading}>{loading ? "Guardando…" : "Guardar proveedor"}</Button>
         </div>
@@ -93,19 +138,14 @@ export function EditarProveedorInline({
 
   return (
     <form action={handleSubmit} className="flex flex-col gap-3 p-3 bg-[var(--katia-surface-raised)] rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] mt-2 w-full">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field name="nombre" label="Nombre / Razón social *" defaultValue={proveedor.nombre} required />
-        <Field name="documento" label="Documento" defaultValue={proveedor.documento ?? ""} />
-        <Field name="telefono" label="Teléfono" defaultValue={proveedor.telefono ?? ""} />
-        <div>
-          <Field name="tipo_proveedor" label="Tipo de proveedor" defaultValue={proveedor.tipo_proveedor ?? ""} list="edit-proveedor-tipos-list" />
-          <datalist id="edit-proveedor-tipos-list">
-            {tiposExistentes.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
-        </div>
-      </div>
+      <ProveedorFormFields
+        tiposExistentes={tiposExistentes}
+        defaultNombre={proveedor.nombre}
+        defaultDocumento={proveedor.documento ?? ""}
+        defaultTelefono={proveedor.telefono ?? ""}
+        defaultTipoProveedor={proveedor.tipo_proveedor ?? ""}
+        prefixDatalist="edit-proveedor"
+      />
       {error && <p className="text-xs text-red-500">{error}</p>}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>

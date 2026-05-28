@@ -7,6 +7,61 @@ import { Button } from "@/components/ui/button";
 import { TRow, TD } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
+export function ChoferFormFields({
+  tiposExistentes = [],
+  defaultNombre = "",
+  defaultTelefono = "",
+  defaultPlaca = "",
+  defaultTipoVehiculo = "",
+  prefixDatalist = "chofer",
+}: {
+  tiposExistentes?: string[];
+  defaultNombre?: string;
+  defaultTelefono?: string;
+  defaultPlaca?: string;
+  defaultTipoVehiculo?: string;
+  prefixDatalist?: string;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 w-full">
+      <Field
+        name="nombre"
+        label="Nombre *"
+        placeholder="Nombre completo"
+        defaultValue={defaultNombre}
+        required
+        className="sm:col-span-2"
+      />
+      <Field
+        name="telefono"
+        label="Teléfono"
+        placeholder="999 000 000"
+        defaultValue={defaultTelefono}
+      />
+      <Field
+        name="placa"
+        label="Placa del vehículo"
+        placeholder="ABC-123"
+        defaultValue={defaultPlaca}
+      />
+      <div className="sm:col-span-2">
+        <Field
+          name="tipo_vehiculo"
+          label="Tipo de vehículo"
+          placeholder="Camioneta, moto, etc."
+          defaultValue={defaultTipoVehiculo}
+          list={`${prefixDatalist}-tipos-list`}
+        />
+        <datalist id={`${prefixDatalist}-tipos-list`}>
+          {tiposExistentes.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+      </div>
+    </div>
+  );
+}
+
 export function RegistrarChoferInline({ tiposExistentes = [] }: { tiposExistentes?: string[] }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -44,20 +99,10 @@ export function RegistrarChoferInline({ tiposExistentes = [] }: { tiposExistente
         <p className="text-sm font-semibold text-[var(--katia-text-primary)]">Nuevo chofer</p>
         <button type="button" onClick={() => { setOpen(false); setError(null); }} className="text-xs text-[var(--katia-text-tertiary)] hover:text-[var(--katia-text-primary)]">Cancelar</button>
       </div>
-      <form action={handleSubmit} className="grid gap-3 sm:grid-cols-2">
-        <Field name="nombre" label="Nombre *" placeholder="Nombre completo" required className="sm:col-span-2" />
-        <Field name="telefono" label="Teléfono" placeholder="999 000 000" />
-        <Field name="placa" label="Placa del vehículo" placeholder="ABC-123" />
-        <div className="sm:col-span-2">
-          <Field name="tipo_vehiculo" label="Tipo de vehículo" placeholder="Camioneta, moto, etc." list="chofer-tipos-list" />
-          <datalist id="chofer-tipos-list">
-            {tiposExistentes.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
-        </div>
-        {error && <p className="sm:col-span-2 text-xs text-red-500">{error}</p>}
-        <div className="sm:col-span-2 flex justify-end gap-2">
+      <form action={handleSubmit} className="flex flex-col gap-3">
+        <ChoferFormFields tiposExistentes={tiposExistentes} prefixDatalist="inline-chofer" />
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={() => { setOpen(false); setError(null); }}>Cancelar</Button>
           <Button type="submit" size="sm" disabled={loading}>{loading ? "Guardando…" : "Guardar chofer"}</Button>
         </div>
@@ -94,23 +139,18 @@ export function EditarChoferInline({
 
   return (
     <form action={handleSubmit} className="flex flex-col gap-3 p-3 bg-[var(--katia-surface-raised)] rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] mt-2 w-full">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field name="nombre" label="Nombre *" defaultValue={chofer.nombre} required />
-        <Field name="telefono" label="Teléfono" defaultValue={chofer.telefono ?? ""} />
-        <Field name="placa" label="Placa" defaultValue={chofer.placa ?? ""} />
-        <div>
-          <Field name="tipo_vehiculo" label="Tipo de vehículo" defaultValue={chofer.tipo_vehiculo ?? ""} list="edit-chofer-tipos-list" />
-          <datalist id="edit-chofer-tipos-list">
-            {tiposExistentes.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
-        </div>
-        <label className="flex items-center gap-2 text-sm font-semibold text-[var(--katia-text-primary)] sm:col-span-2 cursor-pointer mt-1">
-          <input type="checkbox" name="activo" defaultChecked={chofer.activo} className="rounded accent-[var(--katia-primary)] w-4 h-4" />
-          Chofer Activo
-        </label>
-      </div>
+      <ChoferFormFields
+        tiposExistentes={tiposExistentes}
+        defaultNombre={chofer.nombre}
+        defaultTelefono={chofer.telefono ?? ""}
+        defaultPlaca={chofer.placa ?? ""}
+        defaultTipoVehiculo={chofer.tipo_vehiculo ?? ""}
+        prefixDatalist="edit-chofer"
+      />
+      <label className="flex items-center gap-2 text-sm font-semibold text-[var(--katia-text-primary)] cursor-pointer mt-1">
+        <input type="checkbox" name="activo" defaultChecked={chofer.activo} className="rounded accent-[var(--katia-primary)] w-4 h-4" />
+        Chofer Activo
+      </label>
       {error && <p className="text-xs text-red-500">{error}</p>}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
