@@ -5167,214 +5167,245 @@ export async function createUnidadMedida(formData: FormData) {
   }
 }
 
-export async function updateContratoAlquiler(formData: FormData) {
-  const actor = await requireMutationAccess(writerRoles);
-  const id = formData.get("id") as string;
-  if (!id) throw new Error("ID de contrato requerido.");
+export async function updateContratoAlquiler(
+  formData: FormData,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const actor = await requireMutationAccess(writerRoles);
+    const id = formData.get("id") as string;
+    if (!id) return { ok: false, error: "ID de contrato requerido." };
 
-  const parsed = contratoAlquilerSchema.safeParse({
-    clienteId: formData.get("cliente_id"),
-    activo: formData.get("activo"),
-    codigo: formData.get("codigo"),
-    representante: formData.get("representante"),
-    rucEmpresa: formData.get("ruc_empresa"),
-    direccionEjecucion: formData.get("direccion_ejecucion"),
-    fechaInicio: formData.get("fecha_inicio"),
-    fechaTermino: formData.get("fecha_termino"),
-    diasAlquiler: formData.get("dias_alquiler"),
-    tarifaUnidad: formData.get("tarifa_unidad"),
-    tarifa: formData.get("tarifa"),
-    montoTotal: formData.get("monto_total"),
-    metodoPago: formData.get("metodo_pago"),
-    modalidadPago: formData.get("modalidad_pago"),
-    fechaPagoCredito: formData.get("fecha_pago_credito"),
-    adelanto: formData.get("adelanto"),
-    montoCredito: formData.get("monto_credito"),
-    penalidadRetrasoPagoPct: formData.get("penalidad_retraso_pago_pct"),
-    penalidadDevolucionTardiaPct: formData.get("penalidad_devolucion_tardia_pct"),
-    penalidadDaniosPct: formData.get("penalidad_danios_pct"),
-  });
+    const parsed = contratoAlquilerSchema.safeParse({
+      clienteId: formData.get("cliente_id"),
+      activo: formData.get("activo"),
+      codigo: formData.get("codigo"),
+      representante: formData.get("representante"),
+      rucEmpresa: formData.get("ruc_empresa"),
+      direccionEjecucion: formData.get("direccion_ejecucion"),
+      fechaInicio: formData.get("fecha_inicio"),
+      fechaTermino: formData.get("fecha_termino"),
+      diasAlquiler: formData.get("dias_alquiler"),
+      tarifaUnidad: formData.get("tarifa_unidad"),
+      tarifa: formData.get("tarifa"),
+      montoTotal: formData.get("monto_total"),
+      metodoPago: formData.get("metodo_pago"),
+      modalidadPago: formData.get("modalidad_pago"),
+      fechaPagoCredito: formData.get("fecha_pago_credito"),
+      adelanto: formData.get("adelanto"),
+      montoCredito: formData.get("monto_credito"),
+      penalidadRetrasoPagoPct: formData.get("penalidad_retraso_pago_pct"),
+      penalidadDevolucionTardiaPct: formData.get("penalidad_devolucion_tardia_pct"),
+      penalidadDaniosPct: formData.get("penalidad_danios_pct"),
+    });
 
-  if (!parsed.success) {
-    throw new Error("Datos de contrato inválidos.");
-  }
-
-  const total = roundMoney(parsed.data.montoTotal);
-  let deposito30 = roundMoney(total * 0.3);
-  if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
-    if (parsed.data.adelanto !== undefined && parsed.data.adelanto > 0) {
-      deposito30 = roundMoney(parsed.data.adelanto);
-    }
-  } else if (parsed.data.modalidadPago === "credito") {
-    deposito30 = 0;
-  }
-
-  // Obtener nombre de cliente para la descripción de caja
-  let clienteNombre = "Cliente Desconocido";
-  if (!hasSupabaseEnv()) {
-    const { demoClientesRows } = await import("@/lib/demo-store");
-    const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
-    if (c) clienteNombre = c.nombre;
-  } else {
-    const supabase = getSupabaseServerClient();
-    const { data: cData } = await supabase
-      .from("clientes")
-      .select("nombre")
-      .eq("id", parsed.data.clienteId)
-      .maybeSingle();
-    if (cData) clienteNombre = cData.nombre;
-  }
-
-  if (!hasSupabaseEnv()) {
-    const { demoAlquilerRows, demoCajaRows, demoCreateCaja, demoDeleteOneById, persistStore } = await import("@/lib/demo-store");
-    const row = demoAlquilerRows().find((x) => x.id === id);
-    if (row) {
-      row.cliente_id = parsed.data.clienteId;
-      row.activo = parsed.data.activo;
-      row.fecha_inicio = parsed.data.fechaInicio;
-      row.fecha_termino = parsed.data.fechaTermino || null;
-      row.dias_alquiler = parsed.data.diasAlquiler ?? null;
-      row.tarifa_unidad = parsed.data.tarifaUnidad;
-      row.tarifa = parsed.data.tarifa;
-      row.monto_total = parsed.data.montoTotal;
-      row.deposito_30 = deposito30;
-      row.representante = parsed.data.representante || null;
-      row.ruc_empresa = parsed.data.rucEmpresa || null;
-      row.direccion_ejecucion = parsed.data.direccionEjecucion || null;
-      row.metodo_pago = parsed.data.metodoPago;
-      row.modalidad_pago = parsed.data.modalidadPago;
-      row.fecha_pago_credito = parsed.data.fechaPagoCredito || null;
-      row.penalidad_retraso_pago_pct = parsed.data.penalidadRetrasoPagoPct;
-      row.penalidad_devolucion_tardia_pct = parsed.data.penalidadDevolucionTardiaPct;
-      row.penalidad_danios_pct = parsed.data.penalidadDaniosPct;
+    if (!parsed.success) {
+      return { ok: false, error: "Datos de contrato inválidos." };
     }
 
-    // Sync movements:
-    const cRow = demoCajaRows().find((c) => c.referencia_id === id && c.modulo_origen === "ventas_alquiler");
-    if (cRow) {
-      if (deposito30 > 0) {
-        cRow.monto = deposito30;
-        cRow.fecha = parsed.data.fechaInicio;
-        cRow.medio = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
-        cRow.descripcion = `Alquiler de mixer - ${clienteNombre}`;
-      } else {
-        demoDeleteOneById("caja", cRow.id);
+    const total = roundMoney(parsed.data.montoTotal);
+    let deposito30 = roundMoney(total * 0.3);
+    if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
+      if (parsed.data.adelanto !== undefined && parsed.data.adelanto > 0) {
+        deposito30 = roundMoney(parsed.data.adelanto);
       }
-    } else if (deposito30 > 0) {
-      demoCreateCaja({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fechaInicio,
-        tipo: "ingreso",
-        medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
-        categoria: "alquiler_bomba_mixer",
-        monto: deposito30,
-        descripcion: `Alquiler de mixer - ${clienteNombre}`,
-        modulo_origen: "ventas_alquiler",
-        referencia_id: id,
-      });
-    }
-    persistStore();
-  } else {
-    const supabase = getSupabaseServerClient();
-    const { error: updErr } = await supabase
-      .from("alquileres")
-      .update({
-        cliente_id: parsed.data.clienteId,
-        activo: parsed.data.activo.trim(),
-        fecha_inicio: parsed.data.fechaInicio,
-        fecha_termino: parsed.data.fechaTermino?.trim() || null,
-        tarifa: parsed.data.tarifa,
-        representante: parsed.data.representante?.trim() || null,
-        ruc_empresa: parsed.data.rucEmpresa?.trim() || null,
-        direccion_ejecucion: parsed.data.direccionEjecucion?.trim() || null,
-        dias_alquiler: parsed.data.diasAlquiler ?? null,
-        tarifa_unidad: parsed.data.tarifaUnidad,
-        monto_total: parsed.data.montoTotal,
-        deposito_30: deposito30,
-        penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct,
-        penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct,
-        penalidad_danios_pct: parsed.data.penalidadDaniosPct,
-        metodo_pago: parsed.data.metodoPago,
-        modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
-        fecha_pago_credito: parsed.data.modalidadPago === "credito" ? parsed.data.fechaPagoCredito || null : null,
-      })
-      .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID);
-
-    if (updErr) {
-      throw new Error(updErr.message);
+    } else if (parsed.data.modalidadPago === "credito") {
+      deposito30 = 0;
     }
 
-    // Sync movements using the exact requested pattern:
-    // - Buscar: SELECT id FROM movimientos_caja WHERE referencia_id = p_id AND modulo_origen = 'x'
-    const { data: existingCaja, error: cajaSelectErr } = await supabase
-      .from("movimientos_caja")
-      .select("id")
-      .eq("referencia_id", id)
-      .eq("modulo_origen", "ventas_alquiler")
-      .maybeSingle();
-
-    if (cajaSelectErr) {
-      throw new Error(cajaSelectErr.message);
+    // Obtener nombre de cliente para la descripción de caja
+    let clienteNombre = "Cliente Desconocido";
+    if (!hasSupabaseEnv()) {
+      const { demoClientesRows } = await import("@/lib/demo-store");
+      const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
+      if (c) clienteNombre = c.nombre;
+    } else {
+      const supabase = getSupabaseServerClient();
+      const { data: cData } = await supabase
+        .from("clientes")
+        .select("nombre")
+        .eq("id", parsed.data.clienteId)
+        .maybeSingle();
+      if (cData) clienteNombre = cData.nombre;
     }
 
-    if (existingCaja) {
-      if (deposito30 > 0) {
-        // - Si existe -> UPDATE
+    if (!hasSupabaseEnv()) {
+      const { demoAlquilerRows, demoCajaRows, demoCreateCaja, demoDeleteOneById, persistStore } = await import("@/lib/demo-store");
+      const row = demoAlquilerRows().find((x) => x.id === id);
+      if (row) {
+        if (row.estado === "cerrado") {
+          return { ok: false, error: "El contrato ya está cerrado y no se puede modificar." };
+        }
+        row.cliente_id = parsed.data.clienteId;
+        row.activo = parsed.data.activo;
+        row.fecha_inicio = parsed.data.fechaInicio;
+        row.fecha_termino = parsed.data.fechaTermino || null;
+        row.dias_alquiler = parsed.data.diasAlquiler ?? null;
+        row.tarifa_unidad = parsed.data.tarifaUnidad;
+        row.tarifa = parsed.data.tarifa;
+        row.monto_total = parsed.data.montoTotal;
+        row.deposito_30 = deposito30;
+        row.representante = parsed.data.representante || null;
+        row.ruc_empresa = parsed.data.rucEmpresa || null;
+        row.direccion_ejecucion = parsed.data.direccionEjecucion || null;
+        row.metodo_pago = parsed.data.metodoPago;
+        row.modalidad_pago = parsed.data.modalidadPago;
+        row.fecha_pago_credito = parsed.data.fechaPagoCredito || null;
+        row.penalidad_retraso_pago_pct = parsed.data.penalidadRetrasoPagoPct;
+        row.penalidad_devolucion_tardia_pct = parsed.data.penalidadDevolucionTardiaPct;
+        row.penalidad_danios_pct = parsed.data.penalidadDaniosPct;
+      }
+
+      // Sync movements:
+      const cRow = demoCajaRows().find((c) => c.referencia_id === id && c.modulo_origen === "ventas_alquiler");
+      if (cRow) {
+        if (cRow.periodo_cerrado) {
+          return { ok: false, error: "El movimiento de caja pertenece a un período cerrado y no se puede editar." };
+        }
+        if (deposito30 > 0) {
+          cRow.monto = deposito30;
+          cRow.fecha = parsed.data.fechaInicio;
+          cRow.medio = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
+          cRow.descripcion = `Alquiler de mixer - ${clienteNombre}`;
+        } else {
+          demoDeleteOneById("caja", cRow.id);
+        }
+      } else if (deposito30 > 0) {
+        demoCreateCaja({
+          organization_id: DEFAULT_ORG_ID,
+          fecha: parsed.data.fechaInicio,
+          tipo: "ingreso",
+          medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
+          categoria: "alquiler_bomba_mixer",
+          monto: deposito30,
+          descripcion: `Alquiler de mixer - ${clienteNombre}`,
+          modulo_origen: "ventas_alquiler",
+          referencia_id: id,
+        });
+      }
+      persistStore();
+    } else {
+      const supabase = getSupabaseServerClient();
+
+      const { data: currentContract } = await supabase
+        .from("alquileres")
+        .select("estado")
+        .eq("id", id)
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .maybeSingle();
+
+      if (currentContract && currentContract.estado === "cerrado") {
+        return { ok: false, error: "El contrato ya está cerrado y no se puede modificar." };
+      }
+
+      const { error: updErr } = await supabase
+        .from("alquileres")
+        .update({
+          cliente_id: parsed.data.clienteId,
+          activo: parsed.data.activo.trim(),
+          fecha_inicio: parsed.data.fechaInicio,
+          fecha_termino: parsed.data.fechaTermino?.trim() || null,
+          tarifa: parsed.data.tarifa,
+          representante: parsed.data.representante?.trim() || null,
+          ruc_empresa: parsed.data.rucEmpresa?.trim() || null,
+          direccion_ejecucion: parsed.data.direccionEjecucion?.trim() || null,
+          dias_alquiler: parsed.data.diasAlquiler ?? null,
+          tarifa_unidad: parsed.data.tarifaUnidad,
+          monto_total: parsed.data.montoTotal,
+          deposito_30: deposito30,
+          penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct,
+          penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct,
+          penalidad_danios_pct: parsed.data.penalidadDaniosPct,
+          metodo_pago: parsed.data.metodoPago,
+          modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
+          fecha_pago_credito: parsed.data.modalidadPago === "credito" ? parsed.data.fechaPagoCredito || null : null,
+        })
+        .eq("id", id)
+        .eq("organization_id", DEFAULT_ORG_ID);
+
+      if (updErr) {
+        return { ok: false, error: updErr.message };
+      }
+
+      // Sync movements using the exact requested pattern:
+      // - Buscar: SELECT id FROM movimientos_caja WHERE referencia_id = p_id AND modulo_origen = 'x'
+      const { data: existingCaja, error: cajaSelectErr } = await supabase
+        .from("movimientos_caja")
+        .select("id, periodo_cerrado")
+        .eq("referencia_id", id)
+        .eq("modulo_origen", "ventas_alquiler")
+        .maybeSingle();
+
+      if (cajaSelectErr) {
+        return { ok: false, error: cajaSelectErr.message };
+      }
+
+      if (existingCaja) {
+        if (existingCaja.periodo_cerrado) {
+          return { ok: false, error: "El movimiento de caja pertenece a un período cerrado y no se puede editar." };
+        }
+        if (deposito30 > 0) {
+          // - Si existe -> UPDATE
+          const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
+          const { error: updCajaErr } = await supabase
+            .from("movimientos_caja")
+            .update({
+              fecha: parsed.data.fechaInicio,
+              monto: deposito30,
+              medio: medioCaja,
+              descripcion: `Alquiler de mixer - ${clienteNombre}`,
+            })
+            .eq("id", existingCaja.id)
+            .eq("organization_id", DEFAULT_ORG_ID);
+
+          if (updCajaErr) {
+            return { ok: false, error: updCajaErr.message };
+          }
+        } else {
+          // - Si existe y monto = 0 -> DELETE
+          const { error: delCajaErr } = await supabase
+            .from("movimientos_caja")
+            .delete()
+            .eq("id", existingCaja.id)
+            .eq("organization_id", DEFAULT_ORG_ID);
+
+          if (delCajaErr) {
+            return { ok: false, error: delCajaErr.message };
+          }
+        }
+      } else if (deposito30 > 0) {
+        // - Si no existe y monto > 0 -> INSERT
         const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
-        const { error: updCajaErr } = await supabase
-          .from("movimientos_caja")
-          .update({
-            fecha: parsed.data.fechaInicio,
-            monto: deposito30,
-            medio: medioCaja,
-            descripcion: `Alquiler de mixer - ${clienteNombre}`,
-          })
-          .eq("id", existingCaja.id)
-          .eq("organization_id", DEFAULT_ORG_ID);
+        const { error: insCajaErr } = await supabase.from("movimientos_caja").insert({
+          organization_id: DEFAULT_ORG_ID,
+          fecha: parsed.data.fechaInicio,
+          tipo: "ingreso",
+          medio: medioCaja,
+          categoria: "alquiler_bomba_mixer",
+          monto: deposito30,
+          descripcion: `Alquiler de mixer - ${clienteNombre}`,
+          modulo_origen: "ventas_alquiler",
+          referencia_id: id,
+          created_by: actor.userId,
+          updated_by: actor.userId,
+        });
 
-        if (updCajaErr) {
-          throw new Error(updCajaErr.message);
+        if (insCajaErr) {
+          return { ok: false, error: insCajaErr.message };
         }
-      } else {
-        // - Si existe y monto = 0 -> DELETE
-        const { error: delCajaErr } = await supabase
-          .from("movimientos_caja")
-          .delete()
-          .eq("id", existingCaja.id)
-          .eq("organization_id", DEFAULT_ORG_ID);
-
-        if (delCajaErr) {
-          throw new Error(delCajaErr.message);
-        }
-      }
-    } else if (deposito30 > 0) {
-      // - Si no existe y monto > 0 -> INSERT
-      const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
-      const { error: insCajaErr } = await supabase.from("movimientos_caja").insert({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fechaInicio,
-        tipo: "ingreso",
-        medio: medioCaja,
-        categoria: "alquiler_bomba_mixer",
-        monto: deposito30,
-        descripcion: `Alquiler de mixer - ${clienteNombre}`,
-        modulo_origen: "ventas_alquiler",
-        referencia_id: id,
-        created_by: actor.userId,
-        updated_by: actor.userId,
-      });
-
-      if (insCajaErr) {
-        throw new Error(insCajaErr.message);
       }
     }
-  }
 
-  revalidatePath("/ventas");
-  revalidatePath("/ventas/alquiler-mixer");
-  revalidatePath("/alquiler");
-  revalidatePath("/caja");
+    revalidatePath("/ventas");
+    revalidatePath("/ventas/alquiler-mixer");
+    revalidatePath("/alquiler");
+    revalidatePath("/caja");
+    return { ok: true };
+  } catch (err: any) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Error desconocido al actualizar contrato.",
+    };
+  }
 }
 
 export async function submitUpdateContratoAlquilerForm(
@@ -5382,7 +5413,14 @@ export async function submitUpdateContratoAlquilerForm(
   formData: FormData,
 ): Promise<MutationFormState> {
   try {
-    await updateContratoAlquiler(formData);
+    const res = await updateContratoAlquiler(formData);
+    if (!res.ok) {
+      return {
+        success: false,
+        error: res.error,
+        message: null,
+      };
+    }
     return {
       success: true,
       error: null,
