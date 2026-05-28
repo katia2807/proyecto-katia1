@@ -5019,7 +5019,7 @@ export async function updateMargenGananciaPredeterminado(margenGananciaDefaultPc
   const supabase = getSupabaseServerClient();
   const { data: existing } = await supabase
     .from("configuracion_empresa")
-    .select("nombre,ruc,telefono,direccion,firmante,logo_url")
+    .select("nombre,ruc,telefono,direccion,firmante,firmante_cargo,logo_url")
     .eq("organization_id", DEFAULT_ORG_ID)
     .maybeSingle();
 
@@ -5030,6 +5030,7 @@ export async function updateMargenGananciaPredeterminado(margenGananciaDefaultPc
     telefono: String(existing?.telefono ?? "987 654 321"),
     direccion: String(existing?.direccion ?? "Lima, Peru"),
     firmante: String(existing?.firmante ?? "Katia Lizzet Meneses Taype"),
+    firmante_cargo: String(existing?.firmante_cargo ?? "Gerente"),
     logo_url: typeof existing?.logo_url === "string" && existing.logo_url.trim() !== "" ? existing.logo_url.trim() : null,
     margen_ganancia_default_pct: margen,
     updated_at: new Date().toISOString(),

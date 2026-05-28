@@ -191,6 +191,15 @@ export function CotizacionResumenFormal({
           </p>
         )}
       </section>
+
+      {/* ── Firma ── */}
+      <footer className="mt-12 flex justify-end text-xs text-center">
+        <div className="flex flex-col items-center">
+          <div className="w-56 border-b border-[#333] mb-1.5 dark:border-neutral-700"></div>
+          <p className="font-bold text-neutral-800 dark:text-neutral-100">{empresa.firmante}</p>
+          <p className="text-neutral-500 dark:text-neutral-400">{empresa.firmante_cargo}</p>
+        </div>
+      </footer>
     </div>
   );
 }

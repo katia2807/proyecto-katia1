@@ -24,6 +24,7 @@ export function EmpresaSettingsForm({ empresa }: EmpresaSettingsFormProps) {
       <Field name="ruc" label="RUC" defaultValue={empresa.ruc} required />
       <Field name="telefono" label="Telefono" defaultValue={empresa.telefono} required />
       <Field name="firmante" label="Firmante" defaultValue={empresa.firmante} required />
+      <Field name="firmante_cargo" label="Cargo del firmante" defaultValue={empresa.firmante_cargo} required />
       <Field
         className="md:col-span-2"
         name="direccion"

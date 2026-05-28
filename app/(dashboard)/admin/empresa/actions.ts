@@ -45,6 +45,7 @@ const empresaSchema = z.object({
   telefono: z.string().trim().min(6, "Ingresa un telefono valido."),
   direccion: z.string().trim().min(4, "Ingresa la direccion de la empresa."),
   firmante: z.string().trim().min(2, "Ingresa el nombre del firmante."),
+  firmante_cargo: z.string().trim().min(2, "Ingresa el cargo del firmante."),
 });
 
 export async function updateEmpresaConfig(
@@ -59,6 +60,7 @@ export async function updateEmpresaConfig(
     telefono: formData.get("telefono"),
     direccion: formData.get("direccion"),
     firmante: formData.get("firmante"),
+    firmante_cargo: formData.get("firmante_cargo"),
   });
 
   if (!parsed.success) {
@@ -84,6 +86,7 @@ export async function updateEmpresaConfig(
     telefono: parsed.data.telefono,
     direccion: parsed.data.direccion,
     firmante: parsed.data.firmante,
+    firmante_cargo: parsed.data.firmante_cargo,
     updated_at: new Date().toISOString(),
     logo_url: logoUrlPersist,
     margen_ganancia_default_pct: existing?.margen_ganancia_default_pct ?? 30,

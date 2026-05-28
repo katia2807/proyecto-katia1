@@ -105,7 +105,8 @@ export default async function ContratoPdfPage({ params }: PageProps) {
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 50 }}>
           <div style={{ borderTop: "1px solid #333", paddingTop: 4, width: 220 }}>Cliente</div>
           <div style={{ borderTop: "1px solid #333", paddingTop: 4, width: 220 }}>
-            {empresa.firmante}
+            <p style={{ margin: 0, fontWeight: "bold", color: "#111" }}>{empresa.firmante}</p>
+            <p style={{ margin: 0, color: "#666" }}>{empresa.firmante_cargo}</p>
           </div>
         </div>
       </footer>
