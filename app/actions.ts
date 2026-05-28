@@ -4244,128 +4244,133 @@ export async function createContratoAlquiler(formData: FormData) {
 }
 
 export async function cerrarContratoAlquiler(formData: FormData) {
-  const actor = await requireMutationAccess(writerRoles);
-  const parsed = cerrarContratoSchema.safeParse({
-    contratoId: formData.get("contrato_id"),
-    fechaCierre: formData.get("fecha_cierre"),
-    observaciones: formData.get("observaciones"),
-    retrasoPago: formData.get("retraso_pago"),
-    devolucionTardia: formData.get("devolucion_tardia"),
-    danios: formData.get("danios"),
-  });
-  if (!parsed.success) {
-    throw new Error("Datos de cierre inválidos.");
-  }
-  if (!hasSupabaseEnv()) {
-    demoCerrarContratoAlquiler(parsed.data.contratoId, {
-      fechaCierre: parsed.data.fechaCierre,
-      observaciones: parsed.data.observaciones || null,
-      penalidades: {
-        retraso_pago: parsed.data.retrasoPago,
-        devolucion_tardia: parsed.data.devolucionTardia,
-        danios: parsed.data.danios,
-      },
+  try {
+    const actor = await requireMutationAccess(writerRoles);
+    const parsed = cerrarContratoSchema.safeParse({
+      contratoId: formData.get("contrato_id"),
+      fechaCierre: formData.get("fecha_cierre"),
+      observaciones: formData.get("observaciones"),
+      retrasoPago: formData.get("retraso_pago"),
+      devolucionTardia: formData.get("devolucion_tardia"),
+      danios: formData.get("danios"),
     });
-  } else {
-    const supabase = getSupabaseServerClient();
-    const { data: row, error: fetchErr } = await supabase
-      .from("alquileres")
-      .select("*")
-      .eq("id", parsed.data.contratoId)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .maybeSingle();
-
-    if (fetchErr) {
-      throw new Error(fetchErr.message);
+    if (!parsed.success) {
+      return { ok: false, error: "Datos de cierre inválidos." };
     }
-    if (!row) {
-      throw new Error("Contrato no encontrado.");
-    }
-    if (row.estado === "cerrado") {
-      throw new Error("El contrato ya está cerrado.");
-    }
-
-    const montoTotal = row.monto_total != null ? Number(row.monto_total) : null;
-    let penalidadTotal = 0;
-    if (montoTotal != null && montoTotal > 0) {
-      if (parsed.data.retrasoPago) {
-        penalidadTotal += (montoTotal * Number(row.penalidad_retraso_pago_pct)) / 100;
-      }
-      if (parsed.data.devolucionTardia) {
-        penalidadTotal += (montoTotal * Number(row.penalidad_devolucion_tardia_pct)) / 100;
-      }
-      if (parsed.data.danios) {
-        penalidadTotal += (montoTotal * Number(row.penalidad_danios_pct)) / 100;
-      }
-    }
-    penalidadTotal = roundMoney(penalidadTotal);
-
-    const penalidadAcum = roundMoney(Number(row.penalidad) + penalidadTotal);
-
-    const { error: updErr } = await supabase
-      .from("alquileres")
-      .update({
-        estado: "cerrado",
-        fecha_fin: parsed.data.fechaCierre,
-        observaciones_retorno:
-          parsed.data.observaciones?.trim() || row.observaciones_retorno,
-        penalidad: penalidadAcum,
-      })
-      .eq("id", row.id)
-      .eq("organization_id", DEFAULT_ORG_ID);
-
-    if (updErr) {
-      throw new Error(updErr.message);
-    }
-
-    const refCodigo = row.codigo ?? row.id.slice(0, 8);
-
-    if (penalidadTotal > 0) {
-      const { error: penErr } = await supabase.from("movimientos_caja").insert({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fechaCierre,
-        tipo: "ingreso",
-        medio: "efectivo",
-        categoria: "penalidad_alquiler",
-        monto: penalidadTotal,
-        descripcion: `Penalidad cierre contrato ${refCodigo}`,
-        modulo_origen: "ventas_alquiler",
-        referencia_id: row.id,
-        created_by: actor.userId,
-        updated_by: actor.userId,
+    if (!hasSupabaseEnv()) {
+      demoCerrarContratoAlquiler(parsed.data.contratoId, {
+        fechaCierre: parsed.data.fechaCierre,
+        observaciones: parsed.data.observaciones || null,
+        penalidades: {
+          retraso_pago: parsed.data.retrasoPago,
+          devolucion_tardia: parsed.data.devolucionTardia,
+          danios: parsed.data.danios,
+        },
       });
-      if (penErr) {
-        throw new Error(penErr.message);
-      }
-    }
+    } else {
+      const supabase = getSupabaseServerClient();
+      const { data: row, error: fetchErr } = await supabase
+        .from("alquileres")
+        .select("*")
+        .eq("id", parsed.data.contratoId)
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .maybeSingle();
 
-    const deposito = row.deposito_30 != null ? Number(row.deposito_30) : 0;
-    if (montoTotal != null && montoTotal > 0) {
-      const saldo = roundMoney(montoTotal - deposito);
-      if (saldo > 0) {
-        const medioSaldo = mapMetodoPagoVentaToMedioCaja(row.metodo_pago ?? "efectivo");
-        const { error: saldoErr } = await supabase.from("movimientos_caja").insert({
+      if (fetchErr) {
+        return { ok: false, error: fetchErr.message };
+      }
+      if (!row) {
+        return { ok: false, error: "Contrato no encontrado." };
+      }
+      if (row.estado === "cerrado") {
+        return { ok: false, error: "El contrato ya está cerrado." };
+      }
+
+      const montoTotal = row.monto_total != null ? Number(row.monto_total) : null;
+      let penalidadTotal = 0;
+      if (montoTotal != null && montoTotal > 0) {
+        if (parsed.data.retrasoPago) {
+          penalidadTotal += (montoTotal * Number(row.penalidad_retraso_pago_pct)) / 100;
+        }
+        if (parsed.data.devolucionTardia) {
+          penalidadTotal += (montoTotal * Number(row.penalidad_devolucion_tardia_pct)) / 100;
+        }
+        if (parsed.data.danios) {
+          penalidadTotal += (montoTotal * Number(row.penalidad_danios_pct)) / 100;
+        }
+      }
+      penalidadTotal = roundMoney(penalidadTotal);
+
+      const penalidadAcum = roundMoney(Number(row.penalidad) + penalidadTotal);
+
+      const { error: updErr } = await supabase
+        .from("alquileres")
+        .update({
+          estado: "cerrado",
+          fecha_fin: parsed.data.fechaCierre,
+          observaciones_retorno:
+            parsed.data.observaciones?.trim() || row.observaciones_retorno,
+          penalidad: penalidadAcum,
+        })
+        .eq("id", row.id)
+        .eq("organization_id", DEFAULT_ORG_ID);
+
+      if (updErr) {
+        return { ok: false, error: updErr.message };
+      }
+
+      const refCodigo = row.codigo ?? row.id.slice(0, 8);
+
+      if (penalidadTotal > 0) {
+        const { error: penErr } = await supabase.from("movimientos_caja").insert({
           organization_id: DEFAULT_ORG_ID,
           fecha: parsed.data.fechaCierre,
           tipo: "ingreso",
-          medio: medioSaldo,
-          categoria: "alquiler_bomba_mixer",
-          monto: saldo,
-          descripcion: `Saldo final contrato ${refCodigo}`,
+          medio: "efectivo",
+          categoria: "penalidad_alquiler",
+          monto: penalidadTotal,
+          descripcion: `Penalidad cierre contrato ${refCodigo}`,
           modulo_origen: "ventas_alquiler",
           referencia_id: row.id,
           created_by: actor.userId,
           updated_by: actor.userId,
         });
-        if (saldoErr) {
-          throw new Error(saldoErr.message);
+        if (penErr) {
+          return { ok: false, error: penErr.message };
+        }
+      }
+
+      const deposito = row.deposito_30 != null ? Number(row.deposito_30) : 0;
+      if (montoTotal != null && montoTotal > 0) {
+        const saldo = roundMoney(montoTotal - deposito);
+        if (saldo > 0) {
+          const medioSaldo = mapMetodoPagoVentaToMedioCaja(row.metodo_pago ?? "efectivo");
+          const { error: saldoErr } = await supabase.from("movimientos_caja").insert({
+            organization_id: DEFAULT_ORG_ID,
+            fecha: parsed.data.fechaCierre,
+            tipo: "ingreso",
+            medio: medioSaldo,
+            categoria: "alquiler_bomba_mixer",
+            monto: saldo,
+            descripcion: `Saldo final contrato ${refCodigo}`,
+            modulo_origen: "ventas_alquiler",
+            referencia_id: row.id,
+            created_by: actor.userId,
+            updated_by: actor.userId,
+          });
+          if (saldoErr) {
+            return { ok: false, error: saldoErr.message };
+          }
         }
       }
     }
+    revalidatePath("/ventas/alquiler-mixer");
+    revalidatePath("/alquiler");
+    revalidatePath("/caja");
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message || "Error al cerrar el contrato." };
   }
-  revalidatePath("/ventas/alquiler-mixer");
-  revalidatePath("/alquiler");
-  revalidatePath("/caja");
 }
 
 // ---------------------------------------------------------------------------

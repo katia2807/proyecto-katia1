@@ -1,7 +1,8 @@
 "use client";
 
 import { cerrarContratoAlquiler } from "@/app/actions";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { formatPen } from "@/lib/utils";
@@ -49,8 +50,38 @@ export function CierreContratoForm({ contratos }: CierreContratoFormProps) {
   // Validaciones
   const hasStep1Warning = !contratoId;
 
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (isPending) return;
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const formData = new FormData(e.currentTarget);
+    startTransition(async () => {
+      try {
+        const res = await cerrarContratoAlquiler(formData);
+        if (res && !res.ok) {
+          setErrorMessage(res.error || "Ocurrió un error al cerrar el contrato.");
+        } else {
+          setSuccessMessage("¡Contrato cerrado exitosamente!");
+          router.refresh();
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        }
+      } catch (err: any) {
+        setErrorMessage(err.message || "Error al procesar la solicitud.");
+      }
+    });
+  };
+
   return (
-    <form action={cerrarContratoAlquiler} noValidate className="space-y-6">
+    <form onSubmit={handleSubmit} noValidate className="space-y-6">
       {/* ── STEPPER DE WIZARD ── */}
       <div className="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
         <div className="flex items-center justify-between">
@@ -394,20 +425,34 @@ export function CierreContratoForm({ contratos }: CierreContratoFormProps) {
           </div>
         </div>
 
+        {errorMessage && (
+          <div className="mt-4 rounded-xl border border-[var(--color-danger)] bg-[color-mix(in_srgb,var(--color-danger)_10%,var(--color-surface))] p-4 text-[var(--color-danger)] text-sm font-semibold flex items-center gap-2 animate-bounce">
+            <span>⚠️</span>
+            <span>{errorMessage}</span>
+          </div>
+        )}
+        {successMessage && (
+          <div className="mt-4 rounded-xl border border-[var(--color-success)] bg-[color-mix(in_srgb,var(--color-success)_10%,var(--color-surface))] p-4 text-[var(--color-success)] text-sm font-semibold flex items-center gap-2">
+            <span>✓</span>
+            <span>{successMessage}</span>
+          </div>
+        )}
+
         <div className="flex justify-between pt-4 mt-4">
           <Button
             type="button"
             variant="secondary"
+            disabled={isPending}
             onClick={() => setStep(3)}
             className="px-6 py-2"
           >
             ← Anterior
           </Button>
           <Button
-            disabled={hasStep1Warning}
+            disabled={hasStep1Warning || isPending}
             className="px-8 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
           >
-            Cerrar contrato ✓
+            {isPending ? "Procesando..." : "Cerrar contrato ✓"}
           </Button>
         </div>
       </div>
