@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   submitCreateClienteForm,
   submitCreateProveedorForm,
@@ -18,6 +19,7 @@ type VentasHubContextPanelsProps = {
 };
 
 export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
+  const router = useRouter();
   const [openCliente, setOpenCliente] = useState(quick === "cliente");
   const [clienteFormKey, setClienteFormKey] = useState(0);
   const [clienteState, clienteFormAction] = useActionState(submitCreateClienteForm, mutationFormInitialState);
@@ -47,10 +49,12 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenCliente(false);
       setClienteFormKey((k) => k + 1);
+      router.refresh();
+      window.location.reload();
     } else if (clienteState.error) {
       showToast({ variant: "error", message: clienteState.error });
     }
-  }, [clienteState, showToast]);
+  }, [clienteState, showToast, router]);
 
   useEffect(() => {
     if (proveedorState.success && proveedorState.message) {
@@ -58,10 +62,12 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenProveedor(false);
       setProveedorFormKey((k) => k + 1);
+      router.refresh();
+      window.location.reload();
     } else if (proveedorState.error) {
       showToast({ variant: "error", message: proveedorState.error });
     }
-  }, [proveedorState, showToast]);
+  }, [proveedorState, showToast, router]);
 
   useEffect(() => {
     if (choferState.success && choferState.message) {
@@ -69,10 +75,12 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenChofer(false);
       setChoferFormKey((k) => k + 1);
+      router.refresh();
+      window.location.reload();
     } else if (choferState.error) {
       showToast({ variant: "error", message: choferState.error });
     }
-  }, [choferState, showToast]);
+  }, [choferState, showToast, router]);
 
   return (
     <>
