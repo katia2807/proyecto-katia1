@@ -550,6 +550,16 @@ export function CotizacionUnificadaWizard({
   const [muebleTemplates, setMuebleTemplates] = useState<MuebleTemplate[]>(() => [getDefaultGerenciaTemplate()]);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [descripcionManual, setDescripcionManual] = useState<string>("");
+  const [isDescriptionInitialized, setIsDescriptionInitialized] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (toastMessage) {
+      const t = setTimeout(() => setToastMessage(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [toastMessage]);
 
   useEffect(() => {
     setIsClient(true);
@@ -1120,6 +1130,8 @@ export function CotizacionUnificadaWizard({
     setPagoModalidadUI(draft.pagoModalidadUI);
     setPlazoDiasUI(draft.plazoDiasUI);
     setPlazoUnidadUI(draft.plazoUnidadUI);
+    setDescripcionManual("");
+    setIsDescriptionInitialized(false);
     setError("Borrador recuperado.");
   }, [applyCotizacionPreset]);
 
@@ -1154,6 +1166,8 @@ export function CotizacionUnificadaWizard({
     setPagoModalidadUI("");
     setPlazoDiasUI("15");
     setPlazoUnidadUI("dias");
+    setDescripcionManual("");
+    setIsDescriptionInitialized(false);
     setStepIndex(0);
     setMaxStep(0);
     clearDraft();
@@ -1238,12 +1252,11 @@ export function CotizacionUnificadaWizard({
   }, [lineasFormalSafe]);
 
   useEffect(() => {
-    if (!descripcionComercialSugerida) return;
-    setDetalle((d) => {
-      if ((d.descripcion_cliente ?? "").trim()) return d;
-      return { ...d, descripcion_cliente: descripcionComercialSugerida };
-    });
-  }, [descripcionComercialSugerida]);
+    if (!isDescriptionInitialized && descripcionComercialSugerida) {
+      setDescripcionManual(descripcionComercialSugerida);
+      setIsDescriptionInitialized(true);
+    }
+  }, [descripcionComercialSugerida, isDescriptionInitialized]);
 
   const correlativoMostrar = useMemo(() => {
     if (guardadaId) {
@@ -1443,7 +1456,7 @@ export function CotizacionUnificadaWizard({
         return;
       }
 
-      let det = { ...detalle };
+      let det = { ...detalle, descripcion_cliente: descripcionManual };
       if (!det.rubros.muebles) {
         det = { ...det, muebles_lineas: [] };
       }
@@ -1453,6 +1466,8 @@ export function CotizacionUnificadaWizard({
       if (!det.rubros.alquiler) {
         det = { ...det, alquiler: null };
       }
+
+      setDetalle(det);
 
       const res = await saveCotizacionUnificada({
         id: guardadaId ?? undefined,
@@ -1475,7 +1490,7 @@ export function CotizacionUnificadaWizard({
         window.open(`/cotizacion/unificada/${res.id}/pdf`, "_blank");
       }
     },
-    [canSave, clearDraft, detalle, ensureCliente, fecha, guardadaId, router, tipoCliente, totalGral],
+    [canSave, clearDraft, detalle, ensureCliente, fecha, guardadaId, router, tipoCliente, totalGral, descripcionManual],
   );
 
   const loadCotizacion = useCallback((row: CotizacionUnificadaRow) => {
@@ -1484,6 +1499,8 @@ export function CotizacionUnificadaWizard({
     setTipoCliente(row.tipo_cliente);
     setFecha(row.fecha);
     setDetalle(d);
+    setDescripcionManual(d.descripcion_cliente ?? "");
+    setIsDescriptionInitialized(true);
     setClienteId(row.cliente_id);
     const cl = effectiveClientes.find((c) => c.id === row.cliente_id);
     setNombreCliente(cl?.nombre ?? "");
@@ -1528,6 +1545,66 @@ export function CotizacionUnificadaWizard({
     setMaxStep(targetIdx);
     setError("");
   }, [effectiveClientes]);
+
+  const handleGuardarDescripcion = async () => {
+    setDetalle((d) => ({ ...d, descripcion_cliente: descripcionManual }));
+
+    if (guardadaId) {
+      setBusy(true);
+      setError("");
+      try {
+        let det = { ...detalle, descripcion_cliente: descripcionManual };
+        if (!det.rubros.muebles) {
+          det = { ...det, muebles_lineas: [] };
+        }
+        if (!det.rubros.aserradero) {
+          det = { ...det, aserradero: null };
+        }
+        if (!det.rubros.alquiler) {
+          det = { ...det, alquiler: null };
+        }
+
+        const res = await saveCotizacionUnificada({
+          id: guardadaId,
+          clienteId: clienteId || "",
+          tipoCliente,
+          fecha,
+          detalle: det,
+          total: totalGral,
+          estadoFlujo: guardadaRow?.estado_flujo === "lista_produccion" ? "lista_produccion" : "pendiente",
+        });
+
+        if (!res.ok) {
+          setError(res.error);
+          setBusy(false);
+          return;
+        }
+        router.refresh();
+      } catch (err: any) {
+        setError(err.message || "Error al persistir la descripción");
+        setBusy(false);
+        return;
+      }
+      setBusy(false);
+    }
+
+    setToastMessage("¡Descripción guardada correctamente!");
+  };
+
+  const handleRestablecerDescripcion = () => {
+    const hasUnsavedChanges = descripcionManual !== (detalle.descripcion_cliente ?? "");
+    if (hasUnsavedChanges) {
+      if (
+        !confirm(
+          "Tienes cambios manuales sin guardar en la descripción. ¿Estás seguro de que deseas restablecerla?",
+        )
+      ) {
+        return;
+      }
+    }
+    setDescripcionManual(descripcionComercialSugerida);
+    setToastMessage("¡Descripción restablecida a la sugerida!");
+  };
 
   useEffect(() => {
     if (editarId) {
@@ -3162,7 +3239,7 @@ export function CotizacionUnificadaWizard({
             </p>
           </div>
 
-          <div className="space-y-2 border-t border-[var(--color-border)] px-5 py-4">
+          <div className="space-y-3 border-t border-[var(--color-border)] px-5 py-4">
             <label className="block space-y-1">
               <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
                 Descripción / notas comerciales
@@ -3170,12 +3247,33 @@ export function CotizacionUnificadaWizard({
               <textarea
                 className={`${inputClass} min-h-[88px] py-2`}
                 placeholder="Ej: Acabado barniz natural. Incluye instalación en obra. No incluye bisagras ni cerraduras..."
-                value={detalle.descripcion_cliente ?? ""}
-                onChange={(e) =>
-                  setDetalle((d) => ({ ...d, descripcion_cliente: e.target.value }))
-                }
+                value={descripcionManual}
+                onChange={(e) => setDescripcionManual(e.target.value)}
               />
             </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleGuardarDescripcion}
+                className="h-9 rounded-lg bg-[var(--color-primary-soft)]/20 px-3 text-xs font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-primary-soft)]/35 transition-colors border border-[var(--color-border)]"
+              >
+                Guardar descripción
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleRestablecerDescripcion}
+                className="h-9 rounded-lg border border-[var(--color-border)] px-3 text-xs font-semibold text-[var(--color-text-secondary)] hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                Restablecer descripción automática
+              </button>
+            </div>
+            {toastMessage && (
+              <p className="text-xs font-semibold text-[var(--color-success)] animate-pulse mt-1">
+                {toastMessage}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2 border-t border-[var(--color-border)] px-5 py-4">
