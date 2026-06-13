@@ -50,6 +50,11 @@ function num(v: ExcelJS.CellValue): number | null {
   return isNaN(n) ? null : n;
 }
 
+function codeFromName(nombre: string): string {
+  const base = normalizeText(nombre).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return (base || "producto").slice(0, 36).toUpperCase();
+}
+
 function rowValues(row: ExcelJS.Row): ExcelJS.CellValue[] {
   const vals: ExcelJS.CellValue[] = [];
   row.eachCell({ includeEmpty: true }, (cell, col) => {
@@ -225,6 +230,7 @@ function parseProveedoresSheet(ws: ExcelJS.Worksheet): Array<{
 
 function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
   codigo: string;
+  codigo_generado: boolean;
   nombre: string;
   categoria: string | null;
   unidad: string | null;
@@ -286,12 +292,22 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
       }
     }
 
-    const codigo = str(vals[columns.codigo]);
-    if (!codigo || normalizeText(codigo).startsWith("generado") || normalizeText(codigo) === "total") return;
+    const codigoOriginal = str(vals[columns.codigo]);
+    const nombre = columns.nombre === null ? codigoOriginal : str(vals[columns.nombre]);
+    const codigoKey = normalizeText(codigoOriginal);
+    const nombreKey = normalizeText(nombre);
+    if (
+      (!codigoOriginal && !nombre) ||
+      codigoKey.startsWith("generado") ||
+      codigoKey === "total" ||
+      codigoKey === "codigo" ||
+      nombreKey === "nombre"
+    ) return;
     const activoText = columns.activo === null ? "" : normalizeText(str(vals[columns.activo]));
     rows.push({
-      codigo,
-      nombre: columns.nombre === null ? codigo : str(vals[columns.nombre]) || codigo,
+      codigo: codigoOriginal || codeFromName(nombre),
+      codigo_generado: !codigoOriginal,
+      nombre: nombre || codigoOriginal,
       categoria: columns.categoria !== null && str(vals[columns.categoria]) !== "—" ? str(vals[columns.categoria]) || null : null,
       unidad: columns.unidad !== null && str(vals[columns.unidad]) !== "—" ? str(vals[columns.unidad]) || null : null,
       stock_actual: columns.stockActual === null ? null : num(vals[columns.stockActual]),
@@ -304,12 +320,12 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
   if (rows.length === 0) {
     ws.eachRow((row) => {
       const vals = rowValues(row);
-      const codigo = str(vals[0]);
+      const codigoOriginal = str(vals[0]);
       const nombre = str(vals[1]);
-      const codigoKey = normalizeText(codigo);
+      const codigoKey = normalizeText(codigoOriginal);
       const nombreKey = normalizeText(nombre);
 
-      if (!codigo || !nombre) return;
+      if (!codigoOriginal && !nombre) return;
       if (
         codigoKey === "codigo" ||
         codigoKey === "total" ||
@@ -322,7 +338,8 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
       }
 
       rows.push({
-        codigo,
+        codigo: codigoOriginal || codeFromName(nombre),
+        codigo_generado: !codigoOriginal,
         nombre,
         categoria: str(vals[2]) !== "—" ? str(vals[2]) || null : null,
         unidad: str(vals[3]) !== "—" ? str(vals[3]) || null : null,
@@ -509,12 +526,14 @@ export async function POST(request: Request) {
         if (row.costo_unitario !== null) patch.costo_unitario = row.costo_unitario;
         if (row.activo !== null) patch.activo = row.activo;
 
-        const { error: updateError, data: updated } = await supabase
+        const updateQuery = supabase
           .from("inventario_productos")
           .update(patch)
-          .eq("codigo", row.codigo)
-          .eq("organization_id", DEFAULT_ORG_ID)
-          .select("id");
+          .eq("organization_id", DEFAULT_ORG_ID);
+        const { error: updateError, data: updated } = await (row.codigo_generado
+          ? updateQuery.eq("nombre", row.nombre)
+          : updateQuery.eq("codigo", row.codigo)
+        ).select("id");
 
         if (updateError) {
           result.errors.push(`${row.codigo}: ${updateError.message}`);
