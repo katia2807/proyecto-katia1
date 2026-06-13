@@ -4,6 +4,7 @@ import {
   Boxes,
   Hammer,
   PackageOpen,
+  PlusCircle,
   Scissors,
   TruckIcon,
 } from "lucide-react";
@@ -41,35 +42,35 @@ const tarjetas: Tarjeta[] = [
   {
     href: "/ventas/muebles-terminados",
     titulo: "Muebles terminados",
-    descripcion: "Venta directa desde el catálogo (el alta del catálogo está en Inventario). Regateo y entrega con chofer.",
+    descripcion: "Venta directa desde el catálogo cuando ya está claro qué producto del inventario se entrega.",
     icono: Boxes,
     badge: "Catálogo",
   },
   {
     href: "/ventas/muebles-personalizados",
     titulo: "Muebles personalizados",
-    descripcion: "Cotizador inteligente, aprobación a orden de producción y seguimiento.",
+    descripcion: "Flujo especializado para producción de muebles a medida.",
     icono: Hammer,
     badge: "Cotizador",
   },
   {
     href: "/ventas/madera-cortada",
     titulo: "Madera cortada",
-    descripcion: "Venta por pie tablar con calculadora PT y control de stock.",
+    descripcion: "Caso específico para ventas por pie tablar y cubicaje.",
     icono: PackageOpen,
     badge: "PT",
   },
   {
     href: "/ventas/alquiler-mixer",
     titulo: "Alquiler Bomba Mixer",
-    descripcion: "Contrato extendido, depósito 30% automático y penalidades por cierre.",
+    descripcion: "Contrato, depósito, penalidades y cierre de alquiler.",
     icono: TruckIcon,
     badge: "Contrato",
   },
   {
     href: "/ventas/aserradero-servicios",
     titulo: "Servicio Aserradero",
-    descripcion: "Cubicaje rápido, cepillado, machembrado y otros procesos especiales.",
+    descripcion: "Servicios especiales de aserradero y procesos por encargo.",
     icono: Scissors,
     badge: "Cubicaje",
   },
@@ -167,13 +168,19 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Ventas</h2>
           <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
-            Muebles terminados, personalizados, madera cortada, alquiler de Mixer y servicio de aserradero.
+            Usa el flujo guiado para crear una venta desde cotización, cobrarla y dejarla registrada.
           </p>
           <p className="text-sm text-[var(--katia-text-secondary)]">
-            Para la ficha completa de clientes y análisis ejecutivo, usa el Centro de Mando.
+            Los accesos por tipo quedan disponibles para operaciones específicas o edición detallada.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href="/cotizacion">
+            <Button>
+              <PlusCircle className="mr-2 size-4" />
+              Nueva venta guiada
+            </Button>
+          </Link>
           <Link href="/ventas/dashboard">
             <Button variant="secondary">Dashboard del mes</Button>
           </Link>
@@ -207,6 +214,37 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
           </div>
         </Card>
       ) : null}
+
+      <Card className="border-[var(--katia-primary)]/30 bg-[var(--katia-primary)]/5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center rounded-full bg-[var(--katia-primary)] px-2.5 py-1 text-xs font-bold text-white">
+              Recomendado
+            </div>
+            <CardTitle className="mt-3">Nueva venta guiada</CardTitle>
+            <CardDescription className="mt-1">
+              Para uso diario, empieza aquí: eliges o creas cliente, agregas muebles, madera, servicios o alquiler,
+              guardas la cotización y luego la conviertes a venta cuando el cliente acepta. Evita decidir entre varios
+              formularios antes de saber qué necesita el cliente.
+            </CardDescription>
+          </div>
+          <Link href="/cotizacion">
+            <Button>
+              <PlusCircle className="mr-2 size-4" />
+              Crear venta
+            </Button>
+          </Link>
+        </div>
+      </Card>
+
+      <div>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--katia-text-secondary)]">
+          Accesos específicos
+        </h3>
+        <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
+          Úsalos cuando ya sabes exactamente qué operación registrar o necesitas editar un flujo puntual.
+        </p>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {tarjetas.map((tarjeta) => {

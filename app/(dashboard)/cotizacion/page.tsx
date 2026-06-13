@@ -51,16 +51,29 @@ export default async function CotizacionPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Cotizaciones</h2>
+        <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Nueva venta guiada</h2>
         <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
-          {cotizacionesGuardadas.length} cotización{cotizacionesGuardadas.length !== 1 ? "es" : ""} registrada{cotizacionesGuardadas.length !== 1 ? "s" : ""}.
-          Los documentos generados son internos y privados — sin referencias fiscales.
+          Crea una cotización, imprime el documento y conviértela a venta cuando el cliente acepte.
         </p>
       </div>
 
+      <CotizacionUnificadaWizard
+        canSave={canSave}
+        correlativoPreview={correlativoPreview}
+        productos={productos}
+        mueblesCatalogo={mueblesCatalogo}
+        clientes={clientes}
+        cotizacionesGuardadas={cotizacionesGuardadas}
+        empresa={empresa}
+        mockData={comboMock}
+      />
+
       <Card>
-        <CardTitle>Cotizaciones guardadas</CardTitle>
-        <CardDescription>Haz clic en una fila para abrir detalle, items, cliente, fechas, estado e historial.</CardDescription>
+        <CardTitle>Historial de cotizaciones</CardTitle>
+        <CardDescription>
+          {cotizacionesGuardadas.length} cotización{cotizacionesGuardadas.length !== 1 ? "es" : ""} registrada{cotizacionesGuardadas.length !== 1 ? "s" : ""}.
+          Abre una fila para revisar detalle, estado o convertirla a venta.
+        </CardDescription>
         <div className="mt-3">
           <CotizacionMasterDetail
             canMutate={canSave}
@@ -78,17 +91,6 @@ export default async function CotizacionPage() {
           />
         </div>
       </Card>
-
-      <CotizacionUnificadaWizard
-        canSave={canSave}
-        correlativoPreview={correlativoPreview}
-        productos={productos}
-        mueblesCatalogo={mueblesCatalogo}
-        clientes={clientes}
-        cotizacionesGuardadas={cotizacionesGuardadas}
-        empresa={empresa}
-        mockData={comboMock}
-      />
     </div>
   );
 }
