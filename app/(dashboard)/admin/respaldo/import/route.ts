@@ -18,7 +18,16 @@ function str(v: ExcelJS.CellValue): string {
 }
 
 function normalizeText(v: string): string {
-  return v
+  const repaired = v
+    .replace(/Ã³/g, "o")
+    .replace(/Ã­/g, "i")
+    .replace(/Ã¡/g, "a")
+    .replace(/Ã©/g, "e")
+    .replace(/Ãº/g, "u")
+    .replace(/Ã±/g, "n")
+    .replace(/â€”/g, "-");
+
+  return repaired
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
@@ -70,7 +79,10 @@ function findHeaderIndex(headers: Map<string, number>, candidates: string[]): nu
     if (exact !== undefined) return exact;
   }
   for (const [header, index] of headers) {
-    if (normalizedCandidates.some((candidate) => header.includes(candidate) || candidate.includes(header))) {
+    if (
+      normalizedCandidates.some((candidate) => header.includes(candidate) || candidate.includes(header)) ||
+      (normalizedCandidates.includes("codigo") && header.includes("digo"))
+    ) {
       return index;
     }
   }
@@ -387,47 +399,55 @@ export async function POST(request: Request) {
     const parsed = parseInventarioSheet(wsInv);
     const result: ImportResult = { sheet: "Inventario", inserted: 0, skipped: 0, errors: [] };
 
-    for (const row of parsed) {
-      const patch: Record<string, unknown> = {};
-      if (row.nombre) patch.nombre = row.nombre;
-      if (row.categoria) patch.categoria = row.categoria;
-      if (row.unidad) patch.unidad = row.unidad;
-      if (row.stock_actual !== null) patch.stock_actual = row.stock_actual;
-      if (row.stock_minimo !== null) patch.stock_minimo = row.stock_minimo;
-      if (row.costo_unitario !== null) patch.costo_unitario = row.costo_unitario;
-      if (row.activo !== null) patch.activo = row.activo;
+    if (parsed.length === 0) {
+      result.errors.push(
+        `La hoja "${wsInv.name}" fue encontrada, pero no se detectaron filas de productos. Revisa que tenga columnas Codigo y Nombre.`,
+      );
+      results.push(result);
+    } else {
 
-      const { error: updateError, data: updated } = await supabase
-        .from("inventario_productos")
-        .update(patch)
-        .eq("codigo", row.codigo)
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .select("id");
+      for (const row of parsed) {
+        const patch: Record<string, unknown> = {};
+        if (row.nombre) patch.nombre = row.nombre;
+        if (row.categoria) patch.categoria = row.categoria;
+        if (row.unidad) patch.unidad = row.unidad;
+        if (row.stock_actual !== null) patch.stock_actual = row.stock_actual;
+        if (row.stock_minimo !== null) patch.stock_minimo = row.stock_minimo;
+        if (row.costo_unitario !== null) patch.costo_unitario = row.costo_unitario;
+        if (row.activo !== null) patch.activo = row.activo;
 
-      if (updateError) {
-        result.errors.push(`${row.codigo}: ${updateError.message}`);
-      } else if ((updated ?? []).length > 0) {
-        result.inserted++;
-      } else {
-        const { error: insertError } = await supabase.from("inventario_productos").insert({
-          organization_id: DEFAULT_ORG_ID,
-          codigo: row.codigo,
-          nombre: row.nombre || row.codigo,
-          categoria: row.categoria || "General",
-          unidad: row.unidad || "und",
-          stock_actual: row.stock_actual ?? 0,
-          stock_minimo: row.stock_minimo ?? 0,
-          costo_unitario: row.costo_unitario,
-          activo: row.activo ?? true,
-        });
-        if (insertError) {
-          result.errors.push(`${row.codigo}: ${insertError.message}`);
-        } else {
+        const { error: updateError, data: updated } = await supabase
+          .from("inventario_productos")
+          .update(patch)
+          .eq("codigo", row.codigo)
+          .eq("organization_id", DEFAULT_ORG_ID)
+          .select("id");
+
+        if (updateError) {
+          result.errors.push(`${row.codigo}: ${updateError.message}`);
+        } else if ((updated ?? []).length > 0) {
           result.inserted++;
+        } else {
+          const { error: insertError } = await supabase.from("inventario_productos").insert({
+            organization_id: DEFAULT_ORG_ID,
+            codigo: row.codigo,
+            nombre: row.nombre || row.codigo,
+            categoria: row.categoria || "General",
+            unidad: row.unidad || "und",
+            stock_actual: row.stock_actual ?? 0,
+            stock_minimo: row.stock_minimo ?? 0,
+            costo_unitario: row.costo_unitario,
+            activo: row.activo ?? true,
+          });
+          if (insertError) {
+            result.errors.push(`${row.codigo}: ${insertError.message}`);
+          } else {
+            result.inserted++;
+          }
         }
       }
+      results.push(result);
     }
-    results.push(result);
   }
 
   if (results.length === 0) {
