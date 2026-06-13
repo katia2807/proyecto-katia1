@@ -198,7 +198,7 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
   activo: boolean | null;
 }> {
   const rows: ReturnType<typeof parseInventarioSheet> = [];
-  let columns: {
+  type InventoryColumns = {
     codigo: number;
     nombre: number | null;
     categoria: number | null;
@@ -207,7 +207,18 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
     stockActual: number | null;
     stockMinimo: number | null;
     costoUnitario: number | null;
-  } | null = null;
+  };
+  const defaultColumns: InventoryColumns = {
+    codigo: 0,
+    nombre: 1,
+    categoria: 2,
+    unidad: 3,
+    stockActual: 4,
+    stockMinimo: 5,
+    costoUnitario: 6,
+    activo: 9,
+  };
+  let columns: InventoryColumns | null = null;
 
   ws.eachRow((row) => {
     const vals = rowValues(row);
@@ -226,8 +237,17 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
           stockMinimo: findHeaderIndex(headers, ["stock minimo", "minimo"]),
           costoUnitario: findHeaderIndex(headers, ["costo unit prom", "costo unitario promedio", "costo unitario", "costo unit"]),
         };
+        return;
       }
-      return;
+
+      const first = normalizeText(str(vals[0]));
+      const second = normalizeText(str(vals[1]));
+      if (row.number >= 4 && (first.includes("digo") || second.includes("nombre") || (first && second))) {
+        columns = defaultColumns;
+        if (first.includes("digo") || second.includes("nombre")) return;
+      } else {
+        return;
+      }
     }
 
     const codigo = str(vals[columns.codigo]);
