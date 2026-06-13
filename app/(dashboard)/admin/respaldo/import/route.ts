@@ -264,6 +264,40 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
       activo: columns.activo === null ? null : !["no", "false", "0", "inactivo"].includes(activoText),
     });
   });
+
+  if (rows.length === 0) {
+    ws.eachRow((row) => {
+      const vals = rowValues(row);
+      const codigo = str(vals[0]);
+      const nombre = str(vals[1]);
+      const codigoKey = normalizeText(codigo);
+      const nombreKey = normalizeText(nombre);
+
+      if (!codigo || !nombre) return;
+      if (
+        codigoKey === "codigo" ||
+        codigoKey === "total" ||
+        codigoKey.startsWith("generado") ||
+        codigoKey.includes("inventario") ||
+        nombreKey === "nombre" ||
+        nombreKey.includes("katia suite")
+      ) {
+        return;
+      }
+
+      rows.push({
+        codigo,
+        nombre,
+        categoria: str(vals[2]) !== "—" ? str(vals[2]) || null : null,
+        unidad: str(vals[3]) !== "—" ? str(vals[3]) || null : null,
+        stock_actual: num(vals[4]),
+        stock_minimo: num(vals[5]),
+        costo_unitario: num(vals[6]),
+        activo: !["no", "false", "0", "inactivo"].includes(normalizeText(str(vals[9]))),
+      });
+    });
+  }
+
   return rows;
 }
 
