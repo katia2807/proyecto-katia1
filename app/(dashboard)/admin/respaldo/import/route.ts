@@ -17,9 +17,27 @@ function str(v: ExcelJS.CellValue): string {
   return String(v).trim();
 }
 
+function normalizeText(v: string): string {
+  return v
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 function num(v: ExcelJS.CellValue): number | null {
-  const s = str(v);
-  const n = parseFloat(s.replace(/[^0-9.-]/g, ""));
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  let s = str(v).replace(/[^\d,.-]/g, "");
+  const comma = s.lastIndexOf(",");
+  const dot = s.lastIndexOf(".");
+  if (comma >= 0 && dot >= 0) {
+    s = comma > dot ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+  } else if (comma >= 0) {
+    const decimals = s.length - comma - 1;
+    s = decimals > 0 && decimals <= 2 ? s.replace(",", ".") : s.replace(/,/g, "");
+  }
+  const n = parseFloat(s);
   return isNaN(n) ? null : n;
 }
 
@@ -29,6 +47,34 @@ function rowValues(row: ExcelJS.Row): ExcelJS.CellValue[] {
     vals[col - 1] = cell.value;
   });
   return vals;
+}
+
+function findWorksheet(wb: ExcelJS.Workbook, names: string[]): ExcelJS.Worksheet | undefined {
+  const expected = new Set(names.map(normalizeText));
+  return wb.worksheets.find((ws) => expected.has(normalizeText(ws.name)));
+}
+
+function headerMap(vals: ExcelJS.CellValue[]): Map<string, number> {
+  const headers = new Map<string, number>();
+  vals.forEach((value, index) => {
+    const key = normalizeText(str(value));
+    if (key) headers.set(key, index);
+  });
+  return headers;
+}
+
+function findHeaderIndex(headers: Map<string, number>, candidates: string[]): number | null {
+  const normalizedCandidates = candidates.map(normalizeText);
+  for (const candidate of normalizedCandidates) {
+    const exact = headers.get(candidate);
+    if (exact !== undefined) return exact;
+  }
+  for (const [header, index] of headers) {
+    if (normalizedCandidates.some((candidate) => header.includes(candidate) || candidate.includes(header))) {
+      return index;
+    }
+  }
+  return null;
 }
 
 // ── Sheet parsers ─────────────────────────────────────────────────────────────
@@ -134,28 +180,56 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
   nombre: string;
   categoria: string | null;
   unidad: string | null;
+  stock_actual: number | null;
   stock_minimo: number | null;
-  costo_unitario_promedio: number | null;
+  costo_unitario: number | null;
+  activo: boolean | null;
 }> {
   const rows: ReturnType<typeof parseInventarioSheet> = [];
-  let dataStart = false;
+  let columns: {
+    codigo: number;
+    nombre: number | null;
+    categoria: number | null;
+    unidad: number | null;
+    activo: number | null;
+    stockActual: number | null;
+    stockMinimo: number | null;
+    costoUnitario: number | null;
+  } | null = null;
+
   ws.eachRow((row) => {
     const vals = rowValues(row);
-    const first = str(vals[0]).toLowerCase();
-    if (!dataStart && (first === "código" || first === "codigo" || first.includes("digo"))) {
-      dataStart = true;
+    if (!columns) {
+      const headers = headerMap(vals);
+      const codigo = findHeaderIndex(headers, ["codigo", "cod"]);
+      const nombre = findHeaderIndex(headers, ["nombre", "producto"]);
+      if (codigo !== null && nombre !== null) {
+        columns = {
+          codigo,
+          nombre,
+          categoria: findHeaderIndex(headers, ["categoria"]),
+          unidad: findHeaderIndex(headers, ["unidad"]),
+          activo: findHeaderIndex(headers, ["activo"]),
+          stockActual: findHeaderIndex(headers, ["stock actual", "stock"]),
+          stockMinimo: findHeaderIndex(headers, ["stock minimo", "minimo"]),
+          costoUnitario: findHeaderIndex(headers, ["costo unit prom", "costo unitario promedio", "costo unitario", "costo unit"]),
+        };
+      }
       return;
     }
-    if (!dataStart) return;
-    const codigo = str(vals[0]);
-    if (!codigo || codigo.startsWith("Generado")) return;
+
+    const codigo = str(vals[columns.codigo]);
+    if (!codigo || normalizeText(codigo).startsWith("generado") || normalizeText(codigo) === "total") return;
+    const activoText = columns.activo === null ? "" : normalizeText(str(vals[columns.activo]));
     rows.push({
       codigo,
-      nombre: str(vals[1]) || codigo,
-      categoria: str(vals[2]) !== "—" ? str(vals[2]) || null : null,
-      unidad: str(vals[3]) !== "—" ? str(vals[3]) || null : null,
-      stock_minimo: num(vals[5]),
-      costo_unitario_promedio: num(vals[6]),
+      nombre: columns.nombre === null ? codigo : str(vals[columns.nombre]) || codigo,
+      categoria: columns.categoria !== null && str(vals[columns.categoria]) !== "—" ? str(vals[columns.categoria]) || null : null,
+      unidad: columns.unidad !== null && str(vals[columns.unidad]) !== "—" ? str(vals[columns.unidad]) || null : null,
+      stock_actual: columns.stockActual === null ? null : num(vals[columns.stockActual]),
+      stock_minimo: columns.stockMinimo === null ? null : num(vals[columns.stockMinimo]),
+      costo_unitario: columns.costoUnitario === null ? null : num(vals[columns.costoUnitario]),
+      activo: columns.activo === null ? null : !["no", "false", "0", "inactivo"].includes(activoText),
     });
   });
   return rows;
@@ -307,34 +381,50 @@ export async function POST(request: Request) {
     results.push(result);
   }
 
-  // ── Inventario (solo actualiza productos existentes por código) ───────────
-  const wsInv = wb.getWorksheet("📦 Inventario") ?? wb.getWorksheet("Inventario");
+  // ── Inventario ───────────────────────────────────────────────────────────
+  const wsInv = findWorksheet(wb, ["📦 Inventario", "Inventario", "Stock Actual", "Stock"]);
   if (wsInv) {
     const parsed = parseInventarioSheet(wsInv);
     const result: ImportResult = { sheet: "Inventario", inserted: 0, skipped: 0, errors: [] };
 
     for (const row of parsed) {
       const patch: Record<string, unknown> = {};
+      if (row.nombre) patch.nombre = row.nombre;
       if (row.categoria) patch.categoria = row.categoria;
       if (row.unidad) patch.unidad = row.unidad;
+      if (row.stock_actual !== null) patch.stock_actual = row.stock_actual;
       if (row.stock_minimo !== null) patch.stock_minimo = row.stock_minimo;
-      if (row.costo_unitario_promedio !== null) patch.costo_unitario_promedio = row.costo_unitario_promedio;
-      if (Object.keys(patch).length === 0) {
-        result.skipped++;
-        continue;
-      }
-      const { error, count } = await supabase
+      if (row.costo_unitario !== null) patch.costo_unitario = row.costo_unitario;
+      if (row.activo !== null) patch.activo = row.activo;
+
+      const { error: updateError, data: updated } = await supabase
         .from("inventario_productos")
         .update(patch)
         .eq("codigo", row.codigo)
         .eq("organization_id", DEFAULT_ORG_ID)
         .select("id");
-      if (error) {
-        result.errors.push(`${row.codigo}: ${error.message}`);
-      } else if ((count ?? 0) === 0) {
-        result.skipped++;
-      } else {
+
+      if (updateError) {
+        result.errors.push(`${row.codigo}: ${updateError.message}`);
+      } else if ((updated ?? []).length > 0) {
         result.inserted++;
+      } else {
+        const { error: insertError } = await supabase.from("inventario_productos").insert({
+          organization_id: DEFAULT_ORG_ID,
+          codigo: row.codigo,
+          nombre: row.nombre || row.codigo,
+          categoria: row.categoria || "General",
+          unidad: row.unidad || "und",
+          stock_actual: row.stock_actual ?? 0,
+          stock_minimo: row.stock_minimo ?? 0,
+          costo_unitario: row.costo_unitario,
+          activo: row.activo ?? true,
+        });
+        if (insertError) {
+          result.errors.push(`${row.codigo}: ${insertError.message}`);
+        } else {
+          result.inserted++;
+        }
       }
     }
     results.push(result);
