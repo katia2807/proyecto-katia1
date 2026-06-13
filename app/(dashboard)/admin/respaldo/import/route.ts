@@ -103,6 +103,28 @@ function findHeaderIndex(headers: Map<string, number>, candidates: string[]): nu
   return null;
 }
 
+function previewWorksheet(ws: ExcelJS.Worksheet, maxRows = 8, maxCols = 12): string {
+  const lines: string[] = [];
+  ws.eachRow({ includeEmpty: false }, (row) => {
+    if (lines.length >= maxRows) return;
+    const vals = rowValues(row)
+      .slice(0, maxCols)
+      .map((value) => str(value).replace(/\s+/g, " ").slice(0, 40));
+    if (vals.some(Boolean)) lines.push(`F${row.number}: ${vals.join(" | ")}`);
+  });
+  return lines.join(" / ");
+}
+
+function workbookDiagnostic(wb: ExcelJS.Workbook, sheets: ExcelJS.Worksheet[]): string {
+  const sheetList = wb.worksheets
+    .map((ws) => `${ws.name}(${ws.rowCount} filas x ${ws.columnCount} cols)`)
+    .join(", ");
+  const previews = sheets
+    .map((ws) => `${ws.name}: ${previewWorksheet(ws) || "sin filas visibles"}`)
+    .join(" || ");
+  return `Hojas del archivo: ${sheetList}. Vista previa: ${previews}`;
+}
+
 // ── Sheet parsers ─────────────────────────────────────────────────────────────
 
 type ImportResult = {
@@ -526,7 +548,7 @@ export async function POST(request: Request) {
         inserted: 0,
         skipped: 0,
         errors: [
-          `No se detectaron filas de productos en las hojas revisadas: ${emptySheetNames.join(", ")}. Version importador: positional-all-sheets.`,
+          `No se detectaron filas de productos en las hojas revisadas: ${emptySheetNames.join(", ")}. Version importador: diagnostic-preview. ${workbookDiagnostic(wb, inventorySheets)}`,
         ],
       });
     }
