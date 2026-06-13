@@ -50,20 +50,24 @@ export function ImportExcelPanel() {
     <Card>
       <CardTitle>Importar datos desde Excel</CardTitle>
       <CardDescription className="leading-relaxed">
-        Sube el archivo <strong>.xlsx</strong> exportado desde esta app. El sistema detecta automáticamente las hojas
-        presentes y solo importa registros <strong>nuevos</strong> (no duplica los que ya existen por nombre o código).
-        El inventario solo actualiza productos existentes; no crea productos nuevos por seguridad.
+        Sube el archivo <strong>.xlsx</strong> exportado desde Katia o un Excel externo de inventario. El sistema detecta
+        hojas y columnas comunes como producto, descripción, cantidad, stock, costo o precio; si no hay categoría, la
+        clasifica automáticamente como muebles, materiales, servicios o sin clasificar.
       </CardDescription>
 
       <div className="mt-3 rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-3 text-xs text-[var(--katia-text-secondary)]">
-        <strong className="text-[var(--katia-text-primary)]">Hojas reconocidas:</strong>{" "}
+        <strong className="text-[var(--katia-text-primary)]">Formatos reconocidos:</strong>{" "}
         <span className="inline-flex flex-wrap gap-x-3 gap-y-1 mt-1">
-          {["👥 Compradores", "🚛 Choferes", "🏭 Proveedores", "📦 Inventario"].map((h) => (
+          {["👥 Compradores", "🚛 Choferes", "🏭 Proveedores", "📦 Inventario Katia", "Excel externo"].map((h) => (
             <span key={h} className="rounded bg-[var(--katia-primary)]/10 px-1.5 py-0.5 font-semibold text-[var(--katia-primary)]">
               {h}
             </span>
           ))}
         </span>
+        <p className="mt-2">
+          Para Excel externo, usa encabezados como Producto, Descripción, Cantidad, Stock, Costo, Precio, Categoría o
+          Unidad. Si falta Código, Katia usa el nombre del producto.
+        </p>
       </div>
 
       <form onSubmit={handleUpload} className="mt-4 space-y-3">

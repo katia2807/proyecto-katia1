@@ -55,6 +55,21 @@ function codeFromName(nombre: string): string {
   return (base || "producto").slice(0, 36).toUpperCase();
 }
 
+function inferCategoria(nombre: string, fallback: string | null): string | null {
+  if (fallback) return fallback;
+  const q = normalizeText(nombre);
+  if (/\b(mesa|silla|cama|camarote|ropero|closet|comoda|velador|estante|mueble|banca|escritorio)\b/.test(q)) {
+    return "Muebles";
+  }
+  if (/\b(tabla|tablon|liston|cuarton|poste|viga|madera|tornillo|clavo|bisagra|riel|barniz|laca|cola|pegamento|melamina|triplay|mdf)\b/.test(q)) {
+    return "Materiales e insumos";
+  }
+  if (/\b(servicio|corte|cepillado|aserrado|instalacion|flete|transporte)\b/.test(q)) {
+    return "Servicios";
+  }
+  return "Sin clasificar";
+}
+
 function rowValues(row: ExcelJS.Row): ExcelJS.CellValue[] {
   const vals: ExcelJS.CellValue[] = [];
   row.eachCell({ includeEmpty: true }, (cell, col) => {
@@ -266,18 +281,45 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
     const vals = rowValues(row);
     if (!columns) {
       const headers = headerMap(vals);
-      const codigo = findHeaderIndex(headers, ["codigo", "cod"]);
-      const nombre = findHeaderIndex(headers, ["nombre", "producto"]);
-      if (codigo !== null && nombre !== null) {
+      const codigo = findHeaderIndex(headers, ["codigo", "cod", "sku", "clave", "id producto"]);
+      const nombre = findHeaderIndex(headers, [
+        "nombre",
+        "producto",
+        "descripcion",
+        "descripcion producto",
+        "articulo",
+        "item",
+        "material",
+        "insumo",
+      ]);
+      if (nombre !== null) {
         columns = {
-          codigo,
+          codigo: codigo ?? nombre,
           nombre,
-          categoria: findHeaderIndex(headers, ["categoria"]),
-          unidad: findHeaderIndex(headers, ["unidad"]),
-          activo: findHeaderIndex(headers, ["activo"]),
-          stockActual: findHeaderIndex(headers, ["stock actual", "stock"]),
-          stockMinimo: findHeaderIndex(headers, ["stock minimo", "minimo"]),
-          costoUnitario: findHeaderIndex(headers, ["costo unit prom", "costo unitario promedio", "costo unitario", "costo unit"]),
+          categoria: findHeaderIndex(headers, ["categoria", "familia", "linea", "tipo", "grupo", "rubro"]),
+          unidad: findHeaderIndex(headers, ["unidad", "und", "um", "medida", "u m"]),
+          activo: findHeaderIndex(headers, ["activo", "estado", "habilitado"]),
+          stockActual: findHeaderIndex(headers, [
+            "stock actual",
+            "stock",
+            "cantidad",
+            "existencia",
+            "existencias",
+            "saldo",
+            "inventario",
+          ]),
+          stockMinimo: findHeaderIndex(headers, ["stock minimo", "minimo", "stock min", "alerta", "punto reposicion"]),
+          costoUnitario: findHeaderIndex(headers, [
+            "costo unit prom",
+            "costo unitario promedio",
+            "costo unitario",
+            "costo unit",
+            "costo",
+            "precio costo",
+            "precio compra",
+            "precio unitario",
+            "precio",
+          ]),
         };
         return;
       }
@@ -304,11 +346,12 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
       nombreKey === "nombre"
     ) return;
     const activoText = columns.activo === null ? "" : normalizeText(str(vals[columns.activo]));
+    const categoria = columns.categoria !== null && str(vals[columns.categoria]) !== "—" ? str(vals[columns.categoria]) || null : null;
     rows.push({
       codigo: codigoOriginal || codeFromName(nombre),
       codigo_generado: !codigoOriginal,
       nombre: nombre || codigoOriginal,
-      categoria: columns.categoria !== null && str(vals[columns.categoria]) !== "—" ? str(vals[columns.categoria]) || null : null,
+      categoria: inferCategoria(nombre || codigoOriginal, categoria),
       unidad: columns.unidad !== null && str(vals[columns.unidad]) !== "—" ? str(vals[columns.unidad]) || null : null,
       stock_actual: columns.stockActual === null ? null : num(vals[columns.stockActual]),
       stock_minimo: columns.stockMinimo === null ? null : num(vals[columns.stockMinimo]),
@@ -320,8 +363,11 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
   if (rows.length === 0) {
     ws.eachRow((row) => {
       const vals = rowValues(row);
-      const codigoOriginal = str(vals[0]);
-      const nombre = str(vals[1]);
+      const first = str(vals[0]);
+      const second = str(vals[1]);
+      const secondIsNumber = num(vals[1]) !== null;
+      const codigoOriginal = secondIsNumber ? "" : first;
+      const nombre = secondIsNumber ? first : second;
       const codigoKey = normalizeText(codigoOriginal);
       const nombreKey = normalizeText(nombre);
 
@@ -341,11 +387,11 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
         codigo: codigoOriginal || codeFromName(nombre),
         codigo_generado: !codigoOriginal,
         nombre,
-        categoria: str(vals[2]) !== "—" ? str(vals[2]) || null : null,
-        unidad: str(vals[3]) !== "—" ? str(vals[3]) || null : null,
-        stock_actual: num(vals[4]),
-        stock_minimo: num(vals[5]),
-        costo_unitario: num(vals[6]),
+        categoria: inferCategoria(nombre, secondIsNumber ? null : str(vals[2]) || null),
+        unidad: secondIsNumber ? null : str(vals[3]) !== "—" ? str(vals[3]) || null : null,
+        stock_actual: secondIsNumber ? num(vals[1]) : num(vals[4]),
+        stock_minimo: secondIsNumber ? null : num(vals[5]),
+        costo_unitario: secondIsNumber ? num(vals[2]) : num(vals[6]),
         activo: !["no", "false", "0", "inactivo"].includes(normalizeText(str(vals[9]))),
       });
     });
