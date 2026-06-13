@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { parseDecimal, parseDecimalOptional, decimalSchema } from "@/lib/utils";
+import { parseDecimal, parseDecimalOptional, decimalSchema, formatPen, roundMoney } from "@/lib/utils";
 
 describe("parseDecimal", () => {
   test("debería parsear coma decimal peruana", () => {
@@ -61,5 +61,18 @@ describe("decimalSchema", () => {
     if (res.success) {
       expect(res.data).toBeUndefined();
     }
+  });
+});
+
+describe("money helpers", () => {
+  test("redondea errores flotantes a centavos exactos", () => {
+    expect(roundMoney(59.999999999)).toBe(60);
+    expect(roundMoney(55.5)).toBe(55.5);
+    expect(roundMoney(0.1 + 0.2)).toBe(0.3);
+  });
+
+  test("formatea soles siempre con centavos", () => {
+    expect(formatPen(59.999999999)).toContain("60.00");
+    expect(formatPen(55.5)).toContain("55.50");
   });
 });

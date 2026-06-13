@@ -78,6 +78,9 @@ const preprocessDecimal = (v: unknown) => {
   return parseDecimal(v as string | number | null | undefined);
 };
 
+const money = (value: number): number => roundMoney(value);
+const moneySchema = (schema: z.ZodType<number>) => z.preprocess(preprocessDecimal, schema).transform(money);
+
 const margenGananciaConfigSchema = z.object({
   margenGananciaDefaultPct: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative()),
 });
@@ -87,7 +90,7 @@ const cajaSchema = z.object({
   tipo: z.enum(["ingreso", "egreso", "transferencia"]),
   medio: z.enum(["efectivo", "banco", "yape", "otro"]),
   categoria: z.string().min(2),
-  monto: z.coerce.number().positive(),
+  monto: moneySchema(z.number().positive()),
   descripcion: z.string().optional(),
   esPersonal: z.coerce.boolean().optional(),
   urlComprobante: z.string().optional(),
@@ -97,7 +100,7 @@ const cajaSchema = z.object({
 const ventaSchema = z.object({
   clienteId: z.string().uuid(),
   fecha: z.string().min(1),
-  total: z.coerce.number().positive(),
+  total: moneySchema(z.number().positive()),
   estado: z.enum(["borrador", "confirmada"]).default("borrador"),
   productoInventarioId: z.string().uuid().optional(),
   cantidadProducto: z.preprocess(
@@ -122,8 +125,8 @@ const cotizacionSchema = z.object({
   tipo: z.enum(["mueble_personalizado", "servicio_corte"]),
   especieMadera: z.string().min(2),
   unidadMedida: z.enum(["cm", "in", "otro"]),
-  precioCalculado: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative()),
-  precioAcordado: z.preprocess(preprocessDecimal, z.coerce.number().positive()),
+  precioCalculado: moneySchema(z.number().nonnegative()),
+  precioAcordado: moneySchema(z.number().positive()),
   motivoAjuste: z.string().optional(),
   estado: z.enum(["borrador", "confirmada"]).default("borrador"),
 });
@@ -147,14 +150,14 @@ const empleadoSchema = z.object({
 const adelantoSchema = z.object({
   empleadoId: z.string().uuid(),
   fecha: z.string().min(1),
-  monto: z.coerce.number().positive(),
+  monto: moneySchema(z.number().positive()),
 });
 
 const sueldoSchema = z.object({
   empleadoId: z.string().uuid(),
   periodo: z.string().min(7),
-  montoBruto: z.coerce.number().positive(),
-  descuentos: z.coerce.number().nonnegative().default(0),
+  montoBruto: moneySchema(z.number().positive()),
+  descuentos: moneySchema(z.number().nonnegative()).default(0),
 });
 
 const clienteSchema = z.object({
@@ -176,7 +179,7 @@ const choferSchema = z.object({
 const zonaEntregaSchema = z.object({
   nombre: z.string().min(3),
   distanciaKm: z.coerce.number().nonnegative(),
-  tarifa: z.coerce.number().nonnegative(),
+  tarifa: moneySchema(z.number().nonnegative()),
 });
 
 const metodoPagoEnum = z.enum([
@@ -194,7 +197,7 @@ const muebleCatalogoSchema = z.object({
   codigo: z.string().min(2),
   nombre: z.string().min(3),
   descripcion: z.string().optional(),
-  precioLista: z.coerce.number().nonnegative(),
+  precioLista: moneySchema(z.number().nonnegative()),
   stockDisponible: z.coerce.number().int().nonnegative().default(0),
   fotoUrl: z.string().optional(),
 });
@@ -203,7 +206,7 @@ const ventaMuebleTerminadoSchema = z.object({
   clienteId: z.string().uuid(),
   muebleCatalogoId: z.string().uuid(),
   cantidad: z.coerce.number().int().positive(),
-  precioUnitario: z.coerce.number().positive(),
+  precioUnitario: moneySchema(z.number().positive()),
   fecha: z.string().min(1),
   choferId: z.string().uuid().optional().or(z.literal("")),
   tipoEntrega: tipoEntregaEnum.default("envio"),
@@ -212,8 +215,8 @@ const ventaMuebleTerminadoSchema = z.object({
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("contado"),
   fechaPagoCredito: z.string().optional().or(z.literal("")),
-  adelanto: z.coerce.number().nonnegative().optional().default(0),
-  montoCredito: z.coerce.number().nonnegative().optional().default(0),
+  adelanto: moneySchema(z.number().nonnegative()).optional().default(0),
+  montoCredito: moneySchema(z.number().nonnegative()).optional().default(0),
   tipoComprobante: z.enum(["factura", "boleta", "ninguno"]).optional().default("ninguno"),
   urlComprobante: z.string().optional().nullable(),
 });
@@ -221,7 +224,7 @@ const ventaMuebleTerminadoSchema = z.object({
 const ventaPdfSchema = z.object({
   clienteId: z.string().uuid(),
   fecha: z.string().min(1),
-  total: z.coerce.number().positive(),
+  total: moneySchema(z.number().positive()),
   tipoEvento: z.string().default("General"),
   detalle: z.string().optional(),
   metodoPago: metodoPagoEnum.default("efectivo"),
@@ -236,7 +239,7 @@ const aprobarCotizacionSchema = z.object({
   cotizacionId: z.string().uuid(),
   notas: z.string().optional(),
   /** Monto del adelanto cobrado al aceptar (si > 0 se asienta en caja). */
-  adelanto: z.coerce.number().nonnegative().optional(),
+  adelanto: moneySchema(z.number().nonnegative()).optional(),
   metodoAdelanto: z.enum(["efectivo", "yape", "banco", "otro"]).optional(),
 });
 
@@ -250,13 +253,13 @@ const ventaMaderaCortadaSchema = z.object({
   fecha: z.string().min(1),
   tipoCorte: z.enum(["tabla", "liston", "cuarton", "poste"]),
   totalPt: z.preprocess(preprocessDecimal, z.coerce.number().positive()),
-  precioPorPt: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative()),
-  total: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative()),
+  precioPorPt: moneySchema(z.number().nonnegative()),
+  total: moneySchema(z.number().nonnegative()),
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("contado"),
   fechaPagoCredito: z.string().optional().or(z.literal("")),
-  adelanto: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative().optional().default(0)),
-  montoCredito: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative().optional().default(0)),
+  adelanto: moneySchema(z.number().nonnegative()).optional().default(0),
+  montoCredito: moneySchema(z.number().nonnegative()).optional().default(0),
   choferId: z.string().uuid().optional().or(z.literal("")),
   tipoEntrega: tipoEntregaEnum.default("envio"),
   direccionEntrega: z.string().optional(),
@@ -277,13 +280,13 @@ const contratoAlquilerSchema = z.object({
   fechaTermino: z.string().optional().or(z.literal("")),
   diasAlquiler: z.coerce.number().int().positive().optional(),
   tarifaUnidad: z.enum(["hora_maquina", "m3", "dia"]).default("hora_maquina"),
-  tarifa: z.coerce.number().positive(),
-  montoTotal: z.coerce.number().positive(),
+  tarifa: moneySchema(z.number().positive()),
+  montoTotal: moneySchema(z.number().positive()),
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("adelanto"),
   fechaPagoCredito: z.string().optional().or(z.literal("")),
-  adelanto: z.coerce.number().nonnegative().optional().default(0),
-  montoCredito: z.coerce.number().nonnegative().optional().default(0),
+  adelanto: moneySchema(z.number().nonnegative()).optional().default(0),
+  montoCredito: moneySchema(z.number().nonnegative()).optional().default(0),
   penalidadRetrasoPagoPct: z.coerce.number().nonnegative().optional().default(3),
   penalidadDevolucionTardiaPct: z.coerce.number().nonnegative().optional().default(3),
   penalidadDaniosPct: z.coerce.number().nonnegative().optional().default(3),
@@ -303,13 +306,13 @@ const servicioAserraderoSchema = z.object({
   clienteId: z.string().uuid(),
   fecha: z.string().min(1),
   piesCubicos: z.preprocess(preprocessDecimal, z.coerce.number().positive()),
-  costoCubicaje: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative()),
-  precioCobrado: z.preprocess(preprocessDecimal, z.coerce.number().positive()),
+  costoCubicaje: moneySchema(z.number().nonnegative()),
+  precioCobrado: moneySchema(z.number().positive()),
   lineas: z.string().optional(), // JSON con desglose si aplica
   metodoPago: z.string().optional().default("efectivo"),
   modalidadPago: z.string().optional().default("contado"),
   fechaPagoCredito: z.string().optional(),
-  adelanto: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative().optional().default(0)),
+  adelanto: moneySchema(z.number().nonnegative()).optional().default(0),
   tipoComprobante: z.enum(["factura", "boleta", "ninguno"]).optional().default("ninguno"),
   urlComprobante: z.string().optional().nullable(),
 });
@@ -328,9 +331,9 @@ const compraMaderaSchema = z.object({
   detalle: z.string().optional(),
   cantidad: z.coerce.number().positive(),
   unidad: z.string().min(1).default("unidad"),
-  precioUnitario: z.coerce.number().positive(),
+  precioUnitario: moneySchema(z.number().positive()),
   modalidadPago: z.enum(["contado", "fiado"]).default("contado"),
-  adelanto: z.coerce.number().nonnegative().default(0),
+  adelanto: moneySchema(z.number().nonnegative()).default(0),
   estado: z.enum(["borrador", "confirmada"]).default("confirmada"),
   urlComprobante: z.string().optional(),
 });
@@ -349,7 +352,7 @@ const inventarioMovimientoSchema = z.object({
   fecha: z.string().min(1),
   tipo: z.enum(["entrada_compra", "salida_venta", "ajuste"]),
   cantidad: z.coerce.number().positive(),
-  costoUnitario: z.coerce.number().nonnegative().optional(),
+  costoUnitario: moneySchema(z.number().nonnegative()).optional(),
   referencia: z.string().optional(),
 });
 
@@ -361,8 +364,8 @@ const inventarioCompraRapidaSchema = z.object({
       const processed = preprocessDecimal(value);
       return (processed === null || processed === undefined) ? undefined : processed;
     },
-    z.coerce.number().nonnegative().optional(),
-  ),
+    z.number().nonnegative().optional(),
+  ).transform((value) => value === undefined ? undefined : money(value)),
   proveedor: z.string().optional(),
   fecha: z.string().min(1),
   nota: z.string().optional(),
@@ -383,9 +386,9 @@ const inventarioProductoUpdateSchema = z.object({
   ),
   fotoUrl: z.string().optional().nullable(),
   costoUnitario: z.preprocess(
-    (v) => (v === "" || v === null || v === undefined ? undefined : v),
-    z.coerce.number().nonnegative().optional(),
-  ),
+    (v) => (v === "" || v === null || v === undefined ? undefined : preprocessDecimal(v)),
+    z.number().nonnegative().optional(),
+  ).transform((value) => value === undefined ? undefined : money(value)),
 });
 
 const inventarioToggleActivoSchema = z.object({
@@ -402,7 +405,7 @@ const inventarioDeleteProductoSchema = z.object({
 const muebleCatalogoUpdateSchema = z.object({
   id: z.string().uuid(),
   descripcion: z.string().optional(),
-  precioLista: z.coerce.number().nonnegative(),
+  precioLista: moneySchema(z.number().nonnegative()),
   fotoUrl: z.string().optional(),
 });
 
@@ -428,9 +431,9 @@ const registroGeneralSchema = z.object({
   titulo: z.string().min(3),
   detalle: z.string().optional(),
   monto: z.preprocess(
-    (value) => (value === "" || value === null ? undefined : value),
-    z.coerce.number().nonnegative().optional(),
-  ),
+    (value) => (value === "" || value === null ? undefined : preprocessDecimal(value)),
+    z.number().nonnegative().optional(),
+  ).transform((value) => value === undefined ? undefined : money(value)),
 });
 
 const writerRoles: readonly AppRole[] = ["owner_admin", "gerencia", "almacen", "ventas"];
