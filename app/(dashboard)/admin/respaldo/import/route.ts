@@ -63,6 +63,20 @@ function findWorksheet(wb: ExcelJS.Workbook, names: string[]): ExcelJS.Worksheet
   return wb.worksheets.find((ws) => expected.has(normalizeText(ws.name)));
 }
 
+function findInventoryWorksheets(wb: ExcelJS.Workbook): ExcelJS.Worksheet[] {
+  const preferred = findWorksheet(wb, ["📦 Inventario", "Inventario", "Stock Actual", "Stock"]);
+  const ignored = new Set(["indice", "index", "kardex", "compradores", "clientes", "choferes", "proveedores"]);
+  const sheets = preferred ? [preferred] : [];
+  for (const ws of wb.worksheets) {
+    const name = normalizeText(ws.name);
+    if (sheets.includes(ws) || ignored.has(name)) continue;
+    if (name.includes("inventario") || name.includes("stock") || name.includes("madera") || name.includes("producto")) {
+      sheets.push(ws);
+    }
+  }
+  return sheets;
+}
+
 function headerMap(vals: ExcelJS.CellValue[]): Map<string, number> {
   const headers = new Map<string, number>();
   vals.forEach((value, index) => {
@@ -448,17 +462,20 @@ export async function POST(request: Request) {
   }
 
   // ── Inventario ───────────────────────────────────────────────────────────
-  const wsInv = findWorksheet(wb, ["📦 Inventario", "Inventario", "Stock Actual", "Stock"]);
-  if (wsInv) {
-    const parsed = parseInventarioSheet(wsInv);
-    const result: ImportResult = { sheet: "Inventario", inserted: 0, skipped: 0, errors: [] };
+  const inventorySheets = findInventoryWorksheets(wb);
+  if (inventorySheets.length > 0) {
+    let importedInventory = false;
+    const emptySheetNames: string[] = [];
 
-    if (parsed.length === 0) {
-      result.errors.push(
-        `La hoja "${wsInv.name}" fue encontrada, pero no se detectaron filas de productos. Revisa que tenga columnas Codigo y Nombre.`,
-      );
-      results.push(result);
-    } else {
+    for (const wsInv of inventorySheets) {
+      const parsed = parseInventarioSheet(wsInv);
+      if (parsed.length === 0) {
+        emptySheetNames.push(wsInv.name);
+        continue;
+      }
+
+      importedInventory = true;
+      const result: ImportResult = { sheet: `Inventario (${wsInv.name})`, inserted: 0, skipped: 0, errors: [] };
 
       for (const row of parsed) {
         const patch: Record<string, unknown> = {};
@@ -501,6 +518,17 @@ export async function POST(request: Request) {
         }
       }
       results.push(result);
+    }
+
+    if (!importedInventory) {
+      results.push({
+        sheet: "Inventario",
+        inserted: 0,
+        skipped: 0,
+        errors: [
+          `No se detectaron filas de productos en las hojas revisadas: ${emptySheetNames.join(", ")}. Version importador: positional-all-sheets.`,
+        ],
+      });
     }
   }
 
