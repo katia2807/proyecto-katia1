@@ -3005,6 +3005,8 @@ export function demoCreateVentaMaderaCortada(input: {
   tipo_corte: "tabla" | "liston" | "cuarton" | "poste";
   total_pt: number;
   precio_por_pt: number;
+  cantidad_piezas?: number;
+  precio_unitario_comercial?: number;
   total: number;
   metodo_pago: MetodoPago;
   modalidad_pago: ModalidadPago;
@@ -3037,7 +3039,10 @@ export function demoCreateVentaMaderaCortada(input: {
       medio: mapMetodoPagoToMedio(input.metodo_pago),
       categoria: "venta_madera_cortada",
       monto: input.total,
-      descripcion: `Venta ${input.total_pt.toFixed(2)} PT (${input.tipo_corte})`,
+      descripcion:
+        input.cantidad_piezas && input.precio_unitario_comercial
+          ? `Venta ${input.cantidad_piezas} pzs x S/ ${input.precio_unitario_comercial.toFixed(2)} (${input.tipo_corte})`
+          : `Venta ${input.total_pt.toFixed(2)} PT (${input.tipo_corte})`,
       modulo_origen: "ventas_madera_cortada",
       referencia_id: venta.id,
     });

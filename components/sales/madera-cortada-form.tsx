@@ -27,6 +27,10 @@ type Producto = {
   costo_unitario?: number | string | null;
 };
 
+type CubicajePiezaCalculada = {
+  inventario_producto_id?: string | null;
+};
+
 type MaderaCortadaFormProps = {
   clientes: Cliente[];
   choferes: Chofer[];
@@ -125,20 +129,25 @@ export function MaderaCortadaForm({
   const [totalPC, setTotalPC] = useState<number>(0);
   const [precioPorPt, setPrecioPorPt] = useState<number>(0);
   const [totalSolesCalculado, setTotalSolesCalculado] = useState<number>(0);
+  const [totalCantidad, setTotalCantidad] = useState<number>(0);
+  const [precioUnitarioComercial, setPrecioUnitarioComercial] = useState<number>(0);
 
   // Paso 3 States
   const [totalManual, setTotalManual] = useState<string>("");
 
-  const handleCubicajeChange = useCallback((data: { totalPT: number; totalPC: number; precioPorPT: number; totalSoles: number; piezas: any[] }) => {
+  const handleCubicajeChange = useCallback((data: { totalPT: number; totalPC: number; precioPorPT: number; totalSoles: number; totalCantidad: number; precioUnitarioComercial: number; piezas: CubicajePiezaCalculada[] }) => {
     setTotalPt(data.totalPT);
     setTotalPC(data.totalPC);
     setPrecioPorPt(data.precioPorPT);
     setTotalSolesCalculado(data.totalSoles);
+    setTotalCantidad(data.totalCantidad);
+    setPrecioUnitarioComercial(data.precioUnitarioComercial);
     const firstProd = data.piezas.find((p) => p.inventario_producto_id)?.inventario_producto_id || "";
     setProductoId(firstProd);
   }, []);
 
   const totalFinal = totalManual !== "" ? (Number(totalManual) || 0) : totalSolesCalculado;
+  const precioUnitarioComercialFinal = totalCantidad > 0 ? totalFinal / totalCantidad : precioUnitarioComercial;
 
   const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
 
@@ -171,6 +180,8 @@ export function MaderaCortadaForm({
       setTotalPC(0);
       setPrecioPorPt(0);
       setTotalSolesCalculado(0);
+      setTotalCantidad(0);
+      setPrecioUnitarioComercial(0);
       setProductoId("");
       setTotalManual("");
       
@@ -349,15 +360,15 @@ export function MaderaCortadaForm({
               Comprobante *
             </p>
             <div className="flex gap-2">
-              {[
+              {([
                 { value: "boleta", label: "Boleta" },
                 { value: "factura", label: "Factura" },
-              ].map((opt) => (
+              ] as const).map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
                   onClick={() => {
-                    setTipoComprobante(opt.value as any);
+                    setTipoComprobante(opt.value);
                     setTouchedSteps((prev) => ({ ...prev, 1: true }));
                   }}
                   className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -516,6 +527,10 @@ export function MaderaCortadaForm({
                   <span>Corte: {totalPt.toFixed(2)} PT a S/ {precioPorPt || "0.00"}</span>
                   <span className="font-semibold">{formatPen(totalSolesCalculado)}</span>
                 </div>
+                <div className="flex justify-between items-center text-sm border-b border-[var(--color-border)] pb-2">
+                  <span>Comercial: {totalCantidad} pzs a {formatPen(precioUnitarioComercialFinal)}</span>
+                  <span className="font-semibold">{formatPen(totalSolesCalculado)}</span>
+                </div>
                 
                 <div className="space-y-1.5 pt-1">
                   <label htmlFor="total-editable" className="text-sm font-medium text-[var(--color-text-primary)]">Total editable (S/)</label>
@@ -622,6 +637,9 @@ export function MaderaCortadaForm({
               <p className="text-sm">
                 <strong>Costo por PT:</strong> {formatPen(Number(precioPorPt) || 0)}
               </p>
+              <p className="text-sm">
+                <strong>Precio unitario comercial:</strong> {formatPen(precioUnitarioComercialFinal)} x {totalCantidad} pzs
+              </p>
             </div>
 
             {/* Resumen Cobro Final */}
@@ -669,6 +687,8 @@ export function MaderaCortadaForm({
       {/* Hidden inputs expected by submitCreateVentaMaderaCortadaForm */}
       <input type="hidden" name="total_pt" value={totalPt.toFixed(4)} />
       <input type="hidden" name="precio_por_pt" value={precioPorPt} />
+      <input type="hidden" name="cantidad_piezas" value={totalCantidad} />
+      <input type="hidden" name="precio_unitario_comercial" value={precioUnitarioComercialFinal.toFixed(2)} />
       <input type="hidden" name="total" value={totalFinal.toFixed(2)} />
 
       {state?.error && (

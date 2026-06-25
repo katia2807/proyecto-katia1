@@ -116,14 +116,17 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
     clienteNombre  = cli?.nombre ?? "—";
     clienteDoc     = cli?.ruc ?? cli?.documento ?? "—";
 
+    const cantidadPiezas = Number(venta.cantidad_piezas ?? 0);
+    const precioUnitarioComercial = Number(venta.precio_unitario_comercial ?? 0);
+    const usarPrecioComercial = cantidadPiezas > 0 && precioUnitarioComercial > 0;
     const pt       = Number(venta.total_pt ?? 0).toFixed(2);
     const ppt      = Number(venta.precio_por_pt ?? 0);
     const tipoCorte = (venta.tipo_corte ?? "madera").replace(/_/g, " ");
     items = [
       {
         desc: `Madera cortada - ${tipoCorte}`,
-        qty: `${pt} PT`,
-        unitario: formatPen(ppt),
+        qty: usarPrecioComercial ? `${cantidadPiezas} pzs` : `${pt} PT`,
+        unitario: usarPrecioComercial ? formatPen(precioUnitarioComercial) : formatPen(ppt),
         total: formatPen(totalSoles),
       },
     ];
@@ -443,4 +446,3 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
     </>
   );
 }
-

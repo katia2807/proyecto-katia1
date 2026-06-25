@@ -254,6 +254,8 @@ const ventaMaderaCortadaSchema = z.object({
   tipoCorte: z.enum(["tabla", "liston", "cuarton", "poste"]),
   totalPt: z.preprocess(preprocessDecimal, z.coerce.number().positive()),
   precioPorPt: moneySchema(z.number().nonnegative()),
+  cantidadPiezas: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative()).optional().default(0),
+  precioUnitarioComercial: moneySchema(z.number().nonnegative()).optional().default(0),
   total: moneySchema(z.number().nonnegative()),
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("contado"),
@@ -3862,6 +3864,8 @@ export async function createVentaMaderaCortada(formData: FormData) {
     tipoCorte: formData.get("tipo_corte"),
     totalPt: formData.get("total_pt"),
     precioPorPt: formData.get("precio_por_pt"),
+    cantidadPiezas: formData.get("cantidad_piezas"),
+    precioUnitarioComercial: formData.get("precio_unitario_comercial"),
     total: formData.get("total"),
     metodoPago: formData.get("metodo_pago"),
     modalidadPago: formData.get("modalidad_pago"),
@@ -3893,6 +3897,8 @@ export async function createVentaMaderaCortada(formData: FormData) {
       tipo_corte: parsed.data.tipoCorte,
       total_pt: parsed.data.totalPt,
       precio_por_pt: parsed.data.precioPorPt,
+      cantidad_piezas: parsed.data.cantidadPiezas,
+      precio_unitario_comercial: parsed.data.precioUnitarioComercial,
       total: parsed.data.total,
       metodo_pago: parsed.data.metodoPago,
       modalidad_pago: parsed.data.modalidadPago,
@@ -3913,7 +3919,7 @@ export async function createVentaMaderaCortada(formData: FormData) {
 
     // Parse detailed pieces for multi-product stock verification
     const lineasRaw = formData.get("lineas_cubicaje");
-    let lineas: any[] = [];
+    let lineas: Array<{ inventario_producto_id?: string | null; subtotalPT?: number }> = [];
     if (typeof lineasRaw === "string" && lineasRaw.trim().length > 0) {
       try {
         lineas = JSON.parse(lineasRaw);
@@ -3983,6 +3989,8 @@ export async function createVentaMaderaCortada(formData: FormData) {
         tipo_corte: parsed.data.tipoCorte,
         total_pt: parsed.data.totalPt,
         precio_por_pt: parsed.data.precioPorPt,
+        cantidad_piezas: parsed.data.cantidadPiezas || null,
+        precio_unitario_comercial: parsed.data.precioUnitarioComercial || null,
         total: parsed.data.total,
         metodo_pago: parsed.data.metodoPago,
         modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
@@ -4010,7 +4018,10 @@ export async function createVentaMaderaCortada(formData: FormData) {
     let cajaRegistrado = false;
     if (montoCaja > 0) {
       const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
-      const descripcionBase = `Venta ${parsed.data.totalPt.toFixed(2)} PT (${parsed.data.tipoCorte})`;
+      const descripcionBase =
+        parsed.data.cantidadPiezas > 0 && parsed.data.precioUnitarioComercial > 0
+          ? `Venta ${parsed.data.cantidadPiezas} pzs x S/ ${parsed.data.precioUnitarioComercial.toFixed(2)} (${parsed.data.tipoCorte})`
+          : `Venta ${parsed.data.totalPt.toFixed(2)} PT (${parsed.data.tipoCorte})`;
       const descripcionModalidad = 
         parsed.data.modalidadPago === "adelanto" ? ` - Adelanto: S/ ${(parsed.data.adelanto || 0).toFixed(2)}`
         : parsed.data.modalidadPago === "adelanto_saldo" ? ` - Adelanto: S/ ${(parsed.data.adelanto || 0).toFixed(2)}`

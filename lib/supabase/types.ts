@@ -623,6 +623,8 @@ export type Database = {
           tipo_corte: "tabla" | "liston" | "cuarton" | "poste";
           total_pt: number;
           precio_por_pt: number;
+          cantidad_piezas: number | null;
+          precio_unitario_comercial: number | null;
           total: number;
           metodo_pago:
             | "efectivo"
@@ -649,6 +651,8 @@ export type Database = {
           tipo_corte: "tabla" | "liston" | "cuarton" | "poste";
           total_pt: number;
           precio_por_pt: number;
+          cantidad_piezas?: number | null;
+          precio_unitario_comercial?: number | null;
           total: number;
           metodo_pago:
             | "efectivo"
@@ -667,8 +671,10 @@ export type Database = {
           created_by?: string | null;
         };
         Update: {
+          cantidad_piezas?: number | null;
           estado?: "borrador" | "confirmada";
           estado_entrega?: "pendiente" | "en_proceso" | "entregado";
+          precio_unitario_comercial?: number | null;
         };
       };
       ventas_mueble_terminado: {

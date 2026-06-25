@@ -164,7 +164,7 @@ describe("cálculos de utilidad", () => {
   });
 });
 
-describe("cálculos de cubicaje aserradero comercial", () => {
+describe("cálculos de cubicaje madera aserrada", () => {
   test("PT real unitario se calcula correctamente por pieza individual", () => {
     // espesor: 2, ancho: 6, largo: 8.5
     // PT unitario real = (2 * 6 * 8.5) / 12 = 8.5
@@ -172,28 +172,34 @@ describe("cálculos de cubicaje aserradero comercial", () => {
     expect(ptRealUnit).toBe(8.5);
   });
 
-  test("PT comercial unitario aplica Math.floor al PT real unitario", () => {
+  test("PT total de venta usa PT real unitario por la cantidad de piezas", () => {
     const ptRealUnit = 8.5;
-    const ptComercialUnit = Math.floor(ptRealUnit);
-    expect(ptComercialUnit).toBe(8);
-  });
-
-  test("PT comercial total multiplica el comercial unitario por la cantidad de piezas", () => {
-    const ptComercialUnit = 8;
     const cantidad = 5;
-    const ptComercialTotal = ptComercialUnit * cantidad;
-    expect(ptComercialTotal).toBe(40);
-    
-    // Y verificamos que NO se usa Math.floor(PT real unitario * cantidad)
-    // Math.floor(8.5 * 5) = Math.floor(42.5) = 42 (lo cual sería INCORRECTO comercialmente)
-    const formulaIncorrecta = Math.floor(8.5 * cantidad);
-    expect(ptComercialTotal).not.toBe(formulaIncorrecta);
+    const ptTotalReal = ptRealUnit * cantidad;
+    expect(ptTotalReal).toBe(42.5);
   });
 
-  test("Costo comercial se calcula sobre el total PT comercial por el precio", () => {
-    const totalPTComercial = 40; // de la prueba anterior
+  test("total de venta se calcula sobre el PT real total por el precio", () => {
+    const totalPTReal = 42.5;
     const precioPorPT = 2.5;
-    const costoComercial = totalPTComercial * precioPorPT;
-    expect(costoComercial).toBe(100);
+    const totalVenta = totalPTReal * precioPorPT;
+    expect(totalVenta).toBe(106.25);
+  });
+
+  test("caso 12 tablas de 1 x 8 x 10 mantiene 80 PT reales de referencia", () => {
+    const cantidad = 12;
+    const ptUnitarioReal = (1 * 8 * 10) / 12;
+    const totalPTReal = ptUnitarioReal * cantidad;
+
+    expect(ptUnitarioReal).toBeCloseTo(6.6666666667, 10);
+    expect(totalPTReal).toBe(80);
+  });
+
+  test("caso comercial 12 tablas de 1 x 8 x 10 con P.UNIT S/23.30 da S/279.60", () => {
+    const cantidad = 12;
+    const precioUnitarioComercial = 23.3;
+    const totalVenta = cantidad * precioUnitarioComercial;
+
+    expect(totalVenta).toBe(279.6);
   });
 });

@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatPen } from "@/lib/utils";
+import { formatPen, roundMoney } from "@/lib/utils";
 
 type Pieza = {
   id: number;
@@ -12,6 +12,7 @@ type Pieza = {
   ancho: number;
   largo: number;
   descripcion: string;
+  precioUnitarioComercial?: number | null;
   inventario_producto_id?: string | null;
 };
 
@@ -29,7 +30,7 @@ type CubicajeInputProps = {
   /** Nombre del campo oculto que reporta el volumen total en m³. */
   totalM3Name?: string;
   /** Callback opcional para notificar cambios de valores al padre */
-  onChange?: (data: { totalPT: number; totalPC: number; precioPorPT: number; totalSoles: number; piezas: Pieza[]; totalPTComercial?: number }) => void;
+  onChange?: (data: { totalPT: number; totalPC: number; precioPorPT: number; totalSoles: number; totalCantidad: number; precioUnitarioComercial: number; piezas: Pieza[] }) => void;
   /** Lista opcional de productos de inventario para autocompletar fila por fila */
   productos?: {
     id: string;
@@ -118,24 +119,27 @@ export function CubicajeInput({
   );
   const [precioInput, setPrecioInput] = useState(defaultPrecioPorPT);
   const [focusRowId, setFocusRowId] = useState<number | null>(null);
+  const precioActivo = precioEditable
+    ? Number.parseFloat(precioInput.replace(",", ".")) || 0
+    : (precioPorPT ?? 0);
 
   const piezasConSubtotal = useMemo(
     () => piezas.map((p) => {
       const ptUnitarioReal = calcularPTUnitarioReal(p);
       const ptTotalReal = ptUnitarioReal * p.cantidad;
-      const ptUnitarioComercial = Math.floor(ptUnitarioReal);
-      const ptTotalComercial = ptUnitarioComercial * p.cantidad;
+      const precioUnitarioComercial = p.precioUnitarioComercial ?? roundMoney(ptUnitarioReal * precioActivo);
+      const subtotalComercial = roundMoney(precioUnitarioComercial * p.cantidad);
       return {
         ...p,
         ptUnitarioReal,
         ptTotalReal,
-        ptUnitarioComercial,
-        ptTotalComercial,
+        precioUnitarioComercial,
+        subtotalComercial,
         // Mantener compatibilidad con subtotalPT para no romper esquemas
         subtotalPT: ptTotalReal,
       };
     }),
-    [piezas],
+    [piezas, precioActivo],
   );
 
   const totalPT = useMemo(
@@ -143,19 +147,18 @@ export function CubicajeInput({
     [piezasConSubtotal],
   );
 
-  const totalPTComercial = useMemo(
-    () => piezasConSubtotal.reduce((acc, p) => acc + p.ptTotalComercial, 0),
-    [piezasConSubtotal],
-  );
-
   const totalPC = useMemo(() => totalPT / 12, [totalPT]);
   const totalM3 = useMemo(() => ptAM3(totalPT), [totalPT]);
-  const precioActivo = precioEditable
-    ? Number.parseFloat(precioInput.replace(",", ".")) || 0
-    : (precioPorPT ?? 0);
+  const totalCantidad = useMemo(
+    () => piezasConSubtotal.reduce((acc, p) => acc + p.cantidad, 0),
+    [piezasConSubtotal],
+  );
   
-  // Costo comercial se calcula con Total PT comercial * precio por PT
-  const totalSoles = totalPTComercial * precioActivo;
+  const totalSoles = useMemo(
+    () => roundMoney(piezasConSubtotal.reduce((acc, p) => acc + p.subtotalComercial, 0)),
+    [piezasConSubtotal],
+  );
+  const precioUnitarioComercialPromedio = totalCantidad > 0 ? roundMoney(totalSoles / totalCantidad) : 0;
 
   // Notificar al padre cuando cambien los valores calculados
   useEffect(() => {
@@ -165,7 +168,8 @@ export function CubicajeInput({
         totalPC,
         precioPorPT: precioActivo,
         totalSoles,
-        totalPTComercial,
+        totalCantidad,
+        precioUnitarioComercial: precioUnitarioComercialPromedio,
         piezas: piezasConSubtotal.map(p => ({
           ...p,
           descripcion: p.descripcion || "",
@@ -173,7 +177,7 @@ export function CubicajeInput({
         })),
       });
     }
-  }, [totalPT, totalPC, precioActivo, totalSoles, totalPTComercial, piezasConSubtotal, onChange]);
+  }, [totalPT, totalPC, precioActivo, totalSoles, totalCantidad, precioUnitarioComercialPromedio, piezasConSubtotal, onChange]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (e.key === "Enter") {
@@ -248,10 +252,10 @@ export function CubicajeInput({
                 Largo (ft)
               </th>
               <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[100px]">
-                PT Real (u / tot)
+                PT (u / tot)
               </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[110px] text-[var(--color-primary)]">
-                PT Com (u / tot)
+              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[100px]">
+                P.Unit (S/)
               </th>
               <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[48px]">
                 Acciones
@@ -262,7 +266,7 @@ export function CubicajeInput({
             {piezasConSubtotal.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-3 py-6 text-center text-xs text-[var(--color-text-secondary)] italic">
-                  Calculadora vacía. Haz clic en "Agregar pieza" o selecciona un producto de inventario en la fila para empezar.
+                  Calculadora vacía. Haz clic en &quot;Agregar pieza&quot; o selecciona un producto de inventario en la fila para empezar.
                 </td>
               </tr>
             ) : (
@@ -381,10 +385,17 @@ export function CubicajeInput({
                     <span className="mx-1 text-[var(--color-border)]">/</span>
                     <span className="font-bold text-[var(--color-text-primary)]">{p.ptTotalReal.toFixed(2)}</span>
                   </td>
-                  <td className="px-2 py-1.5 text-center font-medium text-xs whitespace-nowrap">
-                    <span className="text-[var(--color-text-secondary)]">{p.ptUnitarioComercial}</span>
-                    <span className="mx-1 text-[var(--color-border)]">/</span>
-                    <span className="font-bold text-[var(--color-primary)]">{p.ptTotalComercial}</span>
+                  <td className="px-2 py-1.5 text-center">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className={`${inputClass} text-center`}
+                      value={p.precioUnitarioComercial === 0 ? "" : p.precioUnitarioComercial}
+                      onChange={(e) => actualizar(p.id, { precioUnitarioComercial: Number(e.target.value) || 0 })}
+                      onKeyDown={handleKeyDown}
+                      autoComplete="off"
+                    />
                   </td>
                   <td className="px-1 py-1.5 text-center">
                     <button
@@ -416,11 +427,11 @@ export function CubicajeInput({
           <Plus className="mr-1 size-4" /> Agregar pieza
         </Button>
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 bg-[var(--color-primary-soft)]/10 text-[var(--color-primary)]">
-            Total PT Comercial: <span className="font-bold">{totalPTComercial}</span>
+          <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-secondary)]">
+            Total PT: <span className="font-bold">{totalPT.toFixed(2)}</span>
           </span>
           <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-secondary)]">
-            Total PT Real: <span className="font-bold">{totalPT.toFixed(2)}</span>
+            Piezas: <span className="font-bold">{totalCantidad}</span>
           </span>
           <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-secondary)]">
             Total Pie Cúbico: <span className="font-bold">{totalPC.toFixed(2)} ft³</span>
