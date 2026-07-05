@@ -646,24 +646,24 @@ export default async function ComprobantePage({
               {/* Detalle Venta Madera */}
               <div className="voucher-section mt-4 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4">
                 <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Detalle de Venta</p>
-                <table className="w-full">
+                <table className="w-full table-fixed">
                   <thead>
                     <tr>
-                      <th className="voucher-th w-1/2 border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-left">Especie de madera / Descripción</th>
-                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Cant.</th>
-                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Unidad</th>
-                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Precio unit.</th>
-                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Total</th>
+                      <th className="voucher-th w-[46%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 pr-3 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Descripción</th>
+                      <th className="voucher-th w-[12%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Cant.</th>
+                      <th className="voucher-th w-[13%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Unidad</th>
+                      <th className="voucher-th w-[14%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">P. Unit.</th>
+                      <th className="voucher-th w-[15%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     {ventaMaderaLineasResueltas.map((linea, i) => (
                       <tr key={i} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-left">{linea.desc}</td>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{linea.qty}</td>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right font-medium text-[var(--color-text-secondary,#64748b)] capitalize">{linea.unidad}</td>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{linea.unitario}</td>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right font-semibold">{linea.total}</td>
+                        <td className="voucher-td min-w-0 whitespace-normal break-words py-2 pr-3 text-left text-sm leading-snug text-[var(--color-text-primary,#1e293b)]">{linea.desc}</td>
+                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.qty}</td>
+                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm font-medium capitalize text-[var(--color-text-secondary,#64748b)]">{linea.unidad}</td>
+                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.unitario}</td>
+                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">{linea.total}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -698,22 +698,22 @@ export default async function ComprobantePage({
               {/* Detalle Mueble o Madera Cortada */}
               <div className="voucher-section mt-4 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4">
                 <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Detalle</p>
-                <table className="w-full">
+                <table className="w-full table-fixed">
                   <thead>
                     <tr>
-                      <th className="voucher-th w-1/2 border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-left">Descripción</th>
-                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Cant.</th>
-                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Precio unit.</th>
-                      <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)] text-right">Total</th>
+                      <th className="voucher-th w-[52%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 pr-3 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Descripción</th>
+                      <th className="voucher-th w-[12%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Cant.</th>
+                      <th className="voucher-th w-[14%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">P. Unit.</th>
+                      <th className="voucher-th w-[15%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item, i) => (
                       <tr key={i} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)]">{item.desc}</td>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{item.qty}</td>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{item.unitario}</td>
-                        <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right font-semibold">{item.total}</td>
+                        <td className="voucher-td min-w-0 whitespace-normal break-words py-2 pr-3 text-sm leading-snug text-[var(--color-text-primary,#1e293b)]">{item.desc}</td>
+                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{item.qty}</td>
+                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{item.unitario}</td>
+                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">{item.total}</td>
                       </tr>
                     ))}
                   </tbody>
