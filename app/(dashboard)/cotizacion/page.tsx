@@ -14,7 +14,18 @@ import { canMutateVentas } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
-export default async function CotizacionPage() {
+type CotizacionPageProps = {
+  searchParams?: Promise<{ modo?: string | string[] }>;
+};
+
+function normalizeModoParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
+}
+
+export default async function CotizacionPage({ searchParams }: CotizacionPageProps) {
+  const modo = normalizeModoParam((await searchParams)?.modo);
+  const modoGuiado = modo === "guiado";
   const session = await getDashboardSession();
   const role = session?.role ?? null;
   const uiRole = session?.uiRole ?? null;
@@ -53,7 +64,9 @@ export default async function CotizacionPage() {
       <div>
         <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Nueva venta guiada</h2>
         <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
-          Crea una cotización, imprime el documento y conviértela a venta cuando el cliente acepte.
+          {modoGuiado
+            ? "Completa los datos paso a paso. Usa Siguiente para avanzar y revisa el total antes de guardar."
+            : "Crea una cotizacion, imprime el documento y conviertela a venta cuando el cliente acepte."}
         </p>
       </div>
 
@@ -63,9 +76,11 @@ export default async function CotizacionPage() {
             <div className="inline-flex items-center rounded-full bg-[var(--katia-primary)] px-2.5 py-1 text-xs font-bold text-white">
               Recomendado para encargados
             </div>
-            <CardTitle className="mt-3 text-xl">Modo rápido para encargados</CardTitle>
+            <CardTitle className="mt-3 text-xl">Modo rapido para encargados</CardTitle>
             <CardDescription className="mt-2 text-sm leading-6">
-              Usa este flujo si solo necesitas registrar una venta o cotización con los datos básicos. Las opciones avanzadas siguen disponibles en el mismo formulario.
+              {modoGuiado
+                ? "Completa los datos paso a paso. Usa Siguiente para avanzar y revisa el total antes de guardar."
+                : "Usa este flujo si solo necesitas registrar una venta o cotizacion con los datos basicos. Las opciones avanzadas siguen disponibles en el mismo formulario."}
             </CardDescription>
           </div>
           <a
@@ -80,7 +95,7 @@ export default async function CotizacionPage() {
             "Cliente",
             "Producto o servicio",
             "Total",
-            "Guardar / convertir a venta",
+            "Confirmar",
           ].map((step, index) => (
             <div key={step} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
               <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Paso {index + 1}</p>

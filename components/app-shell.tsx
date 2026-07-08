@@ -27,6 +27,7 @@ import {
 } from "@tabler/icons-react";
 import { navItems } from "@/lib/constants";
 import { logout } from "@/app/(auth)/actions";
+import { AppVersionNotice } from "@/components/app-version-notice";
 import type { AppRole } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 import { AppShellAccessGuard } from "@/components/app-shell-access-guard";
@@ -345,6 +346,7 @@ export function AppShell({
         <div className="dashboard-content p-4 md:p-6 lg:p-8">{children}</div>
         <AppFooter companyName={companyName} />
       </main>
+      <AppVersionNotice />
       <FloatingHelp />
     </div>
   );

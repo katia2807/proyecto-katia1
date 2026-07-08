@@ -97,20 +97,6 @@ export default async function MueblesTerminadosPage() {
         </div>
       </Card>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card className="py-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Muebles disponibles</p>
-          <p className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">{mueblesDisponibles}</p>
-        </Card>
-        <Card className="py-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Ventas registradas</p>
-          <p className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">{ventas.length}</p>
-        </Card>
-        <Card className="py-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Stock bajo</p>
-          <p className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">{stockBajo}</p>
-        </Card>
-      </div>
 
       <Card>
         <CardTitle>Ventas registradas</CardTitle>
@@ -280,6 +266,24 @@ export default async function MueblesTerminadosPage() {
               </p>
             </Card>
           ) : null}
+        </div>
+      </Card>
+      <Card className="py-4">
+        <CardTitle className="text-base">Resumen del módulo</CardTitle>
+        <CardDescription>Información secundaria para seguimiento rápido.</CardDescription>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-[var(--color-border)] px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Muebles disponibles</p>
+            <p className="mt-1 text-xl font-bold text-[var(--color-text-primary)]">{mueblesDisponibles}</p>
+          </div>
+          <div className="rounded-xl border border-[var(--color-border)] px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Ventas registradas</p>
+            <p className="mt-1 text-xl font-bold text-[var(--color-text-primary)]">{ventas.length}</p>
+          </div>
+          <div className="rounded-xl border border-[var(--color-border)] px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Stock bajo</p>
+            <p className="mt-1 text-xl font-bold text-[var(--color-text-primary)]">{stockBajo}</p>
+          </div>
         </div>
       </Card>
     </div>

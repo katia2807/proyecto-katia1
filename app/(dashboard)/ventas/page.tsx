@@ -175,7 +175,7 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/cotizacion">
+          <Link href="/cotizacion?modo=guiado#cotizacion-wizard">
             <Button variant="secondary">
               <PlusCircle className="mr-2 size-4" />
               Nueva venta guiada
@@ -228,7 +228,7 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
               atención diaria.
             </CardDescription>
           </div>
-          <Link href="/cotizacion">
+          <Link href="/cotizacion?modo=guiado#cotizacion-wizard">
             <Button className="h-12 px-6 text-base font-bold shadow-sm">
               <PlusCircle className="mr-2 size-4" />
               Crear venta

@@ -644,6 +644,14 @@ export function CotizacionUnificadaWizard({
 
   const effectiveStepIndex = Math.min(stepIndex, Math.max(0, steps.length - 1));
   const currentStepId = steps[effectiveStepIndex] ?? "cliente";
+  const guidedStepLabels = ["Cliente", "Producto o servicio", "Total", "Confirmar"];
+  const guidedStepIndex = currentStepId === "cliente"
+    ? 0
+    : currentStepId === "rubros"
+      ? 1
+      : currentStepId === "resumen"
+        ? 3
+        : 2;
 
   const margenGananciaPct = empresa.margen_ganancia_default_pct;
   const totales = useMemo(() => computeTotalesDetalle(detalle), [detalle]);
@@ -1631,27 +1639,40 @@ export function CotizacionUnificadaWizard({
 
   return (
     <div id="cotizacion-wizard" className="space-y-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 md:p-6">
-      <Card className="border-[var(--katia-primary)]/30 bg-[var(--katia-primary)]/5 p-4">
+      <Card className="border-2 border-[var(--katia-primary)] bg-[var(--katia-primary)]/5 p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-[var(--katia-primary)]">Ruta simple</p>
-            <CardTitle className="mt-1 text-lg">Venta guiada rápida</CardTitle>
+          <div className="max-w-2xl">
+            <p className="text-xs font-bold uppercase tracking-wide text-[var(--katia-primary)]">Flujo guiado</p>
+            <CardTitle className="mt-1 text-lg">Venta guiada paso a paso</CardTitle>
             <CardDescription className="mt-1">
-              Primero selecciona o registra al cliente. Luego agrega el producto o servicio. Al final revisa el total antes de guardar o convertir a venta.
+              Completa cliente, producto o servicio, total y confirmacion. Usa Siguiente y Anterior para avanzar sin perder las opciones avanzadas.
             </CardDescription>
           </div>
-          <div className="grid gap-2 text-xs sm:grid-cols-4">
-            {["Cliente", "Producto o servicio", "Total", "Guardar"].map((label) => (
-              <span key={label} className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 font-semibold text-[var(--color-text-primary)]">
-                {label}
-              </span>
+          <div className="grid w-full gap-2 text-xs sm:grid-cols-4 lg:w-auto">
+            {guidedStepLabels.map((label, idx) => (
+              <div
+                key={label}
+                className={`rounded-xl border px-3 py-2 ${idx === guidedStepIndex
+                    ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)] shadow-sm"
+                    : idx < guidedStepIndex
+                      ? "border-[var(--color-accent)]/40 bg-[var(--color-primary-soft)] text-[var(--color-text-primary)]"
+                      : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)]"
+                  }`}
+              >
+                <p className="text-[10px] font-bold uppercase tracking-wide opacity-80">Paso {idx + 1}</p>
+                <p className="font-semibold">{label}</p>
+              </div>
             ))}
           </div>
         </div>
       </Card>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <Card className="p-4">
+      <details className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-[var(--color-text-primary)]">
+          Informacion adicional
+        </summary>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+<Card className="p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
             Pendientes
           </p>
@@ -1679,7 +1700,8 @@ export function CotizacionUnificadaWizard({
           <p className="text-2xl font-bold text-teal-700 dark:text-teal-400">0</p>
           <p className="text-xs text-[var(--color-text-secondary)]">Ingreso registrado en caja.</p>
         </Card>
-      </div>
+        </div>
+      </details>
 
       {guardadaRow ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300 shadow-sm transition-all">
@@ -1711,8 +1733,12 @@ export function CotizacionUnificadaWizard({
         </div>
       ) : null}
 
-      <Card className="sticky top-2 z-10 border-[var(--color-border)] bg-[var(--color-surface)]/95 p-4 backdrop-blur">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <details className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-[var(--color-text-primary)]">
+          Borradores y resumen rapido
+        </summary>
+        <div className="mt-4">
+<div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
               Resumen de la cotización
@@ -1756,9 +1782,14 @@ export function CotizacionUnificadaWizard({
             : "Aún no hay borrador guardado."}{" "}
           En PC: `Ctrl/Cmd + S` guarda, `Alt + R` recupera, `Alt + N` nueva.
         </p>
-      </Card>
+        </div>
+      </details>
 
-      <Card className="space-y-3 border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+      <details className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-[var(--color-text-primary)]">
+          Opciones avanzadas
+        </summary>
+        <div className="mt-4 space-y-3">
         <CardTitle className="text-base">Modo completo y opciones avanzadas</CardTitle>
         <CardDescription>
           Modo completo: usa estos pasos cuando necesites medidas, rubros, margen, aserradero, alquiler o notas detalladas.
@@ -1782,7 +1813,8 @@ export function CotizacionUnificadaWizard({
             </button>
           ))}
         </div>
-      </Card>
+        </div>
+      </details>
 
       {currentStepId === "cliente" ? (
         <Card className={`${panelClass} space-y-5 border-none`}>
@@ -3432,8 +3464,11 @@ export function CotizacionUnificadaWizard({
           </div>
         </Card>
       ) : null}
-
-      <Card className="overflow-x-auto p-0">
+      <details className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-[var(--color-text-primary)]">
+          Informacion adicional: cotizaciones guardadas
+        </summary>
+        <Card className="mt-4 overflow-x-auto p-0">
         <div className="border-b border-[var(--color-border)] px-5 py-4">
           <CardTitle className="text-base">Cotizaciones guardadas</CardTitle>
           <CardDescription>Cargá una para editarla o usá las acciones según estado.</CardDescription>
@@ -3615,6 +3650,7 @@ export function CotizacionUnificadaWizard({
           <p className="px-5 py-6 text-sm text-[var(--color-text-secondary)]">Aún no hay cotizaciones unificadas guardadas.</p>
         ) : null}
       </Card>
+      </details>
 
       {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
       {!canSave ? (

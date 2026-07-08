@@ -1,8 +1,7 @@
 import Link from "next/link";
+import { APP_LAST_UPDATE, APP_VERSION } from "@/lib/app-version";
 import { cn } from "@/lib/utils";
 
-const APP_VERSION = "1.0.0";
-const APP_BUILD_DATE = "Mayo 2026";
 
 type AppFooterProps = {
   className?: string;
@@ -27,7 +26,7 @@ export function AppFooter({ className, companyName }: AppFooterProps) {
       </p>
       <div className="flex items-center gap-3">
         <p className="text-xs text-[var(--katia-text-disabled)]">
-          v{APP_VERSION} Â· {APP_BUILD_DATE}
+          Versión {APP_VERSION} · Actualizado: {APP_LAST_UPDATE}
         </p>
         <Link href="/legal/terminos" className="text-xs text-[var(--katia-text-disabled)] hover:text-[var(--katia-text-tertiary)]">
           TÃ©rminos
