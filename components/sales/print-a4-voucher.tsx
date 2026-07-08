@@ -173,6 +173,11 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
   }
 
   const docTitle = docType === "factura" ? "FACTURA DE VENTA" : "BOLETA DE VENTA";
+  const brandContactLines = [
+    empresa.telefono ? `Tel: ${empresa.telefono}` : null,
+    empresa.direccion ? `Dir: ${empresa.direccion}` : null,
+    empresa.ruc ? `RUC: ${empresa.ruc}` : null,
+  ].filter((line): line is string => Boolean(line));
 
   return (
     <>
@@ -367,24 +372,31 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
         {tipo === "venta-madera" && (
           <div className="mt-6">
             <h3 className="text-xs font-black uppercase tracking-wider text-gray-600 mb-3">Detalle de Productos</h3>
-            <table className="w-full text-xs">
+            <table className="w-full table-fixed text-xs">
+              <colgroup>
+                <col className="w-[52%]" />
+                <col className="w-[10%]" />
+                <col className="w-[12%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-gray-400 bg-slate-100">
-                  <th className="text-left py-2 font-bold uppercase">Descripción del Producto</th>
-                  <th className="text-right py-2 font-bold uppercase">Cant.</th>
-                  <th className="text-right py-2 font-bold uppercase">Unidad</th>
-                  <th className="text-right py-2 font-bold uppercase">Precio Unit.</th>
-                  <th className="text-right py-2 font-bold uppercase">Subtotal</th>
+                  <th className="py-2 pl-3 pr-4 text-left font-bold uppercase">Descripción</th>
+                  <th className="px-2 py-2 text-right font-bold uppercase">Cant.</th>
+                  <th className="px-2 py-2 text-right font-bold uppercase">Unidad</th>
+                  <th className="px-2 py-2 text-right font-bold uppercase">P. Unit.</th>
+                  <th className="py-2 pl-2 pr-3 text-right font-bold uppercase">Subtotal</th>
                 </tr>
               </thead>
               <tbody>
                 {ventaMaderaLineasResueltas.map((linea, i) => (
                   <tr key={i} className="border-b border-gray-200">
-                    <td className="py-2.5 text-sm font-semibold">{linea.desc}</td>
-                    <td className="text-right py-2.5 text-sm">{linea.qty}</td>
-                    <td className="text-right py-2.5 text-sm uppercase text-gray-500">{linea.unidad}</td>
-                    <td className="text-right py-2.5 text-sm">{linea.unitario}</td>
-                    <td className="text-right py-2.5 text-sm font-bold">{linea.total}</td>
+                    <td className="min-w-0 whitespace-normal break-words py-2.5 pl-3 pr-4 text-sm font-semibold leading-snug">{linea.desc}</td>
+                    <td className="px-2 py-2.5 text-right text-sm">{linea.qty}</td>
+                    <td className="px-2 py-2.5 text-right text-sm uppercase text-gray-500">{linea.unidad}</td>
+                    <td className="px-2 py-2.5 text-right text-sm">{linea.unitario}</td>
+                    <td className="py-2.5 pl-2 pr-3 text-right text-sm font-bold">{linea.total}</td>
                   </tr>
                 ))}
               </tbody>
@@ -417,22 +429,33 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
         {["madera", "mueble"].includes(tipo || "") && (
           <div className="mt-6">
             <h3 className="text-xs font-black uppercase tracking-wider text-gray-600 mb-3">Detalle de Venta</h3>
-            <table className="w-full text-xs">
+            <table className="w-full table-fixed text-xs">
+              <colgroup>
+                <col className="w-[52%]" />
+                <col className="w-[10%]" />
+                <col className="w-[12%]" />
+                <col className="w-[13%]" />
+                <col className="w-[13%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-gray-400 bg-slate-100">
-                  <th className="text-left py-2 font-bold uppercase">Descripción</th>
-                  <th className="text-right py-2 font-bold uppercase">Cant.</th>
-                  <th className="text-right py-2 font-bold uppercase">Precio Unit.</th>
-                  <th className="text-right py-2 font-bold uppercase">Subtotal</th>
+                  <th className="py-2 pl-3 pr-4 text-left font-bold uppercase">Descripción</th>
+                  <th className="px-2 py-2 text-right font-bold uppercase">Cant.</th>
+                  <th className="px-2 py-2 text-right font-bold uppercase">Unidad</th>
+                  <th className="px-2 py-2 text-right font-bold uppercase">P. Unit.</th>
+                  <th className="py-2 pl-2 pr-3 text-right font-bold uppercase">Subtotal</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, i) => (
                   <tr key={i} className="border-b border-gray-200">
-                    <td className="py-2.5 text-sm font-semibold">{item.desc}</td>
-                    <td className="text-right py-2.5 text-sm">{item.qty}</td>
-                    <td className="text-right py-2.5 text-sm">{item.unitario}</td>
-                    <td className="text-right py-2.5 text-sm font-bold">{item.total}</td>
+                    <td className="min-w-0 whitespace-normal break-words py-2.5 pl-3 pr-4 text-sm leading-snug">
+                      <p className="font-semibold">{item.desc}</p>
+                    </td>
+                    <td className="px-2 py-2.5 text-right text-sm">{tipo === "madera" ? item.qty.replace(" PT", "") : item.qty}</td>
+                    <td className="px-2 py-2.5 text-right text-sm uppercase text-gray-500">{tipo === "madera" ? "PT" : "und."}</td>
+                    <td className="px-2 py-2.5 text-right text-sm">{item.unitario}</td>
+                    <td className="py-2.5 pl-2 pr-3 text-right text-sm font-bold">{item.total}</td>
                   </tr>
                 ))}
               </tbody>
@@ -489,6 +512,39 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
             <div className="w-48 border-b border-gray-400 h-16 mb-2"></div>
             <p className="font-bold uppercase">Katia Lizzet Meneses Taype</p>
             <p className="text-gray-500">Gerente</p>
+          </div>
+        </div>
+        {/* Brand footer */}
+        <div className="mt-8 border-t border-gray-200 pt-4">
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-slate-50/70 px-4 py-3 text-xs text-gray-600">
+            <div className="flex min-w-0 items-center gap-3">
+              {empresa.logo_url ? (
+                <Image
+                  src={empresa.logo_url}
+                  alt={empresa.nombre}
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 rounded-md border border-gray-200 bg-white object-contain p-1"
+                  unoptimized
+                />
+              ) : (
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-sm font-black text-gray-700">
+                  {empresa.nombre.slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-sm font-black uppercase tracking-wide text-gray-800">{empresa.nombre}</p>
+                <p className="font-semibold text-gray-700">Gracias por su compra</p>
+                {brandContactLines.length > 0 ? (
+                  <p className="mt-0.5 whitespace-normal break-words leading-snug text-gray-500">
+                    {brandContactLines.join(" | ")}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <p className="shrink-0 text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+              Comprobante A4
+            </p>
           </div>
         </div>
 

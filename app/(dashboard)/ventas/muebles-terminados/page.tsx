@@ -37,117 +37,85 @@ export default async function MueblesTerminadosPage() {
   const muebleHelpers = new Map(muebles.map((m) => [m.id, m]));
 
   const hoy = new Date().toISOString().slice(0, 10);
+  const mueblesDisponibles = muebles.filter((m) => m.stock_disponible > 0).length;
+  const stockBajo = muebles.filter((m) => m.stock_disponible > 0 && m.stock_disponible <= 2).length;
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold">Muebles terminados</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Catálogo de muebles listos para entrega inmediata. Las ventas usan solo ítems ya dados de alta en{" "}
+          Registra ventas de muebles listos, revisa el historial del módulo y usa el catálogo como apoyo. Los productos se administran en{" "}
           <Link href="/inventario?tab=muebles" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
             Inventario
           </Link>
-          . Cada venta confirma el ingreso en caja según método de pago.
+          .
         </p>
       </div>
 
-      <Card className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <CardTitle>Operaciones</CardTitle>
-          <CardDescription>Registrar ventas con muebles del catálogo (el catálogo se administra en Inventario).</CardDescription>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canMutate ? (
-            <MueblesTerminadosContextPanels
-              clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre, ruc: c.ruc || null, documento: c.documento || null }))}
-              muebles={muebles.map((m) => ({
-                id: m.id,
-                codigo: m.codigo,
-                nombre: m.nombre,
-                precio_lista: m.precio_lista,
-                stock_disponible: m.stock_disponible,
-              }))}
-              choferes={choferes.map((c) => ({
-                id: c.id,
-                nombre: c.nombre,
-                telefono: c.telefono,
-                placa: c.placa,
-              }))}
-              zonas={zonas.map((z) => ({
-                id: z.id,
-                nombre: z.nombre,
-                tarifa: z.tarifa,
-                distancia_km: z.distancia_km,
-              }))}
-              fechaDefault={hoy}
-              mockData={comboMock}
-            />
-          ) : (
-            <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
-              Tu rol es de solo lectura.
-            </p>
-          )}
+      <Card className="border-2 border-[var(--katia-primary)] bg-[var(--katia-primary)]/5 shadow-md">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center rounded-full bg-[var(--katia-primary)] px-2.5 py-1 text-xs font-bold text-white">
+              Acción principal
+            </div>
+            <CardTitle className="mt-3 text-xl">Vender mueble</CardTitle>
+            <CardDescription className="mt-2">Registra una venta desde el catálogo de muebles terminados.</CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {canMutate ? (
+              <MueblesTerminadosContextPanels
+                clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre, ruc: c.ruc || null, documento: c.documento || null }))}
+                muebles={muebles.map((m) => ({
+                  id: m.id,
+                  codigo: m.codigo,
+                  nombre: m.nombre,
+                  precio_lista: m.precio_lista,
+                  stock_disponible: m.stock_disponible,
+                }))}
+                choferes={choferes.map((c) => ({
+                  id: c.id,
+                  nombre: c.nombre,
+                  telefono: c.telefono,
+                  placa: c.placa,
+                }))}
+                zonas={zonas.map((z) => ({
+                  id: z.id,
+                  nombre: z.nombre,
+                  tarifa: z.tarifa,
+                  distancia_km: z.distancia_km,
+                }))}
+                fechaDefault={hoy}
+                mockData={comboMock}
+              />
+            ) : (
+              <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
+                Tu rol es de solo lectura.
+              </p>
+            )}
+          </div>
         </div>
       </Card>
 
-      <Card>
-        <CardTitle>Catálogo</CardTitle>
-        <CardDescription>{muebles.length} muebles registrados.</CardDescription>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {muebles.map((mueble) => (
-            <Card key={mueble.id} className="space-y-2">
-              {mueble.foto_url ? (
-                <Image
-                  src={mueble.foto_url}
-                  alt={mueble.nombre}
-                  width={320}
-                  height={180}
-                  className="h-36 w-full rounded-xl object-cover"
-                  unoptimized
-                />
-              ) : (
-                <div className="flex h-36 items-center justify-center rounded-[var(--katia-radius-lg)] bg-[var(--katia-surface-raised)]">
-                  <IconPhoto className="size-8 text-[var(--katia-text-tertiary)]/40" />
-                </div>
-              )}
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    {mueble.codigo}
-                  </p>
-                  <p className="text-base font-semibold">{mueble.nombre}</p>
-                </div>
-                <Badge variant={mueble.stock_disponible > 0 ? "success" : "danger"}>
-                  Stock: {mueble.stock_disponible}
-                </Badge>
-              </div>
-              {mueble.descripcion ? (
-                <p className="text-xs text-[var(--color-text-secondary)]">{mueble.descripcion}</p>
-              ) : null}
-              <p className="text-lg font-bold text-[var(--color-text-primary)]">
-                {formatPen(mueble.precio_lista)}
-              </p>
-            </Card>
-          ))}
-          {muebles.length === 0 ? (
-            <Card className="md:col-span-2 xl:col-span-3 space-y-2 text-center text-sm text-[var(--color-text-secondary)]">
-              <p>Aún no hay muebles en catálogo.</p>
-              <p>
-                Para agregar muebles al catálogo andá a{" "}
-                <Link href="/inventario?tab=muebles" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
-                  Inventario
-                </Link>{" "}
-                → pestaña <strong>Catálogo muebles</strong> → botón <strong>Agregar mueble</strong>.
-              </p>
-            </Card>
-          ) : null}
-        </div>
-      </Card>
+      <div className="grid gap-3 md:grid-cols-3">
+        <Card className="py-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Muebles disponibles</p>
+          <p className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">{mueblesDisponibles}</p>
+        </Card>
+        <Card className="py-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Ventas registradas</p>
+          <p className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">{ventas.length}</p>
+        </Card>
+        <Card className="py-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Stock bajo</p>
+          <p className="mt-1 text-2xl font-bold text-[var(--color-text-primary)]">{stockBajo}</p>
+        </Card>
+      </div>
 
       <Card>
-        <CardTitle>Ventas confirmadas</CardTitle>
+        <CardTitle>Ventas registradas</CardTitle>
         <CardDescription>
-          {ventas.length} ventas registradas. Marca el estado de entrega cuando corresponda.
+          {ventas.length} ventas registradas de muebles terminados. Marca el estado de entrega cuando corresponda.
         </CardDescription>
         <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
           <Table>
@@ -207,7 +175,7 @@ export default async function MueblesTerminadosPage() {
                           className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
                           title="Imprimir comprobante"
                         >
-                          🖨️
+                          Imprimir
                         </Link>
                         {canMutate && venta.estado_entrega !== "entregado" ? (
                           <form action={marcarEntregaMueble} className="inline-flex">
@@ -237,7 +205,7 @@ export default async function MueblesTerminadosPage() {
                             <PendingSubmitButton
                               variant="secondary"
                               className="h-8 px-3 text-xs"
-                              idleText="↩ Retroceder"
+                              idleText="Retroceder"
                             />
                           </form>
                         ) : null}
@@ -252,12 +220,66 @@ export default async function MueblesTerminadosPage() {
               {ventas.length === 0 ? (
                 <TRow>
                   <TD colSpan={8} className="text-center text-[var(--color-text-secondary)]">
-                    Aún no hay ventas. Usa “Vender mueble” para registrar una.
+                    Aún no hay ventas. Usa "Vender mueble" para registrar una.
                   </TD>
                 </TRow>
               ) : null}
             </tbody>
           </Table>
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Catálogo disponible</CardTitle>
+        <CardDescription>Selecciona productos listos para entrega inmediata. {muebles.length} muebles registrados.</CardDescription>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {muebles.map((mueble) => (
+            <Card key={mueble.id} className="space-y-2">
+              {mueble.foto_url ? (
+                <Image
+                  src={mueble.foto_url}
+                  alt={mueble.nombre}
+                  width={320}
+                  height={180}
+                  className="h-36 w-full rounded-xl object-cover"
+                  unoptimized
+                />
+              ) : (
+                <div className="flex h-36 items-center justify-center rounded-[var(--katia-radius-lg)] bg-[var(--katia-surface-raised)]">
+                  <IconPhoto className="size-8 text-[var(--katia-text-tertiary)]/40" />
+                </div>
+              )}
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    {mueble.codigo}
+                  </p>
+                  <p className="text-base font-semibold">{mueble.nombre}</p>
+                </div>
+                <Badge variant={mueble.stock_disponible > 0 ? "success" : "danger"}>
+                  Stock: {mueble.stock_disponible}
+                </Badge>
+              </div>
+              {mueble.descripcion ? (
+                <p className="text-xs text-[var(--color-text-secondary)]">{mueble.descripcion}</p>
+              ) : null}
+              <p className="text-lg font-bold text-[var(--color-text-primary)]">
+                {formatPen(mueble.precio_lista)}
+              </p>
+            </Card>
+          ))}
+          {muebles.length === 0 ? (
+            <Card className="md:col-span-2 xl:col-span-3 space-y-2 text-center text-sm text-[var(--color-text-secondary)]">
+              <p>Aún no hay muebles en catálogo.</p>
+              <p>
+                Para agregar muebles al catálogo andá a{" "}
+                <Link href="/inventario?tab=muebles" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
+                  Inventario
+                </Link>{" "}
+                → pestaña <strong>Catálogo muebles</strong> → botón <strong>Agregar mueble</strong>.
+              </p>
+            </Card>
+          ) : null}
         </div>
       </Card>
     </div>

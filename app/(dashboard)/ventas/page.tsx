@@ -168,15 +168,15 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Ventas</h2>
           <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
-            Usa el flujo guiado para crear una venta desde cotización, cobrarla y dejarla registrada.
+            Usa el flujo guiado para registrar ventas con menos pasos y menos decisiones manuales.
           </p>
           <p className="text-sm text-[var(--katia-text-secondary)]">
-            Los accesos por tipo quedan disponibles para operaciones específicas o edición detallada.
+            Los accesos por tipo quedan disponibles abajo para casos puntuales.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/cotizacion">
-            <Button>
+            <Button variant="secondary">
               <PlusCircle className="mr-2 size-4" />
               Nueva venta guiada
             </Button>
@@ -215,81 +215,25 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
         </Card>
       ) : null}
 
-      <Card className="border-[var(--katia-primary)]/30 bg-[var(--katia-primary)]/5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <Card className="border-2 border-[var(--katia-primary)] bg-[var(--katia-primary)]/5 shadow-md">
+        <div className="flex flex-wrap items-center justify-between gap-5">
           <div className="max-w-3xl">
             <div className="inline-flex items-center rounded-full bg-[var(--katia-primary)] px-2.5 py-1 text-xs font-bold text-white">
-              Recomendado
+              Recomendado para uso diario
             </div>
-            <CardTitle className="mt-3">Nueva venta guiada</CardTitle>
-            <CardDescription className="mt-1">
-              Para uso diario, empieza aquí: eliges o creas cliente, agregas muebles, madera, servicios o alquiler,
-              guardas la cotización y luego la conviertes a venta cuando el cliente acepta. Evita decidir entre varios
-              formularios antes de saber qué necesita el cliente.
+            <CardTitle className="mt-3 text-xl">Nueva venta guiada</CardTitle>
+            <CardDescription className="mt-2 text-sm leading-6">
+              Empieza aquí para registrar ventas de forma más fácil: eliges o creas el cliente, agregas lo que necesita
+              y dejas la operación lista para cobrar o convertir desde cotización. Es el camino recomendado para la
+              atención diaria.
             </CardDescription>
           </div>
           <Link href="/cotizacion">
-            <Button>
+            <Button className="h-12 px-6 text-base font-bold shadow-sm">
               <PlusCircle className="mr-2 size-4" />
               Crear venta
             </Button>
           </Link>
-        </div>
-      </Card>
-
-      <div>
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--katia-text-secondary)]">
-          Accesos específicos
-        </h3>
-        <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
-          Úsalos cuando ya sabes exactamente qué operación registrar o necesitas editar un flujo puntual.
-        </p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {tarjetas.map((tarjeta) => {
-          const Icon = tarjeta.icono;
-          return (
-            <Link
-              key={tarjeta.href}
-              href={tarjeta.href}
-              className="group rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_var(--color-accent)]"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex size-12 items-center justify-center rounded-2xl bg-[var(--color-primary-soft)] text-[var(--color-text-primary)]">
-                  <Icon className="size-6" />
-                </div>
-                {tarjeta.badge ? (
-                  <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    {tarjeta.badge}
-                  </span>
-                ) : null}
-              </div>
-              <h3 className="mt-4 text-base font-semibold text-[var(--color-text-primary)]">
-                {tarjeta.titulo}
-              </h3>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{tarjeta.descripcion}</p>
-              <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-accent)] group-hover:gap-2">
-                Abrir <ArrowRight className="size-3.5" />
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-
-      <Card className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <CardTitle>Operaciones</CardTitle>
-          <CardDescription>Alta de cliente, proveedor o chofer.</CardDescription>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {!canMutate ? (
-            <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
-              Tu rol es de solo lectura en ventas.
-            </p>
-          ) : (
-            <VentasHubContextPanels quick={quick} />
-          )}
         </div>
       </Card>
 
@@ -335,6 +279,63 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
           </Card>
         </div>
       </div>
+
+      <div>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--katia-text-secondary)]">
+          Opciones para casos puntuales
+        </h3>
+        <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
+          Usa estos accesos si ya sabes exactamente qué operación registrar o necesitas entrar a un flujo especializado.
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {tarjetas.map((tarjeta) => {
+          const Icon = tarjeta.icono;
+          return (
+            <Link
+              key={tarjeta.href}
+              href={tarjeta.href}
+              className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_var(--color-accent)]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-[var(--color-primary-soft)] text-[var(--color-text-primary)]">
+                  <Icon className="size-5" />
+                </div>
+                {tarjeta.badge ? (
+                  <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    {tarjeta.badge}
+                  </span>
+                ) : null}
+              </div>
+              <h3 className="mt-3 text-sm font-semibold text-[var(--color-text-primary)]">
+                {tarjeta.titulo}
+              </h3>
+              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{tarjeta.descripcion}</p>
+              <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-accent)] group-hover:gap-2">
+                Abrir <ArrowRight className="size-3.5" />
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <CardTitle>Operaciones</CardTitle>
+          <CardDescription>Alta de cliente, proveedor o chofer.</CardDescription>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {!canMutate ? (
+            <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
+              Tu rol es de solo lectura en ventas.
+            </p>
+          ) : (
+            <VentasHubContextPanels quick={quick} />
+          )}
+        </div>
+      </Card>
+
 
       <VentasPdfImport clientes={clientes.map(c => ({ id: c.id, nombre: c.nombre }))} />
 

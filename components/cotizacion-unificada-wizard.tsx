@@ -1631,6 +1631,24 @@ export function CotizacionUnificadaWizard({
 
   return (
     <div id="cotizacion-wizard" className="space-y-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 md:p-6">
+      <Card className="border-[var(--katia-primary)]/30 bg-[var(--katia-primary)]/5 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-[var(--katia-primary)]">Ruta simple</p>
+            <CardTitle className="mt-1 text-lg">Venta guiada rápida</CardTitle>
+            <CardDescription className="mt-1">
+              Primero selecciona o registra al cliente. Luego agrega el producto o servicio. Al final revisa el total antes de guardar o convertir a venta.
+            </CardDescription>
+          </div>
+          <div className="grid gap-2 text-xs sm:grid-cols-4">
+            {["Cliente", "Producto o servicio", "Total", "Guardar"].map((label) => (
+              <span key={label} className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1 font-semibold text-[var(--color-text-primary)]">
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       <div className="grid gap-3 md:grid-cols-2">
         <Card className="p-4">
@@ -1741,10 +1759,10 @@ export function CotizacionUnificadaWizard({
       </Card>
 
       <Card className="space-y-3 border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-        <CardTitle className="text-base">Pasos de cotización</CardTitle>
+        <CardTitle className="text-base">Modo completo y opciones avanzadas</CardTitle>
         <CardDescription>
-          Podés volver atrás y cambiar tipo de cliente o rubros cuando quieras. Los pasos visibles dependen de lo
-          que marques.
+          Modo completo: usa estos pasos cuando necesites medidas, rubros, margen, aserradero, alquiler o notas detalladas.
+          Puedes volver atrás y cambiar la información cuando quieras.
         </CardDescription>
         <div className="flex flex-wrap gap-2">
           {steps.map((sid, idx) => (
@@ -1780,6 +1798,10 @@ export function CotizacionUnificadaWizard({
             />
           </div>
           <CardTitle className="text-center text-2xl font-extrabold">Datos del cliente</CardTitle>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 px-4 py-3 text-sm text-[var(--color-text-secondary)]">
+            <p className="font-semibold text-[var(--color-text-primary)]">Datos básicos</p>
+            <p>Primero selecciona un cliente existente o registra uno nuevo. Para factura, usa cliente empresa con RUC válido.</p>
+          </div>
 
           <div className="mx-auto max-w-xs grid grid-cols-2 gap-1 bg-[var(--color-primary-soft)]/30 p-1 rounded-xl border border-[var(--color-border)]">
             <button
@@ -1891,6 +1913,10 @@ export function CotizacionUnificadaWizard({
 
       {currentStepId === "rubros" ? (
         <Card className={`${panelClass} space-y-5 border-none`}>
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 px-4 py-3 text-sm text-[var(--color-text-secondary)]">
+            <p className="font-semibold text-[var(--color-text-primary)]">Producto o servicio</p>
+            <p>Elige el tipo de trabajo que vas a cotizar. Si no estás segura, usa una sola opción y continúa; las opciones avanzadas quedan disponibles en los siguientes pasos.</p>
+          </div>
           <div className="space-y-3">
             <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">
               Tipo de Cotización
@@ -2704,7 +2730,7 @@ export function CotizacionUnificadaWizard({
                   )}
                   <div className="border-t border-[var(--color-border)] pt-3">
                     <div className="flex items-center justify-between">
-                      <span>Costo de producciÃ³n:</span>
+                      <span>Costo de producción:</span>
                       <strong>{formatPen(resumenMargen.costoProduccion)}</strong>
                     </div>
                     <div className="mt-2 flex items-center justify-between">
@@ -3157,12 +3183,16 @@ export function CotizacionUnificadaWizard({
       {currentStepId === "resumen" ? (
         <Card className="space-y-5 overflow-hidden p-0">
           <div className="border-b border-[var(--color-border)] px-5 py-4">
-            <CardTitle>Vista previa — cotización formal</CardTitle>
+            <p className="text-xs font-bold uppercase tracking-wide text-[var(--katia-primary)]">Resumen final</p>
+            <CardTitle className="mt-1">Vista previa — cotización formal</CardTitle>
             <CardDescription>
               Misma maquetación que PDF / impresión. Correlativo mostrado:{" "}
               <strong>{correlativoMostrar}</strong>
               {!guardadaId ? " (previsualización; al guardar se confirma el número)" : null}
             </CardDescription>
+            <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
+              Revisa cliente, producto o servicio y total. Luego guarda la cotización, imprímela o conviértela a venta cuando esté aceptada.
+            </p>
           </div>
 
           <div className="px-3 pb-2 sm:px-5">
@@ -3286,7 +3316,7 @@ export function CotizacionUnificadaWizard({
               onClick={() => handleGuardar("pendiente")}
               className="h-10 rounded-xl bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-on-accent)] disabled:opacity-50"
             >
-              Guardar cotizacion
+              Guardar cotización
             </button>
             <button
               type="button"
@@ -3302,7 +3332,7 @@ export function CotizacionUnificadaWizard({
               onClick={() => handleGuardar("pendiente", true)}
               className="h-10 rounded-xl border border-[var(--color-border)] px-4 text-sm font-semibold disabled:opacity-50"
             >
-              Guardar e imprimir cotizacion
+              Guardar e imprimir cotización
             </button>
             <button
               type="button"
@@ -3317,7 +3347,7 @@ export function CotizacionUnificadaWizard({
               disabled={!guardadaId || !canSave || busy || guardadaRow?.estado_flujo === "pendiente"}
               onClick={async () => {
                 if (!guardadaId) return;
-                if (!confirm("Convertir esta cotizacion aceptada a venta y registrar el ingreso en caja?")) return;
+                if (!confirm("¿Convertir esta cotización aceptada a venta y registrar el ingreso en caja?")) return;
                 setBusy(true);
                 const r = await registrarCobroCotizacionUnificada(guardadaId);
                 setBusy(false);

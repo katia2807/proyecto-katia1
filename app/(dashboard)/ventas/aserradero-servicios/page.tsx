@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AserraderoContextPanels } from "@/components/ventas/aserradero-context-panels";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { AserraderoServiciosTable } from "@/components/sales/aserradero-servicios-table";
 import { getCurrentUserRole } from "@/lib/current-user-role";
 import {
@@ -10,7 +10,7 @@ import {
   getServiciosEspecialesTarifaRows,
 } from "@/lib/data";
 import { canMutateVentas } from "@/lib/permissions";
-import { formatDate, formatPen } from "@/lib/utils";
+import { formatPen } from "@/lib/utils";
 import { getEmpresaConfig } from "@/lib/company-config";
 
 export default async function AserraderoServiciosPage() {
@@ -33,14 +33,19 @@ export default async function AserraderoServiciosPage() {
       <div>
         <h2 className="text-xl font-bold">Servicio aserradero</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Cubicaje rápido y procesos especiales (cepillado, traslapado, machembrado, corte vertical y horizontal).
+          Cubicaje rápido y servicios especiales para madera.
         </p>
       </div>
 
-      <Card className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <CardTitle>Operaciones</CardTitle>
-          <CardDescription>Nuevo servicio con cubicaje base y procesos extra.</CardDescription>
+      <Card className="flex flex-wrap items-center justify-between gap-4 border-[var(--color-primary)]/20 bg-[var(--color-primary)]/5">
+        <div className="space-y-2">
+          <CardTitle>Registrar servicio de aserradero</CardTitle>
+          <CardDescription>
+            Registra un servicio usando los datos de cubicaje y tarifas ya configuradas.
+          </CardDescription>
+          <div className="flex flex-wrap gap-2 text-xs text-[var(--color-text-secondary)]">
+            <Badge variant="neutral">{servicios.length} servicios registrados</Badge>
+          </div>
         </div>
         {canMutate ? (
           <AserraderoContextPanels
@@ -57,7 +62,21 @@ export default async function AserraderoServiciosPage() {
       </Card>
 
       <Card>
-        <CardTitle>Resumen</CardTitle>
+        <CardTitle>Servicios registrados</CardTitle>
+        <CardDescription>Historial de servicios de aserradero registrados.</CardDescription>
+        <div className="mt-3">
+          <AserraderoServiciosTable
+            servicios={servicios}
+            clientesById={Object.fromEntries(clientes.map((c) => [c.id, c.nombre]))}
+            clientesMap={Object.fromEntries(clientes.map((c) => [c.id, c]))}
+            canMutate={canMutate}
+          />
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Resumen de apoyo</CardTitle>
+        <CardDescription>Consulta estos datos como referencia del módulo.</CardDescription>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <div className="rounded-xl border border-[var(--color-border)] p-3">
             <p className="text-xs uppercase text-[var(--color-text-secondary)]">Servicios totales</p>
@@ -71,19 +90,6 @@ export default async function AserraderoServiciosPage() {
             <p className="text-xs uppercase text-[var(--color-text-secondary)]">Utilidad acumulada</p>
             <p className="text-2xl font-bold">{formatPen(totalUtilidad)}</p>
           </div>
-        </div>
-      </Card>
-
-      <Card>
-        <CardTitle>Servicios registrados</CardTitle>
-        <CardDescription>Histórico de servicios facturados.</CardDescription>
-        <div className="mt-3">
-          <AserraderoServiciosTable
-            servicios={servicios}
-            clientesById={Object.fromEntries(clientes.map((c) => [c.id, c.nombre]))}
-            clientesMap={Object.fromEntries(clientes.map((c) => [c.id, c]))}
-            canMutate={canMutate}
-          />
         </div>
       </Card>
 

@@ -11,7 +11,6 @@ import {
   getZonasEntregaRows,
 } from "@/lib/data";
 import { canMutateVentas } from "@/lib/permissions";
-import { formatDate, formatPen } from "@/lib/utils";
 
 export default async function MaderaCortadaPage() {
   const comboMock =
@@ -37,14 +36,18 @@ export default async function MaderaCortadaPage() {
       <div>
         <h2 className="text-xl font-bold">Madera cortada</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Venta por pie tablar con calculadora en vivo. Si seleccionas un producto del inventario, se descuenta automáticamente.
+          Venta por pie tablar con calculadora en vivo.
         </p>
       </div>
 
-      <Card className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <CardTitle>Operaciones</CardTitle>
-          <CardDescription>Venta de madera (flujo clásico) o venta de madera cortada.</CardDescription>
+      <Card className="flex flex-wrap items-center justify-between gap-4 border-[var(--color-primary)]/20 bg-[var(--color-primary)]/5">
+        <div className="space-y-2">
+          <CardTitle>Vender madera cortada</CardTitle>
+          <CardDescription>Registra una venta usando la calculadora de cubicaje.</CardDescription>
+          <div className="flex flex-wrap gap-2 text-xs text-[var(--color-text-secondary)]">
+            <Badge variant="neutral">{productosMadera.length} productos de madera</Badge>
+            <Badge variant="neutral">{ventas.length} ventas registradas</Badge>
+          </div>
         </div>
         {canMutate ? (
           <div className="flex flex-wrap gap-2">
@@ -64,9 +67,32 @@ export default async function MaderaCortadaPage() {
       </Card>
 
       <Card>
-        <CardTitle>Stock disponible de madera</CardTitle>
+        <CardTitle>Ventas registradas</CardTitle>
         <CardDescription>
-          {productosMadera.length} productos categorizados como madera.
+          Historial de ventas de madera cortada y otros canales registrados.
+        </CardDescription>
+        <div className="mt-3">
+          <VentaMaderaCortadaTable
+            ventas={ventas.map((v) => ({
+              id: v.id,
+              cliente_id: v.cliente_id,
+              fecha: v.fecha,
+              estado: v.estado,
+              total: Number(v.total),
+              correlativo: v.correlativo ?? null,
+              tipo_corte: (v as any).tipo_corte ?? null,
+            }))}
+            clientesById={Object.fromEntries(clientesById)}
+            clientesMap={Object.fromEntries(clientesMap)}
+            canMutate={canMutate}
+          />
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Stock de apoyo</CardTitle>
+        <CardDescription>
+          Consulta el inventario antes de vender o cubicajar.
         </CardDescription>
         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {productosMadera.map((p) => {
@@ -86,32 +112,9 @@ export default async function MaderaCortadaPage() {
           })}
           {productosMadera.length === 0 ? (
             <Card className="md:col-span-2 xl:col-span-3 text-center text-sm text-[var(--color-text-secondary)]">
-              Aún no hay productos de madera en inventario.
+              uun no hay productos de madera en inventario.
             </Card>
           ) : null}
-        </div>
-      </Card>
-
-      <Card>
-        <CardTitle>Ventas registradas</CardTitle>
-        <CardDescription>
-          {ventas.length} ventas en el módulo (incluyendo otros canales).
-        </CardDescription>
-        <div className="mt-3">
-          <VentaMaderaCortadaTable
-            ventas={ventas.map((v) => ({
-              id: v.id,
-              cliente_id: v.cliente_id,
-              fecha: v.fecha,
-              estado: v.estado,
-              total: Number(v.total),
-              correlativo: v.correlativo ?? null,
-              tipo_corte: (v as any).tipo_corte ?? null,
-            }))}
-            clientesById={Object.fromEntries(clientesById)}
-            clientesMap={Object.fromEntries(clientesMap)}
-            canMutate={canMutate}
-          />
         </div>
       </Card>
     </div>

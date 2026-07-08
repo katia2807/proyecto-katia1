@@ -57,6 +57,42 @@ export default async function CotizacionPage() {
         </p>
       </div>
 
+      <Card className="border-2 border-[var(--katia-primary)] bg-[var(--katia-primary)]/5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center rounded-full bg-[var(--katia-primary)] px-2.5 py-1 text-xs font-bold text-white">
+              Recomendado para encargados
+            </div>
+            <CardTitle className="mt-3 text-xl">Modo rápido para encargados</CardTitle>
+            <CardDescription className="mt-2 text-sm leading-6">
+              Usa este flujo si solo necesitas registrar una venta o cotización con los datos básicos. Las opciones avanzadas siguen disponibles en el mismo formulario.
+            </CardDescription>
+          </div>
+          <a
+            href="#cotizacion-wizard"
+            className="inline-flex h-11 items-center rounded-xl bg-[var(--color-accent)] px-5 text-sm font-bold text-[var(--color-on-accent)] transition hover:brightness-110"
+          >
+            Empezar rápido
+          </a>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-4">
+          {[
+            "Cliente",
+            "Producto o servicio",
+            "Total",
+            "Guardar / convertir a venta",
+          ].map((step, index) => (
+            <div key={step} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Paso {index + 1}</p>
+              <p className="text-sm font-semibold text-[var(--color-text-primary)]">{step}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-[var(--katia-text-secondary)]">
+          Modo completo: usa los pasos y secciones avanzadas del formulario cuando necesites medidas, rubros, margen, aserradero o alquiler.
+        </p>
+      </Card>
+
       <CotizacionUnificadaWizard
         canSave={canSave}
         correlativoPreview={correlativoPreview}

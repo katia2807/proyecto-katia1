@@ -34,7 +34,7 @@ export default async function MueblesPersonalizadosPage() {
     cotizacionesUnificadas.map((c) => [c.id, c]),
   );
 
-  // Obtener IDs de cotizaciones que ya tienen orden de producción para evitar duplicaciones
+  // Obtener IDs de cotizaciones que ya tienen orden de produccion para evitar duplicaciones
   const ordenesCotizacionIds = new Set(ordenes.map((o) => o.cotizacion_id).filter(Boolean));
   const ordenesCotizacionUnificadaIds = new Set(ordenes.map((o) => o.cotizacion_unificada_id).filter(Boolean));
 
@@ -83,6 +83,9 @@ export default async function MueblesPersonalizadosPage() {
     })
   ].sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0));
 
+  const cotizacionesPendientes = todasLasCotizaciones.filter((c) => c.estado === "pendiente");
+  const ordenesEnProduccion = ordenes.filter((o) => o.estado === "en_produccion");
+
   // Filtrar cotizaciones simples aprobables (estado confirmada y sin orden)
   const aprobablesSimples = cotizacionesPersonalizadas.filter(
     (c) => c.estado === "confirmada" && !ordenesCotizacionIds.has(c.id)
@@ -95,15 +98,15 @@ export default async function MueblesPersonalizadosPage() {
       !ordenesCotizacionUnificadaIds.has(c.id)
   );
 
-  // Mapear ambas a un formato de opción común
+  // Mapear ambas a un formato de opcion comun
   const opcionesAprobacion = [
     ...aprobablesSimples.map((c) => ({
       id: c.id,
-      label: `${c.correlativo ?? formatDate(c.fecha)} · ${clientesById.get(c.cliente_id) ?? "Cliente"} · ${formatPen(Number(c.precio_acordado))}`,
+      label: `${c.correlativo ?? formatDate(c.fecha)} - ${clientesById.get(c.cliente_id) ?? "Cliente"} - ${formatPen(Number(c.precio_acordado))}`,
     })),
     ...aprobablesUnificadas.map((c) => ({
       id: c.id,
-      label: `${c.correlativo ?? formatDate(c.fecha)} (Inteligente) · ${clientesById.get(c.cliente_id) ?? "Cliente"} · ${formatPen(Number(c.total))}`,
+      label: `${c.correlativo ?? formatDate(c.fecha)} (Inteligente) - ${clientesById.get(c.cliente_id) ?? "Cliente"} - ${formatPen(Number(c.total))}`,
     })),
   ];
 
@@ -112,32 +115,35 @@ export default async function MueblesPersonalizadosPage() {
       <div>
         <h2 className="text-xl font-bold">Muebles personalizados</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Lista de cotizaciones y Kanban de produccion unificados. El cotizador inteligente vive en Cotizacion.
+          Cotizaciones, pedidos y seguimiento de producción de muebles personalizados.
         </p>
       </div>
 
-      <Card className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <CardTitle>Operaciones</CardTitle>
-          <CardDescription>Nueva cotización o aprobación a orden de producción.</CardDescription>
+      <Card className="flex flex-wrap items-center justify-between gap-4 border-[var(--color-primary)]/20 bg-[var(--color-primary)]/5">
+        <div className="space-y-2">
+          <CardTitle>Crear cotización de mueble personalizado</CardTitle>
+          <CardDescription>
+            Usa la venta guiada para registrar el pedido del cliente y calcular el total.
+          </CardDescription>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Primero crea la cotización guiada. Luego podrás aprobarla o seguirla desde este módulo.
+          </p>
+          <div className="flex flex-wrap gap-2 text-xs text-[var(--color-text-secondary)]">
+            <Badge variant="neutral">{todasLasCotizaciones.length} cotizaciones registradas</Badge>
+            <Badge variant="neutral">{ordenesEnProduccion.length} en producción</Badge>
+            <Badge variant="neutral">{cotizacionesPendientes.length} pendientes</Badge>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {canMutate ? (
-            <MueblesPersonalizadosContextPanels
-              clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre }))}
-              opcionesAprobacion={opcionesAprobacion}
-              mockData={comboMock}
-            />
-          ) : (
-            <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
-              Tu rol es de solo lectura.
-            </p>
-          )}
-        </div>
+        <Link
+          href="/cotizacion"
+          className="inline-flex items-center justify-center rounded-xl bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
+        >
+          Abrir cotizador guiado
+        </Link>
       </Card>
 
       <Card>
-        <CardTitle>Cotizaciones registradas</CardTitle>
+        <CardTitle>Pedidos y cotizaciones registradas</CardTitle>
         <CardDescription>
           {todasLasCotizaciones.length} cotizaciones de muebles personalizados.
         </CardDescription>
@@ -145,7 +151,7 @@ export default async function MueblesPersonalizadosPage() {
           <Table>
             <THead>
               <TRow>
-                <TH>N°</TH>
+                <TH>Nó</TH>
                 <TH>Fecha</TH>
                 <TH>Cliente</TH>
                 <TH>Especie</TH>
@@ -160,11 +166,11 @@ export default async function MueblesPersonalizadosPage() {
               {todasLasCotizaciones.map((c) => {
                 return (
                 <TRow key={c.id}>
-                  <TD className="font-mono text-xs">{c.correlativo ?? "—"}</TD>
+                  <TD className="font-mono text-xs">{c.correlativo ?? "-"}</TD>
                   <TD>{formatDate(c.fecha)}</TD>
                   <TD>
                     <span className="inline-flex items-center gap-2">
-                      {clientesById.get(c.clienteId) ?? "—"}
+                      {clientesById.get(c.clienteId) ?? "-"}
                     </span>
                   </TD>
                   <TD>{c.especie}</TD>
@@ -210,9 +216,9 @@ export default async function MueblesPersonalizadosPage() {
       </Card>
 
       <Card>
-        <CardTitle>Tablero Kanban de órdenes de producción</CardTitle>
+        <CardTitle>Seguimiento de producción</CardTitle>
         <CardDescription>
-          Arrastra cada orden entre columnas para cambiar su estado. El cambio se guarda al instante.
+          Revisa el estado de cada pedido y mueve las órdenes cuando corresponda.
         </CardDescription>
         <div className="mt-4">
           <KanbanOrdenes
@@ -248,7 +254,25 @@ export default async function MueblesPersonalizadosPage() {
         </div>
       </Card>
 
-
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <CardTitle>Acciones avanzadas</CardTitle>
+          <CardDescription>Aprobación a orden de producción y herramientas del módulo.</CardDescription>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {canMutate ? (
+            <MueblesPersonalizadosContextPanels
+              clientes={clientes.map((c) => ({ id: c.id, nombre: c.nombre }))}
+              opcionesAprobacion={opcionesAprobacion}
+              mockData={comboMock}
+            />
+          ) : (
+            <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
+              Tu rol es de solo lectura.
+            </p>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }
