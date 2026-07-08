@@ -21,15 +21,15 @@ export function AppFooter({ className, companyName }: AppFooterProps) {
         {companyName ? (
           <span className="font-medium text-[var(--katia-text-secondary)]">{companyName}</span>
         ) : null}
-        {companyName ? " · " : null}
+        {companyName ? " Â· " : null}
         Katia Suite
       </p>
       <div className="flex items-center gap-3">
         <p className="text-xs text-[var(--katia-text-disabled)]">
-          Versi�n {APP_VERSION} � Actualizado: {APP_LAST_UPDATE}
+          Versión {APP_VERSION} · Actualizado: {APP_LAST_UPDATE}
         </p>
         <Link href="/legal/terminos" className="text-xs text-[var(--katia-text-disabled)] hover:text-[var(--katia-text-tertiary)]">
-          Términos
+          TÃ©rminos
         </Link>
         <Link href="/legal/privacidad" className="text-xs text-[var(--katia-text-disabled)] hover:text-[var(--katia-text-tertiary)]">
           Privacidad

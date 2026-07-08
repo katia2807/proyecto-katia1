@@ -45,7 +45,7 @@ export default async function MueblesTerminadosPage() {
       <div>
         <h2 className="text-xl font-bold">Muebles terminados</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Registra ventas de muebles listos, revisa el historial del módulo y usa el catálogo como apoyo. Los productos se administran en{" "}
+          Registra ventas de muebles listos, revisa el historial del mÃ³dulo y usa el catÃ¡logo como apoyo. Los productos se administran en{" "}
           <Link href="/inventario?tab=muebles" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
             Inventario
           </Link>
@@ -57,10 +57,10 @@ export default async function MueblesTerminadosPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="max-w-2xl">
             <div className="inline-flex items-center rounded-full bg-[var(--katia-primary)] px-2.5 py-1 text-xs font-bold text-white">
-              Acción principal
+              AcciÃ³n principal
             </div>
             <CardTitle className="mt-3 text-xl">Vender mueble</CardTitle>
-            <CardDescription className="mt-2">Registra una venta desde el catálogo de muebles terminados.</CardDescription>
+            <CardDescription className="mt-2">Registra una venta desde el catÃ¡logo de muebles terminados.</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
             {canMutate ? (
@@ -127,8 +127,8 @@ export default async function MueblesTerminadosPage() {
                 return (
                   <TRow key={venta.id}>
                     <TD>{formatDate(venta.fecha)}</TD>
-                    <TD>{clientesById.get(venta.cliente_id) ?? "—"}</TD>
-                    <TD>{mueble?.nombre ?? "—"}</TD>
+                    <TD>{clientesById.get(venta.cliente_id) ?? "â€”"}</TD>
+                    <TD>{mueble?.nombre ?? "â€”"}</TD>
                     <TD className="text-right">{venta.cantidad}</TD>
                     <TD className="text-right font-semibold">{formatPen(Number(venta.total))}</TD>
                     <TD>
@@ -206,7 +206,7 @@ export default async function MueblesTerminadosPage() {
               {ventas.length === 0 ? (
                 <TRow>
                   <TD colSpan={8} className="text-center text-[var(--color-text-secondary)]">
-                    Aún no hay ventas. Usa "Vender mueble" para registrar una.
+                    AÃºn no hay ventas. Usa "Vender mueble" para registrar una.
                   </TD>
                 </TRow>
               ) : null}
@@ -216,7 +216,7 @@ export default async function MueblesTerminadosPage() {
       </Card>
 
       <Card>
-        <CardTitle>Catálogo disponible</CardTitle>
+        <CardTitle>CatÃ¡logo disponible</CardTitle>
         <CardDescription>Selecciona productos listos para entrega inmediata. {muebles.length} muebles registrados.</CardDescription>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {muebles.map((mueble) => (
@@ -256,21 +256,21 @@ export default async function MueblesTerminadosPage() {
           ))}
           {muebles.length === 0 ? (
             <Card className="md:col-span-2 xl:col-span-3 space-y-2 text-center text-sm text-[var(--color-text-secondary)]">
-              <p>Aún no hay muebles en catálogo.</p>
+              <p>AÃºn no hay muebles en catÃ¡logo.</p>
               <p>
-                Para agregar muebles al catálogo andá a{" "}
+                Para agregar muebles al catÃ¡logo andÃ¡ a{" "}
                 <Link href="/inventario?tab=muebles" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
                   Inventario
                 </Link>{" "}
-                → pestaña <strong>Catálogo muebles</strong> → botón <strong>Agregar mueble</strong>.
+                â†’ pestaÃ±a <strong>CatÃ¡logo muebles</strong> â†’ botÃ³n <strong>Agregar mueble</strong>.
               </p>
             </Card>
           ) : null}
         </div>
       </Card>
       <Card className="py-4">
-        <CardTitle className="text-base">Resumen del m�dulo</CardTitle>
-        <CardDescription>Informaci�n secundaria para seguimiento r�pido.</CardDescription>
+        <CardTitle className="text-base">Resumen del módulo</CardTitle>
+        <CardDescription>Información secundaria para seguimiento rápido.</CardDescription>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-[var(--color-border)] px-3 py-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Muebles disponibles</p>
