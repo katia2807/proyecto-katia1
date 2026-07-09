@@ -19,7 +19,31 @@ function fmt(date: string) {
     return date;
   }
 }
+const decorativeQrCells = [
+  1, 1, 1, 0, 1, 0, 1, 1, 1,
+  1, 0, 1, 0, 1, 1, 1, 0, 1,
+  1, 1, 1, 0, 0, 0, 1, 1, 1,
+  0, 0, 0, 1, 1, 0, 0, 1, 0,
+  1, 0, 1, 1, 0, 1, 1, 0, 1,
+  0, 1, 0, 0, 1, 1, 0, 0, 0,
+  1, 1, 1, 0, 1, 0, 1, 1, 1,
+  1, 0, 1, 1, 1, 0, 1, 0, 1,
+  1, 1, 1, 0, 1, 1, 1, 1, 1,
+];
 
+function DecorativeQr({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={`grid rounded border border-black bg-white p-1 ${className}`}
+      style={{ gridTemplateColumns: "repeat(9, minmax(0, 1fr))" }}
+      aria-label="QR decorativo"
+    >
+      {decorativeQrCells.map((cell, index) => (
+        <span key={index} className={cell ? "aspect-square bg-black" : "aspect-square bg-white"} />
+      ))}
+    </div>
+  );
+}
 export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicketVoucherProps) {
   const { tipo, data: saleRecord } = await resolveSaleDocument(id, searchTipo);
   if (!saleRecord) {
@@ -430,14 +454,9 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
         </div>
         <div className="ticket-dashed-line"></div>
 
-        {/* Bottom barcode mockup and feedback */}
+        {/* Bottom decorative QR and feedback */}
         <div className="flex flex-col items-center justify-center space-y-1 mt-3 text-center">
-          {/* Simulated QR block */}
-          <div className="w-20 h-20 border border-black flex flex-col items-center justify-center p-1 bg-white">
-            <div className="w-full h-full bg-slate-900 flex items-center justify-center text-white text-[7px]">
-              [ Código QR ]
-            </div>
-          </div>
+          <DecorativeQr className="h-16 w-16" />
           <p className="text-[8px] mt-1.5 font-bold">Documento interno de venta. No válido como comprobante SUNAT.</p>
           <p className="text-[10px] font-bold tracking-wider mt-1 text-center">¡GRACIAS POR SU PREFERENCIA!</p>
         </div>

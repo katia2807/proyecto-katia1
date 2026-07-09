@@ -20,7 +20,31 @@ function fmt(date: string) {
     return date;
   }
 }
+const decorativeQrCells = [
+  1, 1, 1, 0, 1, 0, 1, 1, 1,
+  1, 0, 1, 0, 1, 1, 1, 0, 1,
+  1, 1, 1, 0, 0, 0, 1, 1, 1,
+  0, 0, 0, 1, 1, 0, 0, 1, 0,
+  1, 0, 1, 1, 0, 1, 1, 0, 1,
+  0, 1, 0, 0, 1, 1, 0, 0, 0,
+  1, 1, 1, 0, 1, 0, 1, 1, 1,
+  1, 0, 1, 1, 1, 0, 1, 0, 1,
+  1, 1, 1, 0, 1, 1, 1, 1, 1,
+];
 
+function DecorativeQr({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={`grid shrink-0 rounded-md border border-gray-300 bg-white p-1 ${className}`}
+      style={{ gridTemplateColumns: "repeat(9, minmax(0, 1fr))" }}
+      aria-label="QR decorativo"
+    >
+      {decorativeQrCells.map((cell, index) => (
+        <span key={index} className={cell ? "aspect-square bg-gray-900" : "aspect-square bg-white"} />
+      ))}
+    </div>
+  );
+}
 export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4VoucherProps) {
   const { tipo, data: saleRecord } = await resolveSaleDocument(id, searchTipo);
   if (!saleRecord) {
@@ -542,9 +566,12 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
                 ) : null}
               </div>
             </div>
-            <p className="shrink-0 text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-              Comprobante A4
-            </p>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <DecorativeQr className="h-16 w-16" />
+              <p className="text-right text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                Comprobante A4
+              </p>
+            </div>
           </div>
         </div>
 

@@ -22,7 +22,7 @@ import { formatDate, formatPen } from "@/lib/utils";
 export default async function MueblesTerminadosPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ mueble?: string | string[] }>;
+  searchParams?: Promise<{ mueble?: string | string[]; q?: string | string[]; catalogo?: string | string[]; ventas?: string | string[] }>;
 }) {
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
@@ -45,7 +45,38 @@ export default async function MueblesTerminadosPage({
   const stockBajo = muebles.filter((m) => m.stock_disponible > 0 && m.stock_disponible <= 2).length;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const selectedMuebleId = typeof resolvedSearchParams?.mueble === "string" ? resolvedSearchParams.mueble : undefined;
+  const catalogQuery = typeof resolvedSearchParams?.q === "string" ? resolvedSearchParams.q.trim() : "";
+  const catalogSearch = catalogQuery.toLowerCase();
+  const isCatalogSearchActive = catalogSearch.length > 0;
+  const showFullCatalog = resolvedSearchParams?.catalogo === "todo";
+  const showAllVentas = resolvedSearchParams?.ventas === "todo";
+  const filteredMuebles = isCatalogSearchActive
+    ? muebles.filter((mueble) => {
+        const nombre = mueble.nombre.toLowerCase();
+        const codigo = (mueble.codigo ?? "").toLowerCase();
+        return nombre.includes(catalogSearch) || codigo.includes(catalogSearch);
+      })
+    : muebles;
+  const visibleMuebles = isCatalogSearchActive || showFullCatalog ? filteredMuebles : filteredMuebles.slice(0, 6);
+  const visibleVentas = showAllVentas ? ventas : ventas.slice(0, 5);
+  const makeMueblesHref = (overrides: Record<string, string | undefined>) => {
+    const params = new URLSearchParams();
+    if (selectedMuebleId) params.set("mueble", selectedMuebleId);
+    if (catalogQuery) params.set("q", catalogQuery);
+    if (showFullCatalog) params.set("catalogo", "todo");
+    if (showAllVentas) params.set("ventas", "todo");
 
+    Object.entries(overrides).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+
+    const query = params.toString();
+    return query ? `/ventas/muebles-terminados?${query}` : "/ventas/muebles-terminados";
+  };
   return (
     <div className="space-y-6">
       <div>
@@ -109,13 +140,50 @@ export default async function MueblesTerminadosPage({
           <div>
             <CardTitle>Catálogo disponible</CardTitle>
             <CardDescription>
-              Muebles listos para vender. {muebles.length} productos registrados.
+              Muebles listos para vender. {isCatalogSearchActive
+                ? `${filteredMuebles.length} coincidencias encontradas.`
+                : `Mostrando ${visibleMuebles.length} de ${muebles.length} productos registrados.`}
             </CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <form method="get" className="flex flex-wrap items-center gap-2">
+              {selectedMuebleId ? <input type="hidden" name="mueble" value={selectedMuebleId} /> : null}
+              {showAllVentas ? <input type="hidden" name="ventas" value="todo" /> : null}
+              <input
+                type="search"
+                name="q"
+                defaultValue={catalogQuery}
+                placeholder="Buscar nombre o código"
+                className="h-9 w-56 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-accent)]"
+              />
+              <button
+                type="submit"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-[var(--color-border)] px-3 text-xs font-bold text-[var(--color-text-primary)] transition hover:bg-[var(--color-primary-soft)]"
+              >
+                Buscar
+              </button>
+              {isCatalogSearchActive ? (
+                <Link
+                  href={makeMueblesHref({ q: undefined, catalogo: undefined })}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-[var(--color-border)] px-3 text-xs font-bold text-[var(--color-text-secondary)] transition hover:bg-[var(--color-primary-soft)]"
+                >
+                  Limpiar
+                </Link>
+              ) : null}
+            </form>
+            {!isCatalogSearchActive && muebles.length > 6 ? (
+              <Link
+                href={makeMueblesHref({ catalogo: showFullCatalog ? undefined : "todo" })}
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-[var(--color-accent)] px-3 text-xs font-bold text-white shadow-sm transition hover:brightness-110"
+              >
+                {showFullCatalog ? "Ver menos" : "Ver todo"}
+              </Link>
+            ) : null}
           </div>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {muebles.map((mueble) => (
+          {visibleMuebles.map((mueble) => (
             <article
               key={mueble.id}
               className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
@@ -175,19 +243,31 @@ export default async function MueblesTerminadosPage({
               </div>
             </article>
           ))}
-          {muebles.length === 0 ? (
+          {filteredMuebles.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-sm text-[var(--color-text-secondary)] sm:col-span-2 xl:col-span-3">
-              No hay muebles terminados registrados en el catálogo.
+              {isCatalogSearchActive ? "No hay coincidencias para la búsqueda." : "No hay muebles terminados registrados en el catálogo."}
             </div>
           ) : null}
         </div>
       </Card>
 
       <Card>
-        <CardTitle>Ventas registradas</CardTitle>
-        <CardDescription>
-          {ventas.length} ventas registradas de muebles terminados. Marca el estado de entrega cuando corresponda.
-        </CardDescription>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <CardTitle>Ventas registradas</CardTitle>
+            <CardDescription>
+              Mostrando {visibleVentas.length} de {ventas.length} ventas registradas de muebles terminados.
+            </CardDescription>
+          </div>
+          {ventas.length > 5 ? (
+            <Link
+              href={makeMueblesHref({ ventas: showAllVentas ? undefined : "todo" })}
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-[var(--color-border)] px-3 text-xs font-bold text-[var(--color-text-primary)] transition hover:bg-[var(--color-primary-soft)]"
+            >
+              {showAllVentas ? "Ver menos" : "Ver todas"}
+            </Link>
+          ) : null}
+        </div>
         <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
           <Table>
             <THead>
@@ -203,7 +283,7 @@ export default async function MueblesTerminadosPage({
               </TRow>
             </THead>
             <tbody>
-               {ventas.map((venta) => {
+               {visibleVentas.map((venta) => {
                 const mueble = muebleHelpers.get(venta.mueble_catalogo_id);
                 const chofer = venta.chofer_id ? choferesById.get(venta.chofer_id) : null;
                 const cli = clientesMap.get(venta.cliente_id);

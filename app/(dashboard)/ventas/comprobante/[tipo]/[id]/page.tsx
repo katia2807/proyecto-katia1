@@ -19,7 +19,31 @@ function fmt(date: string) {
     return date;
   }
 }
+const decorativeQrCells = [
+  1, 1, 1, 0, 1, 0, 1, 1, 1,
+  1, 0, 1, 0, 1, 1, 1, 0, 1,
+  1, 1, 1, 0, 0, 0, 1, 1, 1,
+  0, 0, 0, 1, 1, 0, 0, 1, 0,
+  1, 0, 1, 1, 0, 1, 1, 0, 1,
+  0, 1, 0, 0, 1, 1, 0, 0, 0,
+  1, 1, 1, 0, 1, 0, 1, 1, 1,
+  1, 0, 1, 1, 1, 0, 1, 0, 1,
+  1, 1, 1, 0, 1, 1, 1, 1, 1,
+];
 
+function DecorativeQr({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={`grid shrink-0 rounded-md border border-[var(--color-border,#e2e8f0)] bg-white p-1 ${className}`}
+      style={{ gridTemplateColumns: "repeat(9, minmax(0, 1fr))" }}
+      aria-label="QR decorativo"
+    >
+      {decorativeQrCells.map((cell, index) => (
+        <span key={index} className={cell ? "aspect-square bg-slate-900" : "aspect-square bg-white"} />
+      ))}
+    </div>
+  );
+}
 type MaderaCortadaRow = {
   id: string;
   cliente_id: string;
@@ -762,9 +786,12 @@ export default async function ComprobantePage({
               <p className="voucher-value mt-0.5 text-sm font-medium text-[var(--color-text-primary,#1e293b)] capitalize">{entrega}</p>
             </div>
           </div>
-          <p className="mt-3 text-center text-[10px] font-medium text-[var(--color-text-secondary,#64748b)]">
-            Documento interno de venta. No válido como comprobante SUNAT.
-          </p>
+          <div className="mt-4 flex flex-col items-center gap-2 text-center">
+            <DecorativeQr className="h-16 w-16" />
+            <p className="text-[10px] font-medium text-[var(--color-text-secondary,#64748b)]">
+              Documento interno de venta. No válido como comprobante SUNAT.
+            </p>
+          </div>
 
         </div>
       </div>
