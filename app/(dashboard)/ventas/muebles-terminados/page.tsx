@@ -45,7 +45,7 @@ export default async function MueblesTerminadosPage() {
       <div>
         <h2 className="text-xl font-bold">Muebles terminados</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Registra ventas de muebles listos, revisa el historial del mÃ³dulo y usa el catÃ¡logo como apoyo. Los productos se administran en{" "}
+          Registra ventas de muebles listos, revisa el historial del módulo y usa el catálogo como apoyo. Los productos se administran en{" "}
           <Link href="/inventario?tab=muebles" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
             Inventario
           </Link>
@@ -57,10 +57,10 @@ export default async function MueblesTerminadosPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="max-w-2xl">
             <div className="inline-flex items-center rounded-full bg-[var(--katia-primary)] px-2.5 py-1 text-xs font-bold text-white">
-              AcciÃ³n principal
+              Acción principal
             </div>
             <CardTitle className="mt-3 text-xl">Vender mueble</CardTitle>
-            <CardDescription className="mt-2">Registra una venta desde el catÃ¡logo de muebles terminados.</CardDescription>
+            <CardDescription className="mt-2">Registra una venta desde el catálogo de muebles terminados.</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
             {canMutate ? (
@@ -97,6 +97,60 @@ export default async function MueblesTerminadosPage() {
         </div>
       </Card>
 
+      <Card className="border-2 border-[var(--katia-primary)]/40">
+        <CardTitle>Catálogo disponible</CardTitle>
+        <CardDescription>Selecciona productos listos para entrega inmediata. {muebles.length} muebles registrados.</CardDescription>
+        <div className="mt-4 grid max-h-[70vh] gap-3 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
+          {muebles.map((mueble) => (
+            <Card key={mueble.id} className="space-y-2">
+              {mueble.foto_url ? (
+                <Image
+                  src={mueble.foto_url}
+                  alt={mueble.nombre}
+                  width={320}
+                  height={180}
+                  className="h-36 w-full rounded-xl object-cover"
+                  unoptimized
+                />
+              ) : (
+                <div className="flex h-36 items-center justify-center rounded-[var(--katia-radius-lg)] bg-[var(--katia-surface-raised)]">
+                  <IconPhoto className="size-8 text-[var(--katia-text-tertiary)]/40" />
+                </div>
+              )}
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    {mueble.codigo}
+                  </p>
+                  <p className="text-base font-semibold">{mueble.nombre}</p>
+                </div>
+                <Badge variant={mueble.stock_disponible > 0 ? "success" : "danger"}>
+                  Stock: {mueble.stock_disponible}
+                </Badge>
+              </div>
+              {mueble.descripcion ? (
+                <p className="text-xs text-[var(--color-text-secondary)]">{mueble.descripcion}</p>
+              ) : null}
+              <p className="text-lg font-bold text-[var(--color-text-primary)]">
+                {formatPen(mueble.precio_lista)}
+              </p>
+            </Card>
+          ))}
+          {muebles.length === 0 ? (
+            <Card className="md:col-span-2 xl:col-span-3 space-y-2 text-center text-sm text-[var(--color-text-secondary)]">
+              <p>No hay muebles terminados registrados en el catálogo.</p>
+              <p>
+                Para agregar muebles al catálogo anda a{" "}
+                <Link href="/inventario?tab=muebles" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
+                  Inventario
+                </Link>{" "}
+                {"->"} pestaña <strong>Catálogo muebles</strong> {"->"} botón <strong>Agregar mueble</strong>.
+              </p>
+            </Card>
+          ) : null}
+        </div>
+      </Card>
+
 
       <Card>
         <CardTitle>Ventas registradas</CardTitle>
@@ -127,8 +181,8 @@ export default async function MueblesTerminadosPage() {
                 return (
                   <TRow key={venta.id}>
                     <TD>{formatDate(venta.fecha)}</TD>
-                    <TD>{clientesById.get(venta.cliente_id) ?? "â€”"}</TD>
-                    <TD>{mueble?.nombre ?? "â€”"}</TD>
+                    <TD>{clientesById.get(venta.cliente_id) ?? "-"}</TD>
+                    <TD>{mueble?.nombre ?? "-"}</TD>
                     <TD className="text-right">{venta.cantidad}</TD>
                     <TD className="text-right font-semibold">{formatPen(Number(venta.total))}</TD>
                     <TD>
@@ -206,7 +260,7 @@ export default async function MueblesTerminadosPage() {
               {ventas.length === 0 ? (
                 <TRow>
                   <TD colSpan={8} className="text-center text-[var(--color-text-secondary)]">
-                    AÃºn no hay ventas. Usa "Vender mueble" para registrar una.
+                    Aún no hay ventas. Usa "Vender mueble" para registrar una.
                   </TD>
                 </TRow>
               ) : null}
@@ -215,59 +269,6 @@ export default async function MueblesTerminadosPage() {
         </div>
       </Card>
 
-      <Card>
-        <CardTitle>CatÃ¡logo disponible</CardTitle>
-        <CardDescription>Selecciona productos listos para entrega inmediata. {muebles.length} muebles registrados.</CardDescription>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {muebles.map((mueble) => (
-            <Card key={mueble.id} className="space-y-2">
-              {mueble.foto_url ? (
-                <Image
-                  src={mueble.foto_url}
-                  alt={mueble.nombre}
-                  width={320}
-                  height={180}
-                  className="h-36 w-full rounded-xl object-cover"
-                  unoptimized
-                />
-              ) : (
-                <div className="flex h-36 items-center justify-center rounded-[var(--katia-radius-lg)] bg-[var(--katia-surface-raised)]">
-                  <IconPhoto className="size-8 text-[var(--katia-text-tertiary)]/40" />
-                </div>
-              )}
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    {mueble.codigo}
-                  </p>
-                  <p className="text-base font-semibold">{mueble.nombre}</p>
-                </div>
-                <Badge variant={mueble.stock_disponible > 0 ? "success" : "danger"}>
-                  Stock: {mueble.stock_disponible}
-                </Badge>
-              </div>
-              {mueble.descripcion ? (
-                <p className="text-xs text-[var(--color-text-secondary)]">{mueble.descripcion}</p>
-              ) : null}
-              <p className="text-lg font-bold text-[var(--color-text-primary)]">
-                {formatPen(mueble.precio_lista)}
-              </p>
-            </Card>
-          ))}
-          {muebles.length === 0 ? (
-            <Card className="md:col-span-2 xl:col-span-3 space-y-2 text-center text-sm text-[var(--color-text-secondary)]">
-              <p>AÃºn no hay muebles en catÃ¡logo.</p>
-              <p>
-                Para agregar muebles al catÃ¡logo andÃ¡ a{" "}
-                <Link href="/inventario?tab=muebles" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
-                  Inventario
-                </Link>{" "}
-                â†’ pestaÃ±a <strong>CatÃ¡logo muebles</strong> â†’ botÃ³n <strong>Agregar mueble</strong>.
-              </p>
-            </Card>
-          ) : null}
-        </div>
-      </Card>
       <Card className="py-4">
         <CardTitle className="text-base">Resumen del módulo</CardTitle>
         <CardDescription>Información secundaria para seguimiento rápido.</CardDescription>
