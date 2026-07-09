@@ -141,6 +141,20 @@ export default async function MueblesPersonalizadosPage() {
           Abrir cotizador guiado
         </Link>
       </Card>
+      <Card className="flex flex-wrap items-center justify-between gap-3 border border-[var(--color-border)] bg-[var(--color-surface)]">
+        <div className="max-w-2xl">
+          <CardTitle className="text-base">¿Quieres vender un mueble ya terminado?</CardTitle>
+          <CardDescription className="mt-1">
+            Si el producto ya existe en stock, usa el catálogo de muebles terminados para seleccionarlo y registrar la venta.
+          </CardDescription>
+        </div>
+        <Link
+          href="/ventas/muebles-terminados"
+          className="inline-flex items-center justify-center rounded-xl border border-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-[var(--color-accent)] transition hover:bg-[var(--color-accent)] hover:text-white"
+        >
+          Ver catálogo de muebles terminados
+        </Link>
+      </Card>
 
       <Card>
         <CardTitle>Pedidos y cotizaciones registradas</CardTitle>
