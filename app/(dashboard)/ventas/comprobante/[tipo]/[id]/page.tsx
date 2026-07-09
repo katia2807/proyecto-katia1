@@ -649,21 +649,22 @@ export default async function ComprobantePage({
                 <table className="w-full table-fixed">
                   <thead>
                     <tr>
-                      <th className="voucher-th w-[46%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 pr-3 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Descripción</th>
-                      <th className="voucher-th w-[12%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Cant.</th>
-                      <th className="voucher-th w-[13%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Unidad</th>
-                      <th className="voucher-th w-[14%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">P. Unit.</th>
-                      <th className="voucher-th w-[15%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Total</th>
+                      <th className="voucher-th w-[14%] border-b border-[var(--color-border,#e2e8f0)] pb-2 pl-2 pr-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Cant.</th>
+                      <th className="voucher-th w-[50%] border-b border-[var(--color-border,#e2e8f0)] px-2 pb-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Descripción</th>
+                      <th className="voucher-th w-[18%] border-b border-[var(--color-border,#e2e8f0)] px-2 pb-2 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">P. Unit.</th>
+                      <th className="voucher-th w-[18%] border-b border-[var(--color-border,#e2e8f0)] pb-2 pl-2 pr-2 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Importe</th>
                     </tr>
                   </thead>
                   <tbody>
                     {ventaMaderaLineasResueltas.map((linea, i) => (
                       <tr key={i} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
-                        <td className="voucher-td min-w-0 whitespace-normal break-words py-2 pr-3 text-left text-sm leading-snug text-[var(--color-text-primary,#1e293b)]">{linea.desc}</td>
-                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.qty}</td>
-                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm font-medium capitalize text-[var(--color-text-secondary,#64748b)]">{linea.unidad}</td>
-                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.unitario}</td>
-                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">{linea.total}</td>
+                        <td className="voucher-td py-2 pl-2 pr-2 text-left text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">
+                          <span>{linea.qty}</span>
+                          <span className="block text-[10px] font-bold uppercase text-[var(--color-text-secondary,#64748b)]">{linea.unidad}</span>
+                        </td>
+                        <td className="voucher-td min-w-0 whitespace-normal break-words px-2 py-2 text-left text-sm leading-snug text-[var(--color-text-primary,#1e293b)]">{linea.desc}</td>
+                        <td className="voucher-td whitespace-nowrap px-2 py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.unitario}</td>
+                        <td className="voucher-td whitespace-nowrap py-2 pl-2 pr-2 text-right text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">{linea.total}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -701,19 +702,21 @@ export default async function ComprobantePage({
                 <table className="w-full table-fixed">
                   <thead>
                     <tr>
-                      <th className="voucher-th w-[52%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 pr-3 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Descripción</th>
-                      <th className="voucher-th w-[12%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Cant.</th>
-                      <th className="voucher-th w-[14%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">P. Unit.</th>
-                      <th className="voucher-th w-[15%] border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Total</th>
+                      <th className="voucher-th w-[14%] border-b border-[var(--color-border,#e2e8f0)] pb-2 pl-2 pr-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Cant.</th>
+                      <th className="voucher-th w-[50%] border-b border-[var(--color-border,#e2e8f0)] px-2 pb-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Descripción</th>
+                      <th className="voucher-th w-[18%] border-b border-[var(--color-border,#e2e8f0)] px-2 pb-2 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">P. Unit.</th>
+                      <th className="voucher-th w-[18%] border-b border-[var(--color-border,#e2e8f0)] pb-2 pl-2 pr-2 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Importe</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item, i) => (
                       <tr key={i} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
-                        <td className="voucher-td min-w-0 whitespace-normal break-words py-2 pr-3 text-sm leading-snug text-[var(--color-text-primary,#1e293b)]">{item.desc}</td>
-                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{item.qty}</td>
-                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{item.unitario}</td>
-                        <td className="voucher-td whitespace-nowrap py-2 text-right text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">{item.total}</td>
+                        <td className="voucher-td whitespace-normal py-2 pl-2 pr-2 text-left text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">
+                          {tipo === "mueble" ? `${item.qty} UND.` : item.qty}
+                        </td>
+                        <td className="voucher-td min-w-0 whitespace-normal break-words px-2 py-2 text-sm leading-snug text-[var(--color-text-primary,#1e293b)]">{item.desc}</td>
+                        <td className="voucher-td whitespace-nowrap px-2 py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{item.unitario}</td>
+                        <td className="voucher-td whitespace-nowrap py-2 pl-2 pr-2 text-right text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">{item.total}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -759,6 +762,9 @@ export default async function ComprobantePage({
               <p className="voucher-value mt-0.5 text-sm font-medium text-[var(--color-text-primary,#1e293b)] capitalize">{entrega}</p>
             </div>
           </div>
+          <p className="mt-3 text-center text-[10px] font-medium text-[var(--color-text-secondary,#64748b)]">
+            Documento interno de venta. No válido como comprobante SUNAT.
+          </p>
 
         </div>
       </div>

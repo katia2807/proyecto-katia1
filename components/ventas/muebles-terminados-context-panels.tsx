@@ -37,6 +37,7 @@ type MueblesTerminadosContextPanelsProps = {
   zonas: Pick<ZonaEntregaRow, "id" | "nombre" | "tarifa" | "distancia_km">[];
   fechaDefault: string;
   mockData?: boolean;
+  selectedMuebleId?: string;
 };
 
 
@@ -47,6 +48,7 @@ export function MueblesTerminadosContextPanels({
   zonas,
   fechaDefault,
   mockData = false,
+  selectedMuebleId,
 }: MueblesTerminadosContextPanelsProps) {
   const { showToast } = useToast();
   const [open, setOpen] = useState(false);
@@ -171,6 +173,15 @@ export function MueblesTerminadosContextPanels({
       : muebles;
   }, [mockData, muebles]);
 
+  useEffect(() => {
+    if (!selectedMuebleId) return;
+    const selected = activeMuebles.find((m) => m.id === selectedMuebleId);
+    if (!selected) return;
+    setMuebleCatalogoId(selected.id);
+    setStep(2);
+    setOpen(true);
+    document.getElementById("vender-mueble")?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [selectedMuebleId, activeMuebles]);
   const muebleOptions = useMemo(() => {
     return activeMuebles.map((m) => ({
       value: m.id,

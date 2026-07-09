@@ -374,29 +374,29 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
             <h3 className="text-xs font-black uppercase tracking-wider text-gray-600 mb-3">Detalle de Productos</h3>
             <table className="w-full table-fixed text-xs">
               <colgroup>
-                <col className="w-[52%]" />
-                <col className="w-[10%]" />
-                <col className="w-[12%]" />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
+                <col className="w-[14%]" />
+                <col className="w-[50%]" />
+                <col className="w-[18%]" />
+                <col className="w-[18%]" />
               </colgroup>
               <thead>
-                <tr className="border-b border-gray-400 bg-slate-100">
-                  <th className="py-2 pl-3 pr-4 text-left font-bold uppercase">Descripción</th>
-                  <th className="px-2 py-2 text-right font-bold uppercase">Cant.</th>
-                  <th className="px-2 py-2 text-right font-bold uppercase">Unidad</th>
-                  <th className="px-2 py-2 text-right font-bold uppercase">P. Unit.</th>
-                  <th className="py-2 pl-2 pr-3 text-right font-bold uppercase">Subtotal</th>
+                <tr className="border-b border-gray-300 bg-slate-50">
+                  <th className="py-2 pl-3 pr-2 text-left font-bold uppercase tracking-wide">Cant.</th>
+                  <th className="px-2 py-2 text-left font-bold uppercase tracking-wide">Descripción</th>
+                  <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">P. Unit.</th>
+                  <th className="py-2 pl-2 pr-3 text-right font-bold uppercase tracking-wide">Importe</th>
                 </tr>
               </thead>
               <tbody>
                 {ventaMaderaLineasResueltas.map((linea, i) => (
-                  <tr key={i} className="border-b border-gray-200">
-                    <td className="min-w-0 whitespace-normal break-words py-2.5 pl-3 pr-4 text-sm font-semibold leading-snug">{linea.desc}</td>
-                    <td className="px-2 py-2.5 text-right text-sm">{linea.qty}</td>
-                    <td className="px-2 py-2.5 text-right text-sm uppercase text-gray-500">{linea.unidad}</td>
-                    <td className="px-2 py-2.5 text-right text-sm">{linea.unitario}</td>
-                    <td className="py-2.5 pl-2 pr-3 text-right text-sm font-bold">{linea.total}</td>
+                  <tr key={i} className="border-b border-gray-100 last:border-b-0">
+                    <td className="py-2.5 pl-3 pr-2 text-left text-sm font-semibold">
+                      <span>{linea.qty}</span>
+                      <span className="block text-[10px] font-bold uppercase text-gray-500">{linea.unidad}</span>
+                    </td>
+                    <td className="min-w-0 whitespace-normal break-words px-2 py-2.5 text-sm font-semibold leading-snug">{linea.desc}</td>
+                    <td className="px-2 py-2.5 text-right text-sm whitespace-nowrap">{linea.unitario}</td>
+                    <td className="py-2.5 pl-2 pr-3 text-right text-sm font-bold whitespace-nowrap">{linea.total}</td>
                   </tr>
                 ))}
               </tbody>
@@ -431,31 +431,30 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
             <h3 className="text-xs font-black uppercase tracking-wider text-gray-600 mb-3">Detalle de Venta</h3>
             <table className="w-full table-fixed text-xs">
               <colgroup>
-                <col className="w-[52%]" />
-                <col className="w-[10%]" />
-                <col className="w-[12%]" />
-                <col className="w-[13%]" />
-                <col className="w-[13%]" />
+                <col className="w-[14%]" />
+                <col className="w-[50%]" />
+                <col className="w-[18%]" />
+                <col className="w-[18%]" />
               </colgroup>
               <thead>
-                <tr className="border-b border-gray-400 bg-slate-100">
-                  <th className="py-2 pl-3 pr-4 text-left font-bold uppercase">Descripción</th>
-                  <th className="px-2 py-2 text-right font-bold uppercase">Cant.</th>
-                  <th className="px-2 py-2 text-right font-bold uppercase">Unidad</th>
-                  <th className="px-2 py-2 text-right font-bold uppercase">P. Unit.</th>
-                  <th className="py-2 pl-2 pr-3 text-right font-bold uppercase">Subtotal</th>
+                <tr className="border-b border-gray-300 bg-slate-50">
+                  <th className="py-2 pl-3 pr-2 text-left font-bold uppercase tracking-wide">Cant.</th>
+                  <th className="px-2 py-2 text-left font-bold uppercase tracking-wide">Descripción</th>
+                  <th className="px-2 py-2 text-right font-bold uppercase tracking-wide">P. Unit.</th>
+                  <th className="py-2 pl-2 pr-3 text-right font-bold uppercase tracking-wide">Importe</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, i) => (
-                  <tr key={i} className="border-b border-gray-200">
-                    <td className="min-w-0 whitespace-normal break-words py-2.5 pl-3 pr-4 text-sm leading-snug">
+                  <tr key={i} className="border-b border-gray-100 last:border-b-0">
+                    <td className="py-2.5 pl-3 pr-2 text-left text-sm font-semibold whitespace-normal">
+                      {tipo === "mueble" ? `${item.qty} UND.` : item.qty}
+                    </td>
+                    <td className="min-w-0 whitespace-normal break-words px-2 py-2.5 text-sm leading-snug">
                       <p className="font-semibold">{item.desc}</p>
                     </td>
-                    <td className="px-2 py-2.5 text-right text-sm">{tipo === "madera" ? item.qty.replace(" PT", "") : item.qty}</td>
-                    <td className="px-2 py-2.5 text-right text-sm uppercase text-gray-500">{tipo === "madera" ? "PT" : "und."}</td>
-                    <td className="px-2 py-2.5 text-right text-sm">{item.unitario}</td>
-                    <td className="py-2.5 pl-2 pr-3 text-right text-sm font-bold">{item.total}</td>
+                    <td className="px-2 py-2.5 text-right text-sm whitespace-nowrap">{item.unitario}</td>
+                    <td className="py-2.5 pl-2 pr-3 text-right text-sm font-bold whitespace-nowrap">{item.total}</td>
                   </tr>
                 ))}
               </tbody>
@@ -535,6 +534,7 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
               <div className="min-w-0">
                 <p className="truncate text-sm font-black uppercase tracking-wide text-gray-800">{empresa.nombre}</p>
                 <p className="font-semibold text-gray-700">Gracias por su compra</p>
+                <p className="mt-0.5 text-[10px] font-medium text-gray-500">Documento interno de venta. No válido como comprobante SUNAT.</p>
                 {brandContactLines.length > 0 ? (
                   <p className="mt-0.5 whitespace-normal break-words leading-snug text-gray-500">
                     {brandContactLines.join(" | ")}

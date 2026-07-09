@@ -19,7 +19,11 @@ import {
 import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 
-export default async function MueblesTerminadosPage() {
+export default async function MueblesTerminadosPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ mueble?: string | string[] }>;
+}) {
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const [muebles, clientes, choferes, ventas, zonas] = await Promise.all([
@@ -39,6 +43,8 @@ export default async function MueblesTerminadosPage() {
   const hoy = new Date().toISOString().slice(0, 10);
   const mueblesDisponibles = muebles.filter((m) => m.stock_disponible > 0).length;
   const stockBajo = muebles.filter((m) => m.stock_disponible > 0 && m.stock_disponible <= 2).length;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const selectedMuebleId = typeof resolvedSearchParams?.mueble === "string" ? resolvedSearchParams.mueble : undefined;
 
   return (
     <div className="space-y-6">
@@ -87,6 +93,7 @@ export default async function MueblesTerminadosPage() {
                 }))}
                 fechaDefault={hoy}
                 mockData={comboMock}
+                selectedMuebleId={selectedMuebleId}
               />
             ) : (
               <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
@@ -154,7 +161,7 @@ export default async function MueblesTerminadosPage() {
                   </p>
                   {canMutate && mueble.stock_disponible > 0 ? (
                     <Link
-                      href="#vender-mueble"
+                      href={`/ventas/muebles-terminados?mueble=${mueble.id}#vender-mueble`}
                       className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-accent)] px-3 text-xs font-bold text-white shadow-sm transition hover:brightness-110"
                     >
                       Vender mueble

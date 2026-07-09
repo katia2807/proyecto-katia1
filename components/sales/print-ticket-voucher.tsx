@@ -435,10 +435,10 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
           {/* Simulated QR block */}
           <div className="w-20 h-20 border border-black flex flex-col items-center justify-center p-1 bg-white">
             <div className="w-full h-full bg-slate-900 flex items-center justify-center text-white text-[7px]">
-              [ QR SUNAT ]
+              [ Código QR ]
             </div>
           </div>
-          <p className="text-[8px] mt-1.5 font-bold">Representación impresa autorizada de comprobante electrónico.</p>
+          <p className="text-[8px] mt-1.5 font-bold">Documento interno de venta. No válido como comprobante SUNAT.</p>
           <p className="text-[10px] font-bold tracking-wider mt-1 text-center">¡GRACIAS POR SU PREFERENCIA!</p>
         </div>
 
