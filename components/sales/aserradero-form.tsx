@@ -35,9 +35,9 @@ type AserraderoFormProps = {
 
 const PIE_TABLAR_A_PIE_CUBICO = 1 / 12;
 
-/** Misma pieza por defecto que `CubicajeInput` (1×2×6×8 → 8 PT) para que `pies_cubicos` no quede en 0 al enviar sin tocar la tabla. */
+/** Misma estructura que `CubicajeInput`, sin cubicaje precargado. */
 const DEFAULT_LINEAS_CUBICAJE_JSON = JSON.stringify([
-  { id: 1, cantidad: 1, espesor: 2, ancho: 6, largo: 8, descripcion: "", subtotalPT: 8 },
+  { id: 1, cantidad: 0, espesor: 0, ancho: 0, largo: 0, descripcion: "", subtotalPT: 0 },
 ]);
 
 export function AserraderoForm({

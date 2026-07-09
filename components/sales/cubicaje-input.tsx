@@ -92,10 +92,10 @@ function parseDimensionesDeNombre(nombre: string) {
     const ancho = parseFractionOrFloat(twoPartMatch[2]);
     const descMatch = cleanName.match(/^(.*?)\b\d/);
     const descripcion = descMatch ? descMatch[1].trim() : cleanName;
-    return { espesor, ancho, largo: 8, descripcion };
+    return { espesor, ancho, largo: 0, descripcion };
   }
 
-  return { espesor: 2, ancho: 6, largo: 8, descripcion: nombre };
+  return { espesor: 0, ancho: 0, largo: 0, descripcion: nombre };
 }
 
 const inputClass =
@@ -115,7 +115,7 @@ export function CubicajeInput({
   const [piezas, setPiezas] = useState<Pieza[]>(
     defaultPiezas !== undefined
       ? defaultPiezas
-      : [{ id: 1, cantidad: 1, espesor: 2, ancho: 6, largo: 8, descripcion: "Tabla", inventario_producto_id: null }],
+      : [{ id: 1, cantidad: 0, espesor: 0, ancho: 0, largo: 0, descripcion: "", inventario_producto_id: null }],
   );
   const [precioInput, setPrecioInput] = useState(defaultPrecioPorPT);
   const [focusRowId, setFocusRowId] = useState<number | null>(null);
@@ -191,7 +191,7 @@ export function CubicajeInput({
     const nextId = (piezas.at(-1)?.id ?? 0) + 1;
     setPiezas((prev) => [
       ...prev,
-      { id: nextId, cantidad: 1, espesor: 2, ancho: 6, largo: 8, descripcion: "", inventario_producto_id: null },
+      { id: nextId, cantidad: 0, espesor: 0, ancho: 0, largo: 0, descripcion: "", inventario_producto_id: null },
     ]);
     setFocusRowId(nextId);
   }
@@ -232,160 +232,167 @@ export function CubicajeInput({
 
   return (
     <div className="space-y-3 w-full">
-      <div className="overflow-x-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] w-full">
-        <table className="min-w-[760px] w-full text-sm table-layout-fixed">
-          <thead className="bg-[var(--color-primary-soft)]/30">
-            <tr>
-              <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[180px]">
-                Producto / Descripción
-              </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[80px]">
-                Cant.
-              </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[80px]">
-                Esp. (in)
-              </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[80px]">
-                Anch. (in)
-              </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[80px]">
-                Largo (ft)
-              </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[100px]">
-                PT (u / tot)
-              </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[100px]">
-                P.Unit (S/)
-              </th>
-              <th className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)] min-w-[48px]">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {piezasConSubtotal.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-xs text-[var(--color-text-secondary)] italic">
-                  Calculadora vacía. Haz clic en &quot;Agregar pieza&quot; o selecciona un producto de inventario en la fila para empezar.
-                </td>
-              </tr>
-            ) : (
-              piezasConSubtotal.map((p) => (
-                <tr key={p.id} className="border-t border-[var(--color-border)]">
-                  <td className="px-2 py-1.5 space-y-1.5">
-                    {productos && productos.length > 0 ? (
-                      <select
-                        ref={(el) => {
-                          if (el && focusRowId === p.id) {
-                            el.focus();
-                            setFocusRowId(null);
-                          }
-                        }}
-                        value={p.inventario_producto_id || "manual"}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === "manual") {
-                            actualizar(p.id, {
-                              inventario_producto_id: null,
-                            });
-                          } else {
-                            const selectedProd = productos.find((prod) => prod.id === val);
-                            if (selectedProd) {
-                              const parsed = parseDimensionesDeNombre(selectedProd.nombre);
-                              actualizar(p.id, {
-                                inventario_producto_id: val,
-                                descripcion: parsed.descripcion,
-                                espesor: parsed.espesor,
-                                ancho: parsed.ancho,
-                                largo: parsed.largo,
-                              });
-                              // Si el costo sugerido está presente y es el primer producto, sugerir cambiar precio global
-                              if (selectedProd.costo_unitario && Number(selectedProd.costo_unitario) > 0) {
-                                setPrecioInput(String(selectedProd.costo_unitario));
-                              }
-                            }
-                          }
-                        }}
-                        onKeyDown={handleKeyDown}
-                        className="h-8 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-1 text-xs font-semibold outline-none"
-                      >
-                        <option value="manual">✏️ Escribir manual (sin inventario)</option>
-                        {productos.map((prod) => (
-                          <option key={prod.id} value={prod.id}>
-                            {prod.nombre} (Stock: {Number(prod.stock_actual).toFixed(1)} {prod.unidad})
-                          </option>
-                        ))}
-                      </select>
-                    ) : null}
-                    <input
+      <div className="space-y-3">
+        {piezasConSubtotal.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-6 text-center text-xs italic text-[var(--color-text-secondary)]">
+            Calculadora vacía. Haz clic en &quot;Agregar pieza&quot; o selecciona un producto de inventario para empezar.
+          </div>
+        ) : (
+          piezasConSubtotal.map((p, index) => (
+            <div
+              key={p.id}
+              className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-sm"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-[var(--color-text-primary)]">Pieza {index + 1}</p>
+                  <p className="text-xs text-[var(--color-text-secondary)]">Detalle de producto, cantidad y medidas</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => eliminar(p.id)}
+                  className="rounded-lg p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-soft)]/40 hover:text-[var(--color-danger)]"
+                  aria-label="Eliminar pieza"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    Producto o descripción
+                  </label>
+                  {productos && productos.length > 0 ? (
+                    <select
                       ref={(el) => {
-                        if (el && focusRowId === p.id && (!productos || productos.length === 0)) {
+                        if (el && focusRowId === p.id) {
                           el.focus();
                           setFocusRowId(null);
                         }
                       }}
-                      className={inputClass}
-                      value={p.descripcion}
-                      placeholder="Tabla, listón, especie…"
-                      onChange={(e) => actualizar(p.id, { descripcion: e.target.value })}
+                      value={p.inventario_producto_id || "manual"}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "manual") {
+                          actualizar(p.id, {
+                            inventario_producto_id: null,
+                          });
+                        } else {
+                          const selectedProd = productos.find((prod) => prod.id === val);
+                          if (selectedProd) {
+                            const parsed = parseDimensionesDeNombre(selectedProd.nombre);
+                            actualizar(p.id, {
+                              inventario_producto_id: val,
+                              descripcion: parsed.descripcion,
+                              espesor: parsed.espesor,
+                              ancho: parsed.ancho,
+                              largo: parsed.largo,
+                            });
+                            // Si el costo sugerido está presente y es el primer producto, sugerir cambiar precio global
+                            if (selectedProd.costo_unitario && Number(selectedProd.costo_unitario) > 0) {
+                              setPrecioInput(String(selectedProd.costo_unitario));
+                            }
+                          }
+                        }
+                      }}
                       onKeyDown={handleKeyDown}
-                      autoComplete="off"
-                    />
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
+                      className="h-9 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                    >
+                      <option value="manual">Escribir manual (sin inventario)</option>
+                      {productos.map((prod) => (
+                        <option key={prod.id} value={prod.id}>
+                          {prod.nombre} (Stock: {Number(prod.stock_actual).toFixed(1)} {prod.unidad})
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                  <input
+                    ref={(el) => {
+                      if (el && focusRowId === p.id && (!productos || productos.length === 0)) {
+                        el.focus();
+                        setFocusRowId(null);
+                      }
+                    }}
+                    className={inputClass}
+                    value={p.descripcion}
+                    placeholder="Tabla, listón, especie..."
+                    onChange={(e) => actualizar(p.id, { descripcion: e.target.value })}
+                    onKeyDown={handleKeyDown}
+                    autoComplete="off"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <label className="space-y-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    Cantidad
                     <input
                       type="number"
                       min="0"
                       step="1"
                       className={`${inputClass} text-center`}
                       value={p.cantidad === 0 ? "" : p.cantidad}
+                      placeholder="Cant."
                       onChange={(e) => actualizar(p.id, { cantidad: Number(e.target.value) || 0 })}
                       onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
+                  </label>
+                  <label className="space-y-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    Espesor (in)
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       className={`${inputClass} text-center`}
                       value={p.espesor === 0 ? "" : p.espesor}
+                      placeholder="Espesor"
                       onChange={(e) => actualizar(p.id, { espesor: Number(e.target.value) || 0 })}
                       onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
+                  </label>
+                  <label className="space-y-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    Ancho (in)
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       className={`${inputClass} text-center`}
                       value={p.ancho === 0 ? "" : p.ancho}
+                      placeholder="Ancho"
                       onChange={(e) => actualizar(p.id, { ancho: Number(e.target.value) || 0 })}
                       onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
+                  </label>
+                  <label className="space-y-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    Largo (ft)
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       className={`${inputClass} text-center`}
                       value={p.largo === 0 ? "" : p.largo}
+                      placeholder="Largo"
                       onChange={(e) => actualizar(p.id, { largo: Number(e.target.value) || 0 })}
                       onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
-                  </td>
-                  <td className="px-2 py-1.5 text-center font-medium text-xs whitespace-nowrap">
-                    <span className="text-[var(--color-text-secondary)]">{p.ptUnitarioReal.toFixed(2)}</span>
-                    <span className="mx-1 text-[var(--color-border)]">/</span>
-                    <span className="font-bold text-[var(--color-text-primary)]">{p.ptTotalReal.toFixed(2)}</span>
-                  </td>
-                  <td className="px-2 py-1.5 text-center">
+                  </label>
+                </div>
+
+                <div className="grid gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-2 sm:grid-cols-4">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">PT unitario</p>
+                    <p className="text-sm font-bold text-[var(--color-text-primary)]">{p.ptUnitarioReal.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">PT total</p>
+                    <p className="text-sm font-bold text-[var(--color-text-primary)]">{p.ptTotalReal.toFixed(2)}</p>
+                  </div>
+                  <label className="space-y-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    Precio unit. S/
                     <input
                       type="number"
                       min="0"
@@ -396,24 +403,17 @@ export function CubicajeInput({
                       onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
-                  </td>
-                  <td className="px-1 py-1.5 text-center">
-                    <button
-                      type="button"
-                      onClick={() => eliminar(p.id)}
-                      className="rounded-lg p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-soft)]/40 hover:text-[var(--color-danger)]"
-                      aria-label="Eliminar pieza"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                  </label>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Total S/</p>
+                    <p className="text-sm font-bold text-[var(--color-text-primary)]">{formatPen(p.subtotalComercial)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
-
       {stockWarnings.length > 0 ? (
         <div className="rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-3 space-y-1 animate-in fade-in duration-200">
           {stockWarnings.map((warn, index) => (
