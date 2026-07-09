@@ -39,6 +39,8 @@ export default async function MueblesTerminadosPage() {
   const hoy = new Date().toISOString().slice(0, 10);
   const mueblesDisponibles = muebles.filter((m) => m.stock_disponible > 0).length;
   const stockBajo = muebles.filter((m) => m.stock_disponible > 0 && m.stock_disponible <= 2).length;
+  const mueblesCatalogoVisibles = muebles.slice(0, 9);
+  const hayMasMuebles = muebles.length > mueblesCatalogoVisibles.length;
 
   return (
     <div className="space-y-6">
@@ -53,7 +55,7 @@ export default async function MueblesTerminadosPage() {
         </p>
       </div>
 
-      <Card className="border-2 border-[var(--katia-primary)] bg-[var(--katia-primary)]/5 shadow-md">
+      <Card id="vender-mueble" className="scroll-mt-24 border-2 border-[var(--katia-primary)] bg-[var(--katia-primary)]/5 shadow-md">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="max-w-2xl">
             <div className="inline-flex items-center rounded-full bg-[var(--katia-primary)] px-2.5 py-1 text-xs font-bold text-white">
@@ -97,60 +99,89 @@ export default async function MueblesTerminadosPage() {
         </div>
       </Card>
 
-      <Card className="border-2 border-[var(--katia-primary)]/40">
-        <CardTitle>Catálogo disponible</CardTitle>
-        <CardDescription>Selecciona productos listos para entrega inmediata. {muebles.length} muebles registrados.</CardDescription>
-        <div className="mt-4 grid max-h-[70vh] gap-3 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
-          {muebles.map((mueble) => (
-            <Card key={mueble.id} className="space-y-2">
+      <Card className="border border-[var(--color-border)]">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <CardTitle>Catálogo disponible</CardTitle>
+            <CardDescription>
+              Muebles listos para vender. Mostrando {mueblesCatalogoVisibles.length} de {muebles.length} productos registrados.
+            </CardDescription>
+          </div>
+          {hayMasMuebles ? (
+            <p className="text-xs font-medium text-[var(--color-text-secondary)]">
+              Hay más productos registrados; por ahora se muestran los primeros 9 para mantener la vista ligera.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {mueblesCatalogoVisibles.map((mueble) => (
+            <article
+              key={mueble.id}
+              className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
               {mueble.foto_url ? (
                 <Image
                   src={mueble.foto_url}
                   alt={mueble.nombre}
-                  width={320}
-                  height={180}
-                  className="h-36 w-full rounded-xl object-cover"
+                  width={360}
+                  height={200}
+                  className="h-32 w-full object-cover"
                   unoptimized
                 />
               ) : (
-                <div className="flex h-36 items-center justify-center rounded-[var(--katia-radius-lg)] bg-[var(--katia-surface-raised)]">
-                  <IconPhoto className="size-8 text-[var(--katia-text-tertiary)]/40" />
+                <div className="flex h-32 items-center justify-center bg-[var(--color-primary-soft)]/45">
+                  <div className="flex flex-col items-center gap-1 text-[var(--color-text-secondary)]">
+                    <IconPhoto className="size-7 opacity-40" aria-hidden />
+                    <span className="text-xs">Sin imagen</span>
+                  </div>
                 </div>
               )}
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    {mueble.codigo}
-                  </p>
-                  <p className="text-base font-semibold">{mueble.nombre}</p>
+
+              <div className="space-y-3 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    {mueble.codigo ? (
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                        {mueble.codigo}
+                      </p>
+                    ) : null}
+                    <h3 className="line-clamp-2 text-sm font-bold text-[var(--color-text-primary)]">
+                      {mueble.nombre}
+                    </h3>
+                  </div>
+                  <Badge variant={mueble.stock_disponible > 0 ? "success" : "danger"}>
+                    Stock: {mueble.stock_disponible}
+                  </Badge>
                 </div>
-                <Badge variant={mueble.stock_disponible > 0 ? "success" : "danger"}>
-                  Stock: {mueble.stock_disponible}
-                </Badge>
+
+                <div className="flex items-center justify-between gap-3 border-t border-[var(--color-border)] pt-3">
+                  <p className="text-lg font-black text-[var(--color-text-primary)]">
+                    {formatPen(mueble.precio_lista)}
+                  </p>
+                  {canMutate && mueble.stock_disponible > 0 ? (
+                    <Link
+                      href="#vender-mueble"
+                      className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-accent)] px-3 text-xs font-bold text-white shadow-sm transition hover:brightness-110"
+                    >
+                      Vender mueble
+                    </Link>
+                  ) : (
+                    <span className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] px-3 text-xs font-semibold text-[var(--color-text-secondary)]">
+                      {canMutate ? "Sin stock" : "Solo lectura"}
+                    </span>
+                  )}
+                </div>
               </div>
-              {mueble.descripcion ? (
-                <p className="text-xs text-[var(--color-text-secondary)]">{mueble.descripcion}</p>
-              ) : null}
-              <p className="text-lg font-bold text-[var(--color-text-primary)]">
-                {formatPen(mueble.precio_lista)}
-              </p>
-            </Card>
+            </article>
           ))}
           {muebles.length === 0 ? (
-            <Card className="md:col-span-2 xl:col-span-3 space-y-2 text-center text-sm text-[var(--color-text-secondary)]">
-              <p>No hay muebles terminados registrados en el catálogo.</p>
-              <p>
-                Para agregar muebles al catálogo anda a{" "}
-                <Link href="/inventario?tab=muebles" className="font-semibold text-[var(--color-accent)] underline underline-offset-2">
-                  Inventario
-                </Link>{" "}
-                {"->"} pestaña <strong>Catálogo muebles</strong> {"->"} botón <strong>Agregar mueble</strong>.
-              </p>
-            </Card>
+            <div className="rounded-xl border border-dashed border-[var(--color-border)] px-4 py-8 text-center text-sm text-[var(--color-text-secondary)] sm:col-span-2 xl:col-span-3">
+              No hay muebles terminados registrados en el catálogo.
+            </div>
           ) : null}
         </div>
       </Card>
-
 
       <Card>
         <CardTitle>Ventas registradas</CardTitle>
