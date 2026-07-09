@@ -39,8 +39,6 @@ export default async function MueblesTerminadosPage() {
   const hoy = new Date().toISOString().slice(0, 10);
   const mueblesDisponibles = muebles.filter((m) => m.stock_disponible > 0).length;
   const stockBajo = muebles.filter((m) => m.stock_disponible > 0 && m.stock_disponible <= 2).length;
-  const mueblesCatalogoVisibles = muebles.slice(0, 9);
-  const hayMasMuebles = muebles.length > mueblesCatalogoVisibles.length;
 
   return (
     <div className="space-y-6">
@@ -104,18 +102,13 @@ export default async function MueblesTerminadosPage() {
           <div>
             <CardTitle>Catálogo disponible</CardTitle>
             <CardDescription>
-              Muebles listos para vender. Mostrando {mueblesCatalogoVisibles.length} de {muebles.length} productos registrados.
+              Muebles listos para vender. {muebles.length} productos registrados.
             </CardDescription>
           </div>
-          {hayMasMuebles ? (
-            <p className="text-xs font-medium text-[var(--color-text-secondary)]">
-              Hay más productos registrados; por ahora se muestran los primeros 9 para mantener la vista ligera.
-            </p>
-          ) : null}
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {mueblesCatalogoVisibles.map((mueble) => (
+          {muebles.map((mueble) => (
             <article
               key={mueble.id}
               className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
