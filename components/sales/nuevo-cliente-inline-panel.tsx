@@ -9,14 +9,18 @@ import { useState, useRef } from "react";
  * Mini formulario reutilizable para crear un cliente sin salir del panel de venta.
  * Usado en MaderaCortadaForm, AserraderoForm, ContratoAlquilerForm, etc.
  */
+type ClienteValidationMode = "basic" | "contract";
+
 export function NuevoClienteInlinePanel({
   onCreated,
   onCancel,
   temporal = false,
+  validationMode = "basic",
 }: {
   onCreated: (id: string, nombre: string, documento?: string, ruc?: string) => void;
   onCancel: () => void;
   temporal?: boolean;
+  validationMode?: ClienteValidationMode;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,8 +80,22 @@ export function NuevoClienteInlinePanel({
     }
   };
 
+  const optionalFields = (
+    <>
+      <Field name="documento" label="DNI / Documento" placeholder="12345678" />
+      <Field name="telefono" label="Teléfono" placeholder="999 000 000" />
+      <Field name="ruc" label="RUC (opcional)" placeholder="20123456789" />
+      <Field name="direccion" label="Dirección (opcional)" placeholder="Av. / Jr. / Referencia" />
+      <SelectField name="tipo_persona" label="Tipo" defaultValue="">
+        <option value="">Sin especificar</option>
+        <option value="natural">Persona natural</option>
+        <option value="empresa">Empresa</option>
+      </SelectField>
+    </>
+  );
+
   return (
-    <div 
+    <div
       ref={containerRef}
       onKeyDown={handleKeyDown}
       className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
@@ -102,20 +120,30 @@ export function NuevoClienteInlinePanel({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field
           name="nombre"
-          label="Nombre *"
+          label={validationMode === "basic" ? "Nombre / Razón social *" : "Nombre *"}
           placeholder={temporal ? "Ej: Cliente mostrador" : "Nombre completo o razón social"}
           required
           className="sm:col-span-2"
         />
-        <Field name="documento" label="DNI / Documento" placeholder="12345678" />
-        <Field name="telefono" label="Teléfono" placeholder="999 000 000" />
-        <Field name="ruc" label="RUC (opcional)" placeholder="20123456789" />
-        <Field name="direccion" label="Dirección (opcional)" placeholder="Av. / Jr. / Referencia" />
-        <SelectField name="tipo_persona" label="Tipo" defaultValue="">
-          <option value="">Sin especificar</option>
-          <option value="natural">Persona natural</option>
-          <option value="empresa">Empresa</option>
-        </SelectField>
+
+        {validationMode === "basic" ? (
+          <>
+            <p className="sm:col-span-2 text-xs text-[var(--color-text-secondary)]">
+              Solo el nombre es obligatorio. Puedes completar los demás datos después.
+            </p>
+            <details className="sm:col-span-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
+              <summary className="cursor-pointer text-xs font-semibold text-[var(--color-accent)]">
+                Datos para contacto o factura
+              </summary>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {optionalFields}
+              </div>
+            </details>
+          </>
+        ) : (
+          optionalFields
+        )}
+
         {error ? (
           <p className="sm:col-span-2 text-xs text-red-500">{error}</p>
         ) : null}

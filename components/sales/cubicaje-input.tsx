@@ -18,6 +18,9 @@ type Pieza = {
   inventario_producto_id?: string | null;
 };
 
+type QuantityMode = "visible" | "fixed-one";
+type UnitPriceMode = "current" | "auto-editable";
+
 type CubicajeInputProps = {
   /** Nombre del campo oculto donde se guardará el JSON con todas las piezas. */
   name?: string;
@@ -31,6 +34,10 @@ type CubicajeInputProps = {
   totalPtName?: string;
   /** Nombre del campo oculto que reporta el volumen total en m³. */
   totalM3Name?: string;
+  /** Controla si la cantidad se captura visualmente o queda fija internamente en 1 para nuevas tarjetas. */
+  quantityMode?: QuantityMode;
+  /** Controla si el precio unitario usa el comportamiento actual o sugerencia automática editable. */
+  unitPriceMode?: UnitPriceMode;
   /** Callback opcional para notificar cambios de valores al padre */
   onChange?: (data: { totalPT: number; totalPC: number; precioPorPT: number; totalSoles: number; totalCantidad: number; precioUnitarioComercial: number; piezas: Pieza[] }) => void;
   /** Lista opcional de productos de inventario para autocompletar fila por fila */
@@ -111,6 +118,8 @@ export function CubicajeInput({
   defaultPrecioPorPT = "0",
   totalPtName = "total_pt",
   totalM3Name = "total_m3",
+  quantityMode,
+  unitPriceMode = "current",
   onChange,
   productos,
 }: CubicajeInputProps) {
@@ -121,9 +130,19 @@ export function CubicajeInput({
   );
   const [precioInput, setPrecioInput] = useState(defaultPrecioPorPT);
   const [focusRowId, setFocusRowId] = useState<number | null>(null);
+  const [manualPrecioIds, setManualPrecioIds] = useState<Set<number>>(
+    () => new Set((defaultPiezas ?? [])
+      .filter((p) => p.precioUnitarioComercial !== undefined && p.precioUnitarioComercial !== null)
+      .map((p) => p.id)),
+  );
   const precioActivo = precioEditable
     ? Number.parseFloat(precioInput.replace(",", ".")) || 0
     : (precioPorPT ?? 0);
+  const effectiveQuantityMode = quantityMode ?? "fixed-one";
+  const isQuantityVisible = effectiveQuantityMode === "visible";
+  const itemLabel = quantityMode === "fixed-one" ? "Bloque" : "Pieza";
+  const addButtonLabel = quantityMode === "fixed-one" ? "Agregar bloque" : "Agregar pieza";
+  const isAutoEditableUnitPrice = unitPriceMode === "auto-editable";
 
   const piezasConSubtotal = useMemo(
     () => piezas.map((p) => {
@@ -131,7 +150,10 @@ export function CubicajeInput({
       const ptTotalReal = ptUnitarioReal * p.cantidad;
       const ptUnitarioComercial = Math.floor(ptUnitarioReal);
       const ptTotalComercial = ptUnitarioComercial * p.cantidad;
-      const precioUnitarioComercial = p.precioUnitarioComercial ?? roundMoney(ptUnitarioReal * precioActivo);
+      const precioUnitarioSugerido = roundMoney(ptUnitarioComercial * precioActivo);
+      const precioUnitarioComercial = isAutoEditableUnitPrice && !manualPrecioIds.has(p.id)
+        ? precioUnitarioSugerido
+        : (p.precioUnitarioComercial ?? roundMoney(ptUnitarioReal * precioActivo));
       const subtotalComercial = roundMoney(precioUnitarioComercial * p.cantidad);
       return {
         ...p,
@@ -145,7 +167,7 @@ export function CubicajeInput({
         subtotalPT: ptTotalReal,
       };
     }),
-    [piezas, precioActivo],
+    [isAutoEditableUnitPrice, manualPrecioIds, piezas, precioActivo],
   );
 
   const totalPT = useMemo(
@@ -156,8 +178,10 @@ export function CubicajeInput({
   const totalPC = useMemo(() => totalPT / 12, [totalPT]);
   const totalM3 = useMemo(() => ptAM3(totalPT), [totalPT]);
   const totalCantidad = useMemo(
-    () => piezasConSubtotal.length,
-    [piezasConSubtotal],
+    () => isQuantityVisible
+      ? piezasConSubtotal.reduce((acc, p) => acc + p.cantidad, 0)
+      : piezasConSubtotal.length,
+    [isQuantityVisible, piezasConSubtotal],
   );
   const totalPTComercial = useMemo(
     () => piezasConSubtotal.reduce((acc, p) => acc + p.ptTotalComercial, 0),
@@ -214,6 +238,24 @@ export function CubicajeInput({
     setPiezas((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
 
+  function actualizarPrecioUnitarioManual(id: number, value: number) {
+    setManualPrecioIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    actualizar(id, { precioUnitarioComercial: value > 0 ? value : 0 });
+  }
+
+  function restablecerPrecioAutomatico(id: number) {
+    setManualPrecioIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    actualizar(id, { precioUnitarioComercial: null });
+  }
+
   // Genera alertas de stock en tiempo real analizando acumulados por producto en la calculadora
   const stockWarnings = useMemo(() => {
     if (!productos || productos.length === 0) return [];
@@ -245,7 +287,7 @@ export function CubicajeInput({
       <div className="space-y-3">
         {piezasConSubtotal.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-6 text-center text-xs italic text-[var(--color-text-secondary)]">
-            Calculadora vacía. Haz clic en &quot;Agregar pieza&quot; o selecciona un producto de inventario para empezar.
+            Calculadora vacía. Haz clic en &quot;{addButtonLabel}&quot; o selecciona un producto de inventario para empezar.
           </div>
         ) : (
           piezasConSubtotal.map((p, index) => (
@@ -255,14 +297,14 @@ export function CubicajeInput({
             >
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-bold text-[var(--color-text-primary)]">Pieza {index + 1}</p>
+                  <p className="text-sm font-bold text-[var(--color-text-primary)]">{itemLabel} {index + 1}</p>
                   <p className="text-xs text-[var(--color-text-secondary)]">Detalle de producto y medidas</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => eliminar(p.id)}
                   className="rounded-lg p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-soft)]/40 hover:text-[var(--color-danger)]"
-                  aria-label="Eliminar pieza"
+                  aria-label={`Eliminar ${itemLabel.toLowerCase()}`}
                 >
                   <Trash2 className="size-4" />
                 </button>
@@ -333,7 +375,26 @@ export function CubicajeInput({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className={isQuantityVisible ? "grid grid-cols-2 gap-2 sm:grid-cols-5" : "grid grid-cols-2 gap-2 sm:grid-cols-4"}>
+                  {isQuantityVisible ? (
+                    <label className="space-y-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                      Cantidad
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        className={`${inputClass} text-center`}
+                        value={p.cantidad === 0 ? "" : p.cantidad}
+                        placeholder="Cant."
+                        onChange={(e) => {
+                          const cantidad = e.currentTarget.valueAsNumber;
+                          actualizar(p.id, { cantidad: cantidad > 0 ? cantidad : 0 });
+                        }}
+                        onKeyDown={handleKeyDown}
+                        autoComplete="off"
+                      />
+                    </label>
+                  ) : null}
                   <label className="space-y-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
                     Espesor (in)
                     <input
@@ -394,14 +455,25 @@ export function CubicajeInput({
                     <p className="text-sm font-bold text-[var(--color-text-primary)]">{p.ptTotalReal.toFixed(2)}</p>
                   </div>
                   <label className="space-y-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    Precio unit. S/
+                    <span className="flex items-center justify-between gap-2">
+                      Precio unit. S/
+                      {isAutoEditableUnitPrice ? (
+                        <button
+                          type="button"
+                          onClick={() => restablecerPrecioAutomatico(p.id)}
+                          className="text-[10px] font-bold normal-case text-[var(--color-accent)] hover:underline"
+                        >
+                          Usar sugerido
+                        </button>
+                      ) : null}
+                    </span>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       className={`${inputClass} text-center`}
                       value={p.precioUnitarioComercial === 0 ? "" : p.precioUnitarioComercial}
-                      onChange={(e) => actualizar(p.id, { precioUnitarioComercial: Number(e.target.value) || 0 })}
+                      onChange={(e) => actualizarPrecioUnitarioManual(p.id, e.currentTarget.valueAsNumber)}
                       onKeyDown={handleKeyDown}
                       autoComplete="off"
                     />
@@ -426,7 +498,7 @@ export function CubicajeInput({
 
       <div className="flex items-center justify-between gap-3">
         <Button type="button" variant="secondary" onClick={agregar} className="h-9 px-3">
-          <Plus className="mr-1 size-4" /> Agregar pieza
+          <Plus className="mr-1 size-4" /> {addButtonLabel}
         </Button>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-secondary)]">

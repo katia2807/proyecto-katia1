@@ -1138,6 +1138,38 @@ export async function createCliente(formData: FormData) {
   }
 }
 
+const FACTURA_RUC_ERROR = "Para emitir factura, selecciona un cliente con RUC válido de 11 dígitos.";
+
+function isRucValidoFactura(value: string | null | undefined) {
+  return /^\d{11}$/.test(String(value ?? "").trim());
+}
+
+async function assertClientePuedeEmitirFactura(clienteId: string, tipoComprobante: string) {
+  if (tipoComprobante !== "factura") return;
+
+  if (!hasSupabaseEnv()) {
+    const cliente = demoClientesRows().find((row) => row.id === clienteId);
+    if (!cliente || !isRucValidoFactura(cliente.ruc)) {
+      throw new Error(FACTURA_RUC_ERROR);
+    }
+    return;
+  }
+
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("clientes")
+    .select("ruc")
+    .eq("id", clienteId)
+    .eq("organization_id", DEFAULT_ORG_ID)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data || !isRucValidoFactura(data.ruc)) {
+    throw new Error(FACTURA_RUC_ERROR);
+  }
+}
 export async function createClienteCotizacionRapida(input: {
   nombre: string;
   documento: string;
@@ -3318,6 +3350,8 @@ export async function createVentaMuebleTerminado(formData: FormData) {
     throw new Error("Datos de venta de mueble inválidos.");
   }
 
+  await assertClientePuedeEmitirFactura(parsed.data.clienteId, parsed.data.tipoComprobante);
+
   const total = roundMoney(parsed.data.precioUnitario * parsed.data.cantidad);
 
   let montoCaja = total;
@@ -3887,6 +3921,8 @@ export async function createVentaMaderaCortada(formData: FormData) {
       .join(" | ");
     throw new Error(`Datos de venta de madera cortada inválidos: ${fieldErrors}`);
   }
+
+  await assertClientePuedeEmitirFactura(parsed.data.clienteId, parsed.data.tipoComprobante);
 
   let createdId = "";
   if (!hasSupabaseEnv()) {

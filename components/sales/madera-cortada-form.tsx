@@ -481,6 +481,8 @@ export function MaderaCortadaForm({
             </p>
 
             <CubicajeInput
+              quantityMode="visible"
+              unitPriceMode="auto-editable"
               name="lineas_cubicaje"
               totalPtName="total_pt_calc"
               totalM3Name="total_m3_calc"

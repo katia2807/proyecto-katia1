@@ -171,7 +171,7 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
             Usa el flujo guiado para registrar ventas con menos pasos y menos decisiones manuales.
           </p>
           <p className="text-sm text-[var(--katia-text-secondary)]">
-            Los accesos por tipo quedan disponibles abajo para casos puntuales.
+            También puedes entrar directamente a cada módulo especializado.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -237,6 +237,45 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
         </div>
       </Card>
 
+      <div>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--katia-text-secondary)]">
+          Accesos rápidos
+        </h3>
+        <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
+          Entra directamente al tipo de operación que necesitas registrar.
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {tarjetas.map((tarjeta) => {
+          const Icon = tarjeta.icono;
+          return (
+            <Link
+              key={tarjeta.href}
+              href={tarjeta.href}
+              className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_var(--color-accent)]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-[var(--color-primary-soft)] text-[var(--color-text-primary)]">
+                  <Icon className="size-4" />
+                </div>
+                {tarjeta.badge ? (
+                  <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    {tarjeta.badge}
+                  </span>
+                ) : null}
+              </div>
+              <h3 className="mt-2 text-sm font-semibold text-[var(--color-text-primary)]">
+                {tarjeta.titulo}
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-[var(--color-text-secondary)]">{tarjeta.descripcion}</p>
+              <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-accent)] group-hover:gap-2">
+                Abrir <ArrowRight className="size-3.5" />
+              </span>
+            </Link>
+          );
+        })}
+      </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <VentasListWithFilters ventas={allVentas} />
@@ -279,47 +318,6 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
           </Card>
         </div>
       </div>
-
-      <div>
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--katia-text-secondary)]">
-          Opciones para casos puntuales
-        </h3>
-        <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
-          Usa estos accesos si ya sabes exactamente qué operación registrar o necesitas entrar a un flujo especializado.
-        </p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {tarjetas.map((tarjeta) => {
-          const Icon = tarjeta.icono;
-          return (
-            <Link
-              key={tarjeta.href}
-              href={tarjeta.href}
-              className="group rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_var(--color-accent)]"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-[var(--color-primary-soft)] text-[var(--color-text-primary)]">
-                  <Icon className="size-5" />
-                </div>
-                {tarjeta.badge ? (
-                  <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    {tarjeta.badge}
-                  </span>
-                ) : null}
-              </div>
-              <h3 className="mt-3 text-sm font-semibold text-[var(--color-text-primary)]">
-                {tarjeta.titulo}
-              </h3>
-              <p className="mt-1 text-sm text-[var(--color-text-secondary)]">{tarjeta.descripcion}</p>
-              <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-accent)] group-hover:gap-2">
-                Abrir <ArrowRight className="size-3.5" />
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <CardTitle>Operaciones</CardTitle>

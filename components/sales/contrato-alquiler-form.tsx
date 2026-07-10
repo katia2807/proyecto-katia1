@@ -216,6 +216,7 @@ export function ContratoAlquilerForm({
                 </>
               ) : (
                 <NuevoClienteInlinePanel
+                  validationMode="contract"
                   temporal={modoCliente === "temporal"}
                   onCreated={handleClienteCreado}
                   onCancel={() => setModoCliente("buscar")}

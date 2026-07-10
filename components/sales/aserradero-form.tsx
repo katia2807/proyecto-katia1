@@ -497,17 +497,18 @@ export function AserraderoForm({
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
           <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 1: Cubicaje</h3>
           <p className="text-xs text-[var(--color-text-secondary)]">
-            Ingresa las piezas y dimensiones para realizar el cubicaje rápido.
+            Ingresa los bloques y dimensiones para realizar el cubicaje rápido.
           </p>
           <div className={`mt-2 rounded-xl p-1 transition-all duration-300 ${hasStep2Warning ? "border border-red-500/30 bg-red-500/5 shadow-[0_0_0_1px_rgba(239,68,68,0.1)]" : ""}`}>
             <CubicajeInput
+              quantityMode="fixed-one"
               precioEditable={false}
               onChange={(data) => setPiezasJson(JSON.stringify(data.piezas))}
             />
           </div>
           {hasStep2Warning && (
             <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
-              ⚠️ Debe agregar al menos una pieza antes de confirmar el registro.
+              ⚠️ Debe agregar al menos un bloque antes de confirmar el registro.
             </p>
           )}
           <div className="mt-3 grid gap-4 md:grid-cols-1 lg:grid-cols-3">
@@ -1082,7 +1083,7 @@ export function AserraderoForm({
                        : "El cliente seleccionado no tiene RUC de 11 dígitos para emitir Factura."}
                    </li>
                  )}
-                 {hasStep2Warning && <li>Debes agregar al menos una pieza en el Paso 1.</li>}
+                 {hasStep2Warning && <li>Debes agregar al menos un bloque en el Paso 1.</li>}
               </ul>
               <p className="text-[11px] text-red-500/80 pt-1">
                 Por favor, regresa a los pasos correspondientes usando los botones de navegación para completar la información antes de guardar.
