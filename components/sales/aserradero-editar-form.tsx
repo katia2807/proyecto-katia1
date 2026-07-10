@@ -6,6 +6,7 @@ import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Button } from "@/components/ui/button";
 import { formatPen, roundMoney } from "@/lib/utils";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
+import { NuevoClienteInlinePanel } from "@/components/sales/nuevo-cliente-inline-panel";
 
 type Cliente = { id: string; nombre: string; documento?: string | null; ruc?: string | null };
 
@@ -32,6 +33,8 @@ export function AserraderoEditarForm({
   panelAction,
 }: AserraderoEditarFormProps) {
   const [clienteId, setClienteId] = useState(servicio.cliente_id);
+  const [clientesLocales, setClientesLocales] = useState<Cliente[]>([]);
+  const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo">("buscar");
   const [fecha, setFecha] = useState(servicio.fecha);
   const [piesCubicos, setPiesCubicos] = useState(Number(servicio.pies_cubicos));
   const [costoCubicaje, setCostoCubicaje] = useState(Number(servicio.costo_cubicaje));
@@ -42,8 +45,12 @@ export function AserraderoEditarForm({
     return roundMoney(precioCobrado - costoCubicaje);
   }, [precioCobrado, costoCubicaje]);
 
+  const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
+  const selectedCliente = useMemo(() => todosLosClientes.find((c) => c.id === clienteId), [clienteId, todosLosClientes]);
+  const selectedClienteProvisional = Boolean(selectedCliente?.documento?.startsWith("PEND-"));
+
   const clientOpts = useMemo(() => {
-    return clientes.map((c) => ({
+    return todosLosClientes.map((c) => ({
       id: c.id,
       nombre: c.nombre,
       documento: c.documento ?? null,
@@ -51,7 +58,13 @@ export function AserraderoEditarForm({
       direccion: null,
       ruc: c.ruc ?? null,
     }));
-  }, [clientes]);
+  }, [todosLosClientes]);
+
+  function handleClienteCreado(id: string, nombre: string, documento?: string, ruc?: string) {
+    setClientesLocales((prev) => [...prev, { id, nombre, documento: documento ?? null, ruc: ruc ?? null }]);
+    setClienteId(id);
+    setModoCliente("buscar");
+  }
 
   return (
     <form action={panelAction} className="space-y-6">
@@ -60,15 +73,36 @@ export function AserraderoEditarForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <ClienteCombobox
-            mockData={mockData}
-            clientes={clientOpts}
-            value={clienteId}
-            onChange={setClienteId}
-            hiddenInputName="cliente_id"
-            label="Cliente *"
-            placeholder="Buscar cliente…"
-          />
+          {modoCliente === "buscar" ? (
+            <>
+              <ClienteCombobox
+                mockData={mockData}
+                clientes={clientOpts}
+                value={clienteId}
+                onChange={setClienteId}
+                hiddenInputName="cliente_id"
+                label="Cliente *"
+                placeholder="Buscar cliente..."
+              />
+              {selectedClienteProvisional ? (
+                <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs font-medium text-amber-700 dark:text-amber-300">
+                  Este servicio esta asociado a un cliente provisional ({selectedCliente?.documento}). Selecciona un cliente real o crea uno nuevo para reemplazarlo.
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setModoCliente("nuevo")}
+                className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+              >
+                + Nuevo cliente
+              </button>
+            </>
+          ) : (
+            <NuevoClienteInlinePanel
+              onCreated={handleClienteCreado}
+              onCancel={() => setModoCliente("buscar")}
+            />
+          )}
         </div>
 
         <Field

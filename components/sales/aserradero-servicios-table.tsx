@@ -65,6 +65,11 @@ export function AserraderoServiciosTable({
                 <TD>{formatDate(s.fecha)}</TD>
                 <TD>
                   <div className="font-medium">{clientesById[s.cliente_id] ?? "—"}</div>
+                  {clientesMap[s.cliente_id]?.documento?.startsWith("PEND-") ? (
+                    <div className="mt-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                      {clientesMap[s.cliente_id].documento}
+                    </div>
+                  ) : null}
                   {(() => {
                     try {
                       const lineas = Array.isArray(s.lineas_json)

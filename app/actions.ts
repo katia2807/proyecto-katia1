@@ -4421,10 +4421,87 @@ export async function cerrarContratoAlquiler(formData: FormData) {
 // Sub-flujo 5: Servicio aserradero
 // ---------------------------------------------------------------------------
 
+const CLIENTE_PROVISIONAL_NOMBRE = "Cliente pendiente";
+
+function isCodigoClienteProvisional(value: string | null | undefined) {
+  return Boolean(value && value.startsWith("PEND-"));
+}
+
+function generarCodigoClienteProvisional(fecha = new Date()) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const yyyy = String(fecha.getFullYear());
+  const mm = pad(fecha.getMonth() + 1);
+  const dd = pad(fecha.getDate());
+  const hh = pad(fecha.getHours());
+  const mi = pad(fecha.getMinutes());
+  const ss = pad(fecha.getSeconds());
+  const suffix = randomUUID().replace(/-/g, "").slice(0, 4).toUpperCase();
+  return `PEND-${yyyy}${mm}${dd}-${hh}${mi}${ss}-${suffix}`;
+}
+
+async function crearClienteProvisionalServicioAserradero() {
+  const codigo = generarCodigoClienteProvisional();
+  if (!hasSupabaseEnv()) {
+    const id = demoCreateCliente({
+      organization_id: DEFAULT_ORG_ID,
+      nombre: CLIENTE_PROVISIONAL_NOMBRE,
+      documento: codigo,
+      telefono: null,
+      ruc: null,
+      direccion: null,
+      tipo_persona: null,
+    });
+    return { id, codigo };
+  }
+
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("clientes")
+    .insert({
+      organization_id: DEFAULT_ORG_ID,
+      nombre: CLIENTE_PROVISIONAL_NOMBRE,
+      documento: codigo,
+      telefono: null,
+      ruc: null,
+      direccion: null,
+      tipo_persona: null,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "No se pudo crear el cliente provisional.");
+  }
+
+  return { id: data.id, codigo };
+}
+
+async function cleanupClienteProvisionalCreado(clienteId: string | null) {
+  if (!clienteId) return;
+  if (!hasSupabaseEnv()) {
+    demoDeleteCliente(clienteId);
+    return;
+  }
+
+  const supabase = getSupabaseServerClient();
+  await supabase
+    .from("clientes")
+    .delete()
+    .eq("id", clienteId)
+    .eq("organization_id", DEFAULT_ORG_ID);
+}
+
 export async function createServicioAserradero(formData: FormData) {
   const actor = await requireMutationAccess(ventasRoles);
+  const usarClienteProvisional = formData.get("usarClienteProvisional") === "true";
+  const tipoComprobante = String(formData.get("tipo_comprobante") || "ninguno");
+
+  if (usarClienteProvisional && tipoComprobante === "factura") {
+    throw new Error("Completa un cliente con RUC valido antes de emitir factura.");
+  }
+
   const parsed = servicioAserraderoSchema.safeParse({
-    clienteId: formData.get("cliente_id"),
+    clienteId: usarClienteProvisional ? randomUUID() : formData.get("cliente_id"),
     fecha: formData.get("fecha"),
     piesCubicos: formData.get("pies_cubicos"),
     costoCubicaje: formData.get("costo_cubicaje"),
@@ -4438,7 +4515,7 @@ export async function createServicioAserradero(formData: FormData) {
     urlComprobante: formData.get("url_comprobante"),
   });
   if (!parsed.success) {
-    throw new Error("Datos de servicio inválidos.");
+    throw new Error("Datos de servicio invalidos.");
   }
 
   let lineasJson: Record<string, unknown>[] = [];
@@ -4449,7 +4526,7 @@ export async function createServicioAserradero(formData: FormData) {
         lineasJson = parsedLineas;
       }
     } catch {
-      // Ignoramos JSON inválido y dejamos arreglo vacío.
+      // Ignoramos JSON invalido y dejamos arreglo vacio.
     }
   }
 
@@ -4458,100 +4535,125 @@ export async function createServicioAserradero(formData: FormData) {
   const costoTotal = roundMoney(parsed.data.costoCubicaje + manoDeObra);
   const utilidad = roundMoney(parsed.data.precioCobrado - costoTotal);
 
+  let clienteId = parsed.data.clienteId;
+  let clienteProvisionalCreadoId: string | null = null;
 
-  // Obtener nombre de cliente para la descripción de caja
-  let clienteNombre = "Cliente Desconocido";
-  if (!hasSupabaseEnv()) {
-    const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
-    if (c) clienteNombre = c.nombre;
-  } else {
-    const supabase = getSupabaseServerClient();
-    const { data: cData } = await supabase
-      .from("clientes")
-      .select("nombre")
-      .eq("id", parsed.data.clienteId)
-      .maybeSingle();
-    if (cData) clienteNombre = cData.nombre;
-  }
-
-  if (!hasSupabaseEnv()) {
-    const serviceRow = demoCreateServicioAserradero({
-      organization_id: DEFAULT_ORG_ID,
-      cliente_id: parsed.data.clienteId,
-      fecha: parsed.data.fecha,
-      pies_cubicos: parsed.data.piesCubicos,
-      costo_cubicaje: parsed.data.costoCubicaje,
-      precio_cobrado: parsed.data.precioCobrado,
-      utilidad,
-      lineas_json: lineasJson,
-      correlativo: await nextCorrelativo("servicio_aserradero"),
-      confirmaIngreso: false,
-    });
-    if (parsed.data.precioCobrado > 0) {
-      demoCreateCaja({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fecha,
-        tipo: "ingreso",
-        medio: "efectivo",
-        categoria: "servicio_aserradero",
-        monto: parsed.data.precioCobrado,
-        descripcion: `Servicio de aserradero - ${clienteNombre}`,
-        modulo_origen: "ventas_aserradero",
-        referencia_id: serviceRow?.id ?? null,
-      });
+  try {
+    if (usarClienteProvisional) {
+      const provisional = await crearClienteProvisionalServicioAserradero();
+      clienteId = provisional.id;
+      clienteProvisionalCreadoId = provisional.id;
     }
-  } else {
-    const supabase = getSupabaseServerClient();
-    const correlativo = await nextCorrelativo("servicio_aserradero");
-    const lineasPayload = lineasJson as unknown as Json;
 
-    const { data: servicio, error: servicioErr } = await supabase
-      .from("servicios_aserradero")
-      .insert({
+    // Obtener nombre de cliente para la descripcion de caja y validar factura provisional.
+    let clienteNombre = "Cliente Desconocido";
+    let clienteDocumento: string | null = null;
+    if (!hasSupabaseEnv()) {
+      const c = demoClientesRows().find((x) => x.id === clienteId);
+      if (c) {
+        clienteNombre = c.nombre;
+        clienteDocumento = c.documento ?? null;
+      }
+    } else {
+      const supabase = getSupabaseServerClient();
+      const { data: cData } = await supabase
+        .from("clientes")
+        .select("nombre,documento")
+        .eq("id", clienteId)
+        .maybeSingle();
+      if (cData) {
+        clienteNombre = cData.nombre;
+        clienteDocumento = cData.documento ?? null;
+      }
+    }
+
+    if (parsed.data.tipoComprobante === "factura" && isCodigoClienteProvisional(clienteDocumento)) {
+      throw new Error("Completa un cliente con RUC valido antes de emitir factura.");
+    }
+
+    if (!hasSupabaseEnv()) {
+      const serviceRow = demoCreateServicioAserradero({
         organization_id: DEFAULT_ORG_ID,
-        cliente_id: parsed.data.clienteId,
+        cliente_id: clienteId,
         fecha: parsed.data.fecha,
         pies_cubicos: parsed.data.piesCubicos,
         costo_cubicaje: parsed.data.costoCubicaje,
         precio_cobrado: parsed.data.precioCobrado,
         utilidad,
-        lineas_json: lineasPayload,
-        correlativo,
-        metodo_pago: parsed.data.metodoPago ?? "efectivo",
-        modalidad_pago: parsed.data.modalidadPago ?? "contado",
-        fecha_pago_credito: parsed.data.fechaPagoCredito ?? null,
-        adelanto: parsed.data.adelanto ?? 0,
-        created_by: actor.userId,
-      })
-      .select("id")
-      .single();
-
-    if (servicioErr || !servicio) {
-      throw new Error(servicioErr?.message ?? "No se pudo registrar el servicio.");
-    }
-
-    if (parsed.data.precioCobrado > 0) {
-      const { error: cajaError } = await supabase.from("movimientos_caja").insert({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fecha,
-        tipo: "ingreso",
-        medio: "efectivo",
-        categoria: "servicio_aserradero",
-        monto: parsed.data.precioCobrado,
-        descripcion: `Servicio de aserradero - ${clienteNombre}`,
-        modulo_origen: "ventas_aserradero",
-        referencia_id: servicio.id,
-        tipo_comprobante: parsed.data.tipoComprobante,
-        url_comprobante: parsed.data.urlComprobante ?? null,
-        created_by: actor.userId,
-        updated_by: actor.userId,
+        lineas_json: lineasJson,
+        correlativo: await nextCorrelativo("servicio_aserradero"),
+        confirmaIngreso: false,
       });
-      if (cajaError) {
-        await supabase.from("servicios_aserradero").delete().eq("id", servicio.id);
-        throw new Error(cajaError.message);
+      if (parsed.data.precioCobrado > 0) {
+        demoCreateCaja({
+          organization_id: DEFAULT_ORG_ID,
+          fecha: parsed.data.fecha,
+          tipo: "ingreso",
+          medio: "efectivo",
+          categoria: "servicio_aserradero",
+          monto: parsed.data.precioCobrado,
+          descripcion: `Servicio de aserradero - ${clienteNombre}`,
+          modulo_origen: "ventas_aserradero",
+          referencia_id: serviceRow?.id ?? null,
+        });
+      }
+    } else {
+      const supabase = getSupabaseServerClient();
+      const correlativo = await nextCorrelativo("servicio_aserradero");
+      const lineasPayload = lineasJson as unknown as Json;
+
+      const { data: servicio, error: servicioErr } = await supabase
+        .from("servicios_aserradero")
+        .insert({
+          organization_id: DEFAULT_ORG_ID,
+          cliente_id: clienteId,
+          fecha: parsed.data.fecha,
+          pies_cubicos: parsed.data.piesCubicos,
+          costo_cubicaje: parsed.data.costoCubicaje,
+          precio_cobrado: parsed.data.precioCobrado,
+          utilidad,
+          lineas_json: lineasPayload,
+          correlativo,
+          metodo_pago: parsed.data.metodoPago ?? "efectivo",
+          modalidad_pago: parsed.data.modalidadPago ?? "contado",
+          fecha_pago_credito: parsed.data.fechaPagoCredito ?? null,
+          adelanto: parsed.data.adelanto ?? 0,
+          created_by: actor.userId,
+        })
+        .select("id")
+        .single();
+
+      if (servicioErr || !servicio) {
+        throw new Error(servicioErr?.message ?? "No se pudo registrar el servicio.");
+      }
+
+      if (parsed.data.precioCobrado > 0) {
+        const { error: cajaError } = await supabase.from("movimientos_caja").insert({
+          organization_id: DEFAULT_ORG_ID,
+          fecha: parsed.data.fecha,
+          tipo: "ingreso",
+          medio: "efectivo",
+          categoria: "servicio_aserradero",
+          monto: parsed.data.precioCobrado,
+          descripcion: `Servicio de aserradero - ${clienteNombre}`,
+          modulo_origen: "ventas_aserradero",
+          referencia_id: servicio.id,
+          tipo_comprobante: parsed.data.tipoComprobante,
+          url_comprobante: parsed.data.urlComprobante ?? null,
+          created_by: actor.userId,
+          updated_by: actor.userId,
+        });
+        if (cajaError) {
+          await supabase.from("servicios_aserradero").delete().eq("id", servicio.id);
+          throw new Error(cajaError.message);
+        }
       }
     }
+  } catch (error) {
+    await cleanupClienteProvisionalCreado(clienteProvisionalCreadoId);
+    throw error;
   }
+
   revalidatePath("/ventas");
   revalidatePath("/ventas/aserradero-servicios");
   revalidatePath("/caja");

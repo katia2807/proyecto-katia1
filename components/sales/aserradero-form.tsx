@@ -51,6 +51,7 @@ export function AserraderoForm({
   const { showToast } = useToast();
   const hoy = new Date().toISOString().slice(0, 10);
   const [clienteId, setClienteId] = useState("");
+  const [usarClienteProvisional, setUsarClienteProvisional] = useState(false);
   const [clientesLocales, setClientesLocales] = useState<{ id: string; nombre: string; documento?: string; ruc?: string }[]>([]);
   const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
   const [tipoComprobante, setTipoComprobante] = useState<"boleta" | "factura">("boleta");
@@ -136,7 +137,7 @@ export function AserraderoForm({
   const selectedClienteDoc = (selectedCliente as { documento?: string })?.documento || "";
   const hasRuc = !!(selectedClienteRuc && selectedClienteRuc.trim().length === 11);
 
-  const hasStep1Warning = !clienteId || (tipoComprobante === "factura" && !hasRuc);
+  const hasStep1Warning = !usarClienteProvisional && (!clienteId || (tipoComprobante === "factura" && !hasRuc));
   const hasStep2Warning = piezas.length === 0 || totalPT === 0;
 
   const costoCubicajeSugerido = useMemo(
@@ -171,9 +172,22 @@ export function AserraderoForm({
   const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
   const clientesCombo = useMemo(() => liteClientesToCompleto(todosLosClientes), [todosLosClientes]);
 
+  function handleSeleccionarCliente(id: string) {
+    setClienteId(id);
+    if (id) setUsarClienteProvisional(false);
+  }
+
+  function handleUsarClienteProvisional() {
+    setUsarClienteProvisional(true);
+    setClienteId("");
+    setModoCliente("buscar");
+    setTipoComprobante("boleta");
+  }
+
   function handleClienteCreado(id: string, nombre: string) {
     setClientesLocales((prev) => [...prev, { id, nombre }]);
     setClienteId(id);
+    setUsarClienteProvisional(false);
     setModoCliente("buscar");
   }
 
@@ -360,8 +374,12 @@ export function AserraderoForm({
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => setTipoComprobante(opt.value as "boleta" | "factura")}
-                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  onClick={() => {
+                    if (usarClienteProvisional && opt.value === "factura") return;
+                    setTipoComprobante(opt.value as "boleta" | "factura");
+                  }}
+                  disabled={usarClienteProvisional && opt.value === "factura"}
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     tipoComprobante === opt.value
                       ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
                       : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)]"
@@ -372,6 +390,12 @@ export function AserraderoForm({
               ))}
             </div>
             <input type="hidden" name="tipo_comprobante" value={tipoComprobante} />
+            <input type="hidden" name="usarClienteProvisional" value={usarClienteProvisional ? "true" : "false"} />
+            {usarClienteProvisional ? (
+              <p className="text-xs font-medium text-[var(--color-text-secondary)]">
+                Completa un cliente con RUC valido antes de emitir factura.
+              </p>
+            ) : null}
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -382,27 +406,30 @@ export function AserraderoForm({
                     mockData={mockData}
                     clientes={clientesCombo}
                     value={clienteId}
-                    onChange={setClienteId}
+                    onChange={handleSeleccionarCliente}
                     hiddenInputName="cliente_id"
                     label="Cliente"
                     placeholder="Buscar cliente…"
                     inputAriaLabel="Cliente para servicio de aserradero"
-                    className={hasStep1Warning ? "[&_input]:!border-red-500/80 [&_input]:focus:!border-red-500 [&_input]:focus:!ring-red-500 [&_input]:shadow-[0_0_0_1px_rgba(239,68,68,0.2)]" : ""}
+                    className={hasStep1Warning && !usarClienteProvisional ? "[&_input]:!border-red-500/80 [&_input]:focus:!border-red-500 [&_input]:focus:!ring-red-500 [&_input]:shadow-[0_0_0_1px_rgba(239,68,68,0.2)]" : ""}
                   />
                   {tipoComprobante === "factura" && !hasRuc && clienteId && (
                     <p className="text-xs font-semibold text-red-500 mt-1">
                       ⚠️ El cliente seleccionado no tiene un RUC de 11 dígitos válido.
                     </p>
                   )}
-                  {hasStep1Warning && !clienteId && (
+                  {hasStep1Warning && !clienteId && !usarClienteProvisional && (
                     <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
                       ⚠️ Debe seleccionar un cliente antes de confirmar el registro.
                     </p>
                   )}
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => setModoCliente("nuevo")}
+                      onClick={() => {
+                        setUsarClienteProvisional(false);
+                        setModoCliente("nuevo");
+                      }}
                       className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
                     >
                       + Nuevo cliente
@@ -410,12 +437,28 @@ export function AserraderoForm({
                     <span className="text-xs text-[var(--color-text-secondary)]">·</span>
                     <button
                       type="button"
-                      onClick={() => setModoCliente("temporal")}
+                      onClick={() => {
+                        setUsarClienteProvisional(false);
+                        setModoCliente("temporal");
+                      }}
                       className="text-xs font-semibold text-[var(--color-text-secondary)] hover:underline"
                     >
                       + Cliente temporal
                     </button>
+                    <span className="text-xs text-[var(--color-text-secondary)]">·</span>
+                    <button
+                      type="button"
+                      onClick={handleUsarClienteProvisional}
+                      className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
+                    >
+                      + Continuar sin datos del cliente
+                    </button>
                   </div>
+                  {usarClienteProvisional ? (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      Se generara un cliente provisional al registrar el servicio. Podras reemplazarlo despues desde Editar.
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <NuevoClienteInlinePanel
@@ -1057,7 +1100,7 @@ export function AserraderoForm({
              <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
                <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cliente & Comprobante</h4>
                <p className="text-sm">
-                 <strong>Cliente:</strong> {todosLosClientes.find((c) => c.id === clienteId)?.nombre ?? "No seleccionado"}
+                 <strong>Cliente:</strong> {usarClienteProvisional ? "Cliente pendiente (se generara al registrar)" : (todosLosClientes.find((c) => c.id === clienteId)?.nombre ?? "No seleccionado")}
                </p>
                <p className="text-sm">
                  <strong>Comprobante:</strong> <span className="capitalize">{tipoComprobante}</span>
@@ -1069,7 +1112,7 @@ export function AserraderoForm({
                )}
                {tipoComprobante === "boleta" && (
                  <p className="text-xs text-[var(--color-text-secondary)]">
-                   · DNI/Doc: {selectedClienteDoc || "Opcional"}
+                   · DNI/Doc: {usarClienteProvisional ? "Codigo PEND pendiente de generar" : (selectedClienteDoc || "Opcional")}
                  </p>
                )}
                <p className="text-sm">
