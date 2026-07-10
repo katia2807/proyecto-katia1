@@ -37,7 +37,7 @@ const PIE_TABLAR_A_PIE_CUBICO = 1 / 12;
 
 /** Misma estructura que `CubicajeInput`, sin cubicaje precargado. */
 const DEFAULT_LINEAS_CUBICAJE_JSON = JSON.stringify([
-  { id: 1, cantidad: 0, espesor: 0, ancho: 0, largo: 0, descripcion: "", subtotalPT: 0 },
+  { id: 1, descripcion: "", cantidad: 1, espesor: 0, ancho: 0, largo: 0 },
 ]);
 
 export function AserraderoForm({
@@ -263,7 +263,7 @@ export function AserraderoForm({
       return reset;
     });
     setServiciosPersonalizados([]);
-    setStep(4);
+    setStep(3);
   }
 
   return (
@@ -281,15 +281,15 @@ export function AserraderoForm({
       <div className="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
         <div className="flex items-center justify-between">
           {[
-            { n: 1, label: "Cliente" },
-            { n: 2, label: "Cubicaje" },
-            { n: 3, label: "Servicios" },
+            { n: 1, label: "Cubicaje" },
+            { n: 2, label: "Servicios" },
+            { n: 3, label: "Cliente" },
             { n: 4, label: "Resumen" },
             { n: 5, label: "Confirmar" },
           ].map((item, index) => {
             const isCompleted = step > item.n;
             const isActive = step === item.n;
-            const hasWarning = (item.n === 1 && hasStep1Warning) || (item.n === 2 && hasStep2Warning);
+            const hasWarning = (item.n === 1 && hasStep2Warning) || (item.n === 3 && hasStep1Warning);
             return (
               <div
                 key={item.n}
@@ -340,9 +340,9 @@ export function AserraderoForm({
       </div>
 
       {/* ── PASO 1: DATOS DEL CLIENTE ── */}
-      <div style={{ display: step === 1 ? "block" : "none" }} className="space-y-4">
+      <div style={{ display: step === 3 ? "block" : "none" }} className="space-y-4">
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 1: Datos del cliente y comprobante</h3>
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 3: Cliente y comprobante</h3>
           <p className="text-xs text-[var(--color-text-secondary)]">
             Elige el tipo de comprobante de pago y busca o registra al cliente.
           </p>
@@ -430,23 +430,31 @@ export function AserraderoForm({
           </div>
         </div>
 
-        <div className="flex justify-end pt-4 mt-4">
+        <div className="flex justify-between pt-4 mt-4">
           <Button
             type="button"
+            variant="secondary"
             onClick={() => setStep(2)}
+            className="px-6 py-2"
+          >
+            Anterior
+          </Button>
+          <Button
+            type="button"
+            onClick={() => setStep(4)}
             className="px-6 py-2 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
           >
-            Siguiente: Cubicaje →
+            Siguiente: Resumen y cobro
           </Button>
         </div>
       </div>
 
       {/* ── PASO 2: CUBICAJE BASE ── */}
-      <div style={{ display: step === 2 ? "block" : "none" }} className="space-y-4">
+      <div style={{ display: step === 1 ? "block" : "none" }} className="space-y-4">
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 2: Cubicaje</h3>
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 1: Cubicaje</h3>
           <p className="text-xs text-[var(--color-text-secondary)]">
-            Ingresa las piezas, cantidades y dimensiones para realizar el cubicaje rápido.
+            Ingresa las piezas y dimensiones para realizar el cubicaje rápido.
           </p>
           <div className={`mt-2 rounded-xl p-1 transition-all duration-300 ${hasStep2Warning ? "border border-red-500/30 bg-red-500/5 shadow-[0_0_0_1px_rgba(239,68,68,0.1)]" : ""}`}>
             <CubicajeInput
@@ -560,29 +568,21 @@ export function AserraderoForm({
           </div>
         </div>
 
-        <div className="flex justify-between pt-4 mt-4">
+        <div className="flex justify-end pt-4 mt-4">
           <Button
             type="button"
-            variant="secondary"
-            onClick={() => setStep(1)}
+            onClick={() => setStep(2)}
             className="px-6 py-2"
           >
-            ← Anterior
-          </Button>
-          <Button
-            type="button"
-            onClick={() => setStep(3)}
-            className="px-6 py-2"
-          >
-            Siguiente: Servicios →
+            Siguiente: Servicios
           </Button>
         </div>
       </div>
 
       {/* ── PASO 3: SERVICIOS ESPECIALES ── */}
-      <div style={{ display: step === 3 ? "block" : "none" }} className="space-y-4">
+      <div style={{ display: step === 2 ? "block" : "none" }} className="space-y-4">
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 3: Servicios especiales (Opcional)</h3>
+          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 2: Servicios especiales (Opcional)</h3>
           <p className="text-xs text-[var(--color-text-secondary)]">
             Activa y edita las tarifas y cantidades de los servicios adicionales solicitados por el cliente.
           </p>
@@ -812,7 +812,7 @@ export function AserraderoForm({
           <Button
             type="button"
             variant="secondary"
-            onClick={() => setStep(2)}
+            onClick={() => setStep(1)}
             className="px-6 py-2"
           >
             ← Anterior
@@ -828,10 +828,10 @@ export function AserraderoForm({
             </Button>
             <Button
               type="button"
-              onClick={() => setStep(4)}
+              onClick={() => setStep(3)}
               className="px-6 py-2"
             >
-              Siguiente: Resumen y cobro →
+              Siguiente: Cliente y comprobante
             </Button>
           </div>
         </div>
@@ -1035,11 +1035,11 @@ export function AserraderoForm({
                  {hasStep1Warning && (
                    <li>
                      {!clienteId 
-                       ? "Debes seleccionar un cliente en el Paso 1."
+                       ? "Debes seleccionar un cliente en el Paso 3."
                        : "El cliente seleccionado no tiene RUC de 11 dígitos para emitir Factura."}
                    </li>
                  )}
-                 {hasStep2Warning && <li>Debes agregar al menos una pieza en el Paso 2.</li>}
+                 {hasStep2Warning && <li>Debes agregar al menos una pieza en el Paso 1.</li>}
               </ul>
               <p className="text-[11px] text-red-500/80 pt-1">
                 Por favor, regresa a los pasos correspondientes usando los botones de navegación para completar la información antes de guardar.

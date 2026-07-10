@@ -12,6 +12,8 @@ type Pieza = {
   ancho: number;
   largo: number;
   descripcion: string;
+  ptUnitarioComercial?: number;
+  ptTotalComercial?: number;
   precioUnitarioComercial?: number | null;
   inventario_producto_id?: string | null;
 };
@@ -115,7 +117,7 @@ export function CubicajeInput({
   const [piezas, setPiezas] = useState<Pieza[]>(
     defaultPiezas !== undefined
       ? defaultPiezas
-      : [{ id: 1, cantidad: 0, espesor: 0, ancho: 0, largo: 0, descripcion: "", inventario_producto_id: null }],
+      : [{ id: 1, cantidad: 1, espesor: 0, ancho: 0, largo: 0, descripcion: "", inventario_producto_id: null }],
   );
   const [precioInput, setPrecioInput] = useState(defaultPrecioPorPT);
   const [focusRowId, setFocusRowId] = useState<number | null>(null);
@@ -127,12 +129,16 @@ export function CubicajeInput({
     () => piezas.map((p) => {
       const ptUnitarioReal = calcularPTUnitarioReal(p);
       const ptTotalReal = ptUnitarioReal * p.cantidad;
+      const ptUnitarioComercial = Math.floor(ptUnitarioReal);
+      const ptTotalComercial = ptUnitarioComercial * p.cantidad;
       const precioUnitarioComercial = p.precioUnitarioComercial ?? roundMoney(ptUnitarioReal * precioActivo);
       const subtotalComercial = roundMoney(precioUnitarioComercial * p.cantidad);
       return {
         ...p,
         ptUnitarioReal,
         ptTotalReal,
+        ptUnitarioComercial,
+        ptTotalComercial,
         precioUnitarioComercial,
         subtotalComercial,
         // Mantener compatibilidad con subtotalPT para no romper esquemas
@@ -150,7 +156,11 @@ export function CubicajeInput({
   const totalPC = useMemo(() => totalPT / 12, [totalPT]);
   const totalM3 = useMemo(() => ptAM3(totalPT), [totalPT]);
   const totalCantidad = useMemo(
-    () => piezasConSubtotal.reduce((acc, p) => acc + p.cantidad, 0),
+    () => piezasConSubtotal.length,
+    [piezasConSubtotal],
+  );
+  const totalPTComercial = useMemo(
+    () => piezasConSubtotal.reduce((acc, p) => acc + p.ptTotalComercial, 0),
     [piezasConSubtotal],
   );
   
@@ -191,7 +201,7 @@ export function CubicajeInput({
     const nextId = (piezas.at(-1)?.id ?? 0) + 1;
     setPiezas((prev) => [
       ...prev,
-      { id: nextId, cantidad: 0, espesor: 0, ancho: 0, largo: 0, descripcion: "", inventario_producto_id: null },
+      { id: nextId, cantidad: 1, espesor: 0, ancho: 0, largo: 0, descripcion: "", inventario_producto_id: null },
     ]);
     setFocusRowId(nextId);
   }
@@ -246,7 +256,7 @@ export function CubicajeInput({
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-bold text-[var(--color-text-primary)]">Pieza {index + 1}</p>
-                  <p className="text-xs text-[var(--color-text-secondary)]">Detalle de producto, cantidad y medidas</p>
+                  <p className="text-xs text-[var(--color-text-secondary)]">Detalle de producto y medidas</p>
                 </div>
                 <button
                   type="button"
@@ -325,20 +335,6 @@ export function CubicajeInput({
 
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <label className="space-y-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    Cantidad
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      className={`${inputClass} text-center`}
-                      value={p.cantidad === 0 ? "" : p.cantidad}
-                      placeholder="Cant."
-                      onChange={(e) => actualizar(p.id, { cantidad: Number(e.target.value) || 0 })}
-                      onKeyDown={handleKeyDown}
-                      autoComplete="off"
-                    />
-                  </label>
-                  <label className="space-y-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
                     Espesor (in)
                     <input
                       type="number"
@@ -380,6 +376,12 @@ export function CubicajeInput({
                       autoComplete="off"
                     />
                   </label>
+                  <div className="space-y-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                    PT redondeado
+                    <div className={`${inputClass} flex items-center justify-center text-center font-bold text-[var(--color-primary)]`}>
+                      {p.ptUnitarioComercial}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-2 sm:grid-cols-4">
@@ -428,7 +430,10 @@ export function CubicajeInput({
         </Button>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-secondary)]">
-            Total PT: <span className="font-bold">{totalPT.toFixed(2)}</span>
+            Total PT real: <span className="font-bold">{totalPT.toFixed(2)}</span>
+          </span>
+          <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-secondary)]">
+            Total PT redondeado: <span className="font-bold">{totalPTComercial}</span>
           </span>
           <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-secondary)]">
             Piezas: <span className="font-bold">{totalCantidad}</span>
