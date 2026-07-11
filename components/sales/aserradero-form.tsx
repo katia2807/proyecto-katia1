@@ -502,8 +502,12 @@ export function AserraderoForm({
           <div className={`mt-2 rounded-xl p-1 transition-all duration-300 ${hasStep2Warning ? "border border-red-500/30 bg-red-500/5 shadow-[0_0_0_1px_rgba(239,68,68,0.1)]" : ""}`}>
             <CubicajeInput
               quantityMode="fixed-one"
-              precioEditable={false}
-              onChange={(data) => setPiezasJson(JSON.stringify(data.piezas))}
+              presentationMode="aserradero-compact"
+              defaultPrecioPorPT={String(costoPorPieCubico)}
+              onChange={(data) => {
+                setPiezasJson(JSON.stringify(data.piezas));
+                setCostoPorPieCubico(data.precioPorPT);
+              }}
             />
           </div>
           {hasStep2Warning && (
@@ -511,6 +515,7 @@ export function AserraderoForm({
               ⚠️ Debe agregar al menos un bloque antes de confirmar el registro.
             </p>
           )}
+          <div className="hidden">
           <div className="mt-3 grid gap-4 md:grid-cols-1 lg:grid-cols-3">
             <Field
               label="Costo por PT (S/)"
@@ -609,6 +614,7 @@ export function AserraderoForm({
                 />
               </div>
             </div>
+          </div>
           </div>
         </div>
 

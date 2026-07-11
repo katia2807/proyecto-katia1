@@ -20,6 +20,7 @@ type Pieza = {
 
 type QuantityMode = "visible" | "fixed-one";
 type UnitPriceMode = "current" | "auto-editable";
+type PresentationMode = "cards" | "aserradero-compact";
 
 type CubicajeInputProps = {
   /** Nombre del campo oculto donde se guardará el JSON con todas las piezas. */
@@ -38,6 +39,8 @@ type CubicajeInputProps = {
   quantityMode?: QuantityMode;
   /** Controla si el precio unitario usa el comportamiento actual o sugerencia automática editable. */
   unitPriceMode?: UnitPriceMode;
+  /** Presentacion compacta exclusiva del registro de Servicio Aserradero. */
+  presentationMode?: PresentationMode;
   /** Callback opcional para notificar cambios de valores al padre */
   onChange?: (data: { totalPT: number; totalPC: number; precioPorPT: number; totalSoles: number; totalCantidad: number; precioUnitarioComercial: number; piezas: Pieza[] }) => void;
   /** Lista opcional de productos de inventario para autocompletar fila por fila */
@@ -120,6 +123,7 @@ export function CubicajeInput({
   totalM3Name = "total_m3",
   quantityMode,
   unitPriceMode = "current",
+  presentationMode = "cards",
   onChange,
   productos,
 }: CubicajeInputProps) {
@@ -143,6 +147,7 @@ export function CubicajeInput({
   const itemLabel = quantityMode === "fixed-one" ? "Bloque" : "Pieza";
   const addButtonLabel = quantityMode === "fixed-one" ? "Agregar bloque" : "Agregar pieza";
   const isAutoEditableUnitPrice = unitPriceMode === "auto-editable";
+  const isAserraderoCompact = presentationMode === "aserradero-compact";
 
   const piezasConSubtotal = useMemo(
     () => piezas.map((p) => {
@@ -187,6 +192,10 @@ export function CubicajeInput({
     () => piezasConSubtotal.reduce((acc, p) => acc + p.ptTotalComercial, 0),
     [piezasConSubtotal],
   );
+  const totalComercialSoles = useMemo(
+    () => roundMoney(totalPTComercial * precioActivo),
+    [precioActivo, totalPTComercial],
+  );
   
   const totalSoles = useMemo(
     () => roundMoney(piezasConSubtotal.reduce((acc, p) => acc + p.subtotalComercial, 0)),
@@ -201,7 +210,7 @@ export function CubicajeInput({
         totalPT,
         totalPC,
         precioPorPT: precioActivo,
-        totalSoles,
+        totalSoles: isAserraderoCompact ? totalComercialSoles : totalSoles,
         totalCantidad,
         precioUnitarioComercial: precioUnitarioComercialPromedio,
         piezas: piezasConSubtotal.map(p => ({
@@ -211,7 +220,7 @@ export function CubicajeInput({
         })),
       });
     }
-  }, [totalPT, totalPC, precioActivo, totalSoles, totalCantidad, precioUnitarioComercialPromedio, piezasConSubtotal, onChange]);
+  }, [totalPT, totalPC, precioActivo, totalSoles, totalComercialSoles, totalCantidad, precioUnitarioComercialPromedio, piezasConSubtotal, isAserraderoCompact, onChange]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (e.key === "Enter") {
@@ -281,6 +290,193 @@ export function CubicajeInput({
     }
     return warnings;
   }, [piezasConSubtotal, productos]);
+
+  if (isAserraderoCompact) {
+    return (
+      <div className="w-full space-y-3">
+        <div className="hidden overflow-hidden rounded-lg border border-[var(--color-border)] md:block">
+          <div className="grid grid-cols-[3rem_repeat(3,minmax(0,1fr))_5rem_3rem] items-center gap-2 bg-[var(--color-bg)] px-3 py-2 text-xs font-semibold text-[var(--color-text-secondary)]">
+            <span className="text-center">Nro.</span>
+            <span>Espesor (in)</span>
+            <span>Ancho (in)</span>
+            <span>Largo (ft)</span>
+            <span className="text-center">PT</span>
+            <span className="sr-only">Accion</span>
+          </div>
+          <div className="divide-y divide-[var(--color-border)]">
+            {piezasConSubtotal.map((p, index) => (
+              <div
+                key={p.id}
+                className="grid grid-cols-[3rem_repeat(3,minmax(0,1fr))_5rem_3rem] items-center gap-2 bg-[var(--color-surface)] px-3 py-2"
+              >
+                <span className="text-center text-sm font-bold text-[var(--color-text-secondary)]">{index + 1}</span>
+                <input
+                  ref={(el) => {
+                    if (el && focusRowId === p.id) {
+                      el.focus();
+                      setFocusRowId(null);
+                    }
+                  }}
+                  aria-label={`Espesor del bloque ${index + 1} en pulgadas`}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className={`${inputClass} text-center`}
+                  value={p.espesor === 0 ? "" : p.espesor}
+                  onChange={(e) => actualizar(p.id, { espesor: e.currentTarget.valueAsNumber || 0 })}
+                  autoComplete="off"
+                />
+                <input
+                  aria-label={`Ancho del bloque ${index + 1} en pulgadas`}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className={`${inputClass} text-center`}
+                  value={p.ancho === 0 ? "" : p.ancho}
+                  onChange={(e) => actualizar(p.id, { ancho: e.currentTarget.valueAsNumber || 0 })}
+                  autoComplete="off"
+                />
+                <input
+                  aria-label={`Largo del bloque ${index + 1} en pies`}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className={`${inputClass} text-center`}
+                  value={p.largo === 0 ? "" : p.largo}
+                  onChange={(e) => actualizar(p.id, { largo: e.currentTarget.valueAsNumber || 0 })}
+                  autoComplete="off"
+                />
+                <output
+                  aria-label={`PT comercial del bloque ${index + 1}`}
+                  className="flex h-9 items-center justify-center rounded-lg bg-[var(--color-primary-soft)]/35 text-sm font-bold text-[var(--color-primary)]"
+                >
+                  {p.ptUnitarioComercial}
+                </output>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => eliminar(p.id)}
+                  className="flex size-9 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
+                  aria-label={`Eliminar bloque ${index + 1}`}
+                  title="Eliminar bloque"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2 md:hidden">
+          {piezasConSubtotal.map((p, index) => (
+            <div key={p.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-sm font-bold text-[var(--color-text-primary)]">Bloque {index + 1}</span>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-md bg-[var(--color-primary-soft)]/35 px-2 py-1 text-sm font-bold text-[var(--color-primary)]">
+                    {p.ptUnitarioComercial} PT
+                  </span>
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => eliminar(p.id)}
+                    className="flex size-8 items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
+                    aria-label={`Eliminar bloque ${index + 1}`}
+                    title="Eliminar bloque"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <label className="space-y-1 text-xs font-semibold text-[var(--color-text-secondary)]">
+                  Espesor (in)
+                  <input
+                    ref={(el) => {
+                      if (el && focusRowId === p.id) {
+                        el.focus();
+                        setFocusRowId(null);
+                      }
+                    }}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className={`${inputClass} text-center`}
+                    value={p.espesor === 0 ? "" : p.espesor}
+                    onChange={(e) => actualizar(p.id, { espesor: e.currentTarget.valueAsNumber || 0 })}
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-[var(--color-text-secondary)]">
+                  Ancho (in)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className={`${inputClass} text-center`}
+                    value={p.ancho === 0 ? "" : p.ancho}
+                    onChange={(e) => actualizar(p.id, { ancho: e.currentTarget.valueAsNumber || 0 })}
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-[var(--color-text-secondary)]">
+                  Largo (ft)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className={`${inputClass} text-center`}
+                    value={p.largo === 0 ? "" : p.largo}
+                    onChange={(e) => actualizar(p.id, { largo: e.currentTarget.valueAsNumber || 0 })}
+                    autoComplete="off"
+                  />
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Button type="button" variant="secondary" onClick={agregar} className="h-9 px-3">
+          <Plus className="mr-1 size-4" /> Agregar bloque
+        </Button>
+
+        <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-border)] sm:grid-cols-2 lg:grid-cols-4">
+          <div className="bg-[var(--color-surface)] p-3">
+            <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Bloques registrados</p>
+            <p className="mt-1 text-xl font-bold text-[var(--color-text-primary)]">{piezasConSubtotal.length}</p>
+          </div>
+          <div className="bg-[var(--color-surface)] p-3">
+            <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Total PT comercial</p>
+            <p className="mt-1 text-xl font-bold text-[var(--color-primary)]">{totalPTComercial} PT</p>
+          </div>
+          <label className="bg-[var(--color-surface)] p-3 text-xs font-semibold text-[var(--color-text-secondary)]">
+            Precio por PT
+            <div className="mt-1 flex h-9 items-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2">
+              <span className="mr-1 text-sm">S/</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                name="precio_por_pt"
+                value={precioInput}
+                onChange={(e) => setPrecioInput(e.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-right text-sm font-bold text-[var(--color-text-primary)] outline-none"
+                autoComplete="off"
+              />
+            </div>
+          </label>
+          <div className="bg-[var(--color-primary-soft)]/35 p-3">
+            <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Precio total</p>
+            <p className="mt-1 text-xl font-bold text-[var(--color-text-primary)]">{formatPen(totalComercialSoles)}</p>
+          </div>
+        </div>
+
+        <input type="hidden" name={name} value={JSON.stringify(piezasConSubtotal)} />
+        <input type="hidden" name={totalPtName} value={totalPT.toFixed(4)} />
+        <input type="hidden" name={totalM3Name} value={totalM3.toFixed(6)} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3 w-full">
