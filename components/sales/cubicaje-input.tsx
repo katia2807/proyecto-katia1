@@ -62,6 +62,10 @@ function calcularPTUnitarioReal(p: Pieza) {
   return (p.espesor * p.ancho * p.largo) / 12;
 }
 
+function esPiezaCompleta(p: Pieza) {
+  return p.espesor > 0 && p.ancho > 0 && p.largo > 0;
+}
+
 /** Convierte PT (pies tablares) a metros cúbicos. 1 PT ≈ 0.002359737 m³. */
 function ptAM3(pt: number) {
   return pt * 0.002359737;
@@ -175,9 +179,14 @@ export function CubicajeInput({
     [isAutoEditableUnitPrice, manualPrecioIds, piezas, precioActivo],
   );
 
+  const piezasParaTotales = useMemo(
+    () => isAserraderoCompact ? piezasConSubtotal.filter(esPiezaCompleta) : piezasConSubtotal,
+    [isAserraderoCompact, piezasConSubtotal],
+  );
+
   const totalPT = useMemo(
-    () => piezasConSubtotal.reduce((acc, p) => acc + p.ptTotalReal, 0),
-    [piezasConSubtotal],
+    () => piezasParaTotales.reduce((acc, p) => acc + p.ptTotalReal, 0),
+    [piezasParaTotales],
   );
 
   const totalPC = useMemo(() => totalPT / 12, [totalPT]);
@@ -185,12 +194,12 @@ export function CubicajeInput({
   const totalCantidad = useMemo(
     () => isQuantityVisible
       ? piezasConSubtotal.reduce((acc, p) => acc + p.cantidad, 0)
-      : piezasConSubtotal.length,
-    [isQuantityVisible, piezasConSubtotal],
+      : piezasParaTotales.length,
+    [isQuantityVisible, piezasConSubtotal, piezasParaTotales],
   );
   const totalPTComercial = useMemo(
-    () => piezasConSubtotal.reduce((acc, p) => acc + p.ptTotalComercial, 0),
-    [piezasConSubtotal],
+    () => piezasParaTotales.reduce((acc, p) => acc + p.ptTotalComercial, 0),
+    [piezasParaTotales],
   );
   const totalComercialSoles = useMemo(
     () => roundMoney(totalPTComercial * precioActivo),
@@ -350,7 +359,7 @@ export function CubicajeInput({
                   aria-label={`PT comercial del bloque ${index + 1}`}
                   className="flex h-9 items-center justify-center rounded-lg bg-[var(--color-primary-soft)]/35 text-sm font-bold text-[var(--color-primary)]"
                 >
-                  {p.ptUnitarioComercial}
+                  {esPiezaCompleta(p) ? p.ptUnitarioComercial : 0}
                 </output>
                 <button
                   type="button"
@@ -374,7 +383,7 @@ export function CubicajeInput({
                 <span className="text-sm font-bold text-[var(--color-text-primary)]">Bloque {index + 1}</span>
                 <div className="flex items-center gap-2">
                   <span className="rounded-md bg-[var(--color-primary-soft)]/35 px-2 py-1 text-sm font-bold text-[var(--color-primary)]">
-                    {p.ptUnitarioComercial} PT
+                    {esPiezaCompleta(p) ? p.ptUnitarioComercial : 0} PT
                   </span>
                   <button
                     type="button"
@@ -443,7 +452,7 @@ export function CubicajeInput({
         <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-border)] sm:grid-cols-2 lg:grid-cols-4">
           <div className="bg-[var(--color-surface)] p-3">
             <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Bloques registrados</p>
-            <p className="mt-1 text-xl font-bold text-[var(--color-text-primary)]">{piezasConSubtotal.length}</p>
+            <p className="mt-1 text-xl font-bold text-[var(--color-text-primary)]">{piezasParaTotales.length}</p>
           </div>
           <div className="bg-[var(--color-surface)] p-3">
             <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Total PT comercial</p>

@@ -22,6 +22,20 @@ type ServicioEspecial = {
   tarifa_por_pieza: number;
 };
 
+type CubicajeMedidas = {
+  espesor?: number;
+  ancho?: number;
+  largo?: number;
+};
+
+function esBloqueCompleto(pieza: CubicajeMedidas) {
+  return (pieza.espesor ?? 0) > 0 && (pieza.ancho ?? 0) > 0 && (pieza.largo ?? 0) > 0;
+}
+
+function esFilaCubicajeVacia(pieza: CubicajeMedidas) {
+  return (pieza.espesor ?? 0) === 0 && (pieza.ancho ?? 0) === 0 && (pieza.largo ?? 0) === 0;
+}
+
 type AserraderoFormProps = {
   clientes: Cliente[];
   serviciosEspeciales: ServicioEspecial[];
@@ -112,14 +126,23 @@ export function AserraderoForm({
     }
   }, [piezasJson]);
 
-  const totalPT = useMemo(
-    () => piezas.reduce((acc, p) => acc + (p.ptTotalReal !== undefined ? p.ptTotalReal : (Number(p.subtotalPT) || 0)), 0),
+  const piezasCompletas = useMemo(
+    () => piezas.filter(esBloqueCompleto),
     [piezas],
+  );
+  const tieneFilasParciales = useMemo(
+    () => piezas.some((pieza) => !esFilaCubicajeVacia(pieza) && !esBloqueCompleto(pieza)),
+    [piezas],
+  );
+
+  const totalPT = useMemo(
+    () => piezasCompletas.reduce((acc, p) => acc + (p.ptTotalReal ?? p.subtotalPT ?? 0), 0),
+    [piezasCompletas],
   );
   const piesCubicos = useMemo(() => totalPT * PIE_TABLAR_A_PIE_CUBICO, [totalPT]);
   
   const totalPTComercial = useMemo(() => {
-    return piezas.reduce((acc, p) => {
+    return piezasCompletas.reduce((acc, p) => {
       if (p.ptTotalComercial !== undefined) {
         return acc + p.ptTotalComercial;
       }
@@ -127,7 +150,7 @@ export function AserraderoForm({
       const unitReal = (Number(p.espesor) || 0) * (Number(p.ancho) || 0) * (Number(p.largo) || 0) / 12;
       return acc + (Math.floor(unitReal) * (Number(p.cantidad) || 0));
     }, 0);
-  }, [piezas]);
+  }, [piezasCompletas]);
 
   const selectedCliente = useMemo(() => {
     const all = [...clientes, ...clientesLocales];
@@ -138,7 +161,10 @@ export function AserraderoForm({
   const hasRuc = !!(selectedClienteRuc && selectedClienteRuc.trim().length === 11);
 
   const hasStep1Warning = !usarClienteProvisional && (!clienteId || (tipoComprobante === "factura" && !hasRuc));
-  const hasStep2Warning = piezas.length === 0 || totalPT === 0;
+  const hasStep2Warning = piezasCompletas.length === 0 || tieneFilasParciales;
+  const mensajeValidacionCubicaje = tieneFilasParciales
+    ? "Completa espesor, ancho y largo del bloque antes de continuar."
+    : "Completa las medidas de al menos un bloque para continuar.";
 
   const costoCubicajeSugerido = useMemo(
     () => roundMoney(totalPTComercial * costoPorPieCubico),
@@ -308,7 +334,10 @@ export function AserraderoForm({
               <div
                 key={item.n}
                 className="flex flex-1 items-center cursor-pointer select-none"
-                onClick={() => setStep(item.n)}
+                onClick={() => {
+                  if (step === 1 && item.n > 1 && hasStep2Warning) return;
+                  setStep(item.n);
+                }}
               >
                 <div className="flex flex-col items-center flex-1">
                   <div
@@ -512,7 +541,7 @@ export function AserraderoForm({
           </div>
           {hasStep2Warning && (
             <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
-              ⚠️ Debe agregar al menos un bloque antes de confirmar el registro.
+              ⚠️ {mensajeValidacionCubicaje}
             </p>
           )}
           <div className="hidden">
@@ -622,6 +651,7 @@ export function AserraderoForm({
           <Button
             type="button"
             onClick={() => setStep(2)}
+            disabled={hasStep2Warning}
             className="px-6 py-2"
           >
             Siguiente: Servicios
@@ -1089,7 +1119,7 @@ export function AserraderoForm({
                        : "El cliente seleccionado no tiene RUC de 11 dígitos para emitir Factura."}
                    </li>
                  )}
-                 {hasStep2Warning && <li>Debes agregar al menos un bloque en el Paso 1.</li>}
+                 {hasStep2Warning && <li>{mensajeValidacionCubicaje}</li>}
               </ul>
               <p className="text-[11px] text-red-500/80 pt-1">
                 Por favor, regresa a los pasos correspondientes usando los botones de navegación para completar la información antes de guardar.
