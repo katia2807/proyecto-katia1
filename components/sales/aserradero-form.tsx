@@ -72,6 +72,8 @@ export function AserraderoForm({
   const [costoPorPieCubico, setCostoPorPieCubico] = useState(defaultCostoPorPieCubico);
   const [piezasJson, setPiezasJson] = useState<string>(DEFAULT_LINEAS_CUBICAJE_JSON);
   const [step, setStep] = useState(1);
+  const [cubicajeAttempted, setCubicajeAttempted] = useState(false);
+  const [clienteAttempted, setClienteAttempted] = useState(false);
   const [precioCobradoManual, setPrecioCobradoManual] = useState<string>("");
   const [costoCubicajeManual, setCostoCubicajeManual] = useState<string>("");
   const [tipoRedondeo, setTipoRedondeo] = useState<"ninguno" | "normal" | "abajo" | "arriba">("abajo");
@@ -160,8 +162,10 @@ export function AserraderoForm({
   const selectedClienteDoc = (selectedCliente as { documento?: string })?.documento || "";
   const hasRuc = !!(selectedClienteRuc && selectedClienteRuc.trim().length === 11);
 
-  const hasStep1Warning = !usarClienteProvisional && (!clienteId || (tipoComprobante === "factura" && !hasRuc));
-  const hasStep2Warning = piezasCompletas.length === 0 || tieneFilasParciales;
+  const isClienteValid = usarClienteProvisional || (!!clienteId && (tipoComprobante !== "factura" || hasRuc));
+  const isCubicajeValid = piezasCompletas.length > 0 && !tieneFilasParciales;
+  const showClienteWarning = clienteAttempted && !isClienteValid;
+  const showCubicajeWarning = cubicajeAttempted && !isCubicajeValid;
   const mensajeValidacionCubicaje = tieneFilasParciales
     ? "Completa espesor, ancho y largo del bloque antes de continuar."
     : "Completa las medidas de al menos un bloque para continuar.";
@@ -200,7 +204,10 @@ export function AserraderoForm({
 
   function handleSeleccionarCliente(id: string) {
     setClienteId(id);
-    if (id) setUsarClienteProvisional(false);
+    if (id) {
+      setUsarClienteProvisional(false);
+      setClienteAttempted(false);
+    }
   }
 
   function handleUsarClienteProvisional() {
@@ -208,6 +215,7 @@ export function AserraderoForm({
     setClienteId("");
     setModoCliente("buscar");
     setTipoComprobante("boleta");
+    setClienteAttempted(false);
   }
 
   function handleClienteCreado(id: string, nombre: string) {
@@ -215,6 +223,23 @@ export function AserraderoForm({
     setClienteId(id);
     setUsarClienteProvisional(false);
     setModoCliente("buscar");
+    setClienteAttempted(false);
+  }
+
+  function handleStepNavigation(nextStep: number) {
+    const cubicajeBlocked = nextStep > 1 && !isCubicajeValid;
+    const clienteBlocked = nextStep >= 4 && !isClienteValid;
+
+    if (cubicajeBlocked) {
+      setCubicajeAttempted(true);
+    }
+    if (clienteBlocked) {
+      setClienteAttempted(true);
+    }
+    if (cubicajeBlocked || clienteBlocked) {
+      return;
+    }
+    setStep(nextStep);
   }
 
   const lineasPayload = useMemo(
@@ -329,15 +354,12 @@ export function AserraderoForm({
           ].map((item, index) => {
             const isCompleted = step > item.n;
             const isActive = step === item.n;
-            const hasWarning = (item.n === 1 && hasStep2Warning) || (item.n === 3 && hasStep1Warning);
+            const hasWarning = (item.n === 1 && showCubicajeWarning) || (item.n === 3 && showClienteWarning);
             return (
               <div
                 key={item.n}
                 className="flex flex-1 items-center cursor-pointer select-none"
-                onClick={() => {
-                  if (step === 1 && item.n > 1 && hasStep2Warning) return;
-                  setStep(item.n);
-                }}
+                onClick={() => handleStepNavigation(item.n)}
               >
                 <div className="flex flex-col items-center flex-1">
                   <div
@@ -440,14 +462,14 @@ export function AserraderoForm({
                     label="Cliente"
                     placeholder="Buscar cliente…"
                     inputAriaLabel="Cliente para servicio de aserradero"
-                    className={hasStep1Warning && !usarClienteProvisional ? "[&_input]:!border-red-500/80 [&_input]:focus:!border-red-500 [&_input]:focus:!ring-red-500 [&_input]:shadow-[0_0_0_1px_rgba(239,68,68,0.2)]" : ""}
+                    className={showClienteWarning && !usarClienteProvisional ? "[&_input]:!border-red-500/80 [&_input]:focus:!border-red-500 [&_input]:focus:!ring-red-500 [&_input]:shadow-[0_0_0_1px_rgba(239,68,68,0.2)]" : ""}
                   />
-                  {tipoComprobante === "factura" && !hasRuc && clienteId && (
+                  {showClienteWarning && tipoComprobante === "factura" && !hasRuc && clienteId && (
                     <p className="text-xs font-semibold text-red-500 mt-1">
                       ⚠️ El cliente seleccionado no tiene un RUC de 11 dígitos válido.
                     </p>
                   )}
-                  {hasStep1Warning && !clienteId && !usarClienteProvisional && (
+                  {showClienteWarning && !clienteId && !usarClienteProvisional && (
                     <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
                       ⚠️ Debe seleccionar un cliente antes de confirmar el registro.
                     </p>
@@ -513,7 +535,7 @@ export function AserraderoForm({
           </Button>
           <Button
             type="button"
-            onClick={() => setStep(4)}
+            onClick={() => handleStepNavigation(4)}
             className="px-6 py-2 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
           >
             Siguiente: Resumen y cobro
@@ -528,7 +550,7 @@ export function AserraderoForm({
           <p className="text-xs text-[var(--color-text-secondary)]">
             Ingresa los bloques y dimensiones para realizar el cubicaje rápido.
           </p>
-          <div className={`mt-2 rounded-xl p-1 transition-all duration-300 ${hasStep2Warning ? "border border-red-500/30 bg-red-500/5 shadow-[0_0_0_1px_rgba(239,68,68,0.1)]" : ""}`}>
+          <div className={`mt-2 rounded-xl p-1 transition-all duration-300 ${showCubicajeWarning ? "border border-red-500/30 bg-red-500/5 shadow-[0_0_0_1px_rgba(239,68,68,0.1)]" : ""}`}>
             <CubicajeInput
               quantityMode="fixed-one"
               presentationMode="aserradero-compact"
@@ -536,10 +558,13 @@ export function AserraderoForm({
               onChange={(data) => {
                 setPiezasJson(JSON.stringify(data.piezas));
                 setCostoPorPieCubico(data.precioPorPT);
+                if (data.piezas.some((pieza) => !esFilaCubicajeVacia(pieza) && !esBloqueCompleto(pieza))) {
+                  setCubicajeAttempted(true);
+                }
               }}
             />
           </div>
-          {hasStep2Warning && (
+          {showCubicajeWarning && (
             <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
               ⚠️ {mensajeValidacionCubicaje}
             </p>
@@ -648,14 +673,16 @@ export function AserraderoForm({
         </div>
 
         <div className="flex justify-end pt-4 mt-4">
-          <Button
-            type="button"
-            onClick={() => setStep(2)}
-            disabled={hasStep2Warning}
-            className="px-6 py-2"
-          >
-            Siguiente: Servicios
-          </Button>
+          <div onClick={() => !isCubicajeValid && setCubicajeAttempted(true)}>
+            <Button
+              type="button"
+              onClick={() => handleStepNavigation(2)}
+              disabled={!isCubicajeValid}
+              className={`px-6 py-2 ${!isCubicajeValid ? "pointer-events-none" : ""}`}
+            >
+              Siguiente: Servicios
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1095,7 +1122,7 @@ export function AserraderoForm({
           </Button>
           <Button
             type="button"
-            onClick={() => setStep(5)}
+            onClick={() => handleStepNavigation(5)}
             className="px-6 py-2"
           >
             Siguiente: Confirmar →
@@ -1108,18 +1135,18 @@ export function AserraderoForm({
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
           <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 5: Confirmar y registrar</h3>
           
-          {hasStep1Warning || hasStep2Warning ? (
+          {!isClienteValid || !isCubicajeValid ? (
             <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-red-600 dark:text-red-400 space-y-1">
               <p className="text-sm font-bold">⚠️ Faltan datos obligatorios para registrar el servicio</p>
               <ul className="list-disc list-inside text-xs space-y-0.5 font-medium">
-                 {hasStep1Warning && (
+                 {!isClienteValid && (
                    <li>
                      {!clienteId 
                        ? "Debes seleccionar un cliente en el Paso 3."
                        : "El cliente seleccionado no tiene RUC de 11 dígitos para emitir Factura."}
                    </li>
                  )}
-                 {hasStep2Warning && <li>{mensajeValidacionCubicaje}</li>}
+                 {!isCubicajeValid && <li>{mensajeValidacionCubicaje}</li>}
               </ul>
               <p className="text-[11px] text-red-500/80 pt-1">
                 Por favor, regresa a los pasos correspondientes usando los botones de navegación para completar la información antes de guardar.
@@ -1259,7 +1286,7 @@ export function AserraderoForm({
           </Button>
           <Button
             size="lg"
-            disabled={hasStep1Warning || hasStep2Warning}
+            disabled={!isClienteValid || !isCubicajeValid}
             className="px-8 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
           >
             Registrar servicio ✓
