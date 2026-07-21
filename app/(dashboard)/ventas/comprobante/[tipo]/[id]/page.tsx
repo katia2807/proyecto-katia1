@@ -514,6 +514,9 @@ export default async function ComprobantePage({
           .voucher-th { color: #64748b !important; border-color: #e2e8f0 !important; }
           .voucher-td { color: #1e293b !important; }
           .voucher-total-line { border-color: #334155 !important; color: #0f172a !important; }
+          .aserradero-preview { max-width: 680px !important; }
+          .aserradero-cubicacion-table thead { display: table-header-group; }
+          .aserradero-cubicacion-table tr { break-inside: avoid; page-break-inside: avoid; }
         }
         body { background: var(--color-bg, #f1f5f9); }
       `}</style>
@@ -537,7 +540,11 @@ export default async function ComprobantePage({
 
 
       {/* Voucher */}
-      <div className="mx-auto max-w-[680px] p-8 font-sans text-[13px]">
+      <div
+        className={`mx-auto px-4 py-6 font-sans text-[13px] sm:p-8 ${
+          tipo === "aserradero" ? "aserradero-preview max-w-[1120px]" : "max-w-[680px]"
+        }`}
+      >
         <div className="voucher-card rounded-2xl bg-[var(--color-surface,#ffffff)] text-[var(--color-text-primary,#0f172a)] shadow-lg ring-1 ring-[var(--color-border,#e2e8f0)] p-8">
 
           {/* Header */}
@@ -592,59 +599,61 @@ export default async function ComprobantePage({
           {/* Detalle Conditional Rendering based on tipo */}
           {tipo === "aserradero" && aserraderoServicio && (
             <>
-              {/* Detalle de Cubicaje */}
+              {/* Detalle de madera cubicada */}
               <div className="voucher-section mt-4 rounded-xl border border-[var(--color-border,#e2e8f0)] p-4">
-                <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Detalle de cubicación</p>
                 {aserraderoLineasCubicaje.length > 0 ? (
                   <>
-                    <table className="w-full table-fixed">
-                      <thead className="print:table-header-group">
-                        <tr>
-                          <th className="voucher-th w-10 border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">N.º</th>
-                          {mostrarCantidadCubicaje && (
-                            <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Cant.</th>
-                          )}
-                          <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Espesor (in)</th>
-                          <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Ancho (in)</th>
-                          <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Largo (ft)</th>
-                          <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">PT comercial</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {aserraderoLineasCubicaje.map((linea, index) => (
-                          <tr key={linea.id ?? index} className={index % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
-                            <td className="voucher-td py-2 text-left text-sm text-[var(--color-text-primary,#1e293b)]">{index + 1}</td>
+                    <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Detalle de madera cubicada</p>
+                    <div className="overflow-x-auto print:overflow-visible">
+                      <table className="aserradero-cubicacion-table w-full min-w-[640px] table-fixed print:min-w-0">
+                        <colgroup>
+                          <col className="w-[8%]" />
+                          {mostrarCantidadCubicaje && <col className="w-[10%]" />}
+                          <col className={mostrarCantidadCubicaje ? "w-[18%]" : "w-[20%]"} />
+                          <col className={mostrarCantidadCubicaje ? "w-[18%]" : "w-[20%]"} />
+                          <col className={mostrarCantidadCubicaje ? "w-[18%]" : "w-[20%]"} />
+                          <col className={mostrarCantidadCubicaje ? "w-[28%]" : "w-[32%]"} />
+                        </colgroup>
+                        <thead>
+                          <tr>
+                            <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] px-2 pb-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">N.º</th>
                             {mostrarCantidadCubicaje && (
-                              <td className="voucher-td py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.cantidad}</td>
+                              <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] px-2 pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Cantidad</th>
                             )}
-                            <td className="voucher-td py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.espesor}</td>
-                            <td className="voucher-td py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.ancho}</td>
-                            <td className="voucher-td py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.largo}</td>
-                            <td className="voucher-td py-2 text-right text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">{getPTComercialLinea(linea)}</td>
+                            <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] px-2 pb-1.5 text-right text-[10px] font-semibold uppercase leading-tight tracking-wide text-[var(--color-text-secondary,#64748b)]">Espesor (in)</th>
+                            <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] px-2 pb-1.5 text-right text-[10px] font-semibold uppercase leading-tight tracking-wide text-[var(--color-text-secondary,#64748b)]">Ancho (in)</th>
+                            <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] px-2 pb-1.5 text-right text-[10px] font-semibold uppercase leading-tight tracking-wide text-[var(--color-text-secondary,#64748b)]">Largo (ft)</th>
+                            <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] px-2 pb-1.5 text-right text-[10px] font-semibold uppercase leading-tight tracking-wide text-[var(--color-text-secondary,#64748b)]">Pies tablares (PT)</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className="mt-3 flex flex-wrap justify-end gap-x-6 gap-y-1 border-t border-[var(--color-border,#e2e8f0)] pt-2 text-sm">
-                      <p><strong>Total PT comercial:</strong> {totalPTComercialCubicaje} PT</p>
-                      <p><strong>Pies cúbicos totales:</strong> {aserraderoServicio.pies_cubicos.toFixed(2)} ft³</p>
+                        </thead>
+                        <tbody>
+                          {aserraderoLineasCubicaje.map((linea, index) => (
+                            <tr key={linea.id ?? index} className={index % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]" : ""}>
+                              <td className="voucher-td px-2 py-2 text-left text-sm text-[var(--color-text-primary,#1e293b)]">{index + 1}</td>
+                              {mostrarCantidadCubicaje && (
+                                <td className="voucher-td px-2 py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.cantidad}</td>
+                              )}
+                              <td className="voucher-td px-2 py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.espesor}</td>
+                              <td className="voucher-td px-2 py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.ancho}</td>
+                              <td className="voucher-td px-2 py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{linea.largo}</td>
+                              <td className="voucher-td px-2 py-2 text-right text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">{getPTComercialLinea(linea)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-3 flex justify-end border-t border-[var(--color-border,#e2e8f0)] pt-2 text-sm">
+                      <p><strong>TOTAL PIES TABLARES:</strong> {totalPTComercialCubicaje} PT</p>
                     </div>
                   </>
                 ) : (
-                  <table className="w-full">
-                    <thead>
-                      <tr>
-                        <th className="voucher-th w-2/3 border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Descripción</th>
-                        <th className="voucher-th border-b border-[var(--color-border,#e2e8f0)] pb-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Equiv. PT</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="bg-[var(--color-primary-soft,rgba(0,0,0,0.03))]">
-                        <td className="voucher-td py-2 text-left text-sm text-[var(--color-text-primary,#1e293b)]">Servicio de cubicaje base ({aserraderoServicio.pies_cubicos.toFixed(2)} ft³)</td>
-                        <td className="voucher-td py-2 text-right text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">{(aserraderoServicio.pies_cubicos * 12).toFixed(2)} PT</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <>
+                    <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-secondary,#64748b)]">Resumen de madera cubicada</p>
+                    <div className="grid gap-3 rounded-lg bg-[var(--color-primary-soft,rgba(0,0,0,0.03))] p-3 text-sm sm:grid-cols-2">
+                      <p><strong>Volumen calculado:</strong> {aserraderoServicio.pies_cubicos.toFixed(2)} ft³</p>
+                      <p className="sm:text-right"><strong>Total calculado:</strong> {(aserraderoServicio.pies_cubicos * 12).toFixed(2)} PT</p>
+                    </div>
+                  </>
                 )}
               </div>
 

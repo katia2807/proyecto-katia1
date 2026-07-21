@@ -293,7 +293,11 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
       </div>
 
       {/* Document page layout A4 */}
-      <div className="a4-print-container mx-auto my-6 max-w-4xl rounded-2xl bg-white text-black p-10 shadow-lg border border-[#e2e8f0]">
+      <div
+        className={`a4-print-container mx-auto my-6 rounded-2xl border border-[#e2e8f0] bg-white p-10 text-black shadow-lg ${
+          tipo === "aserradero" ? "w-full max-w-[1120px]" : "max-w-4xl"
+        }`}
+      >
         
         {/* Header */}
         <div className="flex items-start justify-between border-b-2 border-black pb-6">
@@ -339,61 +343,61 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
         {/* Dynamic Detail rendering based on tipo */}
         {tipo === "aserradero" && aserraderoServicio && (
           <div className="mt-6 space-y-6">
-            {/* Detalle de Cubicación */}
+            {/* Detalle de madera cubicada */}
             <div className="rounded-xl border border-gray-300 p-4">
-              <h3 className="mb-3 text-xs font-black uppercase tracking-wider text-gray-600">Detalle de cubicación</h3>
               {aserraderoLineasCubicaje.length > 0 ? (
                 <>
-                  <table className="w-full table-fixed text-xs">
-                    <thead>
-                      <tr className="border-b border-gray-400 bg-slate-100">
-                        <th className="w-10 py-2 text-left font-bold uppercase">N.º</th>
-                        {mostrarCantidadCubicaje && (
-                          <th className="py-2 text-right font-bold uppercase">Cant.</th>
-                        )}
-                        <th className="py-2 text-right font-bold uppercase">Espesor (in)</th>
-                        <th className="py-2 text-right font-bold uppercase">Ancho (in)</th>
-                        <th className="py-2 text-right font-bold uppercase">Largo (ft)</th>
-                        <th className="py-2 text-right font-bold uppercase">PT comercial</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {aserraderoLineasCubicaje.map((linea, index) => (
-                        <tr key={linea.id ?? index} className="border-b border-gray-200">
-                          <td className="py-2 text-left text-sm">{index + 1}</td>
+                  <h3 className="mb-3 text-xs font-black uppercase tracking-wider text-gray-600">Detalle de madera cubicada</h3>
+                  <div className="overflow-x-auto print:overflow-visible">
+                    <table className="w-full min-w-[640px] table-fixed text-xs print:min-w-0">
+                      <colgroup>
+                        <col className="w-[8%]" />
+                        {mostrarCantidadCubicaje && <col className="w-[10%]" />}
+                        <col className={mostrarCantidadCubicaje ? "w-[18%]" : "w-[20%]"} />
+                        <col className={mostrarCantidadCubicaje ? "w-[18%]" : "w-[20%]"} />
+                        <col className={mostrarCantidadCubicaje ? "w-[18%]" : "w-[20%]"} />
+                        <col className={mostrarCantidadCubicaje ? "w-[28%]" : "w-[32%]"} />
+                      </colgroup>
+                      <thead>
+                        <tr className="border-b border-gray-400 bg-slate-100">
+                          <th className="px-2 py-2 text-left font-bold uppercase">N.º</th>
                           {mostrarCantidadCubicaje && (
-                            <td className="py-2 text-right text-sm">{linea.cantidad}</td>
+                            <th className="px-2 py-2 text-right font-bold uppercase">Cantidad</th>
                           )}
-                          <td className="py-2 text-right text-sm">{linea.espesor}</td>
-                          <td className="py-2 text-right text-sm">{linea.ancho}</td>
-                          <td className="py-2 text-right text-sm">{linea.largo}</td>
-                          <td className="py-2 text-right text-sm font-bold">{getPTComercialLinea(linea)}</td>
+                          <th className="px-2 py-2 text-right font-bold uppercase leading-tight">Espesor (in)</th>
+                          <th className="px-2 py-2 text-right font-bold uppercase leading-tight">Ancho (in)</th>
+                          <th className="px-2 py-2 text-right font-bold uppercase leading-tight">Largo (ft)</th>
+                          <th className="px-2 py-2 text-right font-bold uppercase leading-tight">Pies tablares (PT)</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div className="mt-3 flex flex-wrap justify-end gap-x-6 gap-y-1 border-t border-gray-300 pt-2 text-sm">
-                    <p><strong>Total PT comercial:</strong> {totalPTComercialCubicaje} PT</p>
-                    <p><strong>Pies cúbicos totales:</strong> {aserraderoServicio.pies_cubicos.toFixed(2)} ft³</p>
+                      </thead>
+                      <tbody>
+                        {aserraderoLineasCubicaje.map((linea, index) => (
+                          <tr key={linea.id ?? index} className="border-b border-gray-200">
+                            <td className="px-2 py-2 text-left text-sm">{index + 1}</td>
+                            {mostrarCantidadCubicaje && (
+                              <td className="px-2 py-2 text-right text-sm">{linea.cantidad}</td>
+                            )}
+                            <td className="px-2 py-2 text-right text-sm">{linea.espesor}</td>
+                            <td className="px-2 py-2 text-right text-sm">{linea.ancho}</td>
+                            <td className="px-2 py-2 text-right text-sm">{linea.largo}</td>
+                            <td className="px-2 py-2 text-right text-sm font-bold">{getPTComercialLinea(linea)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-3 flex justify-end border-t border-gray-300 pt-2 text-sm">
+                    <p><strong>TOTAL PIES TABLARES:</strong> {totalPTComercialCubicaje} PT</p>
                   </div>
                 </>
               ) : (
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-gray-400 bg-slate-100">
-                      <th className="py-2 text-left font-bold uppercase">Descripción</th>
-                      <th className="py-2 text-right font-bold uppercase">Volumen</th>
-                      <th className="py-2 text-right font-bold uppercase">Equiv. PT</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="py-2.5 text-sm">Servicio de aserradero / cubicaje ({aserraderoServicio.pies_cubicos.toFixed(2)} ft³)</td>
-                      <td className="py-2.5 text-right text-sm">{aserraderoServicio.pies_cubicos.toFixed(2)} ft³</td>
-                      <td className="py-2.5 text-right text-sm font-bold">{(aserraderoServicio.pies_cubicos * 12).toFixed(2)} PT</td>
-                    </tr>
-                  </tbody>
-                </table>
+                <>
+                  <h3 className="mb-3 text-xs font-black uppercase tracking-wider text-gray-600">Resumen de madera cubicada</h3>
+                  <div className="grid gap-3 rounded-lg bg-slate-100 p-3 text-sm sm:grid-cols-2">
+                    <p><strong>Volumen calculado:</strong> {aserraderoServicio.pies_cubicos.toFixed(2)} ft³</p>
+                    <p className="sm:text-right"><strong>Total calculado:</strong> {(aserraderoServicio.pies_cubicos * 12).toFixed(2)} PT</p>
+                  </div>
+                </>
               )}
             </div>
 
