@@ -13,6 +13,46 @@ type PrintA4VoucherProps = {
   searchTipo?: string;
 };
 
+type LineaCubicajeAserradero = {
+  id?: string | number;
+  tipo?: string;
+  cantidad: number;
+  espesor: number;
+  ancho: number;
+  largo: number;
+  ptUnitarioComercial?: number;
+  ptTotalComercial?: number;
+};
+
+function esLineaCubicajeAserradero(linea: unknown): linea is LineaCubicajeAserradero {
+  if (!linea || typeof linea !== "object") return false;
+  const item = linea as Record<string, unknown>;
+  return (
+    typeof item.cantidad === "number" &&
+    Number.isFinite(item.cantidad) &&
+    item.cantidad > 0 &&
+    typeof item.espesor === "number" &&
+    Number.isFinite(item.espesor) &&
+    item.espesor > 0 &&
+    typeof item.ancho === "number" &&
+    Number.isFinite(item.ancho) &&
+    item.ancho > 0 &&
+    typeof item.largo === "number" &&
+    Number.isFinite(item.largo) &&
+    item.largo > 0
+  );
+}
+
+function getPTComercialLinea(linea: LineaCubicajeAserradero) {
+  if (typeof linea.ptTotalComercial === "number" && Number.isFinite(linea.ptTotalComercial)) {
+    return linea.ptTotalComercial;
+  }
+  if (typeof linea.ptUnitarioComercial === "number" && Number.isFinite(linea.ptUnitarioComercial)) {
+    return linea.ptUnitarioComercial * linea.cantidad;
+  }
+  return Math.floor((linea.espesor * linea.ancho * linea.largo) / 12) * linea.cantidad;
+}
+
 function fmt(date: string) {
   try {
     return new Date(date).toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" });
@@ -72,6 +112,7 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
 
   let aserraderoServicio: any = null;
   let aserraderoLineasEspeciales: Array<{ id: string; codigo: string; nombre: string; cantidad: number; tarifa: number; subtotal: number; tipo?: string }> = [];
+  let aserraderoLineasCubicaje: LineaCubicajeAserradero[] = [];
   const ventaMaderaLineasResueltas: Array<{ desc: string; qty: string; unidad: string; unitario: string; total: string }> = [];
 
   if (tipo === "aserradero") {
@@ -93,7 +134,10 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
           ? JSON.parse(aserraderoServicio.lineas_json)
           : aserraderoServicio.lineas_json;
         if (Array.isArray(parsed)) {
-          aserraderoLineasEspeciales = parsed;
+          aserraderoLineasCubicaje = parsed.filter(esLineaCubicajeAserradero);
+          aserraderoLineasEspeciales = parsed.filter(
+            (linea) => !esLineaCubicajeAserradero(linea) && linea?.tipo !== "bloque_cubicaje",
+          );
         }
       } catch (e) {
         console.error("Error parsing lineas_json", e);
@@ -191,6 +235,12 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
     ];
   }
 
+  const mostrarCantidadCubicaje = aserraderoLineasCubicaje.some((linea) => linea.cantidad !== 1);
+  const totalPTComercialCubicaje = aserraderoLineasCubicaje.reduce(
+    (total, linea) => total + getPTComercialLinea(linea),
+    0,
+  );
+
   let montoAdelanto = 0;
   if (modalidad === "adelanto") {
     montoAdelanto = await getAdelantoFromCaja(id);
@@ -220,6 +270,8 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
             padding: 0 !important;
             margin: 0 !important;
           }
+          thead { display: table-header-group; }
+          tr { break-inside: avoid; page-break-inside: avoid; }
         }
         body { background: #f8fafc; color: #0f172a; }
       `}</style>
@@ -287,25 +339,62 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
         {/* Dynamic Detail rendering based on tipo */}
         {tipo === "aserradero" && aserraderoServicio && (
           <div className="mt-6 space-y-6">
-            {/* Cubicaje Base */}
+            {/* Detalle de Cubicación */}
             <div className="rounded-xl border border-gray-300 p-4">
-              <h3 className="text-xs font-black uppercase tracking-wider text-gray-600 mb-3">Servicio de Cubicaje Base</h3>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-gray-400 bg-slate-100">
-                    <th className="text-left py-2 font-bold uppercase">Descripción</th>
-                    <th className="text-right py-2 font-bold uppercase">Volumen</th>
-                    <th className="text-right py-2 font-bold uppercase">Equiv. PT</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="py-2.5 text-sm">Servicio de aserradero / cubicaje ({Number(aserraderoServicio.pies_cubicos).toFixed(2)} ft³)</td>
-                    <td className="text-right py-2.5 text-sm">{Number(aserraderoServicio.pies_cubicos).toFixed(2)} ft³</td>
-                    <td className="text-right py-2.5 text-sm font-bold">{(Number(aserraderoServicio.pies_cubicos) * 12).toFixed(2)} PT</td>
-                  </tr>
-                </tbody>
-              </table>
+              <h3 className="mb-3 text-xs font-black uppercase tracking-wider text-gray-600">Detalle de cubicación</h3>
+              {aserraderoLineasCubicaje.length > 0 ? (
+                <>
+                  <table className="w-full table-fixed text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-400 bg-slate-100">
+                        <th className="w-10 py-2 text-left font-bold uppercase">N.º</th>
+                        {mostrarCantidadCubicaje && (
+                          <th className="py-2 text-right font-bold uppercase">Cant.</th>
+                        )}
+                        <th className="py-2 text-right font-bold uppercase">Espesor (in)</th>
+                        <th className="py-2 text-right font-bold uppercase">Ancho (in)</th>
+                        <th className="py-2 text-right font-bold uppercase">Largo (ft)</th>
+                        <th className="py-2 text-right font-bold uppercase">PT comercial</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aserraderoLineasCubicaje.map((linea, index) => (
+                        <tr key={linea.id ?? index} className="border-b border-gray-200">
+                          <td className="py-2 text-left text-sm">{index + 1}</td>
+                          {mostrarCantidadCubicaje && (
+                            <td className="py-2 text-right text-sm">{linea.cantidad}</td>
+                          )}
+                          <td className="py-2 text-right text-sm">{linea.espesor}</td>
+                          <td className="py-2 text-right text-sm">{linea.ancho}</td>
+                          <td className="py-2 text-right text-sm">{linea.largo}</td>
+                          <td className="py-2 text-right text-sm font-bold">{getPTComercialLinea(linea)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="mt-3 flex flex-wrap justify-end gap-x-6 gap-y-1 border-t border-gray-300 pt-2 text-sm">
+                    <p><strong>Total PT comercial:</strong> {totalPTComercialCubicaje} PT</p>
+                    <p><strong>Pies cúbicos totales:</strong> {aserraderoServicio.pies_cubicos.toFixed(2)} ft³</p>
+                  </div>
+                </>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-400 bg-slate-100">
+                      <th className="py-2 text-left font-bold uppercase">Descripción</th>
+                      <th className="py-2 text-right font-bold uppercase">Volumen</th>
+                      <th className="py-2 text-right font-bold uppercase">Equiv. PT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="py-2.5 text-sm">Servicio de aserradero / cubicaje ({aserraderoServicio.pies_cubicos.toFixed(2)} ft³)</td>
+                      <td className="py-2.5 text-right text-sm">{aserraderoServicio.pies_cubicos.toFixed(2)} ft³</td>
+                      <td className="py-2.5 text-right text-sm font-bold">{(aserraderoServicio.pies_cubicos * 12).toFixed(2)} PT</td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
             </div>
 
             {/* Servicios Especiales */}
@@ -376,15 +465,8 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
               );
             })()}
 
-            {/* Cost Summary */}
-            <div className="mt-6 flex justify-between items-start gap-6 border-t border-gray-300 pt-4">
-              <div className="text-xs text-gray-500 space-y-1">
-                <p><strong>Costo Cubicaje Base:</strong> {formatPen(Number(aserraderoServicio.costo_cubicaje))}</p>
-                {(() => {
-                  const mo = aserraderoLineasEspeciales.find((l) => l.tipo === "mano_de_obra");
-                  return mo ? <p><strong>Mano de Obra:</strong> {formatPen(Number(mo.subtotal))}</p> : null;
-                })()}
-              </div>
+            {/* Total cobrado */}
+            <div className="mt-6 flex justify-end border-t border-gray-300 pt-4">
               <div className="w-80 rounded-xl border border-black p-4 bg-slate-50 text-right">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Monto Total Cobrado</span>
                 <p className="text-2xl font-black text-black mt-1">{formatPen(totalSoles)}</p>

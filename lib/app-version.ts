@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.1.13";
-export const APP_LAST_UPDATE = "11/07/2026";
+export const APP_VERSION = "1.1.14";
+export const APP_LAST_UPDATE = "21/07/2026";
 export const APP_UPDATE_SUMMARY =
-  "El asistente ahora muestra advertencias solo después de una acción incompleta, evitando confusión al iniciar.";
+  "El resumen de Aserradero oculta datos internos de utilidad y el comprobante imprime la cubicación detallada por bloques.";

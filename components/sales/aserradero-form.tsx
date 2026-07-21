@@ -3,7 +3,6 @@
 import { submitCreateServicioAserraderoForm } from "@/app/actions";
 import { useMemo, useState, useActionState, useEffect } from "react";
 import { CubicajeInput } from "@/components/sales/cubicaje-input";
-import { MargenIndicator } from "@/components/sales/margen-indicator";
 import { NuevoClienteInlinePanel } from "@/components/sales/nuevo-cliente-inline-panel";
 import { Button } from "@/components/ui/button";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
@@ -242,7 +241,7 @@ export function AserraderoForm({
     setStep(nextStep);
   }
 
-  const lineasPayload = useMemo(
+  const lineasServiciosPayload = useMemo(
     () => {
       const list = Object.entries(seleccionados)
         .filter(([, v]) => v.activo)
@@ -317,6 +316,17 @@ export function AserraderoForm({
       return list;
     },
     [seleccionados, serviciosEspeciales, serviciosPersonalizados, manoDeObra, extrasMadera, notasInternas],
+  );
+
+  const lineasPayload = useMemo(
+    () => [
+      ...piezasCompletas.map((pieza) => ({
+        ...pieza,
+        tipo: "bloque_cubicaje",
+      })),
+      ...lineasServiciosPayload,
+    ],
+    [piezasCompletas, lineasServiciosPayload],
   );
 
   function handleSaltarServicios() {
@@ -998,11 +1008,6 @@ export function AserraderoForm({
                 <span className="font-black text-base">{formatPen(costoProduccion)}</span>
               </div>
 
-              <div className="flex justify-between py-2.5 text-[var(--color-primary)]">
-                <span className="font-semibold text-sm">Margen de ganancia ({margenGananciaDefaultPct.toFixed(1)}%)</span>
-                <span className="font-bold text-sm">{formatPen(gananciaSugerida)}</span>
-              </div>
-
               <div className="flex justify-between py-3 text-[var(--color-primary)]">
                 <span className="font-bold text-base">Precio sugerido</span>
                 <span className="font-black text-base">{formatPen(precioCalculado)}</span>
@@ -1100,15 +1105,6 @@ export function AserraderoForm({
             )}
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 mt-4 pt-2">
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-              <p className="text-xs uppercase text-[var(--color-text-secondary)]">Utilidad estimada</p>
-              <p className="text-2xl font-black text-[var(--color-success)]">{formatPen(utilidad)}</p>
-            </div>
-            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3 flex flex-col justify-center">
-              <MargenIndicator costo={costoTotalAserradero} precio={precioCobrado} label="Margen del servicio" />
-            </div>
-          </div>
         </div>
 
         <div className="flex justify-between pt-4 mt-4">
@@ -1216,7 +1212,7 @@ export function AserraderoForm({
              <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
                <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Servicios Especiales & Extras</h4>
                <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                 {lineasPayload
+                 {lineasServiciosPayload
                    .filter((s) => s.tipo !== "nota_interna" && s.tipo !== "extra_madera_cliente")
                    .map((s) => (
                      <div key={s.id} className="flex justify-between text-sm">
@@ -1263,13 +1259,6 @@ export function AserraderoForm({
                       />
                     </div>
                   </div>
-                 <div className="flex justify-between text-xs text-[var(--color-success)] font-bold">
-                   <span>Utilidad Estimada:</span>
-                   <span>{formatPen(utilidad)}</span>
-                 </div>
-                 <div className="pt-1">
-                   <MargenIndicator costo={costoTotalAserradero} precio={precioCobrado} label="Margen Final" />
-                 </div>
                </div>
              </div>
           </div>
