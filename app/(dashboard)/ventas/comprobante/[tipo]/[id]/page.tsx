@@ -8,6 +8,8 @@ import { hasSupabaseEnv } from "@/lib/runtime";
 import { formatPen } from "@/lib/utils";
 import { PrintButton } from "@/components/ui/print-button";
 import { PrintSelector } from "@/components/ui/print-selector";
+import { buildAserraderoPrintModel } from "@/lib/aserradero-print-model";
+import { AserraderoPrintA4Detail } from "@/components/sales/aserradero-print-a4-detail";
 
 
 type Params = { tipo: string; id: string };
@@ -90,6 +92,10 @@ type ServicioAserraderoRow = {
   utilidad: number;
   lineas_json: unknown;
   correlativo: string | null;
+  metodo_pago?: string | null;
+  modalidad_pago?: string | null;
+  fecha_pago_credito?: string | null;
+  adelanto?: number | null;
   created_at: string;
 };
 
@@ -497,6 +503,22 @@ export default async function ComprobantePage({
     } else {
       docType = "BOLETA DE VENTA";
     }
+  }
+
+  if (tipo === "aserradero" && aserraderoServicio) {
+    const model = buildAserraderoPrintModel({
+      service: aserraderoServicio,
+      customer: clienteMap.get(aserraderoServicio.cliente_id),
+      tipoComprobante: docType.includes("FACTURA") ? "factura" : "boleta",
+    });
+    return (
+      <AserraderoPrintA4Detail
+        id={id}
+        empresa={empresa}
+        model={model}
+        currentFormat="default"
+      />
+    );
   }
 
   return (

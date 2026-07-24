@@ -6,6 +6,8 @@ import { formatPen } from "@/lib/utils";
 import { resolveSaleDocument, getProductoMaderaById, getAdelantoFromCaja, getMuebleNombre } from "@/lib/print-helpers";
 import { PrintButton } from "@/components/ui/print-button";
 import { PrintSelector } from "@/components/ui/print-selector";
+import { buildAserraderoPrintModel } from "@/lib/aserradero-print-model";
+import { AserraderoPrintA4Detail } from "@/components/sales/aserradero-print-a4-detail";
 
 type PrintA4VoucherProps = {
   id: string;
@@ -99,6 +101,23 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
 
   const clienteMap = new Map(clientes.map((c) => [c.id, c]));
   const choferMap  = new Map(choferes.map((c) => [c.id, c.nombre]));
+
+  if (tipo === "aserradero") {
+    const customer = clienteMap.get(saleRecord.cliente_id);
+    const model = buildAserraderoPrintModel({
+      service: saleRecord,
+      customer,
+      tipoComprobante: docType,
+    });
+    return (
+      <AserraderoPrintA4Detail
+        id={id}
+        empresa={empresa}
+        model={model}
+        currentFormat="a4"
+      />
+    );
+  }
 
   let correlativo = "—";
   let fechaVenta  = "—";

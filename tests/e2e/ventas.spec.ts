@@ -28,11 +28,57 @@ test.describe("ventas — madera, aserradero, mixer (demo DB)", () => {
     await page.getByRole("button", { name: "Registrar servicio" }).first().click();
     await expect(page.getByRole("heading", { name: "Nuevo servicio de aserradero" })).toBeVisible();
 
+    await expect(page.getByRole("button", { name: /Agregar servicio adicional/ })).toHaveAttribute("aria-expanded", "false");
+    await page.getByLabel("Espesor del bloque 1 en pulgadas").fill("11");
+    await page.getByLabel("Ancho del bloque 1 en pulgadas").fill("5");
+    await page.getByLabel("Largo del bloque 1 en pies").fill("14");
+    await expect(page.getByLabel("PT comercial del bloque 1")).toHaveText("64");
+
+    const tarifa = page.getByLabel("Tarifa de corte por PT");
+    const totalCobrar = page.getByLabel("Total a cobrar");
+    await expect(tarifa).toHaveValue("0.50");
+    await expect(totalCobrar).toHaveValue("32.00");
+    await tarifa.fill("0.60");
+    await expect(totalCobrar).toHaveValue("38.40");
+    await totalCobrar.fill("30.00");
+    await tarifa.fill("0.50");
+    await expect(totalCobrar).toHaveValue("30.00");
+    await page.getByRole("button", { name: "Usar total calculado" }).click();
+    await expect(totalCobrar).toHaveValue("32.00");
+
+    await page.getByRole("button", { name: "Siguiente: Cliente y pago" }).click();
     await pickFirstComboboxOption(page, /Cliente para servicio de aserradero/, "Ropero");
+    await page.getByRole("button", { name: "Siguiente: Confirmar" }).click();
+    await expect(page.getByText("Total a cobrar", { exact: true }).last()).toBeVisible();
     await page.getByRole("button", { name: "Registrar servicio" }).last().click();
+    await expect(page.getByText("Servicio de aserradero registrado correctamente.")).toBeVisible();
 
     await expect(page.getByRole("heading", { name: "Servicio aserradero" })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Ropero Carlos" }).first()).toBeVisible();
+
+    const serviceRow = page.getByRole("row").filter({ hasText: "Ropero Carlos" }).first();
+    const previewHref = await serviceRow.getByTitle("Imprimir comprobante").getAttribute("href");
+    expect(previewHref).toBeTruthy();
+    const serviceId = previewHref!.split("/aserradero/")[1]!.split("?")[0]!;
+
+    await page.goto(previewHref!);
+    await expect(page.getByText("Ropero Carlos", { exact: true })).toBeVisible();
+    await expect(page.getByText("64 PT", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("S/ 0.50", { exact: true })).toBeVisible();
+    await expect(page.getByText("S/ 32.00", { exact: true }).last()).toBeVisible();
+
+    await page.goto(`/print/a4/boleta/${serviceId}?tipo=aserradero`);
+    await expect(page.getByText("Ropero Carlos", { exact: true })).toBeVisible();
+    await expect(page.getByText("64 PT", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("S/ 0.50", { exact: true })).toBeVisible();
+    await expect(page.getByText("S/ 32.00", { exact: true }).last()).toBeVisible();
+
+    await page.goto(`/print/ticket/boleta/${serviceId}?tipo=aserradero`);
+    await expect(page.getByText("Medidas: esp(in) ancho(in) largo(ft)")).toBeVisible();
+    await expect(page.getByText(/#01 11 5 14/)).toBeVisible();
+    await expect(page.getByText("64 PT", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("S/ 0.50", { exact: true })).toBeVisible();
+    await expect(page.getByText("S/ 32.00", { exact: true }).last()).toBeVisible();
   });
 
   test("alquiler mixer: contrato básico aparece en tabla", async ({ page }) => {

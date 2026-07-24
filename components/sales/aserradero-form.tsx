@@ -1,19 +1,29 @@
 "use client";
 
 import { submitCreateServicioAserraderoForm } from "@/app/actions";
-import { useMemo, useState, useActionState, useEffect } from "react";
 import { CubicajeInput } from "@/components/sales/cubicaje-input";
 import { NuevoClienteInlinePanel } from "@/components/sales/nuevo-cliente-inline-panel";
 import { Button } from "@/components/ui/button";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { liteClientesToCompleto } from "@/lib/combobox-mocks";
-import { formatPen, roundMoney, parseDecimal } from "@/lib/utils";
-import { calcularGananciaPorMargen, calcularPrecioConMargen, DEFAULT_MARGEN_GANANCIA_PCT } from "@/lib/cotizacion-calculos";
+import { mutationFormInitialState } from "@/lib/mutation-form-state";
+import { formatPen, parseDecimal, roundMoney } from "@/lib/utils";
+import {
+  calculateAserraderoAdjustment,
+  calculateAserraderoCutSubtotal,
+  calculateAserraderoTotal,
+} from "@/lib/aserradero-print-model";
+import { useActionState, useCallback, useEffect, useMemo, useState } from "react";
 
-type Cliente = { id: string; nombre: string };
+type Cliente = {
+  id: string;
+  nombre: string;
+  documento?: string | null;
+  ruc?: string | null;
+};
+
 type ServicioEspecial = {
   id: string;
   codigo: string;
@@ -21,73 +31,110 @@ type ServicioEspecial = {
   tarifa_por_pieza: number;
 };
 
-type CubicajeMedidas = {
-  espesor?: number;
-  ancho?: number;
-  largo?: number;
+type CubicajePieza = {
+  id: number;
+  cantidad: number;
+  espesor: number;
+  ancho: number;
+  largo: number;
+  descripcion: string;
+  ptUnitarioReal?: number;
+  ptTotalReal?: number;
+  ptUnitarioComercial?: number;
+  ptTotalComercial?: number;
 };
 
-function esBloqueCompleto(pieza: CubicajeMedidas) {
-  return (pieza.espesor ?? 0) > 0 && (pieza.ancho ?? 0) > 0 && (pieza.largo ?? 0) > 0;
-}
-
-function esFilaCubicajeVacia(pieza: CubicajeMedidas) {
-  return (pieza.espesor ?? 0) === 0 && (pieza.ancho ?? 0) === 0 && (pieza.largo ?? 0) === 0;
-}
+type CubicajeChange = {
+  totalPT: number;
+  totalPC: number;
+  precioPorPT: number;
+  totalSoles: number;
+  totalCantidad: number;
+  precioUnitarioComercial: number;
+  piezas: CubicajePieza[];
+};
 
 type AserraderoFormProps = {
   clientes: Cliente[];
   serviciosEspeciales: ServicioEspecial[];
-  /** Costo en S/ por pie cúbico para cubicaje base. */
-  defaultCostoPorPieCubico?: number;
-  margenGananciaDefaultPct?: number;
-  /** Lista mock para ClienteCombobox sin Supabase. */
   mockData?: boolean;
   onSuccess?: () => void;
 };
 
-const PIE_TABLAR_A_PIE_CUBICO = 1 / 12;
+type ConfiguredServiceState = Record<
+  string,
+  { activo: boolean; cantidad: string; tarifa: string }
+>;
 
-/** Misma estructura que `CubicajeInput`, sin cubicaje precargado. */
-const DEFAULT_LINEAS_CUBICAJE_JSON = JSON.stringify([
-  { id: 1, descripcion: "", cantidad: 1, espesor: 0, ancho: 0, largo: 0 },
-]);
+type CustomService = {
+  id: string;
+  nombre: string;
+  cantidad: string;
+  tarifa: string;
+};
+
+const DEFAULT_TARIFA_POR_PT = "0.50";
+
+function isCompleteBlock(piece: CubicajePieza) {
+  return piece.espesor > 0 && piece.ancho > 0 && piece.largo > 0;
+}
+
+function isEmptyBlock(piece: CubicajePieza) {
+  return piece.espesor === 0 && piece.ancho === 0 && piece.largo === 0;
+}
+
+function displayPaymentValue(value: string) {
+  return value.replaceAll("_", " ");
+}
 
 export function AserraderoForm({
   clientes,
   serviciosEspeciales,
-  defaultCostoPorPieCubico = 0.5,
-  margenGananciaDefaultPct = DEFAULT_MARGEN_GANANCIA_PCT,
   mockData = false,
   onSuccess,
 }: AserraderoFormProps) {
   const { showToast } = useToast();
-  const hoy = new Date().toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  const [step, setStep] = useState(1);
+  const [pieces, setPieces] = useState<CubicajePieza[]>([]);
+  const [tarifaPorPT, setTarifaPorPT] = useState(0.5);
+  const [cubicajeAttempted, setCubicajeAttempted] = useState(false);
+  const [clientAttempted, setClientAttempted] = useState(false);
+  const [extrasOpen, setExtrasOpen] = useState(false);
+
+  const [configuredServices, setConfiguredServices] = useState<ConfiguredServiceState>(() =>
+    Object.fromEntries(
+      serviciosEspeciales.map((service) => [
+        service.id,
+        {
+          activo: false,
+          cantidad: "1",
+          tarifa: String(service.tarifa_por_pieza),
+        },
+      ]),
+    ),
+  );
+  const [customServices, setCustomServices] = useState<CustomService[]>([]);
+  const [laborInput, setLaborInput] = useState("");
+  const [internalNotes, setInternalNotes] = useState("");
+
   const [clienteId, setClienteId] = useState("");
   const [usarClienteProvisional, setUsarClienteProvisional] = useState(false);
-  const [clientesLocales, setClientesLocales] = useState<{ id: string; nombre: string; documento?: string; ruc?: string }[]>([]);
-  const [modoCliente, setModoCliente] = useState<"buscar" | "nuevo" | "temporal">("buscar");
+  const [clientesLocales, setClientesLocales] = useState<Cliente[]>([]);
+  const [clientMode, setClientMode] = useState<"buscar" | "nuevo" | "temporal">("buscar");
   const [tipoComprobante, setTipoComprobante] = useState<"boleta" | "factura">("boleta");
-  const [costoPorPieCubico, setCostoPorPieCubico] = useState(defaultCostoPorPieCubico);
-  const [piezasJson, setPiezasJson] = useState<string>(DEFAULT_LINEAS_CUBICAJE_JSON);
-  const [step, setStep] = useState(1);
-  const [cubicajeAttempted, setCubicajeAttempted] = useState(false);
-  const [clienteAttempted, setClienteAttempted] = useState(false);
-  const [precioCobradoManual, setPrecioCobradoManual] = useState<string>("");
-  const [costoCubicajeManual, setCostoCubicajeManual] = useState<string>("");
-  const [tipoRedondeo, setTipoRedondeo] = useState<"ninguno" | "normal" | "abajo" | "arriba">("abajo");
-
-  const [manoDeObra, setManoDeObra] = useState<number>(0);
-  const [extrasMadera, setExtrasMadera] = useState<Array<{ id: number; descripcion: string; cantidad: number }>>([]);
-  const [notasInternas, setNotasInternas] = useState<string>("");
-  const [serviciosPersonalizados, setServiciosPersonalizados] = useState<Array<{ id: number; nombre: string; cantidad: string; tarifa: string }>>([]);
-
+  const [fecha, setFecha] = useState(today);
   const [metodoPago, setMetodoPago] = useState("efectivo");
   const [modalidadPago, setModalidadPago] = useState("contado");
   const [adelanto, setAdelanto] = useState("");
   const [fechaPagoCredito, setFechaPagoCredito] = useState("");
 
-  const [state, formAction] = useActionState(submitCreateServicioAserraderoForm, mutationFormInitialState);
+  const [manualTotal, setManualTotal] = useState(false);
+  const [manualTotalInput, setManualTotalInput] = useState("");
+  const [state, formAction, isPending] = useActionState(
+    submitCreateServicioAserraderoForm,
+    mutationFormInitialState,
+  );
 
   useEffect(() => {
     if (state.success && state.message) {
@@ -96,1202 +143,678 @@ export function AserraderoForm({
     } else if (state.error) {
       showToast({ variant: "error", message: state.error });
     }
-  }, [state, showToast, onSuccess]);
+  }, [onSuccess, showToast, state]);
 
-  const [seleccionados, setSeleccionados] = useState<Record<string, { activo: boolean; cantidad: number; tarifa: number }>>(
-    Object.fromEntries(
-      serviciosEspeciales.map((s) => [s.id, { activo: false, cantidad: 1, tarifa: s.tarifa_por_pieza }]),
-    ),
-  );
-
-  const piezas = useMemo(() => {
-    try {
-      const arr = JSON.parse(piezasJson);
-      return Array.isArray(arr)
-        ? (arr as {
-            id?: number;
-            cantidad?: number;
-            espesor?: number;
-            ancho?: number;
-            largo?: number;
-            descripcion?: string;
-            ptUnitarioReal?: number;
-            ptTotalReal?: number;
-            ptUnitarioComercial?: number;
-            ptTotalComercial?: number;
-            subtotalPT?: number;
-          }[])
-        : [];
-    } catch {
-      return [];
-    }
-  }, [piezasJson]);
-
-  const piezasCompletas = useMemo(
-    () => piezas.filter(esBloqueCompleto),
-    [piezas],
-  );
-  const tieneFilasParciales = useMemo(
-    () => piezas.some((pieza) => !esFilaCubicajeVacia(pieza) && !esBloqueCompleto(pieza)),
-    [piezas],
-  );
-
-  const totalPT = useMemo(
-    () => piezasCompletas.reduce((acc, p) => acc + (p.ptTotalReal ?? p.subtotalPT ?? 0), 0),
-    [piezasCompletas],
-  );
-  const piesCubicos = useMemo(() => totalPT * PIE_TABLAR_A_PIE_CUBICO, [totalPT]);
-  
-  const totalPTComercial = useMemo(() => {
-    return piezasCompletas.reduce((acc, p) => {
-      if (p.ptTotalComercial !== undefined) {
-        return acc + p.ptTotalComercial;
-      }
-      // Fallback si no tiene ptTotalComercial
-      const unitReal = (Number(p.espesor) || 0) * (Number(p.ancho) || 0) * (Number(p.largo) || 0) / 12;
-      return acc + (Math.floor(unitReal) * (Number(p.cantidad) || 0));
-    }, 0);
-  }, [piezasCompletas]);
-
-  const selectedCliente = useMemo(() => {
-    const all = [...clientes, ...clientesLocales];
-    return all.find((c) => c.id === clienteId);
-  }, [clienteId, clientes, clientesLocales]);
-  const selectedClienteRuc = (selectedCliente as { ruc?: string })?.ruc || "";
-  const selectedClienteDoc = (selectedCliente as { documento?: string })?.documento || "";
-  const hasRuc = !!(selectedClienteRuc && selectedClienteRuc.trim().length === 11);
-
-  const isClienteValid = usarClienteProvisional || (!!clienteId && (tipoComprobante !== "factura" || hasRuc));
-  const isCubicajeValid = piezasCompletas.length > 0 && !tieneFilasParciales;
-  const showClienteWarning = clienteAttempted && !isClienteValid;
-  const showCubicajeWarning = cubicajeAttempted && !isCubicajeValid;
-  const mensajeValidacionCubicaje = tieneFilasParciales
-    ? "Completa espesor, ancho y largo del bloque antes de continuar."
-    : "Completa las medidas de al menos un bloque para continuar.";
-
-  const costoCubicajeSugerido = useMemo(
-    () => roundMoney(totalPTComercial * costoPorPieCubico),
-    [totalPTComercial, costoPorPieCubico],
-  );
-
-  const costoCubicaje = (costoCubicajeManual !== "" && !isNaN(Number(costoCubicajeManual.replace(",", "."))))
-    ? roundMoney(Number(costoCubicajeManual.replace(",", ".")))
-    : costoCubicajeSugerido;
-
-  const totalServiciosEspeciales = useMemo(() => {
-    const sumConfig = Object.entries(seleccionados).reduce((acc, [, val]) => {
-      if (!val.activo) return acc;
-      return roundMoney(acc + roundMoney(val.cantidad * val.tarifa));
-    }, 0);
-    const sumCustom = serviciosPersonalizados.reduce((acc, item) => {
-      const q = parseDecimal(item.cantidad);
-      const t = parseDecimal(item.tarifa);
-      return roundMoney(acc + roundMoney(q * t));
-    }, 0);
-    return roundMoney(sumConfig + sumCustom);
-  }, [seleccionados, serviciosPersonalizados]);
-
-  const costoProduccion = roundMoney(costoCubicaje + totalServiciosEspeciales + manoDeObra);
-  const gananciaSugerida = calcularGananciaPorMargen(costoProduccion, margenGananciaDefaultPct);
-  const precioCalculado = calcularPrecioConMargen(costoProduccion, margenGananciaDefaultPct);
-  const precioCobrado = (precioCobradoManual !== "" && !isNaN(Number(precioCobradoManual.replace(",", ".")))) ? roundMoney(Number(precioCobradoManual.replace(",", "."))) : precioCalculado;
-  const costoTotalAserradero = roundMoney(costoCubicaje + manoDeObra);
-  const utilidad = roundMoney(precioCobrado - costoTotalAserradero);
-
-  const todosLosClientes = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
-  const clientesCombo = useMemo(() => liteClientesToCompleto(todosLosClientes), [todosLosClientes]);
-
-  function handleSeleccionarCliente(id: string) {
-    setClienteId(id);
-    if (id) {
-      setUsarClienteProvisional(false);
-      setClienteAttempted(false);
-    }
-  }
-
-  function handleUsarClienteProvisional() {
-    setUsarClienteProvisional(true);
-    setClienteId("");
-    setModoCliente("buscar");
-    setTipoComprobante("boleta");
-    setClienteAttempted(false);
-  }
-
-  function handleClienteCreado(id: string, nombre: string) {
-    setClientesLocales((prev) => [...prev, { id, nombre }]);
-    setClienteId(id);
-    setUsarClienteProvisional(false);
-    setModoCliente("buscar");
-    setClienteAttempted(false);
-  }
-
-  function handleStepNavigation(nextStep: number) {
-    const cubicajeBlocked = nextStep > 1 && !isCubicajeValid;
-    const clienteBlocked = nextStep >= 4 && !isClienteValid;
-
-    if (cubicajeBlocked) {
+  const handleCubicajeChange = useCallback((data: CubicajeChange) => {
+    setPieces(data.piezas);
+    setTarifaPorPT(data.precioPorPT);
+    if (data.piezas.some((piece) => !isEmptyBlock(piece) && !isCompleteBlock(piece))) {
       setCubicajeAttempted(true);
     }
-    if (clienteBlocked) {
-      setClienteAttempted(true);
+  }, []);
+
+  const completePieces = useMemo(() => pieces.filter(isCompleteBlock), [pieces]);
+  const hasPartialRows = useMemo(
+    () => pieces.some((piece) => !isEmptyBlock(piece) && !isCompleteBlock(piece)),
+    [pieces],
+  );
+  const totalPTReal = useMemo(
+    () => completePieces.reduce((total, piece) => total + (piece.ptTotalReal ?? 0), 0),
+    [completePieces],
+  );
+  const totalPTComercial = useMemo(
+    () => completePieces.reduce(
+      (total, piece) =>
+        total +
+        (piece.ptTotalComercial ??
+          Math.floor((piece.espesor * piece.ancho * piece.largo) / 12) * piece.cantidad),
+      0,
+    ),
+    [completePieces],
+  );
+  const piesCubicos = totalPTReal / 12;
+  const subtotalCorte = calculateAserraderoCutSubtotal(totalPTComercial, tarifaPorPT);
+
+  const configuredServiceErrors = useMemo(
+    () => Object.values(configuredServices).some(
+      (service) =>
+        service.activo &&
+        (parseDecimal(service.cantidad) <= 0 || parseDecimal(service.tarifa) <= 0),
+    ),
+    [configuredServices],
+  );
+  const customServiceErrors = useMemo(
+    () => customServices.some((service) => {
+      const hasAnyValue =
+        service.nombre.trim() !== "" || service.cantidad.trim() !== "" || service.tarifa.trim() !== "";
+      return hasAnyValue && (
+        service.nombre.trim() === "" ||
+        parseDecimal(service.cantidad) <= 0 ||
+        parseDecimal(service.tarifa) <= 0
+      );
+    }),
+    [customServices],
+  );
+  const additionalServiceErrors = configuredServiceErrors || customServiceErrors;
+
+  useEffect(() => {
+    if (additionalServiceErrors) setExtrasOpen(true);
+  }, [additionalServiceErrors]);
+
+  const configuredSubtotal = useMemo(
+    () => roundMoney(
+      Object.values(configuredServices).reduce((total, service) => {
+        if (!service.activo) return total;
+        return total + roundMoney(parseDecimal(service.cantidad) * parseDecimal(service.tarifa));
+      }, 0),
+    ),
+    [configuredServices],
+  );
+  const customSubtotal = useMemo(
+    () => roundMoney(
+      customServices.reduce(
+        (total, service) =>
+          total + roundMoney(parseDecimal(service.cantidad) * parseDecimal(service.tarifa)),
+        0,
+      ),
+    ),
+    [customServices],
+  );
+  const labor = roundMoney(parseDecimal(laborInput));
+  const subtotalServicios = roundMoney(configuredSubtotal + customSubtotal);
+  const totalCalculado = calculateAserraderoTotal(subtotalCorte, subtotalServicios, labor);
+  const precioCobrado = manualTotal
+    ? roundMoney(parseDecimal(manualTotalInput))
+    : totalCalculado;
+  const ajusteAlTotal = calculateAserraderoAdjustment(precioCobrado, totalCalculado);
+
+  const addedServicesCount = useMemo(
+    () =>
+      Object.values(configuredServices).filter((service) => service.activo).length +
+      customServices.filter((service) => service.nombre.trim() !== "").length +
+      (labor > 0 ? 1 : 0),
+    [configuredServices, customServices, labor],
+  );
+
+  const allClients = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
+  const selectedClient = useMemo(
+    () => allClients.find((client) => client.id === clienteId),
+    [allClients, clienteId],
+  );
+  const clientsForCombobox = useMemo(() => liteClientesToCompleto(allClients), [allClients]);
+  const selectedRuc = selectedClient?.ruc?.trim() ?? "";
+  const selectedDocument = selectedClient?.documento?.trim() ?? "";
+  const hasValidRuc = selectedRuc.length === 11;
+  const isClientValid =
+    usarClienteProvisional ||
+    (clienteId !== "" && (tipoComprobante !== "factura" || hasValidRuc));
+  const isPaymentValid = modalidadPago !== "credito" || fechaPagoCredito !== "";
+  const isStepOneValid =
+    completePieces.length > 0 &&
+    !hasPartialRows &&
+    tarifaPorPT > 0 &&
+    !additionalServiceErrors;
+  const isStepTwoValid = isClientValid && isPaymentValid;
+
+  const lineasServiciosPayload = useMemo<Record<string, unknown>[]>(() => {
+    const lines: Record<string, unknown>[] = [];
+    for (const [id, configured] of Object.entries(configuredServices)) {
+      if (!configured.activo) continue;
+      const service = serviciosEspeciales.find((item) => item.id === id);
+      const cantidad = parseDecimal(configured.cantidad);
+      const tarifa = parseDecimal(configured.tarifa);
+      lines.push({
+        id,
+        tipo: "servicio_especial",
+        codigo: service?.codigo ?? id,
+        nombre: service?.nombre ?? id,
+        cantidad,
+        tarifa,
+        subtotal: roundMoney(cantidad * tarifa),
+      });
     }
-    if (cubicajeBlocked || clienteBlocked) {
+
+    for (const service of customServices) {
+      if (service.nombre.trim() === "") continue;
+      const cantidad = parseDecimal(service.cantidad);
+      const tarifa = parseDecimal(service.tarifa);
+      lines.push({
+        id: service.id,
+        tipo: "servicio_especial",
+        codigo: "SERV-ESP",
+        nombre: service.nombre.trim(),
+        cantidad,
+        tarifa,
+        subtotal: roundMoney(cantidad * tarifa),
+      });
+    }
+
+    if (labor > 0) {
+      lines.push({
+        id: "mano-de-obra-aserradero",
+        tipo: "mano_de_obra",
+        codigo: "MANO-OBRA",
+        nombre: "Mano de obra adicional",
+        cantidad: 1,
+        tarifa: labor,
+        subtotal: labor,
+      });
+    }
+
+    if (internalNotes.trim() !== "") {
+      lines.push({
+        id: "nota-interna-aserradero",
+        tipo: "nota_interna",
+        codigo: "NOTA-INT",
+        nombre: "Nota interna",
+        cantidad: 1,
+        tarifa: 0,
+        subtotal: 0,
+        observaciones: internalNotes.trim(),
+      });
+    }
+    return lines;
+  }, [configuredServices, customServices, internalNotes, labor, serviciosEspeciales]);
+
+  const lineasPayload = useMemo(
+    () => [
+      ...completePieces.map((piece) => ({ ...piece, tipo: "bloque_cubicaje" })),
+      ...lineasServiciosPayload,
+      {
+        tipo: "resumen_aserradero",
+        schemaVersion: 1,
+        precioPorPT: tarifaPorPT,
+        totalPTComercial,
+        tipoComprobante,
+      },
+    ],
+    [completePieces, lineasServiciosPayload, tarifaPorPT, tipoComprobante, totalPTComercial],
+  );
+
+  function navigateTo(nextStep: number) {
+    if (nextStep > 1 && !isStepOneValid) {
+      setCubicajeAttempted(true);
+      if (additionalServiceErrors) setExtrasOpen(true);
+      return;
+    }
+    if (nextStep > 2 && !isStepTwoValid) {
+      setClientAttempted(true);
       return;
     }
     setStep(nextStep);
   }
 
-  const lineasServiciosPayload = useMemo(
-    () => {
-      const list = Object.entries(seleccionados)
-        .filter(([, v]) => v.activo)
-        .map(([id, v]) => {
-          const servicio = serviciosEspeciales.find((s) => s.id === id);
-          return {
-            id,
-            tipo: "servicio_especial",
-            codigo: servicio?.codigo ?? id,
-            nombre: servicio?.nombre ?? id,
-            cantidad: v.cantidad,
-            tarifa: v.tarifa,
-            subtotal: Number((v.cantidad * v.tarifa).toFixed(2)),
-          };
-        });
-
-      for (const item of serviciosPersonalizados) {
-        if (item.nombre.trim()) {
-          const q = parseDecimal(item.cantidad);
-          const t = parseDecimal(item.tarifa);
-          list.push({
-            id: `custom-servicio-${item.id}`,
-            tipo: "servicio_especial",
-            codigo: "SERV-ESP",
-            nombre: item.nombre.trim(),
-            cantidad: q,
-            tarifa: t,
-            subtotal: Number((q * t).toFixed(2)),
-          });
-        }
-      }
-
-      if (manoDeObra > 0) {
-        list.push({
-          id: "mano-de-obra-aserradero",
-          tipo: "mano_de_obra",
-          codigo: "MANO-OBRA",
-          nombre: "Mano de obra (Aserradero)",
-          cantidad: 1,
-          tarifa: manoDeObra,
-          subtotal: manoDeObra,
-        });
-      }
-
-      for (const item of extrasMadera) {
-        if (item.descripcion.trim()) {
-          list.push({
-            id: `extra-madera-${item.id}`,
-            tipo: "extra_madera_cliente",
-            codigo: "EXT-MADERA",
-            nombre: `Madera cliente: ${item.descripcion.trim()}`,
-            cantidad: item.cantidad,
-            tarifa: 0,
-            subtotal: 0,
-          });
-        }
-      }
-
-      if (notasInternas.trim()) {
-        list.push({
-          id: "nota-interna-aserradero",
-          tipo: "nota_interna",
-          codigo: "NOTA-INT",
-          nombre: "Nota interna",
-          cantidad: 1,
-          tarifa: 0,
-          subtotal: 0,
-          observaciones: notasInternas.trim(),
-        } as unknown as { id: string; tipo: string; codigo: string; nombre: string; cantidad: number; tarifa: number; subtotal: number });
-      }
-
-      return list;
-    },
-    [seleccionados, serviciosEspeciales, serviciosPersonalizados, manoDeObra, extrasMadera, notasInternas],
-  );
-
-  const lineasPayload = useMemo(
-    () => [
-      ...piezasCompletas.map((pieza) => ({
-        ...pieza,
-        tipo: "bloque_cubicaje",
-      })),
-      ...lineasServiciosPayload,
-    ],
-    [piezasCompletas, lineasServiciosPayload],
-  );
-
-  function handleSaltarServicios() {
-    setSeleccionados((prev) => {
-      const reset: Record<string, { activo: boolean; cantidad: number; tarifa: number }> = {};
-      for (const [key, val] of Object.entries(prev)) {
-        reset[key] = { ...val, activo: false };
-      }
-      return reset;
-    });
-    setServiciosPersonalizados([]);
-    setStep(3);
+  function selectClient(id: string) {
+    setClienteId(id);
+    if (id !== "") {
+      setUsarClienteProvisional(false);
+      setClientAttempted(false);
+    }
   }
 
+  function useProvisionalClient() {
+    setClienteId("");
+    setUsarClienteProvisional(true);
+    setClientMode("buscar");
+    setTipoComprobante("boleta");
+    setClientAttempted(false);
+  }
+
+  function clientCreated(id: string, nombre: string, documento?: string, ruc?: string) {
+    setClientesLocales((current) => [
+      ...current,
+      { id, nombre, documento: documento ?? null, ruc: ruc ?? null },
+    ]);
+    setClienteId(id);
+    setUsarClienteProvisional(false);
+    setClientMode("buscar");
+    setClientAttempted(false);
+  }
+
+  const visibleServiceLines = lineasServiciosPayload.filter((line) => line.tipo !== "nota_interna");
+
   return (
-    <form
-      action={formAction}
-      className="space-y-6"
-      onChange={(e) => {
-        const target = e.target as unknown as HTMLInputElement;
-        if (target && target.name === "lineas_cubicaje") {
-          setPiezasJson(target.value);
-        }
-      }}
-    >
-      {/* ── STEPPER DE WIZARD ── */}
-      <div className="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          {[
-            { n: 1, label: "Cubicaje" },
-            { n: 2, label: "Servicios" },
-            { n: 3, label: "Cliente" },
-            { n: 4, label: "Resumen" },
-            { n: 5, label: "Confirmar" },
-          ].map((item, index) => {
-            const isCompleted = step > item.n;
-            const isActive = step === item.n;
-            const hasWarning = (item.n === 1 && showCubicajeWarning) || (item.n === 3 && showClienteWarning);
-            return (
-              <div
-                key={item.n}
-                className="flex flex-1 items-center cursor-pointer select-none"
-                onClick={() => handleStepNavigation(item.n)}
-              >
-                <div className="flex flex-col items-center flex-1">
-                  <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-bold transition-all duration-300 ${
-                      hasWarning
-                        ? "border-red-500 bg-red-500/10 text-red-500 shadow-md shadow-red-500/10"
-                        : isCompleted
-                        ? "bg-[var(--color-success)] border-[var(--color-success)] text-white"
-                        : isActive
-                        ? "bg-[var(--color-primary)] border-[var(--color-primary)] text-white shadow-md shadow-[var(--color-primary)]/20"
-                        : "border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-secondary)]"
-                    }`}
-                  >
-                    {hasWarning ? "⚠️" : isCompleted ? "✓" : item.n}
-                  </div>
-                  <span
-                    className={`mt-1.5 text-xs font-semibold tracking-wide transition-all duration-300 hidden sm:inline ${
-                      hasWarning
-                        ? "text-red-500 font-bold"
-                        : isActive
-                        ? "text-[var(--color-primary)] font-bold"
-                        : isCompleted
-                        ? "text-[var(--color-success)]"
-                        : "text-[var(--color-text-secondary)]"
-                    }`}
-                  >
-                    {item.label}
-                  </span>
-                </div>
-                {index < 4 && (
-                  <div
-                    className={`h-0.5 w-full -mt-4 transition-all duration-500 ${
-                      step > item.n
-                        ? "bg-[var(--color-success)]"
-                        : "bg-[var(--color-border)]"
-                    }`}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── PASO 1: DATOS DEL CLIENTE ── */}
-      <div style={{ display: step === 3 ? "block" : "none" }} className="space-y-4">
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 3: Cliente y comprobante</h3>
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            Elige el tipo de comprobante de pago y busca o registra al cliente.
-          </p>
-
-          {/* Tipo de Comprobante */}
-          <div className="space-y-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-              Comprobante *
-            </p>
-            <div className="flex gap-2">
-              {[
-                { value: "boleta", label: "Boleta" },
-                { value: "factura", label: "Factura" },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    if (usarClienteProvisional && opt.value === "factura") return;
-                    setTipoComprobante(opt.value as "boleta" | "factura");
-                  }}
-                  disabled={usarClienteProvisional && opt.value === "factura"}
-                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                    tipoComprobante === opt.value
-                      ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
-                      : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)]"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            <input type="hidden" name="tipo_comprobante" value={tipoComprobante} />
-            <input type="hidden" name="usarClienteProvisional" value={usarClienteProvisional ? "true" : "false"} />
-            {usarClienteProvisional ? (
-              <p className="text-xs font-medium text-[var(--color-text-secondary)]">
-                Completa un cliente con RUC valido antes de emitir factura.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-2">
-              {modoCliente === "buscar" ? (
-                <>
-                  <ClienteCombobox
-                    mockData={mockData}
-                    clientes={clientesCombo}
-                    value={clienteId}
-                    onChange={handleSeleccionarCliente}
-                    hiddenInputName="cliente_id"
-                    label="Cliente"
-                    placeholder="Buscar cliente…"
-                    inputAriaLabel="Cliente para servicio de aserradero"
-                    className={showClienteWarning && !usarClienteProvisional ? "[&_input]:!border-red-500/80 [&_input]:focus:!border-red-500 [&_input]:focus:!ring-red-500 [&_input]:shadow-[0_0_0_1px_rgba(239,68,68,0.2)]" : ""}
-                  />
-                  {showClienteWarning && tipoComprobante === "factura" && !hasRuc && clienteId && (
-                    <p className="text-xs font-semibold text-red-500 mt-1">
-                      ⚠️ El cliente seleccionado no tiene un RUC de 11 dígitos válido.
-                    </p>
-                  )}
-                  {showClienteWarning && !clienteId && !usarClienteProvisional && (
-                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
-                      ⚠️ Debe seleccionar un cliente antes de confirmar el registro.
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUsarClienteProvisional(false);
-                        setModoCliente("nuevo");
-                      }}
-                      className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
-                    >
-                      + Nuevo cliente
-                    </button>
-                    <span className="text-xs text-[var(--color-text-secondary)]">·</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUsarClienteProvisional(false);
-                        setModoCliente("temporal");
-                      }}
-                      className="text-xs font-semibold text-[var(--color-text-secondary)] hover:underline"
-                    >
-                      + Cliente temporal
-                    </button>
-                    <span className="text-xs text-[var(--color-text-secondary)]">·</span>
-                    <button
-                      type="button"
-                      onClick={handleUsarClienteProvisional}
-                      className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
-                    >
-                      + Continuar sin datos del cliente
-                    </button>
-                  </div>
-                  {usarClienteProvisional ? (
-                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-medium text-amber-700 dark:text-amber-300">
-                      Se generara un cliente provisional al registrar el servicio. Podras reemplazarlo despues desde Editar.
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <NuevoClienteInlinePanel
-                  temporal={modoCliente === "temporal"}
-                  onCreated={handleClienteCreado}
-                  onCancel={() => setModoCliente("buscar")}
-                />
-              )}
-            </div>
-
-            <Field name="fecha" type="date" label="Fecha" defaultValue={hoy} required />
-          </div>
-        </div>
-
-        <div className="flex justify-between pt-4 mt-4">
-          <Button
+    <form action={formAction} className="space-y-5">
+      <nav className="grid grid-cols-3 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+        {[
+          { number: 1, label: "Cubicaje y tarifa" },
+          { number: 2, label: "Cliente y pago" },
+          { number: 3, label: "Confirmar y registrar" },
+        ].map((item) => (
+          <button
+            key={item.number}
             type="button"
-            variant="secondary"
-            onClick={() => setStep(2)}
-            className="px-6 py-2"
+            onClick={() => navigateTo(item.number)}
+            className={`px-2 py-3 text-center text-xs font-semibold transition-colors ${
+              step === item.number
+                ? "bg-[var(--color-primary)] text-white"
+                : step > item.number
+                  ? "bg-[var(--color-success)]/10 text-[var(--color-success)]"
+                  : "text-[var(--color-text-secondary)]"
+            }`}
           >
-            Anterior
-          </Button>
-          <Button
-            type="button"
-            onClick={() => handleStepNavigation(4)}
-            className="px-6 py-2 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
-          >
-            Siguiente: Resumen y cobro
-          </Button>
-        </div>
-      </div>
+            <span className="mr-1 font-black">{item.number}.</span> {item.label}
+          </button>
+        ))}
+      </nav>
 
-      {/* ── PASO 2: CUBICAJE BASE ── */}
-      <div style={{ display: step === 1 ? "block" : "none" }} className="space-y-4">
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 1: Cubicaje</h3>
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            Ingresa los bloques y dimensiones para realizar el cubicaje rápido.
+      <section hidden={step !== 1} className="space-y-4">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+          <h3 className="text-lg font-bold">Paso 1: Cubicaje y tarifa</h3>
+          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+            Registra cada bloque. El cobro usa PT comercial por la tarifa global.
           </p>
-          <div className={`mt-2 rounded-xl p-1 transition-all duration-300 ${showCubicajeWarning ? "border border-red-500/30 bg-red-500/5 shadow-[0_0_0_1px_rgba(239,68,68,0.1)]" : ""}`}>
+          <div className="mt-4">
             <CubicajeInput
               quantityMode="fixed-one"
               presentationMode="aserradero-compact"
-              defaultPrecioPorPT={String(costoPorPieCubico)}
-              onChange={(data) => {
-                setPiezasJson(JSON.stringify(data.piezas));
-                setCostoPorPieCubico(data.precioPorPT);
-                if (data.piezas.some((pieza) => !esFilaCubicajeVacia(pieza) && !esBloqueCompleto(pieza))) {
-                  setCubicajeAttempted(true);
-                }
-              }}
+              defaultPrecioPorPT={DEFAULT_TARIFA_POR_PT}
+              onChange={handleCubicajeChange}
             />
           </div>
-          {showCubicajeWarning && (
-            <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
-              ⚠️ {mensajeValidacionCubicaje}
-            </p>
-          )}
-          <div className="hidden">
-          <div className="mt-3 grid gap-4 md:grid-cols-1 lg:grid-cols-3">
-            <Field
-              label="Costo por PT (S/)"
-              type="text"
-              inputMode="decimal"
-              value={costoPorPieCubico}
-              onChange={(e) => {
-                const cleaned = e.target.value.replace(",", ".");
-                setCostoPorPieCubico(Number(cleaned) || 0);
-              }}
-            />
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-              <p className="text-xs text-[var(--color-text-secondary)] font-semibold uppercase">Total PT Real</p>
-              <p className="text-xl font-bold">{totalPT.toFixed(2)} <span className="text-xs font-normal">PT</span></p>
-              <p className="text-[10px] text-[var(--color-text-secondary)] italic">
-                Volumen técnico: {piesCubicos.toFixed(4)} ft³
-              </p>
+          {cubicajeAttempted && !isStepOneValid ? (
+            <div className="mt-3 space-y-1 text-xs font-semibold text-red-500">
+              {completePieces.length === 0 ? <p>Registra al menos un bloque válido.</p> : null}
+              {hasPartialRows ? <p>Completa espesor, ancho y largo de cada fila iniciada.</p> : null}
+              {tarifaPorPT <= 0 ? <p>La tarifa de corte por PT debe ser mayor que cero.</p> : null}
+              {additionalServiceErrors ? <p>Completa o elimina los servicios adicionales incompletos.</p> : null}
             </div>
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/25 p-3 border-dashed">
-              <p className="text-xs text-[var(--color-text-secondary)] font-semibold uppercase">Total PT Comercial</p>
-              <p className="text-xl font-bold text-[var(--color-primary)]">
-                {totalPTComercial} <span className="text-xs font-normal">PT</span>
-              </p>
-              <p className="text-[10px] text-[var(--color-text-secondary)] italic">
-                Truncado por pieza (Math.floor)
-              </p>
-            </div>
-          </div>
-
-          {piezas.length > 0 && (
-            <div className="mt-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4 space-y-3">
-              <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-primary)]">
-                  Desglose Comercial & Técnico por Pieza
-                </span>
-                <span className="text-[10px] bg-[var(--color-primary-soft)]/40 text-[var(--color-primary)] px-2 py-0.5 rounded font-bold">
-                  Cuaderno de Clienta
-                </span>
-              </div>
-              <div className="overflow-x-auto max-h-60 overflow-y-auto">
-                <table className="w-full text-xs text-left">
-                  <thead>
-                    <tr className="border-b border-[var(--color-border)] text-[var(--color-text-secondary)] font-semibold">
-                      <th className="py-1">Descripción de Pieza</th>
-                      <th className="py-1 text-right w-28">Subtotal Real</th>
-                      <th className="py-1 text-right w-28">Subtotal Comercial</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--color-border)]/40">
-                    {piezas.map((p, i) => {
-                      const subReal = p.ptTotalReal !== undefined ? p.ptTotalReal : (Number(p.subtotalPT) || 0);
-                      const subCom = p.ptTotalComercial !== undefined ? p.ptTotalComercial : 0;
-                      const unitReal = p.ptUnitarioReal !== undefined ? p.ptUnitarioReal : (subReal / (p.cantidad || 1));
-                      const unitCom = p.ptUnitarioComercial !== undefined ? p.ptUnitarioComercial : Math.floor(unitReal);
-                      return (
-                        <tr key={i} className="hover:bg-[var(--color-surface)]/40 text-[var(--color-text-secondary)]">
-                          <td className="py-1.5 font-medium">
-                            {p.cantidad ?? 0} pzs ({p.espesor ?? 0}{"\""} x {p.ancho ?? 0}{"\""} x {p.largo ?? 0}{"'"}) {p.descripcion || "Madera"}
-                          </td>
-                          <td className="py-1.5 text-right font-mono">{unitReal.toFixed(2)} / <span className="font-bold text-[var(--color-text-primary)]">{subReal.toFixed(2)} PT</span></td>
-                          <td className="py-1.5 text-right font-mono text-[var(--color-primary)] font-bold">{unitCom} / <span className="font-bold text-[var(--color-primary)]">{subCom} PT</span></td>
-                        </tr>
-                      );
-                    })}
-                    <tr className="font-bold border-t-2 border-[var(--color-border)] text-[var(--color-text-primary)] bg-[var(--color-primary-soft)]/10">
-                      <td className="py-2.5 px-1">TOTAL SUMA</td>
-                      <td className="py-2.5 text-right font-mono">{totalPT.toFixed(2)} PT</td>
-                      <td className="py-2.5 text-right font-mono text-[var(--color-primary)] text-sm">{totalPTComercial} PT</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3 flex flex-col justify-center">
-              <p className="text-xs text-[var(--color-text-secondary)] font-semibold uppercase">Fórmula de costo (Cuaderno)</p>
-              <p className="text-sm font-medium mt-1">
-                {totalPTComercial} PT × S/. {costoPorPieCubico.toFixed(2)} = <span className="text-[var(--color-primary)] font-bold">S/. {costoCubicajeSugerido.toFixed(2)}</span>
-              </p>
-            </div>
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/40 p-3 flex flex-col justify-between">
-              <label className="text-xs text-[var(--color-text-secondary)] font-semibold block mb-0.5">
-                Costo cubicaje final (S/)
-              </label>
-              <div className="flex items-center gap-1">
-                <span className="text-sm font-bold text-[var(--color-text-secondary)]">S/.</span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={costoCubicajeManual}
-                  placeholder={costoCubicajeSugerido.toFixed(2)}
-                  onChange={(e) => setCostoCubicajeManual(e.target.value)}
-                  className="w-full rounded border-0 bg-transparent p-0 text-xl font-bold text-[var(--color-text-primary)] focus:ring-0 focus:outline-none"
-                />
-              </div>
-            </div>
-          </div>
-          </div>
+          ) : null}
         </div>
 
-        <div className="flex justify-end pt-4 mt-4">
-          <div onClick={() => !isCubicajeValid && setCubicajeAttempted(true)}>
-            <Button
-              type="button"
-              onClick={() => handleStepNavigation(2)}
-              disabled={!isCubicajeValid}
-              className={`px-6 py-2 ${!isCubicajeValid ? "pointer-events-none" : ""}`}
-            >
-              Siguiente: Servicios
-            </Button>
-          </div>
-        </div>
-      </div>
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
+          <button
+            type="button"
+            onClick={() => setExtrasOpen((open) => !open)}
+            aria-expanded={extrasOpen}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+          >
+            <span>
+              <strong>Agregar servicio adicional</strong>
+              <span className="ml-2 text-xs text-[var(--color-text-secondary)]">Opcional</span>
+            </span>
+            <span className="text-xs font-semibold text-[var(--color-primary)]">
+              {addedServicesCount > 0 ? `Servicios adicionales · ${addedServicesCount} agregados` : extrasOpen ? "Cerrar" : "Abrir"}
+            </span>
+          </button>
 
-      {/* ── PASO 3: SERVICIOS ESPECIALES ── */}
-      <div style={{ display: step === 2 ? "block" : "none" }} className="space-y-4">
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 2: Servicios especiales (Opcional)</h3>
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            Activa y edita las tarifas y cantidades de los servicios adicionales solicitados por el cliente.
-          </p>
-          <div className="mt-2 space-y-2">
-            {serviciosEspeciales.length === 0 ? (
-              <p className="text-xs text-[var(--color-text-secondary)]">
-                Aún no hay servicios especiales configurados.
-              </p>
-            ) : null}
-            {serviciosEspeciales.map((servicio) => {
-              const estado = seleccionados[servicio.id] ?? {
-                activo: false,
-                cantidad: 1,
-                tarifa: servicio.tarifa_por_pieza,
-              };
-              return (
-                <div
-                  key={servicio.id}
-                  className="grid items-end gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-2 md:grid-cols-[1.5fr_repeat(3,1fr)]"
-                >
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={estado.activo}
-                      onChange={(e) =>
-                        setSeleccionados((prev) => ({
-                          ...prev,
-                          [servicio.id]: { ...estado, activo: e.target.checked },
-                        }))
-                      }
-                      className="rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-                    />
-                    <span>
-                      <strong>{servicio.codigo}</strong> · {servicio.nombre}
-                    </span>
-                  </label>
-                  <Field
-                    label="Cantidad"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={estado.cantidad}
-                    disabled={!estado.activo}
-                    onChange={(e) =>
-                      setSeleccionados((prev) => ({
-                        ...prev,
-                        [servicio.id]: { ...estado, cantidad: Number(e.target.value) || 0 },
-                      }))
-                    }
-                  />
-                  <Field
-                    label="Tarifa S/"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={estado.tarifa}
-                    disabled={!estado.activo}
-                    onChange={(e) =>
-                      setSeleccionados((prev) => ({
-                        ...prev,
-                        [servicio.id]: { ...estado, tarifa: Number(e.target.value) || 0 },
-                      }))
-                    }
-                  />
-                  <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-right">
-                    <p className="text-[10px] uppercase text-[var(--color-text-secondary)]">Subtotal</p>
-                    <p className="text-sm font-bold">
-                      {formatPen(estado.activo ? estado.cantidad * estado.tarifa : 0)}
-                    </p>
-                  </div>
+          {extrasOpen ? (
+            <div className="space-y-4 border-t border-[var(--color-border)] p-4">
+              {serviciosEspeciales.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase text-[var(--color-text-secondary)]">Servicios configurados</p>
+                  {serviciosEspeciales.map((service) => {
+                    const current = configuredServices[service.id] ?? {
+                      activo: false,
+                      cantidad: "1",
+                      tarifa: String(service.tarifa_por_pieza),
+                    };
+                    return (
+                      <div key={service.id} className="grid gap-2 rounded-lg border border-[var(--color-border)] p-2 md:grid-cols-[1.5fr_110px_130px_110px] md:items-end">
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={current.activo}
+                            onChange={(event) => setConfiguredServices((all) => ({
+                              ...all,
+                              [service.id]: { ...current, activo: event.target.checked },
+                            }))}
+                          />
+                          <span><strong>{service.codigo}</strong> · {service.nombre}</span>
+                        </label>
+                        <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                          Cantidad
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            disabled={!current.activo}
+                            value={current.cantidad}
+                            onChange={(event) => setConfiguredServices((all) => ({
+                              ...all,
+                              [service.id]: { ...current, cantidad: event.target.value },
+                            }))}
+                            className="mt-1 h-9 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 text-right"
+                          />
+                        </label>
+                        <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                          Tarifa S/
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            disabled={!current.activo}
+                            value={current.tarifa}
+                            onChange={(event) => setConfiguredServices((all) => ({
+                              ...all,
+                              [service.id]: { ...current, tarifa: event.target.value },
+                            }))}
+                            className="mt-1 h-9 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 text-right"
+                          />
+                        </label>
+                        <output className="rounded-lg bg-[var(--color-bg)] px-2 py-2 text-right text-sm font-bold">
+                          {formatPen(current.activo ? parseDecimal(current.cantidad) * parseDecimal(current.tarifa) : 0)}
+                        </output>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+              ) : null}
 
-          {/* Sección de Servicios Especiales Aplicados Personalizados */}
-          <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)] space-y-3 mt-4">
-            <p className="text-xs uppercase tracking-wide font-bold text-[var(--color-text-secondary)]">Servicios especiales aplicados (Manual)</p>
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              ¿No está en la lista de arriba? Escribe servicios de cepillado, corte especial u otros aplicados a esta orden.
-            </p>
-            <div className="space-y-2">
-              {serviciosPersonalizados.map((item) => {
-                const qtyVal = parseDecimal(item.cantidad);
-                const tarifVal = parseDecimal(item.tarifa);
-                const sub = roundMoney(qtyVal * tarifVal);
-                return (
-                  <div key={item.id} className="grid gap-2 items-end rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]/30 p-2 grid-cols-[2fr_1fr_1fr_1fr_auto]">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-[var(--color-text-secondary)]">Descripción del Servicio</span>
-                      <input
-                        type="text"
-                        value={item.nombre}
-                        placeholder="Ej. Cepillado de cara y canto"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setServiciosPersonalizados((prev) => prev.map((x) => (x.id === item.id ? { ...x, nombre: val } : x)));
-                        }}
-                        className="h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs outline-none"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-[var(--color-text-secondary)]">Cant.</span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={item.cantidad}
-                        placeholder="0"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setServiciosPersonalizados((prev) => prev.map((x) => (x.id === item.id ? { ...x, cantidad: val } : x)));
-                        }}
-                        className="h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs text-center outline-none"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-[var(--color-text-secondary)]">Tarifa S/</span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={item.tarifa}
-                        placeholder="0.00"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setServiciosPersonalizados((prev) => prev.map((x) => (x.id === item.id ? { ...x, tarifa: val } : x)));
-                        }}
-                        className="h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs text-center outline-none"
-                      />
-                    </div>
-                    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-right self-stretch flex flex-col justify-center">
-                      <p className="text-[9px] uppercase text-[var(--color-text-secondary)]">Total</p>
-                      <p className="text-xs font-bold font-mono">
-                        {formatPen(sub)}
-                      </p>
-                    </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-bold uppercase text-[var(--color-text-secondary)]">Servicios manuales</p>
+                  <button
+                    type="button"
+                    onClick={() => setCustomServices((current) => [
+                      ...current,
+                      { id: `servicio-manual-${Date.now()}-${Math.random()}`, nombre: "", cantidad: "1", tarifa: "" },
+                    ])}
+                    className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                  >
+                    + Agregar servicio manual
+                  </button>
+                </div>
+                {customServices.map((service) => (
+                  <div key={service.id} className="grid gap-2 rounded-lg border border-[var(--color-border)] p-2 md:grid-cols-[1fr_100px_120px_auto]">
+                    <input
+                      aria-label="Nombre del servicio manual"
+                      value={service.nombre}
+                      onChange={(event) => setCustomServices((all) => all.map((item) => item.id === service.id ? { ...item, nombre: event.target.value } : item))}
+                      placeholder="Descripción del servicio"
+                      className="h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 text-sm"
+                    />
+                    <input
+                      aria-label="Cantidad del servicio manual"
+                      type="text"
+                      inputMode="decimal"
+                      value={service.cantidad}
+                      onChange={(event) => setCustomServices((all) => all.map((item) => item.id === service.id ? { ...item, cantidad: event.target.value } : item))}
+                      className="h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 text-right text-sm"
+                    />
+                    <input
+                      aria-label="Tarifa del servicio manual"
+                      type="text"
+                      inputMode="decimal"
+                      value={service.tarifa}
+                      onChange={(event) => setCustomServices((all) => all.map((item) => item.id === service.id ? { ...item, tarifa: event.target.value } : item))}
+                      placeholder="Tarifa S/"
+                      className="h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2 text-right text-sm"
+                    />
                     <button
                       type="button"
-                      onClick={() => setServiciosPersonalizados((prev) => prev.filter((x) => x.id !== item.id))}
-                      className="text-xs text-red-500 font-semibold p-2 hover:underline h-9 flex items-center justify-center"
+                      onClick={() => setCustomServices((all) => all.filter((item) => item.id !== service.id))}
+                      className="px-2 text-xs font-semibold text-red-500"
                     >
                       Eliminar
                     </button>
                   </div>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => setServiciosPersonalizados((prev) => [...prev, { id: Date.now() + Math.random(), nombre: "", cantidad: "1", tarifa: "" }])}
-                className="text-xs font-semibold text-[var(--color-accent)] hover:underline mt-1 block"
-              >
-                + Agregar servicio manual
-              </button>
-            </div>
-          </div>
-
-          {/* Mano de Obra y Extras */}
-          <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)] space-y-4 mt-4">
-            <p className="text-xs uppercase tracking-wide font-bold text-[var(--color-text-secondary)]">Mano de Obra & Extras</p>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">Mano de obra (S/)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={manoDeObra || ""}
-                  onChange={(e) => setManoDeObra(Number(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
-                />
-                <span className="text-[10px] text-[var(--color-text-secondary)] block mt-0.5">
-                  Mano de obra cargada al cliente.
-                </span>
+                ))}
               </div>
-            </div>
-          </div>
 
-          <div className="rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)] space-y-3 mt-4">
-            <p className="text-xs uppercase tracking-wide font-bold text-[var(--color-text-secondary)]">Madera del cliente (Extras)</p>
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              Agrega materiales o piezas traídas por el cliente para control propio.
-            </p>
-            <div className="space-y-2">
-              {extrasMadera.map((item) => (
-                <div key={item.id} className="flex gap-2 items-center">
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                  Mano de obra adicional (S/)
                   <input
                     type="text"
-                    value={item.descripcion}
-                    placeholder="Ej. Madera Cedro 2x4x10"
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setExtrasMadera((prev) => prev.map((x) => (x.id === item.id ? { ...x, descripcion: val } : x)));
-                    }}
-                    className="flex-1 h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm outline-none"
+                    inputMode="decimal"
+                    value={laborInput}
+                    onChange={(event) => setLaborInput(event.target.value)}
+                    placeholder="0.00"
+                    className="mt-1 h-10 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 text-sm"
                   />
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.cantidad}
-                    onChange={(e) => {
-                      const val = Number(e.target.value) || 1;
-                      setExtrasMadera((prev) => prev.map((x) => (x.id === item.id ? { ...x, cantidad: val } : x)));
-                    }}
-                    className="w-20 h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-right outline-none"
+                </label>
+                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                  Notas internas
+                  <textarea
+                    value={internalNotes}
+                    onChange={(event) => setInternalNotes(event.target.value)}
+                    rows={2}
+                    placeholder="No se imprimen en comprobantes"
+                    className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setExtrasMadera((prev) => prev.filter((x) => x.id !== item.id))}
-                    className="text-xs text-red-500 font-semibold px-2 hover:underline"
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => setExtrasMadera((prev) => [...prev, { id: Date.now() + Math.random(), descripcion: "", cantidad: 1 }])}
-                className="text-xs font-semibold text-[var(--color-accent)] hover:underline mt-1 block"
-              >
-                + Agregar pieza del cliente
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-between pt-4 mt-4 flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => setStep(1)}
-            className="px-6 py-2"
-          >
-            ← Anterior
-          </Button>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleSaltarServicios}
-              className="px-4 py-2"
-            >
-              Saltar este paso
-            </Button>
-            <Button
-              type="button"
-              onClick={() => setStep(3)}
-              className="px-6 py-2"
-            >
-              Siguiente: Cliente y comprobante
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── PASO 4: RESUMEN Y COBRO ── */}
-      <div style={{ display: step === 4 ? "block" : "none" }} className="space-y-4">
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 4: Resumen y cobro</h3>
-          <p className="text-xs text-[var(--color-text-secondary)]">
-            Visualiza los costos acumulados y define el precio final a cobrar al cliente.
-          </p>
-
-          <div className="space-y-4 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-text-secondary)]">Desglose de Costos</h4>
-            
-            <div className="divide-y divide-[var(--color-border)]">
-              <div className="flex justify-between py-2.5">
-                <div>
-                  <p className="font-semibold text-sm">Cubicaje Base ({totalPTComercial} PT comercial)</p>
-                  <p className="text-xs text-[var(--color-text-secondary)]">Total real: {totalPT.toFixed(2)} PT ({piesCubicos.toFixed(2)} pies³) a S/ {costoPorPieCubico.toFixed(2)} por PT</p>
-                </div>
-                <p className="font-bold text-sm">{formatPen(costoCubicaje)}</p>
-              </div>
-
-              <div className="flex justify-between py-2.5">
-                <div>
-                  <p className="font-semibold text-sm">Servicios Especiales</p>
-                  {Object.entries(seleccionados).filter(([, v]) => v.activo).length === 0 && serviciosPersonalizados.filter(s => s.nombre.trim()).length === 0 ? (
-                    <p className="text-xs text-[var(--color-text-secondary)]">Ninguno seleccionado</p>
-                  ) : (
-                    <p className="text-xs text-[var(--color-text-secondary)]">
-                      {[
-                        ...Object.entries(seleccionados)
-                          .filter(([, v]) => v.activo)
-                          .map(([id]) => serviciosEspeciales.find(s => s.id === id)?.nombre),
-                        ...serviciosPersonalizados
-                          .filter(s => s.nombre.trim())
-                          .map(s => s.nombre.trim())
-                      ].join(', ')}
-                    </p>
-                  )}
-                </div>
-                <p className="font-bold text-sm">{formatPen(totalServiciosEspeciales)}</p>
-              </div>
-
-              <div className="flex justify-between py-2.5">
-                <div>
-                  <p className="font-semibold text-sm">Mano de Obra</p>
-                  <p className="text-xs text-[var(--color-text-secondary)]">Adicional del servicio</p>
-                </div>
-                <p className="font-bold text-sm">{formatPen(manoDeObra)}</p>
-              </div>
-
-              <div className="flex justify-between py-3 text-[var(--color-primary)]">
-                <span className="font-bold text-base">Costo de produccion</span>
-                <span className="font-black text-base">{formatPen(costoProduccion)}</span>
-              </div>
-
-              <div className="flex justify-between py-3 text-[var(--color-primary)]">
-                <span className="font-bold text-base">Precio sugerido</span>
-                <span className="font-black text-base">{formatPen(precioCalculado)}</span>
+                </label>
               </div>
             </div>
-          </div>
+          ) : null}
+        </div>
 
-          <div className="space-y-2">
-            <label htmlFor="precio-cobrado-input" className="text-sm font-semibold text-[var(--color-text-primary)]">
-              Precio Cobrado Final (S/) *
-            </label>
-            <input
-              id="precio-cobrado-input"
-              type="text"
-              inputMode="decimal"
-              value={precioCobradoManual}
-              placeholder={precioCalculado.toFixed(2)}
-              onChange={(e) => setPrecioCobradoManual(e.target.value)}
-              className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2.5 text-lg font-bold text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-            />
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              Deja en blanco para usar el costo total sugerido ({formatPen(precioCalculado)}). El precio es completamente editable.
-            </p>
+        <div className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm md:grid-cols-[1fr_220px] md:items-end">
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between gap-3"><span>Subtotal del corte</span><strong>{formatPen(subtotalCorte)}</strong></div>
+            {subtotalServicios > 0 ? <div className="flex justify-between gap-3"><span>Servicios adicionales</span><strong>{formatPen(subtotalServicios)}</strong></div> : null}
+            {labor > 0 ? <div className="flex justify-between gap-3"><span>Mano de obra adicional</span><strong>{formatPen(labor)}</strong></div> : null}
+            <div className="flex justify-between gap-3 border-t border-[var(--color-border)] pt-1"><span>Total calculado</span><strong>{formatPen(totalCalculado)}</strong></div>
+            {ajusteAlTotal !== 0 ? <div className="flex justify-between gap-3 text-[var(--color-primary)]"><span>Ajuste al total</span><strong>{formatPen(ajusteAlTotal)}</strong></div> : null}
           </div>
-
-          <div className="space-y-2 mt-4">
-            <label className="text-sm font-semibold text-[var(--color-text-primary)]">
-              Notas internas (Solo para control propio)
-            </label>
-            <textarea
-              value={notasInternas}
-              onChange={(e) => setNotasInternas(e.target.value)}
-              rows={2}
-              className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
-              placeholder="Estas notas son de carácter interno y NO se imprimirán en el comprobante del cliente..."
-            />
-          </div>
-
-          {/* ── Condición de pago ── */}
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 space-y-3 mt-4">
-            <h4 className="text-sm font-bold text-[var(--color-text-primary)]">Condición de pago</h4>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Método de pago</label>
-                <select
-                  value={metodoPago}
-                  onChange={(e) => setMetodoPago(e.target.value)}
-                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+          <label className="text-sm font-bold">
+            Total a cobrar
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={manualTotal ? manualTotalInput : totalCalculado.toFixed(2)}
+                onChange={(event) => {
+                  setManualTotal(true);
+                  setManualTotalInput(event.target.value);
+                }}
+                className="h-11 min-w-0 flex-1 rounded-lg border border-[var(--color-primary)] bg-[var(--color-bg)] px-3 text-right text-lg font-black"
+              />
+              {manualTotal ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManualTotal(false);
+                    setManualTotalInput("");
+                  }}
+                  className="text-xs font-semibold text-[var(--color-accent)] hover:underline"
                 >
+                  Usar total calculado
+                </button>
+              ) : null}
+            </div>
+          </label>
+        </div>
+
+        <div className="flex justify-end">
+          <Button type="button" onClick={() => navigateTo(2)}>Siguiente: Cliente y pago</Button>
+        </div>
+      </section>
+
+      <section hidden={step !== 2} className="space-y-4">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+          <h3 className="text-lg font-bold">Paso 2: Cliente y pago</h3>
+          <div className="mt-4 space-y-4">
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase text-[var(--color-text-secondary)]">Comprobante *</p>
+              <div className="flex gap-2">
+                {(["boleta", "factura"] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    disabled={usarClienteProvisional && type === "factura"}
+                    onClick={() => setTipoComprobante(type)}
+                    className={`rounded-lg border px-4 py-2 text-sm font-semibold capitalize ${
+                      tipoComprobante === type
+                        ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white"
+                        : "border-[var(--color-border)]"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                {clientMode === "buscar" ? (
+                  <>
+                    <ClienteCombobox
+                      mockData={mockData}
+                      clientes={clientsForCombobox}
+                      value={clienteId}
+                      onChange={selectClient}
+                      hiddenInputName="cliente_id"
+                      label="Cliente"
+                      placeholder="Buscar cliente…"
+                      inputAriaLabel="Cliente para servicio de aserradero"
+                    />
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <button type="button" onClick={() => { setUsarClienteProvisional(false); setClientMode("nuevo"); }} className="font-semibold text-[var(--color-accent)] hover:underline">+ Nuevo cliente</button>
+                      <button type="button" onClick={() => { setUsarClienteProvisional(false); setClientMode("temporal"); }} className="font-semibold text-[var(--color-text-secondary)] hover:underline">+ Cliente temporal</button>
+                      <button type="button" onClick={useProvisionalClient} className="font-semibold text-[var(--color-primary)] hover:underline">+ Continuar sin datos</button>
+                    </div>
+                    {usarClienteProvisional ? (
+                      <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-700">
+                        Se creará un cliente provisional y el comprobante será Boleta.
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  <NuevoClienteInlinePanel
+                    temporal={clientMode === "temporal"}
+                    onCreated={clientCreated}
+                    onCancel={() => setClientMode("buscar")}
+                  />
+                )}
+              </div>
+              <Field name="fecha" type="date" label="Fecha *" value={fecha} onChange={(event) => setFecha(event.target.value)} required />
+            </div>
+
+            {clientAttempted && !isClientValid ? (
+              <p className="text-xs font-semibold text-red-500">
+                {tipoComprobante === "factura" && clienteId !== ""
+                  ? "El cliente necesita un RUC válido de 11 dígitos para Factura."
+                  : "Selecciona un cliente o usa un cliente provisional."}
+              </p>
+            ) : null}
+
+            <div className="grid gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3 md:grid-cols-2">
+              <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                Método de pago
+                <select value={metodoPago} onChange={(event) => setMetodoPago(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm">
                   <option value="efectivo">Efectivo</option>
                   <option value="yape">Yape</option>
                   <option value="transferencia">Transferencia</option>
                   <option value="billetera_digital">Billetera digital</option>
                   <option value="otro">Otro</option>
                 </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Modalidad</label>
-                <select
-                  value={modalidadPago}
-                  onChange={(e) => setModalidadPago(e.target.value)}
-                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                >
+              </label>
+              <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                Modalidad de pago
+                <select value={modalidadPago} onChange={(event) => setModalidadPago(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm">
                   <option value="contado">Contado</option>
                   <option value="adelanto">Adelanto + saldo</option>
                   <option value="credito">Crédito</option>
                 </select>
-              </div>
+              </label>
+              {modalidadPago === "adelanto" ? (
+                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                  Adelanto (S/)
+                  <input type="text" inputMode="decimal" value={adelanto} onChange={(event) => setAdelanto(event.target.value)} placeholder="0.00" className="mt-1 h-10 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm" />
+                </label>
+              ) : null}
+              {modalidadPago === "credito" ? (
+                <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                  Fecha de crédito *
+                  <input type="date" value={fechaPagoCredito} onChange={(event) => setFechaPagoCredito(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm" />
+                </label>
+              ) : null}
             </div>
-            {modalidadPago === "adelanto" && (
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Adelanto cobrado (S/) — opcional</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={adelanto}
-                  onChange={(e) => setAdelanto(e.target.value)}
-                  placeholder="0.00"
-                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                />
-                <p className="text-xs text-[var(--color-text-secondary)]">Si pones un monto &gt; 0, se asienta como ingreso parcial en caja.</p>
-              </div>
-            )}
-            {modalidadPago === "credito" && (
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Fecha límite de pago</label>
-                <input
-                  type="date"
-                  value={fechaPagoCredito}
-                  onChange={(e) => setFechaPagoCredito(e.target.value)}
-                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                />
-              </div>
-            )}
+            {clientAttempted && !isPaymentValid ? <p className="text-xs font-semibold text-red-500">Indica la fecha de pago del crédito.</p> : null}
           </div>
-
         </div>
-
-        <div className="flex justify-between pt-4 mt-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => setStep(3)}
-            className="px-6 py-2"
-          >
-            ← Anterior
-          </Button>
-          <Button
-            type="button"
-            onClick={() => handleStepNavigation(5)}
-            className="px-6 py-2"
-          >
-            Siguiente: Confirmar →
-          </Button>
+        <div className="flex justify-between gap-3">
+          <Button type="button" variant="secondary" onClick={() => setStep(1)}>Atrás</Button>
+          <Button type="button" onClick={() => navigateTo(3)}>Siguiente: Confirmar</Button>
         </div>
-      </div>
+      </section>
 
-      {/* ── PASO 5: CONFIRMAR Y REGISTRAR ── */}
-      <div style={{ display: step === 5 ? "block" : "none" }} className="space-y-4">
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Paso 5: Confirmar y registrar</h3>
-          
-          {!isClienteValid || !isCubicajeValid ? (
-            <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-red-600 dark:text-red-400 space-y-1">
-              <p className="text-sm font-bold">⚠️ Faltan datos obligatorios para registrar el servicio</p>
-              <ul className="list-disc list-inside text-xs space-y-0.5 font-medium">
-                 {!isClienteValid && (
-                   <li>
-                     {!clienteId 
-                       ? "Debes seleccionar un cliente en el Paso 3."
-                       : "El cliente seleccionado no tiene RUC de 11 dígitos para emitir Factura."}
-                   </li>
-                 )}
-                 {!isCubicajeValid && <li>{mensajeValidacionCubicaje}</li>}
-              </ul>
-              <p className="text-[11px] text-red-500/80 pt-1">
-                Por favor, regresa a los pasos correspondientes usando los botones de navegación para completar la información antes de guardar.
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-[var(--color-success)]/30 bg-[var(--color-success)]/5 p-4 text-[var(--color-success)]">
-              <p className="text-sm font-semibold">✓ Todo listo para registrar</p>
-              <p className="text-xs">Por favor, revisa el resumen a continuación antes de proceder a guardar el servicio.</p>
-            </div>
-          )}
-
-          <div className="grid gap-4 md:grid-cols-2">
-             {/* Resumen Cliente y Cubicaje */}
-             <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
-               <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cliente & Comprobante</h4>
-               <p className="text-sm">
-                 <strong>Cliente:</strong> {usarClienteProvisional ? "Cliente pendiente (se generara al registrar)" : (todosLosClientes.find((c) => c.id === clienteId)?.nombre ?? "No seleccionado")}
-               </p>
-               <p className="text-sm">
-                 <strong>Comprobante:</strong> <span className="capitalize">{tipoComprobante}</span>
-               </p>
-               {tipoComprobante === "factura" && (
-                 <p className="text-xs text-[var(--color-text-secondary)]">
-                   · RUC: {selectedClienteRuc || <span className="text-red-500 font-semibold">Falta RUC</span>}
-                 </p>
-               )}
-               {tipoComprobante === "boleta" && (
-                 <p className="text-xs text-[var(--color-text-secondary)]">
-                   · DNI/Doc: {usarClienteProvisional ? "Codigo PEND pendiente de generar" : (selectedClienteDoc || "Opcional")}
-                 </p>
-               )}
-               <p className="text-sm">
-                 <strong>Fecha de Registro:</strong> {hoy}
-               </p>
-              
-              <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider mt-4">Detalle de Cubicaje</h4>
-              <p className="text-sm">
-                <strong>Total PT Real:</strong> {totalPT.toFixed(2)} PT
-              </p>
-              <p className="text-sm">
-                <strong>Total PT Comercial Usado:</strong> {totalPTComercial} PT
-              </p>
-              <p className="text-sm">
-                <strong>Pies Cúbicos Totales (ft³):</strong> {piesCubicos.toFixed(2)} ft³
-              </p>
-              <p className="text-sm">
-                <strong>Costo de Cubicaje (Base):</strong> {formatPen(costoCubicaje)}
-              </p>
-              
-              <div className="text-xs border-t border-[var(--color-border)] pt-2 mt-2 max-h-32 overflow-y-auto space-y-1">
-                <span className="font-semibold text-[var(--color-text-secondary)]">Piezas ingresadas (Real / Comercial):</span>
-                {piezas.map((p, i) => {
-                  const r = p.ptTotalReal !== undefined ? p.ptTotalReal : (Number(p.subtotalPT) || 0);
-                  const c = p.ptTotalComercial !== undefined ? p.ptTotalComercial : Math.floor(r);
-                  return (
-                    <div key={i} className="flex justify-between text-[var(--color-text-secondary)]">
-                      <span>{p.cantidad ?? 0} pzs ({p.espesor ?? 0}{"\""} x {p.ancho ?? 0}{"\""} x {p.largo ?? 0}{"'"})</span>
-                      <span>{r.toFixed(2)} PT / <span className="font-bold text-[var(--color-primary)]">{c} PT</span></span>
-                    </div>
-                  );
-                })}
-              </div>
-             </div>
-
-             {/* Resumen Servicios y Cobro */}
-             <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-4 bg-[var(--color-bg)]">
-               <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Servicios Especiales & Extras</h4>
-               <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                 {lineasServiciosPayload
-                   .filter((s) => s.tipo !== "nota_interna" && s.tipo !== "extra_madera_cliente")
-                   .map((s) => (
-                     <div key={s.id} className="flex justify-between text-sm">
-                       <span>{s.nombre} <span className="text-xs text-[var(--color-text-secondary)]">(x{s.cantidad})</span></span>
-                       <span className="font-semibold">{formatPen(s.subtotal)}</span>
-                     </div>
-                   ))}
-                 {extrasMadera.length > 0 && (
-                   <div className="border-t border-dashed border-[var(--color-border)] pt-1.5 mt-1.5">
-                     <span className="text-xs font-bold text-[var(--color-text-secondary)]">Madera del Cliente:</span>
-                     {extrasMadera.map((em) => (
-                       <div key={em.id} className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-                         • {em.descripcion} ({em.cantidad} pzs)
-                       </div>
-                     ))}
-                   </div>
-                 )}
-               </div>
-
-               <div className="border-t border-[var(--color-border)] pt-3 space-y-2">
-                 <div className="flex justify-between text-sm">
-                   <span className="text-[var(--color-text-secondary)]">Subtotal Cubicaje:</span>
-                   <span>{formatPen(costoCubicaje)}</span>
-                 </div>
-                 <div className="flex justify-between text-sm">
-                   <span className="text-[var(--color-text-secondary)]">Mano de Obra:</span>
-                   <span>{formatPen(manoDeObra)}</span>
-                 </div>
-                 <div className="flex justify-between text-sm">
-                   <span className="text-[var(--color-text-secondary)]">Subtotal Servicios:</span>
-                   <span>{formatPen(totalServiciosEspeciales)}</span>
-                 </div>
-                  <div className="flex justify-between items-center text-base font-black border-t border-[var(--color-border)] pt-2 text-[var(--color-primary)]">
-                    <span>PRECIO FINAL COBRADO:</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm font-bold text-[var(--color-text-secondary)]">S/.</span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={precioCobradoManual}
-                        placeholder={precioCalculado.toFixed(2)}
-                        onChange={(e) => setPrecioCobradoManual(e.target.value)}
-                        className="w-28 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-sm font-black text-right text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] focus:outline-none"
-                      />
-                    </div>
+      <section hidden={step !== 3} className="space-y-4">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+          <h3 className="text-lg font-bold">Paso 3: Confirmar y registrar</h3>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="space-y-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+              <h4 className="text-xs font-black uppercase text-[var(--color-text-secondary)]">Servicio</h4>
+              <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
+                <dt>Bloques</dt><dd className="font-semibold">{completePieces.length}</dd>
+                <dt>Total PT comercial</dt><dd className="font-semibold">{totalPTComercial} PT</dd>
+                <dt>Tarifa por PT</dt><dd className="font-semibold">{formatPen(tarifaPorPT)}</dd>
+                <dt>Subtotal del corte</dt><dd className="font-semibold">{formatPen(subtotalCorte)}</dd>
+              </dl>
+              <div className="border-t border-[var(--color-border)] pt-2 text-xs">
+                {completePieces.slice(0, 3).map((piece, index) => (
+                  <div key={piece.id} className="flex justify-between gap-3 py-0.5">
+                    <span>#{index + 1} · {piece.espesor} × {piece.ancho} × {piece.largo}</span>
+                    <strong>{piece.ptTotalComercial} PT</strong>
                   </div>
-               </div>
-             </div>
+                ))}
+                {completePieces.length > 3 ? (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer font-semibold text-[var(--color-accent)]">Ver los {completePieces.length} bloques</summary>
+                    <div className="mt-1 max-h-48 space-y-0.5 overflow-y-auto">
+                      {completePieces.map((piece, index) => (
+                        <div key={piece.id} className="flex justify-between gap-3">
+                          <span>#{index + 1} · {piece.espesor} × {piece.ancho} × {piece.largo}</span>
+                          <strong>{piece.ptTotalComercial} PT</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
+              </div>
+
+              {visibleServiceLines.length > 0 ? (
+                <div className="border-t border-[var(--color-border)] pt-2">
+                  <h4 className="mb-1 text-xs font-black uppercase text-[var(--color-text-secondary)]">Servicios adicionales</h4>
+                  {visibleServiceLines.map((line) => (
+                    <div key={String(line.id)} className="flex justify-between gap-3 text-sm">
+                      <span>{String(line.nombre)}</span><strong>{formatPen(typeof line.subtotal === "number" ? line.subtotal : 0)}</strong>
+                    </div>
+                  ))}
+                  <div className="mt-1 flex justify-between border-t border-[var(--color-border)] pt-1 text-sm"><span>Subtotal</span><strong>{formatPen(subtotalServicios + labor)}</strong></div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+              <div>
+                <h4 className="text-xs font-black uppercase text-[var(--color-text-secondary)]">Cliente</h4>
+                <p className="mt-1 text-sm font-semibold">{usarClienteProvisional ? "Cliente pendiente" : selectedClient?.nombre}</p>
+                {!usarClienteProvisional && (selectedRuc || selectedDocument) ? <p className="text-xs text-[var(--color-text-secondary)]">{selectedRuc || selectedDocument}</p> : null}
+                <p className="text-xs capitalize text-[var(--color-text-secondary)]">{tipoComprobante} · {fecha}</p>
+              </div>
+              <div className="border-t border-[var(--color-border)] pt-2">
+                <h4 className="text-xs font-black uppercase text-[var(--color-text-secondary)]">Pago</h4>
+                <p className="mt-1 text-sm capitalize">{displayPaymentValue(modalidadPago)} · {displayPaymentValue(metodoPago)}</p>
+                {modalidadPago === "adelanto" ? <p className="text-xs">Adelanto {formatPen(parseDecimal(adelanto))} · Saldo {formatPen(Math.max(0, precioCobrado - parseDecimal(adelanto)))}</p> : null}
+                {modalidadPago === "credito" ? <p className="text-xs">Fecha de crédito: {fechaPagoCredito}</p> : null}
+              </div>
+              {ajusteAlTotal !== 0 ? <div className="flex justify-between border-t border-[var(--color-border)] pt-2 text-sm"><span>Ajuste al total</span><strong>{formatPen(ajusteAlTotal)}</strong></div> : null}
+              <div className="border-t-2 border-[var(--color-primary)] pt-3 text-center">
+                <p className="text-xs font-black uppercase tracking-widest text-[var(--color-text-secondary)]">Total a cobrar</p>
+                <p className="text-3xl font-black text-[var(--color-primary)]">{formatPen(precioCobrado)}</p>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div className="flex justify-between pt-4 mt-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => setStep(4)}
-            className="px-6 py-2"
-          >
-            ← Anterior
-          </Button>
-          <Button
-            size="lg"
-            disabled={!isClienteValid || !isCubicajeValid}
-            className="px-8 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
-          >
-            Registrar servicio ✓
+        <div className="flex justify-between gap-3">
+          <Button type="button" variant="secondary" onClick={() => setStep(2)}>Atrás</Button>
+          <Button type="submit" size="lg" disabled={!isStepOneValid || !isStepTwoValid || isPending}>
+            {isPending ? "Registrando…" : "Registrar servicio"}
           </Button>
         </div>
-      </div>
+      </section>
 
-      {/* Inputs ocultos requeridos para el Server Action */}
+      <input type="hidden" name="tipo_comprobante" value={tipoComprobante} />
+      <input type="hidden" name="usarClienteProvisional" value={usarClienteProvisional ? "true" : "false"} />
       <input type="hidden" name="pies_cubicos" value={piesCubicos.toFixed(4)} />
-      <input type="hidden" name="costo_cubicaje" value={costoCubicaje.toFixed(2)} />
+      <input type="hidden" name="costo_cubicaje" value={subtotalCorte.toFixed(2)} />
       <input type="hidden" name="precio_cobrado" value={precioCobrado.toFixed(2)} />
       <input type="hidden" name="lineas_json" value={JSON.stringify(lineasPayload)} />
       <input type="hidden" name="metodo_pago" value={metodoPago} />
       <input type="hidden" name="modalidad_pago" value={modalidadPago} />
-      <input type="hidden" name="adelanto" value={adelanto || "0"} />
-      {fechaPagoCredito && <input type="hidden" name="fecha_pago_credito" value={fechaPagoCredito} />}
+      <input type="hidden" name="adelanto" value={adelanto === "" ? "0" : adelanto} />
+      {fechaPagoCredito ? <input type="hidden" name="fecha_pago_credito" value={fechaPagoCredito} /> : null}
     </form>
   );
 }

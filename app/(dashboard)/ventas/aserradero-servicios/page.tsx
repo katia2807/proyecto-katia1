@@ -11,22 +11,19 @@ import {
 } from "@/lib/data";
 import { canMutateVentas } from "@/lib/permissions";
 import { formatPen } from "@/lib/utils";
-import { getEmpresaConfig } from "@/lib/company-config";
 
 export default async function AserraderoServiciosPage() {
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
-  const [clientes, servicios, tarifas, empresa] = await Promise.all([
+  const [clientes, servicios, tarifas] = await Promise.all([
     getClientesRows(),
     getServiciosAserraderoRows(),
     getServiciosEspecialesTarifaRows(),
-    getEmpresaConfig(),
   ]);
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
 
   const totalIngresos = servicios.reduce((acc, s) => acc + Number(s.precio_cobrado), 0);
-  const totalUtilidad = servicios.reduce((acc, s) => acc + Number(s.utilidad), 0);
 
   return (
     <div className="space-y-6">
@@ -51,7 +48,6 @@ export default async function AserraderoServiciosPage() {
           <AserraderoContextPanels
             clientes={clientes}
             serviciosEspeciales={tarifas}
-            margenGananciaDefaultPct={empresa.margen_ganancia_default_pct}
             mockData={comboMock}
           />
         ) : (
@@ -77,7 +73,7 @@ export default async function AserraderoServiciosPage() {
       <Card>
         <CardTitle>Resumen de apoyo</CardTitle>
         <CardDescription>Consulta estos datos como referencia del módulo.</CardDescription>
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
           <div className="rounded-xl border border-[var(--color-border)] p-3">
             <p className="text-xs uppercase text-[var(--color-text-secondary)]">Servicios totales</p>
             <p className="text-2xl font-bold">{servicios.length}</p>
@@ -85,10 +81,6 @@ export default async function AserraderoServiciosPage() {
           <div className="rounded-xl border border-[var(--color-border)] p-3">
             <p className="text-xs uppercase text-[var(--color-text-secondary)]">Ingresos acumulados</p>
             <p className="text-2xl font-bold">{formatPen(totalIngresos)}</p>
-          </div>
-          <div className="rounded-xl border border-[var(--color-border)] p-3">
-            <p className="text-xs uppercase text-[var(--color-text-secondary)]">Utilidad acumulada</p>
-            <p className="text-2xl font-bold">{formatPen(totalUtilidad)}</p>
           </div>
         </div>
       </Card>

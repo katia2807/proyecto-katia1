@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.1.15";
-export const APP_LAST_UPDATE = "21/07/2026";
+export const APP_VERSION = "1.1.16";
+export const APP_LAST_UPDATE = "23/07/2026";
 export const APP_UPDATE_SUMMARY =
-  "El comprobante de Aserradero usa términos más claros y una vista previa A4 más amplia y legible.";
+  "Servicio Aserradero ahora usa un flujo de tres pasos, tarifa final editable y comprobantes A4 y térmicos compactos y consistentes.";

@@ -5,6 +5,8 @@ import { formatPen } from "@/lib/utils";
 import { resolveSaleDocument, getProductoMaderaById, getAdelantoFromCaja, getMuebleNombre } from "@/lib/print-helpers";
 import { PrintButton } from "@/components/ui/print-button";
 import { PrintSelector } from "@/components/ui/print-selector";
+import { buildAserraderoPrintModel } from "@/lib/aserradero-print-model";
+import { AserraderoPrintTicketDetail } from "@/components/sales/aserradero-print-ticket-detail";
 
 type PrintTicketVoucherProps = {
   id: string;
@@ -56,6 +58,22 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
   ]);
 
   const clienteMap = new Map(clientes.map((c) => [c.id, c]));
+
+  if (tipo === "aserradero") {
+    const customer = clienteMap.get(saleRecord.cliente_id);
+    const model = buildAserraderoPrintModel({
+      service: saleRecord,
+      customer,
+      tipoComprobante: docType,
+    });
+    return (
+      <AserraderoPrintTicketDetail
+        id={id}
+        empresa={empresa}
+        model={model}
+      />
+    );
+  }
 
   let correlativo = "—";
   let fechaVenta  = "—";

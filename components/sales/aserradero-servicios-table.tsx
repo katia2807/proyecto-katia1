@@ -17,7 +17,6 @@ type ServicioAserraderoRow = {
   pies_cubicos: number;
   costo_cubicaje: number;
   precio_cobrado: number;
-  utilidad: number;
   lineas_json: any;
   correlativo: string | null;
 };
@@ -55,7 +54,6 @@ export function AserraderoServiciosTable({
               <TH className="text-right">Pies cúbicos</TH>
               <TH className="text-right">Costo</TH>
               <TH className="text-right">Cobrado</TH>
-              <TH className="text-right">Utilidad</TH>
               <TH className="w-24 text-right">Acciones</TH>
             </TRow>
           </THead>
@@ -93,9 +91,6 @@ export function AserraderoServiciosTable({
                 <TD className="text-right">{formatPen(Number(s.costo_cubicaje))}</TD>
                 <TD className="text-right font-semibold">
                   {formatPen(Number(s.precio_cobrado))}
-                </TD>
-                <TD className="text-right text-[var(--color-success)] font-semibold">
-                  {formatPen(Number(s.utilidad))}
                 </TD>
                 <TD className="text-right">
                   <div className="flex items-center justify-end gap-2.5">
@@ -141,7 +136,7 @@ export function AserraderoServiciosTable({
             ))}
             {servicios.length === 0 ? (
               <TRow>
-                <TD colSpan={7} className="text-center py-6 text-[var(--color-text-secondary)]">
+                <TD colSpan={6} className="text-center py-6 text-[var(--color-text-secondary)]">
                   Aún no hay servicios registrados.
                 </TD>
               </TRow>

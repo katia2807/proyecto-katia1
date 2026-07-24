@@ -16,14 +16,12 @@ type ServicioEspecial = {
 type AserraderoPanelProps = {
   clientes: Cliente[];
   serviciosEspeciales: ServicioEspecial[];
-  margenGananciaDefaultPct?: number;
   mockData?: boolean;
 };
 
 export function AserraderoPanel({
   clientes,
   serviciosEspeciales,
-  margenGananciaDefaultPct,
   mockData = false,
 }: AserraderoPanelProps) {
   const [open, setOpen] = useState(false);
@@ -40,7 +38,7 @@ export function AserraderoPanel({
     <ContextActionPanel
       triggerLabel="Registrar servicio"
       title="Nuevo servicio de aserradero"
-      description="Cubicaje + servicios especiales con cálculo en vivo de utilidad."
+      description="Cubicaje, tarifa final y servicios adicionales opcionales."
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
@@ -51,7 +49,6 @@ export function AserraderoPanel({
         key={formKey}
         clientes={clientes}
         serviciosEspeciales={serviciosEspeciales}
-        margenGananciaDefaultPct={margenGananciaDefaultPct}
         mockData={mockData}
         onSuccess={handleSuccess}
       />

@@ -48,6 +48,10 @@ export type ServicioAserraderoRow = {
   utilidad: number;
   lineas_json: unknown;
   correlativo: string | null;
+  metodo_pago?: string | null;
+  modalidad_pago?: string | null;
+  fecha_pago_credito?: string | null;
+  adelanto?: number | null;
   created_at: string;
 };
 

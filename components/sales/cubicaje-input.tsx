@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatPen, roundMoney } from "@/lib/utils";
+import { formatPen, parseDecimal, roundMoney } from "@/lib/utils";
 
 type Pieza = {
   id: number;
@@ -144,7 +144,7 @@ export function CubicajeInput({
       .map((p) => p.id)),
   );
   const precioActivo = precioEditable
-    ? Number.parseFloat(precioInput.replace(",", ".")) || 0
+    ? parseDecimal(precioInput)
     : (precioPorPT ?? 0);
   const effectiveQuantityMode = quantityMode ?? "fixed-one";
   const isQuantityVisible = effectiveQuantityMode === "visible";
@@ -459,13 +459,12 @@ export function CubicajeInput({
             <p className="mt-1 text-xl font-bold text-[var(--color-primary)]">{totalPTComercial} PT</p>
           </div>
           <label className="bg-[var(--color-surface)] p-3 text-xs font-semibold text-[var(--color-text-secondary)]">
-            Precio por PT
+            Tarifa de corte por PT
             <div className="mt-1 flex h-9 items-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-2">
               <span className="mr-1 text-sm">S/</span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 name="precio_por_pt"
                 value={precioInput}
                 onChange={(e) => setPrecioInput(e.target.value)}
@@ -475,7 +474,7 @@ export function CubicajeInput({
             </div>
           </label>
           <div className="bg-[var(--color-primary-soft)]/35 p-3">
-            <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Precio total</p>
+            <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Subtotal del corte</p>
             <p className="mt-1 text-xl font-bold text-[var(--color-text-primary)]">{formatPen(totalComercialSoles)}</p>
           </div>
         </div>

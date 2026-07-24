@@ -4560,16 +4560,13 @@ export async function createServicioAserradero(formData: FormData) {
       const parsedLineas = JSON.parse(parsed.data.lineas);
       if (Array.isArray(parsedLineas)) {
         lineasJson = parsedLineas;
+      } else {
+        throw new Error("El detalle de Aserradero no contiene un arreglo JSON válido.");
       }
     } catch {
-      // Ignoramos JSON invalido y dejamos arreglo vacio.
+      throw new Error("El detalle de Aserradero contiene JSON inválido y no puede guardarse.");
     }
   }
-
-  const manoDeObraItem = lineasJson.find((l) => l.tipo === "mano_de_obra");
-  const manoDeObra = Number(manoDeObraItem?.subtotal ?? 0);
-  const costoTotal = roundMoney(parsed.data.costoCubicaje + manoDeObra);
-  const utilidad = roundMoney(parsed.data.precioCobrado - costoTotal);
 
   let clienteId = parsed.data.clienteId;
   let clienteProvisionalCreadoId: string | null = null;
@@ -4615,7 +4612,7 @@ export async function createServicioAserradero(formData: FormData) {
         pies_cubicos: parsed.data.piesCubicos,
         costo_cubicaje: parsed.data.costoCubicaje,
         precio_cobrado: parsed.data.precioCobrado,
-        utilidad,
+        utilidad: 0,
         lineas_json: lineasJson,
         correlativo: await nextCorrelativo("servicio_aserradero"),
         confirmaIngreso: false,
@@ -4647,7 +4644,7 @@ export async function createServicioAserradero(formData: FormData) {
           pies_cubicos: parsed.data.piesCubicos,
           costo_cubicaje: parsed.data.costoCubicaje,
           precio_cobrado: parsed.data.precioCobrado,
-          utilidad,
+          utilidad: 0,
           lineas_json: lineasPayload,
           correlativo,
           metodo_pago: parsed.data.metodoPago ?? "efectivo",
@@ -5736,13 +5733,13 @@ export async function updateServicioAserradero(formData: FormData) {
       const parsedLineas = JSON.parse(parsed.data.lineas);
       if (Array.isArray(parsedLineas)) {
         lineasJson = parsedLineas;
+      } else {
+        throw new Error("El detalle histórico no contiene un arreglo JSON válido.");
       }
     } catch {
-      // Ignore
+      throw new Error("El detalle histórico contiene JSON inválido. No se guardó ningún cambio.");
     }
   }
-
-  const utilidad = roundMoney(parsed.data.precioCobrado - parsed.data.costoCubicaje);
 
   // Obtener nombre de cliente para la descripción de caja
   let clienteNombre = "Cliente Desconocido";
@@ -5769,7 +5766,6 @@ export async function updateServicioAserradero(formData: FormData) {
       row.pies_cubicos = parsed.data.piesCubicos;
       row.costo_cubicaje = parsed.data.costoCubicaje;
       row.precio_cobrado = parsed.data.precioCobrado;
-      row.utilidad = utilidad;
       row.lineas_json = lineasJson;
     }
 
@@ -5809,7 +5805,6 @@ export async function updateServicioAserradero(formData: FormData) {
         pies_cubicos: parsed.data.piesCubicos,
         costo_cubicaje: parsed.data.costoCubicaje,
         precio_cobrado: parsed.data.precioCobrado,
-        utilidad,
         lineas_json: lineasPayload,
       })
       .eq("id", id)
