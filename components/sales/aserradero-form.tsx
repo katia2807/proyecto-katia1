@@ -228,13 +228,10 @@ export function AserraderoForm({
     : totalCalculado;
   const ajusteAlTotal = calculateAserraderoAdjustment(precioCobrado, totalCalculado);
 
-  const addedServicesCount = useMemo(
-    () =>
+  const addedServicesCount =
       Object.values(configuredServices).filter((service) => service.activo).length +
       customServices.filter((service) => service.nombre.trim() !== "").length +
-      (labor > 0 ? 1 : 0),
-    [configuredServices, customServices, labor],
-  );
+    (labor > 0 ? 1 : 0);
 
   const allClients = useMemo(() => [...clientes, ...clientesLocales], [clientes, clientesLocales]);
   const selectedClient = useMemo(
@@ -256,7 +253,7 @@ export function AserraderoForm({
     !additionalServiceErrors;
   const isStepTwoValid = isClientValid && isPaymentValid;
 
-  const lineasServiciosPayload = useMemo<Record<string, unknown>[]>(() => {
+  const lineasServiciosPayload: Record<string, unknown>[] = (() => {
     const lines: Record<string, unknown>[] = [];
     for (const [id, configured] of Object.entries(configuredServices)) {
       if (!configured.activo) continue;
@@ -314,10 +311,9 @@ export function AserraderoForm({
       });
     }
     return lines;
-  }, [configuredServices, customServices, internalNotes, labor, serviciosEspeciales]);
+  })();
 
-  const lineasPayload = useMemo(
-    () => [
+  const lineasPayload = [
       ...completePieces.map((piece) => ({ ...piece, tipo: "bloque_cubicaje" })),
       ...lineasServiciosPayload,
       {
@@ -327,9 +323,7 @@ export function AserraderoForm({
         totalPTComercial,
         tipoComprobante,
       },
-    ],
-    [completePieces, lineasServiciosPayload, tarifaPorPT, tipoComprobante, totalPTComercial],
-  );
+  ];
 
   function navigateTo(nextStep: number) {
     if (nextStep > 1 && !isStepOneValid) {
