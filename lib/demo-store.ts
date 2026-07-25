@@ -1698,7 +1698,19 @@ function loadPersistedStore(): DemoStore {
   }
 }
 
-const store: DemoStore = loadPersistedStore();
+type DemoStoreRuntime = {
+  store: DemoStore;
+};
+
+const demoStoreRuntimeKey = Symbol.for("katia.demo-store.runtime");
+const demoStoreRuntimeRegistry = globalThis as unknown as Record<
+  PropertyKey,
+  DemoStoreRuntime | undefined
+>;
+const demoStoreRuntime =
+  demoStoreRuntimeRegistry[demoStoreRuntimeKey] ??
+  (demoStoreRuntimeRegistry[demoStoreRuntimeKey] = { store: loadPersistedStore() });
+const store = demoStoreRuntime.store;
 
 export function persistStore() {
   writeStoreToDisk(store);
