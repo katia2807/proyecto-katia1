@@ -41,6 +41,7 @@ test.describe("clientes — hub ventas (demo DB)", () => {
     await page.reload();
     await expect(page.getByRole("heading", { name: "Clientes y Base de datos", exact: true, level: 2 })).toBeVisible();
     const fila = page.getByRole("row").filter({ hasText: nombre });
+    await expect(fila).toHaveCount(1);
     await expect(fila).toBeVisible();
     await expect(fila.getByRole("cell", { name: doc, exact: true })).toBeVisible();
   });

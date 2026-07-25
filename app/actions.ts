@@ -5088,13 +5088,14 @@ export async function submitCreateClienteForm(
   _prev: MutationFormState,
   formData: FormData,
 ): Promise<MutationFormState> {
+  const requestedReturnTo = String(formData.get("return_to") ?? "").trim();
+  const safeReturnTo = /^\/(?!\/)[^\\\r\n]*$/.test(requestedReturnTo)
+    ? requestedReturnTo
+    : "/ventas";
+  formData.set("skip_redirect", "true");
+
   try {
     await createCliente(formData);
-    return {
-      success: true,
-      error: null,
-      message: "Cliente registrado con éxito.",
-    };
   } catch (e) {
     return {
       success: false,
@@ -5102,6 +5103,17 @@ export async function submitCreateClienteForm(
       message: null,
     };
   }
+
+  if (requestedReturnTo) {
+    formData.set("return_to", safeReturnTo);
+    maybeRedirectToQuickStep(formData);
+  }
+
+  return {
+    success: true,
+    error: null,
+    message: "Cliente registrado con éxito.",
+  };
 }
 
 export async function submitCreateProveedorForm(
