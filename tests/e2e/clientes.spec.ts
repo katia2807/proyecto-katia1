@@ -11,7 +11,7 @@ test.describe("clientes — hub ventas (demo DB)", () => {
     const doc = "87654321";
 
     await page.goto("/ventas");
-    await expect(page.getByRole("heading", { name: "Módulo de venta" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ventas", exact: true, level: 2 })).toBeVisible();
 
     await page.getByRole("button", { name: "Registrar cliente" }).click();
     const dialog = page.getByRole("dialog", { name: "Nuevo cliente" });
@@ -23,8 +23,7 @@ test.describe("clientes — hub ventas (demo DB)", () => {
     await dialog.getByLabel("Teléfono").fill("987654321");
     await dialog.getByLabel("Dirección").fill("Jr. Prueba E2E 123");
     // Zod 4: optional string no acepta null; sin campo `ruc` FormData devuelve null y falla el parse en el server action.
-    await dialog.evaluate(() => {
-      const root = document.querySelector('[role="dialog"]');
+    await dialog.evaluate((root) => {
       const form = root?.querySelector("form");
       if (!(form instanceof HTMLFormElement)) return;
       if (!form.querySelector('input[name="ruc"]')) {
@@ -36,10 +35,11 @@ test.describe("clientes — hub ventas (demo DB)", () => {
       }
     });
     await dialog.getByRole("button", { name: "Guardar cliente" }).click();
+    await expect(dialog).toBeHidden();
 
-    await page.waitForURL("/ventas");
     await page.goto(`/ventas/clientes?q=${encodeURIComponent(nombre)}`);
-    await expect(page.getByRole("heading", { name: "Clientes" })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Clientes y Base de datos", exact: true, level: 2 })).toBeVisible();
     const fila = page.getByRole("row").filter({ hasText: nombre });
     await expect(fila).toBeVisible();
     await expect(fila.getByRole("cell", { name: doc, exact: true })).toBeVisible();

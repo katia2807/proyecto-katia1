@@ -10,13 +10,24 @@ test.describe("ventas — madera, aserradero, mixer (demo DB)", () => {
   test("madera cortada: venta básica aparece en listado", async ({ page }) => {
     await page.goto("/ventas/madera-cortada");
     await expect(page.getByRole("heading", { name: "Madera cortada", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Vender madera cortada" }).click();
-    await expect(page.getByRole("heading", { name: "Nueva venta de madera cortada" })).toBeVisible();
+    await page.getByRole("button", { name: "Registrar venta de madera" }).click();
+    await expect(page.getByRole("heading", { name: "Registrar venta de madera", exact: true, level: 3 })).toBeVisible();
 
     await pickFirstComboboxOption(page, /Cliente para venta de madera cortada/, "Ropero");
-    await page.getByLabel("Tipo de entrega").selectOption("entrega_local");
+    await page.getByRole("button", { name: /^Siguiente: Detalle del corte/ }).click();
+    await expect(page.getByRole("heading", { name: "Paso 2: Detalle del corte y cubicaje", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Agregar pieza" }).click();
+    await page.getByLabel("Cantidad").fill("1");
+    await page.getByLabel("Espesor (in)").fill("1");
+    await page.getByLabel("Ancho (in)").fill("12");
+    await page.getByLabel("Largo (ft)").fill("12");
     await page.getByLabel("Precio por PT (S/)").fill("25");
-    await page.getByRole("button", { name: "Confirmar venta" }).click();
+    await page.getByRole("button", { name: /^Siguiente: Cobro y Entrega/ }).click();
+    await expect(page.getByRole("heading", { name: "Paso 3: Resumen de cobro, entrega y pago", exact: true })).toBeVisible();
+    await page.getByLabel("Tipo de entrega").selectOption("entrega_local");
+    await page.getByRole("button", { name: /^Siguiente: Confirmar/ }).click();
+    await expect(page.getByRole("heading", { name: "Paso 4: Confirmar y registrar", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Registrar venta ✓", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Madera cortada", exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Ropero Carlos" }).first()).toBeVisible();
@@ -86,22 +97,28 @@ test.describe("ventas — madera, aserradero, mixer (demo DB)", () => {
     await page.goto("/ventas/alquiler-mixer");
     await expect(page.getByRole("heading", { name: "Alquiler Bomba Mixer" })).toBeVisible();
     await page.getByRole("button", { name: "Nuevo contrato" }).click();
-    await expect(page.getByRole("heading", { name: "Contrato de alquiler" })).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: "Contrato de alquiler" });
+    await expect(dialog.getByRole("heading", { name: "Contrato de alquiler", exact: true })).toBeVisible();
 
     await pickFirstComboboxOption(page, /Cliente para contrato de alquiler/, "Mixer");
     await page.getByLabel("Código de contrato").fill(codigo);
-    await page.getByLabel("Activo / equipo").fill("Bomba Mixer E2E");
+    await page.getByRole("button", { name: /^Siguiente: Datos del Activo/ }).click();
+    await expect(page.getByRole("heading", { name: "Paso 2: Datos del activo", exact: true })).toBeVisible();
+    await page.locator('select[name="activo"]').selectOption({ index: 0 });
     await page.getByLabel("Representante de la empresa").fill("Resp. prueba");
     await page.getByLabel("RUC de la empresa").fill("20601234567");
     await page.getByLabel("Dirección de ejecución de obra").fill("Obra prueba E2E");
+    await page.getByRole("button", { name: /^Siguiente: Fechas y tarifa/ }).click();
+    await expect(page.getByRole("heading", { name: "Paso 3: Fechas y tarifa", exact: true })).toBeVisible();
     await page.getByLabel("Fecha de término estimada").fill("2026-12-31");
-    await page.getByLabel("Tarifa (S/)").clear();
-    await page.getByLabel("Tarifa (S/)").pressSequentially("80");
-    await page.getByLabel("Cantidad de unidades").clear();
-    await page.getByLabel("Cantidad de unidades").pressSequentially("2");
+    await page.getByRole("spinbutton", { name: "Tarifa (S/ por hora)", exact: true }).fill("80");
+    await page.getByRole("spinbutton", { name: "Cantidad de horas", exact: true }).fill("2");
     await expect(page.locator('input[name="monto_total"]')).toHaveValue("160.00");
-    await page.getByRole("button", { name: "Registrar contrato" }).click();
-
+    await page.getByRole("button", { name: /^Siguiente: Resumen y confirmar/ }).click();
+    await expect(page.getByRole("heading", { name: "Paso 4: Resumen y confirmar", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Crear contrato" }).click();
+    await expect(dialog).toBeHidden();
+    await page.reload();
     await expect(page.getByRole("heading", { name: "Alquiler Bomba Mixer" })).toBeVisible();
     await expect(page.getByRole("cell", { name: codigo })).toBeVisible();
   });

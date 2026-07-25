@@ -11,7 +11,7 @@ test.describe("registro general (demo DB)", () => {
     const titulo = `Hecho E2E ${Date.now()}`;
 
     await page.goto("/registro");
-    await expect(page.getByRole("heading", { name: "Registro general por categoría" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bitacora", exact: true, level: 2 })).toBeVisible();
 
     await page.getByRole("button", { name: "Nuevo registro" }).click();
     const dialog = page.getByRole("dialog", { name: "Nuevo registro" });
@@ -23,9 +23,10 @@ test.describe("registro general (demo DB)", () => {
     await dialog.getByLabel("Detalle").fill("Detalle generado por Playwright.");
     await dialog.getByLabel("Monto (opcional)").fill("10.5");
     await dialog.getByRole("button", { name: "Guardar registro" }).click();
+    await expect(dialog).toBeHidden();
 
-    await page.goto("/registro");
-    await expect(page.getByRole("heading", { name: "Registro general por categoría" })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Bitacora", exact: true, level: 2 })).toBeVisible();
     await expect(page.getByRole("cell", { name: titulo })).toBeVisible();
   });
 });
