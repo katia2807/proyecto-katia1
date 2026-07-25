@@ -12,13 +12,12 @@ import {
   cambiarEstadoCotizacionUnificada,
 } from "@/app/actions";
 import {
-  computeEconomiaInterna,
-  computeResumenMargen,
+  calcularContratoCotizacion,
   computeTotalesDetalle,
   economiaLineaMueble,
+  resolverCalculoDocumentoCotizacion,
   round2,
   totalPtLinea,
-  totalGeneralDetalle,
 } from "@/lib/cotizacion-calculos";
 import {
   defaultCotizacionDetalleV1,
@@ -653,15 +652,27 @@ export function CotizacionUnificadaWizard({
         ? 3
         : 2;
 
-  const margenGananciaPct = empresa.margen_ganancia_default_pct;
+  const cotizacionGuardadaParaCalculo = useMemo(
+    () => (guardadaId ? cotizacionesGuardadas.find((row) => row.id === guardadaId) ?? null : null),
+    [cotizacionesGuardadas, guardadaId],
+  );
+  const calculoDocumentoGuardado = useMemo(
+    () =>
+      cotizacionGuardadaParaCalculo
+        ? resolverCalculoDocumentoCotizacion(detalle, cotizacionGuardadaParaCalculo.total)
+        : null,
+    [cotizacionGuardadaParaCalculo, detalle],
+  );
+  const margenGananciaPct =
+    calculoDocumentoGuardado?.margenPctAplicado ?? empresa.margen_ganancia_default_pct;
   const totales = useMemo(() => computeTotalesDetalle(detalle), [detalle]);
-  const resumenMargen = useMemo(
-    () => computeResumenMargen(detalle, margenGananciaPct),
+  const calculoCotizacionActual = useMemo(
+    () => calcularContratoCotizacion(detalle, margenGananciaPct),
     [detalle, margenGananciaPct],
   );
-  const totalGral = resumenMargen.precioSugerido;
+  const resumenCotizacion = calculoDocumentoGuardado ?? calculoCotizacionActual;
+  const totalGral = resumenCotizacion.totalFinal;
   const totalGralSafe = Number.isFinite(totalGral) ? totalGral : 0;
-  const economiaInterna = useMemo(() => computeEconomiaInterna(detalle), [detalle]);
   const conversionMedidasUI = useMemo(() => {
     const esp = parseDecimalInput(medidaEspesorUI);
     const anc = parseDecimalInput(medidaAnchoUI);
@@ -1233,8 +1244,13 @@ export function CotizacionUnificadaWizard({
   }, [detalle]);
 
   const lineasFormal = useMemo(
-    () => buildLineasResumen(detalleParaLineas, margenGananciaPct),
-    [detalleParaLineas, margenGananciaPct],
+    () =>
+      buildLineasResumen(
+        detalleParaLineas,
+        margenGananciaPct,
+        calculoDocumentoGuardado?.margenPctAplicado === null ? undefined : totalGral,
+      ),
+    [calculoDocumentoGuardado?.margenPctAplicado, detalleParaLineas, margenGananciaPct, totalGral],
   );
   const lineasFormalSafe = useMemo(
     () =>
@@ -1591,8 +1607,8 @@ export function CotizacionUnificadaWizard({
           return;
         }
         router.refresh();
-      } catch (err: any) {
-        setError(err.message || "Error al persistir la descripción");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Error al persistir la descripción");
         setBusy(false);
         return;
       }
@@ -2762,12 +2778,19 @@ export function CotizacionUnificadaWizard({
                   )}
                   <div className="border-t border-[var(--color-border)] pt-3">
                     <div className="flex items-center justify-between">
-                      <span>Costo de producción:</span>
-                      <strong>{formatPen(resumenMargen.costoProduccion)}</strong>
+                      <span>Subtotal antes del margen:</span>
+                      <strong>{formatPen(resumenCotizacion.subtotalBase)}</strong>
                     </div>
                     <div className="mt-2 flex items-center justify-between">
-                      <span>Margen de ganancia ({resumenMargen.margenPct.toFixed(1)}%):</span>
-                      <strong>{formatPen(resumenMargen.ganancia)}</strong>
+                      <span>
+                        Margen de ganancia
+                        {resumenCotizacion.margenPctAplicado == null
+                          ? ""
+                          : ` (${resumenCotizacion.margenPctAplicado.toFixed(1)}%)`}:
+                      </span>
+                      <strong>
+                        {resumenCotizacion.margenMonto == null ? "—" : formatPen(resumenCotizacion.margenMonto)}
+                      </strong>
                     </div>
                   </div>
                 </div>
@@ -2775,7 +2798,7 @@ export function CotizacionUnificadaWizard({
 
               <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-center">
                 <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">Precio sugerido final</p>
-                <p className="mt-1 text-4xl font-black text-[var(--color-accent)]">{formatPen(resumenMargen.precioSugerido)}</p>
+                <p className="mt-1 text-4xl font-black text-[var(--color-accent)]">{formatPen(resumenCotizacion.totalFinal)}</p>
                 {tipoMuebleVista && (
                   <p className="mt-2 text-xs font-medium text-[var(--color-text-secondary)]">
                     Tipo de mueble: {selectedTipoMuebleLabel}
@@ -3266,41 +3289,30 @@ export function CotizacionUnificadaWizard({
             </p>
             <dl className="grid gap-2 sm:grid-cols-2">
               <div className="flex justify-between gap-3 rounded-lg bg-[var(--color-primary-soft)]/20 px-3 py-2">
-                <dt className="text-[var(--color-text-secondary)]">Costo total estimado</dt>
-                <dd className="font-semibold tabular-nums">{formatPen(resumenMargen.costoProduccion)}</dd>
+                <dt className="text-[var(--color-text-secondary)]">Subtotal antes del margen</dt>
+                <dd className="font-semibold tabular-nums">{formatPen(resumenCotizacion.subtotalBase)}</dd>
               </div>
               <div className="flex justify-between gap-3 rounded-lg bg-[var(--color-primary-soft)]/20 px-3 py-2">
                 <dt className="text-[var(--color-text-secondary)]">Precio total (cotización)</dt>
-                <dd className="font-semibold tabular-nums">{formatPen(resumenMargen.precioSugerido)}</dd>
+                <dd className="font-semibold tabular-nums">{formatPen(resumenCotizacion.totalFinal)}</dd>
               </div>
-              <div
-                className={`flex justify-between gap-3 rounded-lg px-3 py-2 sm:col-span-2 ${economiaInterna.gananciaEstimada < 0
-                    ? "bg-red-500/15 font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300"
-                    : "bg-[var(--color-primary-soft)]/20"
-                  }`}
-              >
-                <dt className={economiaInterna.gananciaEstimada < 0 ? "" : "text-[var(--color-text-secondary)]"}>
-                  Ganancia estimada
-                </dt>
-                <dd className="tabular-nums">{formatPen(resumenMargen.ganancia)}</dd>
-              </div>
-              <div
-                className={`flex justify-between gap-3 rounded-lg px-3 py-2 sm:col-span-2 ${(economiaInterna.margenPct ?? 0) < 0
-                    ? "bg-red-500/15 font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300"
-                    : "bg-[var(--color-primary-soft)]/20"
-                  }`}
-              >
-                <dt className={(economiaInterna.margenPct ?? 0) < 0 ? "" : "text-[var(--color-text-secondary)]"}>
-                  Margen %
-                </dt>
+              <div className="flex justify-between gap-3 rounded-lg bg-[var(--color-primary-soft)]/20 px-3 py-2 sm:col-span-2">
+                <dt className="text-[var(--color-text-secondary)]">Importe del margen</dt>
                 <dd className="tabular-nums">
-                  {economiaInterna.margenPct != null ? `${economiaInterna.margenPct.toFixed(1)}%` : "—"}
+                  {resumenCotizacion.margenMonto == null ? "—" : formatPen(resumenCotizacion.margenMonto)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3 rounded-lg bg-[var(--color-primary-soft)]/20 px-3 py-2 sm:col-span-2">
+                <dt className="text-[var(--color-text-secondary)]">Margen aplicado</dt>
+                <dd className="tabular-nums">
+                  {resumenCotizacion.margenPctAplicado != null
+                    ? `${resumenCotizacion.margenPctAplicado.toFixed(1)}%`
+                    : "—"}
                 </dd>
               </div>
             </dl>
             <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
-              El costo incluye PT × costo por PT por línea de madera y el costo fijo de acabado (si aplica). Los rubros
-              aserradero/alquiler no tienen costo cargado aquí.
+              El subtotal reúne las tarifas y costos editables del detalle antes de aplicar el margen global.
             </p>
           </div>
 

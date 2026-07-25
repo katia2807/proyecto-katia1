@@ -14,8 +14,37 @@ export type LineaFormal = {
   precioTotal: number;
 };
 
+function reconciliarLineasConTotal(lineas: LineaFormal[], totalFinal: number | undefined): LineaFormal[] {
+  if (totalFinal === undefined || !Number.isFinite(totalFinal) || totalFinal < 0 || lineas.length === 0) {
+    return lineas;
+  }
+  const totalObjetivo = round2(totalFinal);
+  const sumaLineas = round2(lineas.reduce((acumulado, linea) => acumulado + linea.precioTotal, 0));
+  const ajuste = round2(totalObjetivo - sumaLineas);
+  if (ajuste === 0) return lineas;
+
+  const ultimoIndice = lineas.length - 1;
+  const ultimaLinea = lineas[ultimoIndice];
+  const precioTotalAjustado = round2(ultimaLinea.precioTotal + ajuste);
+  if (precioTotalAjustado < 0) return lineas;
+
+  return lineas.map((linea, indice) =>
+    indice === ultimoIndice
+      ? {
+          ...linea,
+          precioUnit: round2(precioTotalAjustado / Math.max(1, linea.cantidad)),
+          precioTotal: precioTotalAjustado,
+        }
+      : linea,
+  );
+}
+
 /** Arma las filas tipo documento comercial (ítem, cant., descripción con viñetas, unitario, total). */
-export function buildLineasResumen(detalle: CotizacionDetalleV1, margenGananciaPct = 0): LineaFormal[] {
+export function buildLineasResumen(
+  detalle: CotizacionDetalleV1,
+  margenGananciaPct = 0,
+  totalFinal?: number,
+): LineaFormal[] {
   const lineas: LineaFormal[] = [];
 
   if (detalle.rubros.muebles && detalle.muebles_lineas.length > 0) {
@@ -151,5 +180,5 @@ export function buildLineasResumen(detalle: CotizacionDetalleV1, margenGananciaP
     }
   }
 
-  return lineas;
+  return reconciliarLineasConTotal(lineas, totalFinal);
 }

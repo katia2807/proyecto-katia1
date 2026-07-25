@@ -26,6 +26,13 @@ export type MuebleLineaMadera = {
   costoPorPt?: number;
 };
 
+export type CotizacionResumenCalculo = {
+  margenPctAplicado: number;
+  subtotalBase: number;
+  margenMonto: number;
+  totalFinal: number;
+};
+
 export type CotizacionDetalleV1 = {
   version: 1;
   rubros: RubrosState;
@@ -60,6 +67,8 @@ export type CotizacionDetalleV1 = {
     monto_garantia: number;
     notas: string;
   } | null;
+  /** Instantánea monetaria de nuevas cotizaciones; los históricos pueden no tenerla. */
+  resumenCalculo?: CotizacionResumenCalculo;
 };
 
 const rubrosSchema = z.object({
@@ -114,6 +123,13 @@ const alquilerSchema = z
   })
   .nullable();
 
+const resumenCalculoSchema = z.object({
+  margenPctAplicado: z.number().finite().nonnegative(),
+  subtotalBase: z.number().finite().nonnegative(),
+  margenMonto: z.number().finite().nonnegative(),
+  totalFinal: z.number().finite().nonnegative(),
+});
+
 export const cotizacionDetalleV1Schema = z.object({
   version: z.literal(1),
   rubros: rubrosSchema,
@@ -125,6 +141,7 @@ export const cotizacionDetalleV1Schema = z.object({
   descripcion_cliente: z.string().optional(),
   aserradero: aserraderoSchema,
   alquiler: alquilerSchema,
+  resumenCalculo: resumenCalculoSchema.optional(),
 });
 
 export function defaultCotizacionDetalleV1(): CotizacionDetalleV1 {

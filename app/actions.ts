@@ -58,9 +58,9 @@ import {
   demoUpdateCotizacionUnificada,
   demoUpdateServicioEspecialTarifa,
 } from "@/lib/demo-store";
-import { totalGeneralDetalle } from "@/lib/cotizacion-calculos";
 import {
   cotizacionDetalleV1Schema,
+  parseCotizacionDetalle,
   textoNotasOrdenProduccionDesdeUnificada,
 } from "@/lib/cotizacion-unificada-payload";
 import { nextCorrelativo } from "@/lib/numeracion";
@@ -71,6 +71,14 @@ import type { MutationFormState } from "@/lib/mutation-form-state";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole, Json } from "@/lib/supabase/types";
 import { roundMoney, safeDivide, parseDecimal } from "@/lib/utils";
+
+import { getEmpresaConfig } from "@/lib/company-config";
+import {
+  calcularContratoCotizacion,
+  crearInstantaneaCalculoCotizacion,
+  resolverCalculoDocumentoCotizacion,
+  totalClienteCoincideConServidor,
+} from "@/lib/cotizacion-calculos";
 
 const preprocessDecimal = (v: unknown) => {
   if (v === null || v === undefined || v === "") {
@@ -1308,7 +1316,7 @@ export async function saveCotizacionUnificada(input: {
   tipoCliente: "natural" | "empresa";
   fecha: string;
   detalle: unknown;
-  total: number;
+  total: unknown;
   estadoFlujo: "pendiente" | "lista_produccion";
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   try {
@@ -1318,26 +1326,70 @@ export async function saveCotizacionUnificada(input: {
       return { ok: false, error: "Detalle de cotización inválido." };
     }
     const det = detParsed.data;
-    const calc = totalGeneralDetalle(det);
-    if (Math.abs(calc - input.total) > 0.05) {
-      return { ok: false, error: "El total no coincide con el detalle. Revisa los importes." };
-    }
-    const detalleRecord = JSON.parse(JSON.stringify(det)) as Record<string, unknown>;
+    const supabase = hasSupabaseEnv() ? getSupabaseServerClient() : null;
+    let cotizacionAnterior: {
+      estado_flujo: string;
+      total: number;
+      detalle: unknown;
+    } | null = null;
 
-    if (!hasSupabaseEnv()) {
-      if (input.id) {
-        const prev = demoGetCotizacionUnificada(input.id);
-        if (!prev) {
+    if (input.id) {
+      if (!supabase) {
+        const previaDemo = demoGetCotizacionUnificada(input.id);
+        if (!previaDemo) {
           return { ok: false, error: "La cotización ya no existe." };
         }
-        if (prev.estado_flujo === "cobrada") {
-          return { ok: false, error: "No se puede editar una cotización ya cobrada." };
+        cotizacionAnterior = previaDemo;
+      } else {
+        const { data: previaSupabase } = await supabase
+          .from("cotizaciones_unificadas")
+          .select("estado_flujo,total,detalle")
+          .eq("id", input.id)
+          .eq("organization_id", DEFAULT_ORG_ID)
+          .maybeSingle();
+        if (!previaSupabase) {
+          return { ok: false, error: "La cotización ya no existe." };
         }
+        cotizacionAnterior = previaSupabase;
+      }
+      if (cotizacionAnterior.estado_flujo === "cobrada") {
+        return { ok: false, error: "No se puede editar una cotización ya cobrada." };
+      }
+    }
+
+    const empresa = await getEmpresaConfig();
+    let margenPctAutorizado = empresa.margen_ganancia_default_pct;
+    if (cotizacionAnterior) {
+      const detalleAnterior = parseCotizacionDetalle(cotizacionAnterior.detalle);
+      const calculoAnterior = resolverCalculoDocumentoCotizacion(
+        detalleAnterior,
+        cotizacionAnterior.total,
+      );
+      if (calculoAnterior.margenPctAplicado == null) {
+        return {
+          ok: false,
+          error: "No se puede recalcular esta cotización histórica sin un margen verificable.",
+        };
+      }
+      margenPctAutorizado = calculoAnterior.margenPctAplicado;
+    }
+    const calculo = calcularContratoCotizacion(det, margenPctAutorizado);
+    if (!totalClienteCoincideConServidor(input.total, calculo.totalFinal)) {
+      return { ok: false, error: "El total no coincide con el detalle. Revisa los importes." };
+    }
+    const detalleConResumen = {
+      ...det,
+      resumenCalculo: crearInstantaneaCalculoCotizacion(calculo),
+    };
+    const detalleRecord = JSON.parse(JSON.stringify(detalleConResumen)) as Record<string, unknown>;
+
+    if (!supabase) {
+      if (input.id) {
         demoUpdateCotizacionUnificada(input.id, {
           cliente_id: input.clienteId,
           tipo_cliente: input.tipoCliente,
           fecha: input.fecha,
-          total: input.total,
+          total: calculo.totalFinal,
           estado_flujo: input.estadoFlujo,
           detalle: detalleRecord,
         });
@@ -1351,7 +1403,7 @@ export async function saveCotizacionUnificada(input: {
         fecha: input.fecha,
         correlativo,
         tipo_cliente: input.tipoCliente,
-        total: input.total,
+        total: calculo.totalFinal,
         estado_flujo: input.estadoFlujo,
         detalle: detalleRecord,
       });
@@ -1359,26 +1411,16 @@ export async function saveCotizacionUnificada(input: {
       return { ok: true, id: row.id };
     }
 
-    const supabase = getSupabaseServerClient();
     if (input.id) {
-      const { data: prevRow } = await supabase
-        .from("cotizaciones_unificadas")
-        .select("estado_flujo")
-        .eq("id", input.id)
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .maybeSingle();
-      if (prevRow?.estado_flujo === "cobrada") {
-        return { ok: false, error: "No se puede editar una cotización ya cobrada." };
-      }
       const { error } = await supabase
         .from("cotizaciones_unificadas")
         .update({
           cliente_id: input.clienteId,
           tipo_cliente: input.tipoCliente,
           fecha: input.fecha,
-          total: input.total,
+          total: calculo.totalFinal,
           estado_flujo: input.estadoFlujo,
-          detalle: det as unknown as Json,
+          detalle: detalleConResumen as unknown as Json,
         })
         .eq("id", input.id)
         .eq("organization_id", DEFAULT_ORG_ID);
@@ -1397,9 +1439,9 @@ export async function saveCotizacionUnificada(input: {
         fecha: input.fecha,
         correlativo,
         tipo_cliente: input.tipoCliente,
-        total: input.total,
+        total: calculo.totalFinal,
         estado_flujo: input.estadoFlujo,
-        detalle: det as unknown as Json,
+        detalle: detalleConResumen as unknown as Json,
       })
       .select("id")
       .single();

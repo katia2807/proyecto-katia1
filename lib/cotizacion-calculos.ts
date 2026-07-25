@@ -49,6 +49,23 @@ export type ResumenMargen = {
   precioSugerido: number;
 };
 
+export type ContratoCalculoCotizacion = {
+  subtotalBase: number;
+  margenPctAplicado: number;
+  margenMonto: number;
+  precioSugerido: number;
+  totalFinal: number;
+};
+
+export type CalculoDocumentoCotizacion = {
+  subtotalBase: number;
+  margenPctAplicado: number | null;
+  margenMonto: number | null;
+  precioSugerido: number;
+  totalFinal: number;
+  usaInstantanea: boolean;
+};
+
 export function totalPtLinea(
   piezas: { cantidad: number; espesor: number; ancho: number; largo: number }[],
 ): number {
@@ -103,15 +120,122 @@ export function totalGeneralDetalle(detalle: CotizacionDetalleV1): number {
   return round2(t.muebles + t.aserradero + t.alquiler);
 }
 
-export function computeResumenMargen(detalle: CotizacionDetalleV1, margenPct: number): ResumenMargen {
-  const costoProduccion = totalGeneralDetalle(detalle);
-  const margen = parseMargenGananciaInput(margenPct);
-  const ganancia = calcularGananciaPorMargen(costoProduccion, margen);
+export function calcularContratoCotizacion(
+  detalle: CotizacionDetalleV1,
+  margenPctAplicado: number,
+): ContratoCalculoCotizacion {
+  if (!Number.isFinite(margenPctAplicado) || margenPctAplicado < 0) {
+    throw new RangeError('El margen aplicado debe ser un número finito mayor o igual a cero.');
+  }
+  const subtotalBase = totalGeneralDetalle(detalle);
+  if (!Number.isFinite(subtotalBase) || subtotalBase < 0) {
+    throw new RangeError('El subtotal de la cotización debe ser un importe finito.');
+  }
+  const margenNormalizado = roundMoney(margenPctAplicado);
+  const margenMonto = roundMoney((subtotalBase * margenNormalizado) / 100);
+  const precioSugerido = roundMoney(subtotalBase + margenMonto);
   return {
-    costoProduccion,
-    margenPct: margen,
-    ganancia,
-    precioSugerido: round2(costoProduccion + ganancia),
+    subtotalBase,
+    margenPctAplicado: margenNormalizado,
+    margenMonto,
+    precioSugerido,
+    totalFinal: precioSugerido,
+  };
+}
+
+export function crearInstantaneaCalculoCotizacion(
+  calculo: ContratoCalculoCotizacion,
+): Omit<ContratoCalculoCotizacion, 'precioSugerido'> {
+  return {
+    margenPctAplicado: calculo.margenPctAplicado,
+    subtotalBase: calculo.subtotalBase,
+    margenMonto: calculo.margenMonto,
+    totalFinal: calculo.totalFinal,
+  };
+}
+
+function importeEnCentavos(value: number): number {
+  return Math.round(roundMoney(value) * 100);
+}
+
+export function totalClienteCoincideConServidor(
+  totalCliente: unknown,
+  totalServidor: number,
+): boolean {
+  if (
+    typeof totalCliente !== 'number' ||
+    !Number.isFinite(totalCliente) ||
+    totalCliente < 0 ||
+    !Number.isFinite(totalServidor) ||
+    totalServidor < 0
+  ) {
+    return false;
+  }
+  return importeEnCentavos(totalCliente) === importeEnCentavos(totalServidor);
+}
+
+export function resolverCalculoDocumentoCotizacion(
+  detalle: CotizacionDetalleV1,
+  totalPersistido: number,
+): CalculoDocumentoCotizacion {
+  if (!Number.isFinite(totalPersistido) || totalPersistido < 0) {
+    throw new RangeError('El total persistido debe ser un importe finito.');
+  }
+  const totalFinal = roundMoney(totalPersistido);
+  const subtotalBase = totalGeneralDetalle(detalle);
+  const instantanea = detalle.resumenCalculo;
+
+  if (instantanea) {
+    try {
+      const recalculado = calcularContratoCotizacion(detalle, instantanea.margenPctAplicado);
+      const instantaneaConsistente =
+        totalClienteCoincideConServidor(instantanea.subtotalBase, recalculado.subtotalBase) &&
+        totalClienteCoincideConServidor(instantanea.margenMonto, recalculado.margenMonto) &&
+        totalClienteCoincideConServidor(instantanea.totalFinal, recalculado.totalFinal) &&
+        totalClienteCoincideConServidor(totalFinal, recalculado.totalFinal);
+      if (instantaneaConsistente) {
+        return {
+          ...recalculado,
+          totalFinal,
+          precioSugerido: totalFinal,
+          usaInstantanea: true,
+        };
+      }
+    } catch {
+      // Una instantánea inválida no debe reemplazar el total histórico persistido.
+    }
+  }
+
+  if (subtotalBase > 0 && totalFinal >= subtotalBase) {
+    const margenMonto = roundMoney(totalFinal - subtotalBase);
+    const margenPctAplicado = roundMoney((margenMonto / subtotalBase) * 100);
+    return {
+      subtotalBase,
+      margenPctAplicado,
+      margenMonto,
+      precioSugerido: totalFinal,
+      totalFinal,
+      usaInstantanea: false,
+    };
+  }
+
+  return {
+    subtotalBase,
+    margenPctAplicado: null,
+    margenMonto: null,
+    precioSugerido: totalFinal,
+    totalFinal,
+    usaInstantanea: false,
+  };
+}
+
+export function computeResumenMargen(detalle: CotizacionDetalleV1, margenPct: number): ResumenMargen {
+  const calculo = calcularContratoCotizacion(detalle, parseMargenGananciaInput(margenPct));
+  return {
+    costoProduccion: calculo.subtotalBase,
+    margenPct: calculo.margenPctAplicado,
+    ganancia: calculo.margenMonto,
+    precioSugerido: calculo.precioSugerido,
   };
 }
 
