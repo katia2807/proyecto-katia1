@@ -66,6 +66,7 @@ import {
 import { nextCorrelativo } from "@/lib/numeracion";
 import type { FilaImportada } from "@/lib/importar";
 import { hasSupabaseEnv } from "@/lib/runtime";
+import { inventarioCostoUnitarioOpcionalSchema } from "@/lib/inventario-validation";
 import type { MutationFormState } from "@/lib/mutation-form-state";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole, Json } from "@/lib/supabase/types";
@@ -354,7 +355,7 @@ const inventarioMovimientoSchema = z.object({
   fecha: z.string().min(1),
   tipo: z.enum(["entrada_compra", "salida_venta", "ajuste"]),
   cantidad: z.coerce.number().positive(),
-  costoUnitario: moneySchema(z.number().nonnegative()).optional(),
+  costoUnitario: inventarioCostoUnitarioOpcionalSchema,
   referencia: z.string().optional(),
 });
 
