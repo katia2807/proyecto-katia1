@@ -69,6 +69,31 @@ describe("reviewMaderaCortadaHistoricalSale", () => {
     expect(review.calculatedSubtotal).toBe(0);
   });
 
+  it("conserva las líneas incompletas para que Katia pueda verlas y corregirlas", () => {
+    const review = reviewMaderaCortadaHistoricalSale(ventaHistorica({
+      lineas_comprobante: [
+        detalleCorrecto,
+        {
+          ...detalleCorrecto,
+          orden: 1,
+          descripcion: "Listón pendiente",
+          cantidad: 0,
+          subtotal: 0,
+        },
+      ],
+    }));
+
+    expect(review.storedLines).toHaveLength(2);
+    expect(review.storedLines[1]).toEqual(expect.objectContaining({
+      descripcion: "Listón pendiente",
+      cantidad: 0,
+    }));
+    expect(review.status).toBe("falta_informacion");
+    expect(review.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "cantidad_faltante", lineIndex: 1 }),
+    ]));
+  });
+
   it("detecta el importe antiguo de S/14 frente al cálculo correcto de S/93.33", () => {
     const review = reviewMaderaCortadaHistoricalSale(ventaHistorica({
       total: 14,

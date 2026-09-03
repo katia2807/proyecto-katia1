@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, LockKeyhole } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -134,6 +134,16 @@ export function MaderaCortadaCorreccionHistoricaForm({
     && (activeCashMovements.length !== 1 || activeCashMovements[0]?.periodo_cerrado);
   const canReview = allComplete && ptMatches && calculation.precioPorPT > 0;
 
+  const updateCalculation = useCallback((nextCalculation: Calculation) => {
+    setConfirmed(false);
+    setCalculation(nextCalculation);
+  }, []);
+
+  const updateTotalMode = (mode: "calculado" | "registrado" | "manual") => {
+    setConfirmed(false);
+    setTotalMode(mode);
+  };
+
   const previewItems = useMemo(() => {
     const lines = buildMaderaCortadaVoucherLines(calculation.piezas, calculation.precioPorPT);
     const model = buildMaderaCortadaPrintModel({
@@ -227,7 +237,7 @@ export function MaderaCortadaCorreccionHistoricaForm({
           precioEditable
           quantityMode="visible"
           unitPriceMode="real-pt-calculated"
-          onChange={setCalculation}
+          onChange={updateCalculation}
         />
 
         {!allComplete ? (
@@ -245,7 +255,14 @@ export function MaderaCortadaCorreccionHistoricaForm({
           <Button type="button" variant="secondary" onClick={() => setStep(1)}>
             <ArrowLeft className="size-4" /> Volver
           </Button>
-          <Button type="button" disabled={!canReview} onClick={() => setStep(3)}>
+          <Button
+            type="button"
+            disabled={!canReview}
+            onClick={() => {
+              setConfirmed(false);
+              setStep(3);
+            }}
+          >
             Revisar resultado <ArrowRight className="size-4" />
           </Button>
         </div>
@@ -255,8 +272,34 @@ export function MaderaCortadaCorreccionHistoricaForm({
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-[var(--color-border)] p-4">
             <h3 className="font-semibold">Antes</h3>
-            <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between gap-3"><dt>Detalle</dt><dd>{review.storedLines.length > 0 ? `${review.storedLines.length} línea(s)` : "Sin detalle"}</dd></div>
+            {review.storedLines.length > 0 ? (
+              <div aria-label="Detalle original de la venta" className="mt-3 space-y-2">
+                {review.storedLines.map((line, index) => (
+                  <div
+                    key={`${line.orden}-${index}`}
+                    className="rounded-lg border border-[var(--color-border)] bg-[var(--bg-surface)] p-3 text-sm"
+                  >
+                    <p className="font-semibold">
+                      {line.descripcion.trim() || "Sin descripción"}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                      {line.cantidad > 0 ? `${line.cantidad} pzs` : "Sin cantidad"}
+                      {" · "}
+                      {line.espesor > 0 && line.ancho > 0 && line.largo > 0
+                        ? `${line.espesor}\" × ${line.ancho}\" × ${line.largo}'`
+                        : "Medidas incompletas"}
+                    </p>
+                    <div className="mt-2 flex justify-between gap-3 text-xs">
+                      <span>P. unit.: {formatPen(line.precio_unitario)}</span>
+                      <span className="font-semibold">Subtotal: {formatPen(line.subtotal)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Sin detalle guardado</p>
+            )}
+            <dl className="mt-3 space-y-2 border-t border-[var(--color-border)] pt-3 text-sm">
               <div className="flex justify-between gap-3"><dt>Precio por PT</dt><dd>{formatPen(Number(venta.precio_por_pt))}</dd></div>
               <div className="flex justify-between gap-3 font-semibold"><dt>Total</dt><dd>{formatPen(Number(venta.total))}</dd></div>
             </dl>
@@ -274,15 +317,15 @@ export function MaderaCortadaCorreccionHistoricaForm({
         <fieldset className="space-y-2 rounded-xl border border-[var(--color-border)] p-4">
           <legend className="px-1 text-sm font-semibold">Total que quedará registrado</legend>
           <label className="flex items-start gap-2 text-sm">
-            <input type="radio" name="total_mode_choice" checked={totalMode === "calculado"} onChange={() => setTotalMode("calculado")} />
+            <input type="radio" name="total_mode_choice" checked={totalMode === "calculado"} onChange={() => updateTotalMode("calculado")} />
             <span><strong>Usar cálculo por PT real ({formatPen(calculation.totalSoles)})</strong><br /><span className="text-[var(--color-text-secondary)]">Recomendado cuando el total antiguo estaba mal calculado.</span></span>
           </label>
           <label className="flex items-start gap-2 text-sm">
-            <input type="radio" name="total_mode_choice" checked={totalMode === "registrado"} onChange={() => setTotalMode("registrado")} />
+            <input type="radio" name="total_mode_choice" checked={totalMode === "registrado"} onChange={() => updateTotalMode("registrado")} />
             <span><strong>Conservar total cobrado ({formatPen(Number(venta.total))})</strong><br /><span className="text-[var(--color-text-secondary)]">Solo corrige el detalle visible de la boleta.</span></span>
           </label>
           <label className="flex items-start gap-2 text-sm">
-            <input type="radio" name="total_mode_choice" checked={totalMode === "manual"} onChange={() => setTotalMode("manual")} />
+            <input type="radio" name="total_mode_choice" checked={totalMode === "manual"} onChange={() => updateTotalMode("manual")} />
             <span className="flex-1"><strong>Usar total confirmado manualmente</strong>
               {totalMode === "manual" ? (
                 <input
@@ -291,7 +334,10 @@ export function MaderaCortadaCorreccionHistoricaForm({
                   min="0.01"
                   step="0.01"
                   value={manualTotal}
-                  onChange={(event) => setManualTotal(event.target.value)}
+                  onChange={(event) => {
+                    setConfirmed(false);
+                    setManualTotal(event.target.value);
+                  }}
                   className={`${inputClass} mt-2 max-w-xs`}
                 />
               ) : null}
@@ -356,7 +402,14 @@ export function MaderaCortadaCorreccionHistoricaForm({
         </label>
 
         <div className="flex flex-wrap justify-between gap-3">
-          <Button type="button" variant="secondary" onClick={() => setStep(2)}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setConfirmed(false);
+              setStep(2);
+            }}
+          >
             <ArrowLeft className="size-4" /> Volver
           </Button>
           <PendingSubmitButton

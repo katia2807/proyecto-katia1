@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatPen } from "@/lib/utils";
-import { ClipboardCheck, Trash2, Edit2 } from "lucide-react";
+import { ClipboardCheck, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { deleteVentaMaderaCortada } from "@/app/actions";
@@ -127,24 +127,14 @@ export function VentaMaderaCortadaTable({
                     })()}
 
                     {canMutate && (
-                      <>
-                        <Link
-                          href={`/ventas/madera-cortada/${v.id}/editar`}
-                          className="p-1 hover:bg-slate-500/10 rounded transition-colors text-slate-400 hover:text-[var(--color-text-primary)]"
-                          title="Editar venta"
-                        >
-                          <Edit2 className="size-3.5" />
-                        </Link>
-
-                        <button
-                          type="button"
-                          onClick={() => setVentaAEliminar(v)}
-                          className="p-1 hover:bg-red-500/10 rounded transition-colors text-slate-400 hover:text-red-500"
-                          title="Eliminar venta"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </>
+                      <button
+                        type="button"
+                        onClick={() => setVentaAEliminar(v)}
+                        className="p-1 hover:bg-red-500/10 rounded transition-colors text-slate-400 hover:text-red-500"
+                        title="Eliminar venta"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
                     )}
                     {canCorrectHistorical ? (
                       <Link

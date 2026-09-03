@@ -91,7 +91,10 @@ test.describe("ventas — madera, aserradero, mixer (demo DB)", () => {
     const oldRow = oldLink.locator("xpath=ancestor::tr");
     await expect(oldRow.getByText("S/ 14.00")).toBeVisible();
     await expect(oldRow.getByText("Ajuste interno")).toBeVisible();
-    await oldRow.getByLabel("Revisar y corregir boleta").click();
+    await expect(oldRow.getByTitle("Editar venta")).toHaveCount(0);
+
+    await page.goto(`/ventas/madera-cortada/${ventaId}/editar`);
+    await expect(page).toHaveURL(new RegExp(`/ventas/madera-cortada/${ventaId}/corregir$`));
 
     await expect(page.getByRole("heading", { name: "Corrección controlada de boleta" })).toBeVisible();
     await expect(page.getByText("Resultado de la revisión")).toBeVisible();
@@ -101,13 +104,33 @@ test.describe("ventas — madera, aserradero, mixer (demo DB)", () => {
     await page.getByRole("button", { name: /Revisar resultado/ }).click();
 
     await expect(page.getByText("Vista previa para el cliente")).toBeVisible();
+    const originalDetail = page.getByLabel("Detalle original de la venta");
+    await expect(originalDetail.getByText("Roble histórico E2E", { exact: true })).toBeVisible();
+    await expect(originalDetail.getByText(/4 pzs/)).toBeVisible();
+    await expect(originalDetail.getByText(/1\" × 8\" × 10'/)).toBeVisible();
+    await expect(originalDetail.getByText(/P\. unit\.: S\/\s*23\.33/)).toBeVisible();
+    await expect(originalDetail.getByText(/Subtotal: S\/\s*93\.33/)).toBeVisible();
     await expect(page.getByText(/S\/\s*14\.00 → S\/\s*93\.33/)).toBeVisible();
     await expect(page.getByText(/Sin cambios\. Se conservarán/)).toBeVisible();
     await page.getByLabel("Motivo de la corrección *").fill(
       "Se corrigió el total antiguo y se confirmó el detalle con Katia.",
     );
-    await page.getByLabel(/Confirmo que revisé la boleta/).check();
-    await page.getByRole("button", { name: "Guardar corrección revisada" }).click();
+    const confirmation = page.getByLabel(/Confirmo que revisé la boleta/);
+    const saveCorrection = page.getByRole("button", { name: "Guardar corrección revisada" });
+    await confirmation.check();
+    await page.getByRole("button", { name: /Volver/ }).click();
+    await page.getByPlaceholder("Tabla, listón, especie...").fill("Roble histórico E2E revisado");
+    await page.getByRole("button", { name: /Revisar resultado/ }).click();
+    await expect(confirmation).not.toBeChecked();
+    await expect(saveCorrection).toBeDisabled();
+
+    await confirmation.check();
+    await page.getByRole("radio", { name: /Conservar total cobrado/ }).check();
+    await expect(confirmation).not.toBeChecked();
+    await expect(saveCorrection).toBeDisabled();
+    await page.getByRole("radio", { name: /Usar cálculo por PT real/ }).check();
+    await confirmation.check();
+    await saveCorrection.click();
 
     await expect(page.getByText("Boleta histórica corregida y registrada en auditoría.")).toBeVisible();
     await expect(page).toHaveURL(/\/ventas\/madera-cortada$/);
