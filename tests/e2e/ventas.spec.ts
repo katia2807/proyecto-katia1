@@ -20,10 +20,13 @@ test.describe("ventas — madera, aserradero, mixer (demo DB)", () => {
     await page.getByPlaceholder("Tabla, listón, especie...").fill("Tabla de roble selección E2E");
     await page.getByLabel("Cantidad").fill("4");
     await page.getByLabel("Espesor (in)").fill("1");
-    await page.getByLabel("Ancho (in)").fill("1");
-    await page.getByLabel("Largo (ft)").fill("12");
+    await page.getByLabel("Ancho (in)").fill("8");
+    await page.getByLabel("Largo (ft)").fill("10");
     await page.getByLabel("Precio por PT (S/)").fill("3.5");
-    await page.locator("label").filter({ hasText: "Precio unit. S/" }).locator('input[type="number"]').fill("3.5");
+    await expect(page.getByText("Precio por pieza", { exact: true })).toBeVisible();
+    await expect(page.getByText(/S\/\s*23\.33/).first()).toBeVisible();
+    await expect(page.getByText("PT redondeado", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Total PT redondeado", { exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: /^Siguiente: Cobro y Entrega/ }).click();
     await expect(page.getByRole("heading", { name: "Paso 3: Resumen de cobro, entrega y pago", exact: true })).toBeVisible();
     await page.getByLabel("Tipo de entrega").selectOption("entrega_local");
@@ -48,11 +51,12 @@ test.describe("ventas — madera, aserradero, mixer (demo DB)", () => {
     ]) {
       await comprobante.goto(url);
       await expect(comprobante.getByText(/Tabla de roble selección E2E/).first()).toBeVisible();
-      await expect(comprobante.getByText(/1\" × 1\" × 12'/).first()).toBeVisible();
+      await expect(comprobante.getByText(/1\" × 8\" × 10'/).first()).toBeVisible();
       await expect(comprobante.getByText(/4\s*pzs/i).first()).toBeVisible();
-      await expect(comprobante.getByText(/S\/\s*3\.50/).first()).toBeVisible();
-      await expect(comprobante.getByText(/S\/\s*14\.00/).last()).toBeVisible();
-      await expect(comprobante.locator("body")).not.toContainText("93.33");
+      await expect(comprobante.getByText(/S\/\s*23\.33/).first()).toBeVisible();
+      await expect(comprobante.getByText(/S\/\s*93\.33/).last()).toBeVisible();
+      await expect(comprobante.locator("body")).not.toContainText(/Ajuste comercial|Descuento comercial/i);
+      await expect(comprobante.locator("body")).not.toContainText(/S\/\s*(14\.00|84\.00|93\.32)/);
     }
 
     await comprobante.close();

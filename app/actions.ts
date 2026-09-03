@@ -3973,10 +3973,24 @@ export async function createVentaMaderaCortada(formData: FormData) {
 
   const lineasRaw = formData.get("lineas_cubicaje");
   const lineas = parseMaderaCortadaCubicajeLines(lineasRaw);
-  const lineasComprobante = buildMaderaCortadaVoucherLines(lineas);
+  const lineasComprobante = buildMaderaCortadaVoucherLines(lineas, parsed.data.precioPorPt);
   if (lineas.length === 0 || lineasComprobante.length === 0) {
     throw new Error("No se pudo conservar el detalle de la venta. Revisa las piezas ingresadas antes de registrar.");
   }
+  const totalPtReal = lineasComprobante.reduce(
+    (sum, linea) => sum + ((linea.espesor * linea.ancho * linea.largo) / 12) * linea.cantidad,
+    0,
+  );
+  const cantidadPiezasReal = lineasComprobante.reduce((sum, linea) => sum + linea.cantidad, 0);
+  const totalCalculadoReal = roundMoney(
+    lineasComprobante.reduce((sum, linea) => sum + linea.subtotal, 0),
+  );
+  const totalManualRaw = formData.get("total_manual_input");
+  const usaTotalManual = typeof totalManualRaw === "string" && totalManualRaw.trim().length > 0;
+  const totalCobrado = usaTotalManual ? parsed.data.total : totalCalculadoReal;
+  const precioUnitarioComercialReal = cantidadPiezasReal > 0
+    ? roundMoney(totalCobrado / cantidadPiezasReal)
+    : 0;
 
   let createdId = "";
   if (!hasSupabaseEnv()) {
@@ -3985,13 +3999,13 @@ export async function createVentaMaderaCortada(formData: FormData) {
       cliente_id: parsed.data.clienteId,
       fecha: parsed.data.fecha,
       tipo_corte: parsed.data.tipoCorte,
-      total_pt: parsed.data.totalPt,
+      total_pt: totalPtReal,
       precio_por_pt: parsed.data.precioPorPt,
-      cantidad_piezas: parsed.data.cantidadPiezas,
-      precio_unitario_comercial: parsed.data.precioUnitarioComercial,
+      cantidad_piezas: cantidadPiezasReal,
+      precio_unitario_comercial: precioUnitarioComercialReal,
       lineas_comprobante: lineasComprobante,
       tipo_comprobante: parsed.data.tipoComprobante,
-      total: parsed.data.total,
+      total: totalCobrado,
       metodo_pago: parsed.data.metodoPago,
       modalidad_pago: parsed.data.modalidadPago,
       fecha_pago_credito: parsed.data.fechaPagoCredito || null,
@@ -4012,9 +4026,18 @@ export async function createVentaMaderaCortada(formData: FormData) {
     const productPtMap = new Map<string, number>();
     for (const linea of lineas) {
       const pId = linea.inventario_producto_id;
-      if (pId && pId !== "manual" && pId.trim().length > 0) {
+      if (
+        pId
+        && pId !== "manual"
+        && pId.trim().length > 0
+        && linea.cantidad > 0
+        && linea.espesor > 0
+        && linea.ancho > 0
+        && linea.largo > 0
+      ) {
         const currentPt = productPtMap.get(pId) ?? 0;
-        productPtMap.set(pId, currentPt + (linea.subtotalPT || 0));
+        const lineaPtReal = ((linea.espesor * linea.ancho * linea.largo) / 12) * linea.cantidad;
+        productPtMap.set(pId, currentPt + lineaPtReal);
       }
     }
 
@@ -4049,7 +4072,7 @@ export async function createVentaMaderaCortada(formData: FormData) {
       if (!prod) {
         throw new Error("Producto de inventario no encontrado.");
       }
-      const piesCubicosRequeridos = parsed.data.totalPt / 12;
+      const piesCubicosRequeridos = totalPtReal / 12;
       if (Number(prod.stock_actual) < piesCubicosRequeridos) {
         throw new Error(`Stock insuficiente para la cantidad vendida. Se requieren ${piesCubicosRequeridos.toFixed(2)} ft³ pero solo hay ${Number(prod.stock_actual).toFixed(2)} ft³ disponibles.`);
       }
@@ -4068,13 +4091,13 @@ export async function createVentaMaderaCortada(formData: FormData) {
         fecha: parsed.data.fecha,
         estado: "confirmada",
         tipo_corte: parsed.data.tipoCorte,
-        total_pt: parsed.data.totalPt,
+        total_pt: totalPtReal,
         precio_por_pt: parsed.data.precioPorPt,
-        cantidad_piezas: parsed.data.cantidadPiezas || null,
-        precio_unitario_comercial: parsed.data.precioUnitarioComercial || null,
+        cantidad_piezas: cantidadPiezasReal || null,
+        precio_unitario_comercial: precioUnitarioComercialReal || null,
         lineas_comprobante: lineasComprobante as unknown as Json,
         tipo_comprobante: parsed.data.tipoComprobante,
-        total: parsed.data.total,
+        total: totalCobrado,
         metodo_pago: parsed.data.metodoPago,
         modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
         fecha_pago_credito: fechaCredito,
@@ -4097,14 +4120,14 @@ export async function createVentaMaderaCortada(formData: FormData) {
         ? 0 
         : parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo"
         ? (parsed.data.adelanto || 0)
-        : parsed.data.total;
+        : totalCobrado;
     let cajaRegistrado = false;
     if (montoCaja > 0) {
       const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
       const descripcionBase =
-        parsed.data.cantidadPiezas > 0 && parsed.data.precioUnitarioComercial > 0
-          ? `Venta ${parsed.data.cantidadPiezas} pzs x S/ ${parsed.data.precioUnitarioComercial.toFixed(2)} (${parsed.data.tipoCorte})`
-          : `Venta ${parsed.data.totalPt.toFixed(2)} PT (${parsed.data.tipoCorte})`;
+        cantidadPiezasReal > 0 && precioUnitarioComercialReal > 0
+          ? `Venta ${cantidadPiezasReal} pzs x S/ ${precioUnitarioComercialReal.toFixed(2)} (${parsed.data.tipoCorte})`
+          : `Venta ${totalPtReal.toFixed(2)} PT (${parsed.data.tipoCorte})`;
       const descripcionModalidad = 
         parsed.data.modalidadPago === "adelanto" ? ` - Adelanto: S/ ${(parsed.data.adelanto || 0).toFixed(2)}`
         : parsed.data.modalidadPago === "adelanto_saldo" ? ` - Adelanto: S/ ${(parsed.data.adelanto || 0).toFixed(2)}`
@@ -4152,7 +4175,7 @@ export async function createVentaMaderaCortada(formData: FormData) {
       }
     } else if (productoId) {
       // Fallback single global product movement recording
-      const piesCubicosRequeridos = parsed.data.totalPt / 12;
+      const piesCubicosRequeridos = totalPtReal / 12;
       const { error: movErr } = await supabase.from("inventario_movimientos").insert({
         organization_id: DEFAULT_ORG_ID,
         producto_id: productoId,

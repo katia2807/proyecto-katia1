@@ -7,7 +7,10 @@ import { PrintButton } from "@/components/ui/print-button";
 import { PrintSelector } from "@/components/ui/print-selector";
 import { buildAserraderoPrintModel } from "@/lib/aserradero-print-model";
 import { AserraderoPrintTicketDetail } from "@/components/sales/aserradero-print-ticket-detail";
-import { buildMaderaCortadaPrintModel } from "@/lib/madera-cortada-print-model";
+import {
+  buildMaderaCortadaPrintModel,
+  getMaderaCortadaCustomerItems,
+} from "@/lib/madera-cortada-print-model";
 
 type PrintTicketVoucherProps = {
   id: string;
@@ -162,7 +165,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
     clienteNombre  = cli?.nombre ?? "—";
     clienteDoc     = cli?.ruc ?? cli?.documento ?? "—";
 
-    items = printModel.items;
+    items = getMaderaCortadaCustomerItems(printModel.items, printModel.totalSoles);
     if (venta.tipo_entrega && venta.direccion_entrega) {
       entrega = `${venta.tipo_entrega} — ${venta.direccion_entrega}`;
     }

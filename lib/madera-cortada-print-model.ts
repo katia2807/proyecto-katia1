@@ -1,4 +1,5 @@
 import { formatPen, roundMoney } from "@/lib/utils";
+import { calculateMaderaCortadaRealPtPricing } from "@/lib/madera-cortada-pricing";
 
 export type TipoComprobanteVenta = "boleta" | "factura" | "ninguno";
 
@@ -43,6 +44,9 @@ export type MaderaCortadaPrintItem = {
   unitario: string;
   total: string;
   kind: "producto" | "ajuste";
+  quantityValue: number;
+  unitPriceValue: number;
+  subtotalValue: number;
 };
 
 export type MaderaCortadaPrintModel = {
@@ -51,6 +55,52 @@ export type MaderaCortadaPrintModel = {
   tipoComprobante: Exclude<TipoComprobanteVenta, "ninguno">;
   hasDetailedLines: boolean;
 };
+
+/**
+ * Mantiene ajustes y descuentos disponibles para control interno. En la copia
+ * del cliente los integra proporcionalmente en los productos para que el
+ * detalle visible siga sumando exactamente el total cobrado.
+ */
+export function getMaderaCortadaCustomerItems(
+  items: readonly MaderaCortadaPrintItem[],
+  totalSoles?: number,
+) {
+  const products = items.filter((item) => item.kind === "producto");
+  if (totalSoles === undefined || products.length === 0) return products;
+
+  const targetTotal = roundMoney(Math.max(0, totalSoles));
+  const productsTotal = roundMoney(products.reduce((sum, item) => sum + item.subtotalValue, 0));
+  if (Math.abs(targetTotal - productsTotal) < 0.01) return products;
+
+  const allocationBase = productsTotal > 0
+    ? products.map((item) => item.subtotalValue)
+    : products.map((item) => item.quantityValue);
+  const allocationTotal = allocationBase.reduce((sum, value) => sum + value, 0);
+  let allocated = 0;
+
+  return products.map((item, index) => {
+    const isLast = index === products.length - 1;
+    const remaining = roundMoney(Math.max(0, targetTotal - allocated));
+    const subtotalValue = isLast
+      ? remaining
+      : Math.min(
+          remaining,
+          roundMoney(targetTotal * (allocationTotal > 0 ? allocationBase[index] / allocationTotal : 0)),
+        );
+    allocated = roundMoney(allocated + subtotalValue);
+    const unitPriceValue = item.quantityValue > 0
+      ? subtotalValue / item.quantityValue
+      : subtotalValue;
+
+    return {
+      ...item,
+      unitario: formatPen(unitPriceValue),
+      total: formatPen(subtotalValue),
+      unitPriceValue,
+      subtotalValue,
+    };
+  });
+}
 
 const TIPO_CORTE_LABELS: Record<string, string> = {
   tabla: "Tabla",
@@ -109,7 +159,10 @@ export function parseMaderaCortadaCubicajeLines(raw: unknown): MaderaCortadaCubi
 }
 
 /** Crea la copia comercial que se conservará para futuras impresiones. */
-export function buildMaderaCortadaVoucherLines(raw: unknown): MaderaCortadaVoucherLine[] {
+export function buildMaderaCortadaVoucherLines(
+  raw: unknown,
+  precioPorPt?: number,
+): MaderaCortadaVoucherLine[] {
   const lineas = Array.isArray(raw) && raw.every((linea) =>
     Boolean(linea) && typeof linea === "object" && "precioUnitarioComercial" in linea
   )
@@ -117,21 +170,41 @@ export function buildMaderaCortadaVoucherLines(raw: unknown): MaderaCortadaVouch
     : parseMaderaCortadaCubicajeLines(raw);
 
   return lineas
-    .filter((linea) => linea.cantidad > 0)
-    .map((linea, index) => ({
-      orden: index,
-      descripcion: compactText(linea.descripcion),
-      cantidad: linea.cantidad,
-      unidad: "pzs" as const,
-      espesor: nonNegativeNumber(linea.espesor),
-      ancho: nonNegativeNumber(linea.ancho),
-      largo: nonNegativeNumber(linea.largo),
-      precio_unitario: nonNegativeNumber(linea.precioUnitarioComercial),
-      subtotal: nonNegativeNumber(
-        linea.subtotalComercial,
-        roundMoney(linea.cantidad * linea.precioUnitarioComercial),
-      ),
-    }));
+    .filter((linea) =>
+      linea.cantidad > 0
+      && linea.espesor > 0
+      && linea.ancho > 0
+      && linea.largo > 0
+    )
+    .map((linea, index) => {
+      const shouldCalculateRealPtPrice = precioPorPt !== undefined && Number.isFinite(precioPorPt);
+      const pricing = shouldCalculateRealPtPrice
+        ? calculateMaderaCortadaRealPtPricing({
+            cantidad: linea.cantidad,
+            espesor: linea.espesor,
+            ancho: linea.ancho,
+            largo: linea.largo,
+            precioPorPt,
+          })
+        : null;
+
+      return {
+        orden: index,
+        descripcion: compactText(linea.descripcion),
+        cantidad: linea.cantidad,
+        unidad: "pzs" as const,
+        espesor: nonNegativeNumber(linea.espesor),
+        ancho: nonNegativeNumber(linea.ancho),
+        largo: nonNegativeNumber(linea.largo),
+        precio_unitario: pricing?.precioUnitarioComercial
+          ?? nonNegativeNumber(linea.precioUnitarioComercial),
+        subtotal: pricing?.subtotalComercial
+          ?? nonNegativeNumber(
+            linea.subtotalComercial,
+            roundMoney(linea.cantidad * linea.precioUnitarioComercial),
+          ),
+      };
+    });
 }
 
 function parseStoredVoucherLines(raw: unknown): MaderaCortadaVoucherLine[] {
@@ -224,6 +297,9 @@ function adjustmentItem(value: number): MaderaCortadaPrintItem | null {
     unitario: formatPen(adjustment),
     total: formatPen(adjustment),
     kind: "ajuste",
+    quantityValue: 0,
+    unitPriceValue: adjustment,
+    subtotalValue: adjustment,
   };
 }
 
@@ -248,6 +324,9 @@ export function buildMaderaCortadaPrintModel(
       unitario: formatPen(linea.precio_unitario),
       total: formatPen(linea.subtotal),
       kind: "producto",
+      quantityValue: linea.cantidad,
+      unitPriceValue: linea.precio_unitario,
+      subtotalValue: linea.subtotal,
     }));
     const adjustment = adjustmentItem(totalSoles - subtotalLineas);
     if (adjustment) items.push(adjustment);
@@ -273,6 +352,9 @@ export function buildMaderaCortadaPrintModel(
       unitario: formatPen(unitPrice),
       total: formatPen(calculatedSubtotal),
       kind: "producto",
+      quantityValue: quantity,
+      unitPriceValue: unitPrice,
+      subtotalValue: calculatedSubtotal,
     },
   ];
   const adjustment = adjustmentItem(totalSoles - calculatedSubtotal);

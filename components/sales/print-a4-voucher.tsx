@@ -8,7 +8,10 @@ import { PrintButton } from "@/components/ui/print-button";
 import { PrintSelector } from "@/components/ui/print-selector";
 import { buildAserraderoPrintModel } from "@/lib/aserradero-print-model";
 import { AserraderoPrintA4Detail } from "@/components/sales/aserradero-print-a4-detail";
-import { buildMaderaCortadaPrintModel } from "@/lib/madera-cortada-print-model";
+import {
+  buildMaderaCortadaPrintModel,
+  getMaderaCortadaCustomerItems,
+} from "@/lib/madera-cortada-print-model";
 
 type PrintA4VoucherProps = {
   id: string;
@@ -210,7 +213,7 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
     clienteNombre  = cli?.nombre ?? "—";
     clienteDoc     = cli?.ruc ?? cli?.documento ?? "—";
 
-    items = printModel.items;
+    items = getMaderaCortadaCustomerItems(printModel.items, printModel.totalSoles);
     if (venta.tipo_entrega && venta.tipo_entrega !== "recojo" && venta.direccion_entrega) {
       entrega = `${venta.tipo_entrega} — ${venta.direccion_entrega}`;
     }

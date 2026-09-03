@@ -29,6 +29,10 @@ type Producto = {
 
 type CubicajePiezaCalculada = {
   inventario_producto_id?: string | null;
+  cantidad: number;
+  espesor: number;
+  ancho: number;
+  largo: number;
 };
 
 type MaderaCortadaFormProps = {
@@ -142,7 +146,13 @@ export function MaderaCortadaForm({
     setTotalSolesCalculado(data.totalSoles);
     setTotalCantidad(data.totalCantidad);
     setPrecioUnitarioComercial(data.precioUnitarioComercial);
-    const firstProd = data.piezas.find((p) => p.inventario_producto_id)?.inventario_producto_id || "";
+    const firstProd = data.piezas.find((p) =>
+      p.inventario_producto_id
+      && p.cantidad > 0
+      && p.espesor > 0
+      && p.ancho > 0
+      && p.largo > 0
+    )?.inventario_producto_id || "";
     setProductoId(firstProd);
   }, []);
 
@@ -482,7 +492,7 @@ export function MaderaCortadaForm({
 
             <CubicajeInput
               quantityMode="visible"
-              unitPriceMode="auto-editable"
+              unitPriceMode="real-pt-calculated"
               name="lineas_cubicaje"
               totalPtName="total_pt_calc"
               totalM3Name="total_m3_calc"

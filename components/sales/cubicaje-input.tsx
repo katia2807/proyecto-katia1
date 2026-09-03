@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPen, parseDecimal, roundMoney } from "@/lib/utils";
+import { calculateMaderaCortadaRealPtPricing } from "@/lib/madera-cortada-pricing";
 
 type Pieza = {
   id: number;
@@ -19,7 +20,7 @@ type Pieza = {
 };
 
 type QuantityMode = "visible" | "fixed-one";
-type UnitPriceMode = "current" | "auto-editable";
+type UnitPriceMode = "current" | "auto-editable" | "real-pt-calculated";
 type PresentationMode = "cards" | "aserradero-compact";
 
 type CubicajeInputProps = {
@@ -37,7 +38,7 @@ type CubicajeInputProps = {
   totalM3Name?: string;
   /** Controla si la cantidad se captura visualmente o queda fija internamente en 1 para nuevas tarjetas. */
   quantityMode?: QuantityMode;
-  /** Controla si el precio unitario usa el comportamiento actual o sugerencia automática editable. */
+  /** Controla si el precio unitario es manual, sugerido o calculado con el PT real. */
   unitPriceMode?: UnitPriceMode;
   /** Presentacion compacta exclusiva del registro de Servicio Aserradero. */
   presentationMode?: PresentationMode;
@@ -53,14 +54,6 @@ type CubicajeInputProps = {
     costo_unitario?: number | string | null;
   }[];
 };
-
-/**
- * Calcula pies tablares (PT) reales unitarios (para 1 pieza):
- *   PT = espesor(in) · ancho(in) · largo(ft) / 12
- */
-function calcularPTUnitarioReal(p: Pieza) {
-  return (p.espesor * p.ancho * p.largo) / 12;
-}
 
 function esPiezaCompleta(p: Pieza) {
   return p.espesor > 0 && p.ancho > 0 && p.largo > 0;
@@ -151,19 +144,38 @@ export function CubicajeInput({
   const itemLabel = quantityMode === "fixed-one" ? "Bloque" : "Pieza";
   const addButtonLabel = quantityMode === "fixed-one" ? "Agregar bloque" : "Agregar pieza";
   const isAutoEditableUnitPrice = unitPriceMode === "auto-editable";
+  const isRealPtCalculatedPrice = unitPriceMode === "real-pt-calculated";
   const isAserraderoCompact = presentationMode === "aserradero-compact";
+  const dimensionsGridClass = isQuantityVisible
+    ? (isRealPtCalculatedPrice
+        ? "grid grid-cols-2 gap-2 sm:grid-cols-4"
+        : "grid grid-cols-2 gap-2 sm:grid-cols-5")
+    : (isRealPtCalculatedPrice
+        ? "grid grid-cols-2 gap-2 sm:grid-cols-3"
+        : "grid grid-cols-2 gap-2 sm:grid-cols-4");
 
   const piezasConSubtotal = useMemo(
     () => piezas.map((p) => {
-      const ptUnitarioReal = calcularPTUnitarioReal(p);
-      const ptTotalReal = ptUnitarioReal * p.cantidad;
+      const realPtPricing = calculateMaderaCortadaRealPtPricing({
+        cantidad: p.cantidad,
+        espesor: p.espesor,
+        ancho: p.ancho,
+        largo: p.largo,
+        precioPorPt: precioActivo,
+      });
+      const ptUnitarioReal = realPtPricing.ptUnitarioReal;
+      const ptTotalReal = realPtPricing.ptTotalReal;
       const ptUnitarioComercial = Math.floor(ptUnitarioReal);
       const ptTotalComercial = ptUnitarioComercial * p.cantidad;
       const precioUnitarioSugerido = roundMoney(ptUnitarioComercial * precioActivo);
-      const precioUnitarioComercial = isAutoEditableUnitPrice && !manualPrecioIds.has(p.id)
-        ? precioUnitarioSugerido
-        : (p.precioUnitarioComercial ?? roundMoney(ptUnitarioReal * precioActivo));
-      const subtotalComercial = roundMoney(precioUnitarioComercial * p.cantidad);
+      const precioUnitarioComercial = isRealPtCalculatedPrice
+        ? realPtPricing.precioUnitarioComercial
+        : (isAutoEditableUnitPrice && !manualPrecioIds.has(p.id)
+            ? precioUnitarioSugerido
+            : (p.precioUnitarioComercial ?? roundMoney(ptUnitarioReal * precioActivo)));
+      const subtotalComercial = isRealPtCalculatedPrice
+        ? realPtPricing.subtotalComercial
+        : roundMoney(precioUnitarioComercial * p.cantidad);
       return {
         ...p,
         ptUnitarioReal,
@@ -176,12 +188,14 @@ export function CubicajeInput({
         subtotalPT: ptTotalReal,
       };
     }),
-    [isAutoEditableUnitPrice, manualPrecioIds, piezas, precioActivo],
+    [isAutoEditableUnitPrice, isRealPtCalculatedPrice, manualPrecioIds, piezas, precioActivo],
   );
 
   const piezasParaTotales = useMemo(
-    () => isAserraderoCompact ? piezasConSubtotal.filter(esPiezaCompleta) : piezasConSubtotal,
-    [isAserraderoCompact, piezasConSubtotal],
+    () => isAserraderoCompact || isRealPtCalculatedPrice
+      ? piezasConSubtotal.filter(esPiezaCompleta)
+      : piezasConSubtotal,
+    [isAserraderoCompact, isRealPtCalculatedPrice, piezasConSubtotal],
   );
 
   const totalPT = useMemo(
@@ -193,9 +207,10 @@ export function CubicajeInput({
   const totalM3 = useMemo(() => ptAM3(totalPT), [totalPT]);
   const totalCantidad = useMemo(
     () => isQuantityVisible
-      ? piezasConSubtotal.reduce((acc, p) => acc + p.cantidad, 0)
+      ? (isRealPtCalculatedPrice ? piezasParaTotales : piezasConSubtotal)
+          .reduce((acc, p) => acc + p.cantidad, 0)
       : piezasParaTotales.length,
-    [isQuantityVisible, piezasConSubtotal, piezasParaTotales],
+    [isQuantityVisible, isRealPtCalculatedPrice, piezasConSubtotal, piezasParaTotales],
   );
   const totalPTComercial = useMemo(
     () => piezasParaTotales.reduce((acc, p) => acc + p.ptTotalComercial, 0),
@@ -579,7 +594,7 @@ export function CubicajeInput({
                   />
                 </div>
 
-                <div className={isQuantityVisible ? "grid grid-cols-2 gap-2 sm:grid-cols-5" : "grid grid-cols-2 gap-2 sm:grid-cols-4"}>
+                <div className={dimensionsGridClass}>
                   {isQuantityVisible ? (
                     <label className="space-y-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
                       Cantidad
@@ -641,12 +656,14 @@ export function CubicajeInput({
                       autoComplete="off"
                     />
                   </label>
-                  <div className="space-y-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    PT redondeado
-                    <div className={`${inputClass} flex items-center justify-center text-center font-bold text-[var(--color-primary)]`}>
-                      {p.ptUnitarioComercial}
+                  {!isRealPtCalculatedPrice ? (
+                    <div className="space-y-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                      PT redondeado
+                      <div className={`${inputClass} flex items-center justify-center text-center font-bold text-[var(--color-primary)]`}>
+                        {p.ptUnitarioComercial}
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                 </div>
 
                 <div className="grid gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-2 sm:grid-cols-4">
@@ -658,30 +675,37 @@ export function CubicajeInput({
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">PT total</p>
                     <p className="text-sm font-bold text-[var(--color-text-primary)]">{p.ptTotalReal.toFixed(2)}</p>
                   </div>
-                  <label className="space-y-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                    <span className="flex items-center justify-between gap-2">
-                      Precio unit. S/
-                      {isAutoEditableUnitPrice ? (
-                        <button
-                          type="button"
-                          onClick={() => restablecerPrecioAutomatico(p.id)}
-                          className="text-[10px] font-bold normal-case text-[var(--color-accent)] hover:underline"
-                        >
-                          Usar sugerido
-                        </button>
-                      ) : null}
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className={`${inputClass} text-center`}
-                      value={p.precioUnitarioComercial === 0 ? "" : p.precioUnitarioComercial}
-                      onChange={(e) => actualizarPrecioUnitarioManual(p.id, e.currentTarget.valueAsNumber)}
-                      onKeyDown={handleKeyDown}
-                      autoComplete="off"
-                    />
-                  </label>
+                  {isRealPtCalculatedPrice ? (
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Precio por pieza</p>
+                      <p className="text-sm font-bold text-[var(--color-text-primary)]">{formatPen(p.precioUnitarioComercial)}</p>
+                    </div>
+                  ) : (
+                    <label className="space-y-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                      <span className="flex items-center justify-between gap-2">
+                        Precio unit. S/
+                        {isAutoEditableUnitPrice ? (
+                          <button
+                            type="button"
+                            onClick={() => restablecerPrecioAutomatico(p.id)}
+                            className="text-[10px] font-bold normal-case text-[var(--color-accent)] hover:underline"
+                          >
+                            Usar sugerido
+                          </button>
+                        ) : null}
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className={`${inputClass} text-center`}
+                        value={p.precioUnitarioComercial === 0 ? "" : p.precioUnitarioComercial}
+                        onChange={(e) => actualizarPrecioUnitarioManual(p.id, e.currentTarget.valueAsNumber)}
+                        onKeyDown={handleKeyDown}
+                        autoComplete="off"
+                      />
+                    </label>
+                  )}
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary)]">Total S/</p>
                     <p className="text-sm font-bold text-[var(--color-text-primary)]">{formatPen(p.subtotalComercial)}</p>
@@ -708,9 +732,11 @@ export function CubicajeInput({
           <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-secondary)]">
             Total PT real: <span className="font-bold">{totalPT.toFixed(2)}</span>
           </span>
-          <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-secondary)]">
-            Total PT redondeado: <span className="font-bold">{totalPTComercial}</span>
-          </span>
+          {!isRealPtCalculatedPrice ? (
+            <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-secondary)]">
+              Total PT redondeado: <span className="font-bold">{totalPTComercial}</span>
+            </span>
+          ) : null}
           <span className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-[var(--color-text-secondary)]">
             Piezas: <span className="font-bold">{totalCantidad}</span>
           </span>
