@@ -62,6 +62,61 @@ test.describe("ventas — madera, aserradero, mixer (demo DB)", () => {
     await comprobante.close();
   });
 
+  test("madera cortada: Katia corrige una boleta antigua con comparación y confirmación", async ({ page }) => {
+    await page.goto("/ventas/madera-cortada");
+    await page.getByRole("button", { name: "Registrar venta de madera" }).click();
+    await pickFirstComboboxOption(page, /Cliente para venta de madera cortada/, "Ropero");
+    await page.getByRole("button", { name: /^Siguiente: Detalle del corte/ }).click();
+    await page.getByRole("button", { name: "Agregar pieza" }).click();
+    await page.getByPlaceholder("Tabla, listón, especie...").fill("Roble histórico E2E");
+    await page.getByLabel("Cantidad").fill("4");
+    await page.getByLabel("Espesor (in)").fill("1");
+    await page.getByLabel("Ancho (in)").fill("8");
+    await page.getByLabel("Largo (ft)").fill("10");
+    await page.getByLabel("Precio por PT (S/)").fill("3.5");
+    await page.getByRole("button", { name: /^Siguiente: Cobro y Entrega/ }).click();
+    await page.getByLabel("Total editable (S/)").fill("14");
+    await page.getByLabel("Tipo de entrega").selectOption("entrega_local");
+    await page.getByRole("button", { name: /^Siguiente: Confirmar/ }).click();
+
+    const popupPromise = page.waitForEvent("popup");
+    await page.getByRole("button", { name: "Registrar venta ✓", exact: true }).click();
+    const comprobante = await popupPromise;
+    await comprobante.waitForLoadState("domcontentloaded");
+    const ventaId = comprobante.url().match(/\/madera\/([0-9a-f-]+)/)?.[1];
+    expect(ventaId).toBeTruthy();
+    await comprobante.close();
+
+    const oldLink = page.locator(`a[href="/ventas/madera-cortada/${ventaId}/corregir"]`);
+    const oldRow = oldLink.locator("xpath=ancestor::tr");
+    await expect(oldRow.getByText("S/ 14.00")).toBeVisible();
+    await expect(oldRow.getByText("Ajuste interno")).toBeVisible();
+    await oldRow.getByLabel("Revisar y corregir boleta").click();
+
+    await expect(page.getByRole("heading", { name: "Corrección controlada de boleta" })).toBeVisible();
+    await expect(page.getByText("Resultado de la revisión")).toBeVisible();
+    await page.getByRole("button", { name: /Completar detalle/ }).click();
+    await expect(page.getByText("Descripción, cantidad y medidas reales")).toBeVisible();
+    await expect(page.getByText("Total PT real: 26.67")).toBeVisible();
+    await page.getByRole("button", { name: /Revisar resultado/ }).click();
+
+    await expect(page.getByText("Vista previa para el cliente")).toBeVisible();
+    await expect(page.getByText(/S\/\s*14\.00 → S\/\s*93\.33/)).toBeVisible();
+    await expect(page.getByText(/Sin cambios\. Se conservarán/)).toBeVisible();
+    await page.getByLabel("Motivo de la corrección *").fill(
+      "Se corrigió el total antiguo y se confirmó el detalle con Katia.",
+    );
+    await page.getByLabel(/Confirmo que revisé la boleta/).check();
+    await page.getByRole("button", { name: "Guardar corrección revisada" }).click();
+
+    await expect(page.getByText("Boleta histórica corregida y registrada en auditoría.")).toBeVisible();
+    await expect(page).toHaveURL(/\/ventas\/madera-cortada$/);
+    const correctedLink = page.locator(`a[href="/ventas/madera-cortada/${ventaId}/corregir"]`);
+    const correctedRow = correctedLink.locator("xpath=ancestor::tr");
+    await expect(correctedRow.getByText("S/ 93.33")).toBeVisible();
+    await expect(correctedRow.getByText("Correcta")).toBeVisible();
+  });
+
   test("aserradero: servicio básico aparece en listado", async ({ page }) => {
     await page.goto("/ventas/aserradero-servicios");
     await expect(page.getByRole("heading", { name: "Servicio aserradero" })).toBeVisible();

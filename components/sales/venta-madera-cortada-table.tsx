@@ -5,11 +5,15 @@ import Link from "next/link";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatPen } from "@/lib/utils";
-import { Trash2, Edit2 } from "lucide-react";
+import { ClipboardCheck, Trash2, Edit2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { deleteVentaMaderaCortada } from "@/app/actions";
 import { useRouter } from "next/navigation";
+import {
+  maderaCortadaHistoricalStatusLabels,
+  reviewMaderaCortadaHistoricalSale,
+} from "@/lib/madera-cortada-historical-review";
 
 type VentaMaderaCortadaRow = {
   id: string;
@@ -17,15 +21,21 @@ type VentaMaderaCortadaRow = {
   fecha: string;
   estado: string;
   total: number | string;
-  correlativo: string | null;
   tipo_corte?: string | null;
+  total_pt: number;
+  precio_por_pt: number;
+  cantidad_piezas: number | null;
+  precio_unitario_comercial: number | null;
+  lineas_comprobante: unknown;
+  tipo_comprobante: string;
 };
 
 type VentaMaderaCortadaTableProps = {
   ventas: VentaMaderaCortadaRow[];
   clientesById: Record<string, string>;
-  clientesMap: Record<string, any>;
+  clientesMap: Record<string, { ruc?: string | null }>;
   canMutate: boolean;
+  canCorrectHistorical: boolean;
 };
 
 export function VentaMaderaCortadaTable({
@@ -33,6 +43,7 @@ export function VentaMaderaCortadaTable({
   clientesById,
   clientesMap,
   canMutate,
+  canCorrectHistorical,
 }: VentaMaderaCortadaTableProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -53,12 +64,15 @@ export function VentaMaderaCortadaTable({
               <TH>Cliente</TH>
               <TH>Tipo corte</TH>
               <TH>Estado</TH>
+              <TH>Revisión de boleta</TH>
               <TH className="text-right">Total</TH>
               <TH className="w-32 text-right">Acciones</TH>
             </TRow>
           </THead>
           <tbody>
-            {ventas.slice(0, 30).map((v) => (
+            {ventas.slice(0, 30).map((v) => {
+              const review = reviewMaderaCortadaHistoricalSale(v);
+              return (
               <TRow key={v.id}>
                 <TD>{formatDate(v.fecha)}</TD>
                 <TD>{clientesById[v.cliente_id] ?? "—"}</TD>
@@ -76,6 +90,19 @@ export function VentaMaderaCortadaTable({
                     {v.estado}
                   </Badge>
                 </TD>
+                <TD>
+                  <Badge
+                    variant={
+                      review.status === "correcta"
+                        ? "success"
+                        : review.status === "falta_informacion"
+                          ? "warning"
+                          : "danger"
+                    }
+                  >
+                    {maderaCortadaHistoricalStatusLabels[review.status]}
+                  </Badge>
+                </TD>
                 <TD className="text-right font-semibold">
                   {formatPen(Number(v.total))}
                 </TD>
@@ -85,10 +112,7 @@ export function VentaMaderaCortadaTable({
                     {(() => {
                       const cli = clientesMap[v.cliente_id];
                       const hasRuc = !!(cli?.ruc && cli.ruc.trim().length === 11);
-                      const printUrl =
-                        (v.correlativo !== null
-                          ? `/ventas/comprobante/venta-madera/${v.id}`
-                          : `/ventas/comprobante/madera/${v.id}`) +
+                      const printUrl = `/ventas/comprobante/madera/${v.id}` +
                         `?tipoComprobante=${hasRuc ? "factura" : "boleta"}`;
                       return (
                         <Link
@@ -122,13 +146,24 @@ export function VentaMaderaCortadaTable({
                         </button>
                       </>
                     )}
+                    {canCorrectHistorical ? (
+                      <Link
+                        href={`/ventas/madera-cortada/${v.id}/corregir`}
+                        className="rounded p-1 text-slate-400 transition-colors hover:bg-emerald-500/10 hover:text-emerald-600"
+                        title="Revisar y corregir boleta"
+                        aria-label="Revisar y corregir boleta"
+                      >
+                        <ClipboardCheck className="size-3.5" />
+                      </Link>
+                    ) : null}
                   </div>
                 </TD>
               </TRow>
-            ))}
+              );
+            })}
             {ventas.length === 0 ? (
               <TRow>
-                <TD colSpan={6} className="text-center py-6 text-[var(--color-text-secondary)]">
+                <TD colSpan={7} className="text-center py-6 text-[var(--color-text-secondary)]">
                   Aún no hay ventas registradas.
                 </TD>
               </TRow>

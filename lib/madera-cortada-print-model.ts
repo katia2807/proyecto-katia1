@@ -207,8 +207,11 @@ export function buildMaderaCortadaVoucherLines(
     });
 }
 
-function parseStoredVoucherLines(raw: unknown): MaderaCortadaVoucherLine[] {
-  return parseJsonArray(raw)
+export function parseStoredMaderaCortadaVoucherLines(
+  raw: unknown,
+  options: { preserveIncomplete?: boolean } = {},
+): MaderaCortadaVoucherLine[] {
+  const lines = parseJsonArray(raw)
     .filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === "object")
     .map((linea, index) => ({
       orden: Math.max(0, Math.trunc(nonNegativeNumber(linea.orden, index))),
@@ -220,8 +223,9 @@ function parseStoredVoucherLines(raw: unknown): MaderaCortadaVoucherLine[] {
       largo: nonNegativeNumber(linea.largo),
       precio_unitario: nonNegativeNumber(linea.precio_unitario),
       subtotal: nonNegativeNumber(linea.subtotal),
-    }))
-    .filter((linea) => linea.cantidad > 0)
+    }));
+
+  return (options.preserveIncomplete ? lines : lines.filter((linea) => linea.cantidad > 0))
     .sort((a, b) => a.orden - b.orden);
 }
 
@@ -312,7 +316,7 @@ export function buildMaderaCortadaPrintModel(
   requestedDocType?: string,
 ): MaderaCortadaPrintModel {
   const totalSoles = nonNegativeNumber(source.total);
-  const storedLines = groupVoucherLines(parseStoredVoucherLines(source.lineas_comprobante));
+  const storedLines = groupVoucherLines(parseStoredMaderaCortadaVoucherLines(source.lineas_comprobante));
   const storedDocumentType = validStoredDocumentType(source.tipo_comprobante);
   const tipoComprobante = storedDocumentType ?? validStoredDocumentType(requestedDocType) ?? "boleta";
 

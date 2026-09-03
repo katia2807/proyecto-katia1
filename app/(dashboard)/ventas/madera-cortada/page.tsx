@@ -2,15 +2,19 @@ import { MaderaCortadaPanel } from "@/components/sales/madera-cortada-panel";
 import { VentaMaderaCortadaTable } from "@/components/sales/venta-madera-cortada-table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { getCurrentUserRole } from "@/lib/current-user-role";
+import { getDashboardSession } from "@/lib/current-user-role";
 import {
   getChoferesRows,
   getClientesRows,
   getInventarioProductosRows,
-  getVentasRows,
+  getVentasMaderaCortadaRows,
   getZonasEntregaRows,
 } from "@/lib/data";
-import { canMutateVentas } from "@/lib/permissions";
+import { canCorrectHistoricalMadera, canMutateVentas } from "@/lib/permissions";
+
+// Los permisos dependen de la sesión actual; esta página no puede quedar
+// congelada durante el build con un rol de solo lectura.
+export const dynamic = "force-dynamic";
 
 export default async function MaderaCortadaPage() {
   const comboMock =
@@ -20,10 +24,11 @@ export default async function MaderaCortadaPage() {
     getChoferesRows(),
     getInventarioProductosRows(),
     getZonasEntregaRows().catch(() => []),
-    getVentasRows(),
+    getVentasMaderaCortadaRows(),
   ]);
-  const role = await getCurrentUserRole();
-  const canMutate = canMutateVentas(role);
+  const session = await getDashboardSession();
+  const canMutate = canMutateVentas(session?.role, session?.uiRole);
+  const canCorrectHistorical = canCorrectHistoricalMadera(session?.role, session?.uiRole);
   const clientesById = new Map(clientes.map((c) => [c.id, c.nombre]));
   const clientesMap = new Map(clientes.map((c) => [c.id, c]));
 
@@ -69,7 +74,7 @@ export default async function MaderaCortadaPage() {
       <Card>
         <CardTitle>Ventas registradas</CardTitle>
         <CardDescription>
-          Historial de ventas de madera cortada y otros canales registrados.
+          Historial exclusivo de ventas de madera cortada.
         </CardDescription>
         <div className="mt-3">
           <VentaMaderaCortadaTable
@@ -79,12 +84,19 @@ export default async function MaderaCortadaPage() {
               fecha: v.fecha,
               estado: v.estado,
               total: Number(v.total),
-              correlativo: v.correlativo ?? null,
-              tipo_corte: (v as any).tipo_corte ?? null,
+              tipo_corte: v.tipo_corte ?? null,
+              total_pt: Number(v.total_pt ?? 0),
+              precio_por_pt: Number(v.precio_por_pt ?? 0),
+              cantidad_piezas: v.cantidad_piezas == null ? null : Number(v.cantidad_piezas),
+              precio_unitario_comercial:
+                v.precio_unitario_comercial == null ? null : Number(v.precio_unitario_comercial),
+              lineas_comprobante: v.lineas_comprobante ?? [],
+              tipo_comprobante: v.tipo_comprobante ?? "ninguno",
             }))}
             clientesById={Object.fromEntries(clientesById)}
             clientesMap={Object.fromEntries(clientesMap)}
             canMutate={canMutate}
+            canCorrectHistorical={canCorrectHistorical}
           />
         </div>
       </Card>

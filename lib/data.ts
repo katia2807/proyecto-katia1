@@ -302,6 +302,25 @@ export async function getVentasRows() {
   }, fallback.ventas);
 }
 
+/** Historial exclusivo del módulo de madera cortada (sin mezclar ventas clásicas). */
+export async function getVentasMaderaCortadaRows() {
+  if (!hasSupabaseEnv()) {
+    return demoVentasRows().filter((row) => Boolean(row.tipo_corte));
+  }
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("ventas_madera_cortada")
+    .select("*")
+    .eq("organization_id", DEFAULT_ORG_ID)
+    .order("fecha", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) {
+    throw new DashboardDataUnavailableError(error);
+  }
+  return data ?? [];
+}
+
 export async function getClientesRows() {
   if (!hasSupabaseEnv()) {
     return demoClientesRows();
@@ -1095,6 +1114,76 @@ export async function getVentaMaderaCortadaById(id: string) {
     .maybeSingle();
   if (error) return null;
   return data ?? null;
+}
+
+export type MaderaCortadaCorrectionContext = {
+  venta: NonNullable<Awaited<ReturnType<typeof getVentaMaderaCortadaById>>>;
+  activeCashMovements: Array<{
+    id: string;
+    monto: number;
+    periodo_cerrado: boolean;
+  }>;
+  inventoryMovements: Array<{
+    id: string;
+    cantidad: number;
+  }>;
+};
+
+/**
+ * Contexto de solo lectura para revisar una venta histórica. Los movimientos
+ * de inventario se muestran como evidencia y nunca se actualizan desde aquí.
+ */
+export async function getMaderaCortadaCorrectionContext(
+  id: string,
+): Promise<MaderaCortadaCorrectionContext | null> {
+  const venta = await getVentaMaderaCortadaById(id);
+  if (!venta) return null;
+
+  if (!hasSupabaseEnv()) {
+    const activeCashMovements = demoCajaRows()
+      .filter((row) => row.referencia_id === id && row.modulo_origen === "ventas_madera_cortada")
+      .map((row) => ({
+        id: row.id,
+        monto: Number(row.monto),
+        periodo_cerrado: Boolean(row.periodo_cerrado),
+      }));
+    const inventoryMovements = demoInventarioMovimientosRows()
+      .filter((row) => row.referencia === `venta_madera_cortada:${id}`)
+      .map((row) => ({ id: row.id, cantidad: Number(row.cantidad) }));
+    return { venta, activeCashMovements, inventoryMovements };
+  }
+
+  const supabase = getSupabaseServerClient();
+  const [cashResult, inventoryResult] = await Promise.all([
+    supabase
+      .from("movimientos_caja")
+      .select("id,monto,periodo_cerrado")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .eq("referencia_id", id)
+      .eq("modulo_origen", "ventas_madera_cortada")
+      .is("voided_at", null),
+    supabase
+      .from("inventario_movimientos")
+      .select("id,cantidad")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .eq("referencia", `venta_madera_cortada:${id}`),
+  ]);
+
+  if (cashResult.error) throw new DashboardDataUnavailableError(cashResult.error);
+  if (inventoryResult.error) throw new DashboardDataUnavailableError(inventoryResult.error);
+
+  return {
+    venta,
+    activeCashMovements: (cashResult.data ?? []).map((row) => ({
+      id: row.id,
+      monto: Number(row.monto),
+      periodo_cerrado: Boolean(row.periodo_cerrado),
+    })),
+    inventoryMovements: (inventoryResult.data ?? []).map((row) => ({
+      id: row.id,
+      cantidad: Number(row.cantidad),
+    })),
+  };
 }
 
 export async function getServiciosEspecialesTarifaRows(): Promise<ServicioEspecialTarifaRow[]> {

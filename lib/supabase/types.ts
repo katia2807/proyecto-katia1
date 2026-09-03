@@ -1131,6 +1131,19 @@ export type Database = {
       };
     };
     Functions: {
+      corregir_venta_madera_cortada_historica: {
+        Args: {
+          p_venta_id: string;
+          p_actor_id: string;
+          p_snapshot_esperado: Json;
+          p_precio_por_pt: number;
+          p_lineas_comprobante: Json;
+          p_total: number;
+          p_motivo: string;
+          p_sincronizar_caja?: boolean;
+        };
+        Returns: Json;
+      };
       cerrar_mes: {
         Args: { p_org_id: string; p_anio: number; p_mes: number };
         Returns: string;

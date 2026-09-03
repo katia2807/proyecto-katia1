@@ -6151,3 +6151,248 @@ export async function submitUpdateVentaMaderaCortadaForm(
     };
   }
 }
+
+const correccionHistoricaMaderaSchema = z.object({
+  id: z.string().uuid(),
+  precioPorPt: z.preprocess(preprocessDecimal, z.number().positive()),
+  totalMode: z.enum(["calculado", "registrado", "manual"]),
+  totalManual: z.preprocess(
+    (value) => (value === "" || value === null ? undefined : preprocessDecimal(value)),
+    z.number().positive().optional(),
+  ),
+  motivo: z.string().trim().min(10, "Explica el motivo con al menos 10 caracteres."),
+});
+
+function parseCorrectionLines(raw: FormDataEntryValue | null) {
+  if (typeof raw !== "string" || !raw.trim()) {
+    throw new Error("Debes completar al menos una línea para la boleta.");
+  }
+
+  let parsedRaw: unknown;
+  try {
+    parsedRaw = JSON.parse(raw);
+  } catch {
+    throw new Error("El detalle de piezas no es válido. Vuelve a revisar las líneas.");
+  }
+  if (!Array.isArray(parsedRaw) || parsedRaw.length === 0) {
+    throw new Error("Debes completar al menos una línea para la boleta.");
+  }
+
+  const lines = parseMaderaCortadaCubicajeLines(parsedRaw);
+  if (lines.length !== parsedRaw.length) {
+    throw new Error("Hay una línea incompleta o inválida. No se guardó ningún cambio.");
+  }
+  const incompleteIndex = lines.findIndex((line) =>
+    !line.descripcion.trim()
+    || line.cantidad <= 0
+    || line.espesor <= 0
+    || line.ancho <= 0
+    || line.largo <= 0
+  );
+  if (incompleteIndex >= 0) {
+    throw new Error(
+      `Completa la descripción, cantidad y las tres medidas de la pieza ${incompleteIndex + 1}.`,
+    );
+  }
+  return lines;
+}
+
+/**
+ * Corrección documental controlada de una venta histórica. Recalcula todo en
+ * el servidor, conserva el PT registrado para no alterar inventario y delega
+ * el guardado real a una única transacción auditable en Supabase.
+ */
+export async function correctVentaMaderaCortadaHistorica(formData: FormData) {
+  const actor = await requireAuthContext({ redirectTo: null });
+  if (actor.role !== "owner_admin" && actor.uiRole !== "owner_admin") {
+    throw new Error("Solo Katia puede corregir comprobantes históricos.");
+  }
+  if (formData.get("confirmacion") !== "on") {
+    throw new Error("Confirma que revisaste la comparación antes de guardar.");
+  }
+
+  const parsed = correccionHistoricaMaderaSchema.safeParse({
+    id: formData.get("id"),
+    precioPorPt: formData.get("precio_por_pt"),
+    totalMode: formData.get("total_mode"),
+    totalManual: formData.get("total_manual"),
+    motivo: formData.get("motivo_correccion"),
+  });
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Revisa los datos de la corrección.");
+  }
+  if (parsed.data.totalMode === "manual" && parsed.data.totalManual === undefined) {
+    throw new Error("Ingresa el total manual que quedará en la boleta.");
+  }
+
+  const lines = parseCorrectionLines(formData.get("lineas_cubicaje"));
+  const voucherLines = buildMaderaCortadaVoucherLines(lines, parsed.data.precioPorPt);
+  if (voucherLines.length !== lines.length) {
+    throw new Error("Hay líneas incompletas. No se guardó ningún cambio.");
+  }
+  const calculatedTotalPt = voucherLines.reduce(
+    (sum, line) => sum + ((line.espesor * line.ancho * line.largo) / 12) * line.cantidad,
+    0,
+  );
+  const calculatedQuantity = voucherLines.reduce((sum, line) => sum + line.cantidad, 0);
+  const calculatedSubtotal = roundMoney(
+    voucherLines.reduce((sum, line) => sum + line.subtotal, 0),
+  );
+
+  let current: {
+    id: string;
+    estado: string;
+    total: number;
+    total_pt: number;
+    precio_por_pt: number;
+    modalidad_pago?: string | null;
+    lineas_comprobante?: unknown;
+  } | null = null;
+
+  if (!hasSupabaseEnv()) {
+    const { demoVentasRows } = await import("@/lib/demo-store");
+    const row = demoVentasRows().find((item) => item.id === parsed.data.id);
+    current = row
+      ? {
+          id: row.id,
+          estado: row.estado,
+          total: Number(row.total),
+          total_pt: Number(row.total_pt ?? 0),
+          precio_por_pt: Number(row.precio_por_pt ?? 0),
+          modalidad_pago: row.modalidad_pago,
+          lineas_comprobante: row.lineas_comprobante ?? [],
+        }
+      : null;
+  } else {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("ventas_madera_cortada")
+      .select("id,estado,total,total_pt,precio_por_pt,modalidad_pago,lineas_comprobante")
+      .eq("id", parsed.data.id)
+      .eq("organization_id", actor.organizationId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    current = data
+      ? {
+          ...data,
+          total: Number(data.total),
+          total_pt: Number(data.total_pt),
+          precio_por_pt: Number(data.precio_por_pt),
+        }
+      : null;
+  }
+
+  if (!current) throw new Error("No se encontró la venta que quieres corregir.");
+  if (current.estado !== "confirmada") {
+    throw new Error("Solo se pueden corregir ventas confirmadas.");
+  }
+  if (Math.abs(calculatedTotalPt - current.total_pt) > 0.01) {
+    throw new Error(
+      "Las medidas no reproducen el PT registrado. No se guardó nada para proteger el inventario.",
+    );
+  }
+
+  const nextTotal = parsed.data.totalMode === "registrado"
+    ? roundMoney(current.total)
+    : parsed.data.totalMode === "manual"
+      ? roundMoney(parsed.data.totalManual ?? 0)
+      : calculatedSubtotal;
+  if (nextTotal <= 0 || calculatedQuantity <= 0) {
+    throw new Error("El total y la cantidad corregidos deben ser mayores que cero.");
+  }
+  const changesTotal = Math.abs(nextTotal - current.total) >= 0.01;
+
+  if (!hasSupabaseEnv()) {
+    const { demoVentasRows, demoCajaRows, persistStore } = await import("@/lib/demo-store");
+    const row = demoVentasRows().find((item) => item.id === parsed.data.id);
+    if (!row) throw new Error("La venta cambió mientras la revisabas. Vuelve a abrirla.");
+
+    if (changesTotal && current.modalidad_pago === "contado") {
+      const cashRows = demoCajaRows().filter(
+        (item) => item.referencia_id === current?.id
+          && item.modulo_origen === "ventas_madera_cortada",
+      );
+      if (cashRows.length !== 1) {
+        throw new Error("Caja no tiene un único movimiento activo para esta venta.");
+      }
+      if (cashRows[0].periodo_cerrado) {
+        throw new Error("El movimiento pertenece a un período cerrado y no puede modificarse.");
+      }
+      cashRows[0].monto = nextTotal;
+    }
+
+    row.precio_por_pt = parsed.data.precioPorPt;
+    row.cantidad_piezas = calculatedQuantity;
+    row.precio_unitario_comercial = roundMoney(nextTotal / calculatedQuantity);
+    row.lineas_comprobante = voucherLines;
+    row.total = nextTotal;
+    persistStore();
+  } else {
+    const supabase = getSupabaseServerClient();
+    let syncCash = false;
+    if (changesTotal && current.modalidad_pago === "contado") {
+      const { data: cashRows, error: cashError } = await supabase
+        .from("movimientos_caja")
+        .select("id,periodo_cerrado")
+        .eq("organization_id", actor.organizationId)
+        .eq("referencia_id", current.id)
+        .eq("modulo_origen", "ventas_madera_cortada")
+        .is("voided_at", null);
+      if (cashError) throw new Error(cashError.message);
+      if ((cashRows ?? []).length !== 1) {
+        throw new Error("Caja no tiene un único movimiento activo para esta venta.");
+      }
+      if (cashRows?.[0]?.periodo_cerrado) {
+        throw new Error("El movimiento pertenece a un período cerrado y no puede modificarse.");
+      }
+      syncCash = true;
+    }
+
+    const snapshot = {
+      total: current.total,
+      total_pt: current.total_pt,
+      precio_por_pt: current.precio_por_pt,
+      lineas_comprobante: current.lineas_comprobante ?? [],
+    };
+    const { error } = await supabase.rpc("corregir_venta_madera_cortada_historica", {
+      p_venta_id: current.id,
+      p_actor_id: actor.userId,
+      p_snapshot_esperado: snapshot as unknown as Json,
+      p_precio_por_pt: parsed.data.precioPorPt,
+      p_lineas_comprobante: voucherLines as unknown as Json,
+      p_total: nextTotal,
+      p_motivo: parsed.data.motivo,
+      p_sincronizar_caja: syncCash,
+    });
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath("/ventas/madera-cortada");
+  revalidatePath(`/ventas/comprobante/madera/${parsed.data.id}`);
+  revalidatePath(`/print/a4/boleta/${parsed.data.id}`);
+  revalidatePath(`/print/a4/factura/${parsed.data.id}`);
+  revalidatePath(`/print/ticket/boleta/${parsed.data.id}`);
+  revalidatePath(`/print/ticket/factura/${parsed.data.id}`);
+  revalidatePath("/caja");
+}
+
+export async function submitCorrectVentaMaderaCortadaHistoricaForm(
+  _prev: MutationFormState,
+  formData: FormData,
+): Promise<MutationFormState> {
+  try {
+    await correctVentaMaderaCortadaHistorica(formData);
+    return {
+      success: true,
+      error: null,
+      message: "Boleta histórica corregida y registrada en auditoría.",
+      id: String(formData.get("id") ?? ""),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "No se pudo corregir la boleta.",
+      message: null,
+    };
+  }
+}

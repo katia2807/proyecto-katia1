@@ -80,6 +80,18 @@ export function canEditMaderaConversion(role: AppRole | null | undefined, uiRole
   return effectiveRole === "owner_admin" || effectiveRole === "gerencia" || effectiveRole === "ventas";
 }
 
+/**
+ * La corrección de comprobantes históricos puede afectar caja y deja una
+ * auditoría permanente. Se reserva a Katia (rol efectivo de dueña).
+ */
+export function canCorrectHistoricalMadera(
+  role: AppRole | null | undefined,
+  uiRole?: string | null,
+) {
+  if (!role) return false;
+  return resolveRole(role, uiRole) === "owner_admin";
+}
+
 export function canMutateVentas(role: AppRole | null | undefined, uiRole?: string | null) {
   if (!role) return false;
   return ventasMutationRoles.has(resolveRole(role, uiRole));
