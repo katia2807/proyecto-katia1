@@ -625,6 +625,8 @@ export type Database = {
           precio_por_pt: number;
           cantidad_piezas: number | null;
           precio_unitario_comercial: number | null;
+          lineas_comprobante: Json;
+          tipo_comprobante: "boleta" | "factura" | "ninguno";
           total: number;
           metodo_pago:
             | "efectivo"
@@ -653,6 +655,8 @@ export type Database = {
           precio_por_pt: number;
           cantidad_piezas?: number | null;
           precio_unitario_comercial?: number | null;
+          lineas_comprobante?: Json;
+          tipo_comprobante?: "boleta" | "factura" | "ninguno";
           total: number;
           metodo_pago:
             | "efectivo"
@@ -674,7 +678,9 @@ export type Database = {
           cantidad_piezas?: number | null;
           estado?: "borrador" | "confirmada";
           estado_entrega?: "pendiente" | "en_proceso" | "entregado";
+          lineas_comprobante?: Json;
           precio_unitario_comercial?: number | null;
+          tipo_comprobante?: "boleta" | "factura" | "ninguno";
         };
       };
       ventas_mueble_terminado: {

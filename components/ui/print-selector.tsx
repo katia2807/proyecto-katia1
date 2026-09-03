@@ -18,6 +18,9 @@ export function PrintSelector({ id, currentFormat, docType, tipoSale }: PrintSel
     if (tipoSale) {
       params.set("tipo", tipoSale);
     }
+    if (docType === "boleta" || docType === "factura") {
+      params.set("tipoComprobante", docType);
+    }
 
     let path = "";
     if (format === "default") {

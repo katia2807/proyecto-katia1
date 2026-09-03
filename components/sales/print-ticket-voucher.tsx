@@ -7,6 +7,7 @@ import { PrintButton } from "@/components/ui/print-button";
 import { PrintSelector } from "@/components/ui/print-selector";
 import { buildAserraderoPrintModel } from "@/lib/aserradero-print-model";
 import { AserraderoPrintTicketDetail } from "@/components/sales/aserradero-print-ticket-detail";
+import { buildMaderaCortadaPrintModel } from "@/lib/madera-cortada-print-model";
 
 type PrintTicketVoucherProps = {
   id: string;
@@ -79,11 +80,12 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
   let fechaVenta  = "—";
   let clienteNombre = "—";
   let clienteDoc    = "—";
-  let items: Array<{ desc: string; qty: string; unitario: string; total: string }> = [];
+  let items: Array<{ desc: string; qty: string; unitario: string; total: string; kind?: "producto" | "ajuste" }> = [];
   let totalSoles    = 0;
   let modalidad     = "—";
   let metodo        = "—";
   let entrega       = "—";
+  let effectiveDocType: "boleta" | "factura" = docType;
 
   let aserraderoServicio: any = null;
   let aserraderoLineasEspeciales: Array<{ id: string; codigo: string; nombre: string; cantidad: number; tarifa: number; subtotal: number; tipo?: string }> = [];
@@ -147,6 +149,8 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
     }
   } else if (tipo === "madera") {
     const venta = saleRecord;
+    const printModel = buildMaderaCortadaPrintModel(venta, docType);
+    effectiveDocType = printModel.tipoComprobante;
     correlativo    = venta.correlativo ?? venta.id.slice(0, 8).toUpperCase();
     fechaVenta     = fmt(venta.fecha);
     totalSoles     = Number(venta.total);
@@ -158,27 +162,9 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
     clienteNombre  = cli?.nombre ?? "—";
     clienteDoc     = cli?.ruc ?? cli?.documento ?? "—";
 
-    const cantidadPiezas = Number(venta.cantidad_piezas ?? 0);
-    const precioUnitarioComercial = Number(venta.precio_unitario_comercial ?? 0);
-    const usarPrecioComercial = cantidadPiezas > 0 && precioUnitarioComercial > 0;
-    const pt       = Number(venta.total_pt ?? 0).toFixed(2);
-    const ppt      = Number(venta.precio_por_pt ?? 0);
-    const tipoCorte = (venta.tipo_corte ?? "madera").replace(/_/g, " ");
-    items = [
-      {
-        desc: `Madera cortada - ${tipoCorte}`,
-        qty: usarPrecioComercial ? `${cantidadPiezas} pzs` : `${pt} PT`,
-        unitario: usarPrecioComercial ? formatPen(precioUnitarioComercial) : formatPen(ppt),
-        total: formatPen(totalSoles),
-      },
-    ];
-    if (venta.costo_envio && Number(venta.costo_envio) > 0) {
-      items.push({
-        desc: "Envio",
-        qty: "1",
-        unitario: formatPen(Number(venta.costo_envio)),
-        total: formatPen(Number(venta.costo_envio)),
-      });
+    items = printModel.items;
+    if (venta.tipo_entrega && venta.direccion_entrega) {
+      entrega = `${venta.tipo_entrega} — ${venta.direccion_entrega}`;
     }
   } else {
     const venta = saleRecord;
@@ -211,7 +197,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
     montoAdelanto = await getAdelantoFromCaja(id);
   }
 
-  const docTitle = docType === "factura" ? "FACTURA DE VENTA" : "BOLETA DE VENTA";
+  const docTitle = effectiveDocType === "factura" ? "FACTURA DE VENTA" : "BOLETA DE VENTA";
 
   return (
     <>
@@ -355,7 +341,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
           <PrintSelector
             id={id}
             currentFormat="ticket"
-            docType={docType}
+            docType={effectiveDocType}
             tipoSale={tipo}
           />
           <PrintButton />
@@ -432,7 +418,9 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
 
               {["madera", "mueble"].includes(tipo || "") && items.map((item, idx) => (
                 <tr key={idx} className="border-b border-dashed border-gray-200">
-                  <td className="py-1 font-semibold text-left">{item.qty} x {item.desc}</td>
+                  <td className="py-1 font-semibold text-left">
+                    {item.kind === "ajuste" ? item.desc : `${item.qty} × ${item.desc}`}
+                  </td>
                   <td className="text-right">{item.unitario}</td>
                   <td className="text-right">{item.total}</td>
                 </tr>

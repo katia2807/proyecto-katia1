@@ -7,7 +7,7 @@ test.describe("ventas — madera, aserradero, mixer (demo DB)", () => {
     await loginDemo(page);
   });
 
-  test("madera cortada: venta básica aparece en listado", async ({ page }) => {
+  test("madera cortada: el detalle registrado coincide en todos los comprobantes", async ({ page }) => {
     await page.goto("/ventas/madera-cortada");
     await expect(page.getByRole("heading", { name: "Madera cortada", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Registrar venta de madera" }).click();
@@ -17,20 +17,45 @@ test.describe("ventas — madera, aserradero, mixer (demo DB)", () => {
     await page.getByRole("button", { name: /^Siguiente: Detalle del corte/ }).click();
     await expect(page.getByRole("heading", { name: "Paso 2: Detalle del corte y cubicaje", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Agregar pieza" }).click();
-    await page.getByLabel("Cantidad").fill("1");
+    await page.getByPlaceholder("Tabla, listón, especie...").fill("Tabla de roble selección E2E");
+    await page.getByLabel("Cantidad").fill("4");
     await page.getByLabel("Espesor (in)").fill("1");
-    await page.getByLabel("Ancho (in)").fill("12");
+    await page.getByLabel("Ancho (in)").fill("1");
     await page.getByLabel("Largo (ft)").fill("12");
-    await page.getByLabel("Precio por PT (S/)").fill("25");
+    await page.getByLabel("Precio por PT (S/)").fill("3.5");
+    await page.locator("label").filter({ hasText: "Precio unit. S/" }).locator('input[type="number"]').fill("3.5");
     await page.getByRole("button", { name: /^Siguiente: Cobro y Entrega/ }).click();
     await expect(page.getByRole("heading", { name: "Paso 3: Resumen de cobro, entrega y pago", exact: true })).toBeVisible();
     await page.getByLabel("Tipo de entrega").selectOption("entrega_local");
     await page.getByRole("button", { name: /^Siguiente: Confirmar/ }).click();
     await expect(page.getByRole("heading", { name: "Paso 4: Confirmar y registrar", exact: true })).toBeVisible();
+    const popupPromise = page.waitForEvent("popup");
     await page.getByRole("button", { name: "Registrar venta ✓", exact: true }).click();
+    const comprobante = await popupPromise;
+    await comprobante.waitForLoadState("domcontentloaded");
 
     await expect(page.getByRole("heading", { name: "Madera cortada", exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Ropero Carlos" }).first()).toBeVisible();
+
+    expect(comprobante.url()).toMatch(/\/ventas\/comprobante\/madera\/[0-9a-f-]+\?tipoComprobante=boleta/);
+    const ventaId = comprobante.url().match(/\/madera\/([0-9a-f-]+)/)?.[1];
+    expect(ventaId).toBeTruthy();
+
+    for (const url of [
+      `/ventas/comprobante/madera/${ventaId}?tipoComprobante=boleta`,
+      `/print/a4/boleta/${ventaId}?tipo=madera`,
+      `/print/ticket/boleta/${ventaId}?tipo=madera`,
+    ]) {
+      await comprobante.goto(url);
+      await expect(comprobante.getByText(/Tabla de roble selección E2E/).first()).toBeVisible();
+      await expect(comprobante.getByText(/1\" × 1\" × 12'/).first()).toBeVisible();
+      await expect(comprobante.getByText(/4\s*pzs/i).first()).toBeVisible();
+      await expect(comprobante.getByText(/S\/\s*3\.50/).first()).toBeVisible();
+      await expect(comprobante.getByText(/S\/\s*14\.00/).last()).toBeVisible();
+      await expect(comprobante.locator("body")).not.toContainText("93.33");
+    }
+
+    await comprobante.close();
   });
 
   test("aserradero: servicio básico aparece en listado", async ({ page }) => {

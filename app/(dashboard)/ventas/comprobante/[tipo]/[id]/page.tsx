@@ -10,6 +10,7 @@ import { PrintButton } from "@/components/ui/print-button";
 import { PrintSelector } from "@/components/ui/print-selector";
 import { buildAserraderoPrintModel } from "@/lib/aserradero-print-model";
 import { AserraderoPrintA4Detail } from "@/components/sales/aserradero-print-a4-detail";
+import { buildMaderaCortadaPrintModel } from "@/lib/madera-cortada-print-model";
 
 
 type Params = { tipo: string; id: string };
@@ -55,6 +56,8 @@ type MaderaCortadaRow = {
   precio_por_pt: number | null;
   cantidad_piezas?: number | null;
   precio_unitario_comercial?: number | null;
+  lineas_comprobante?: unknown;
+  tipo_comprobante?: "boleta" | "factura" | "ninguno";
   total: number;
   metodo_pago: string | null;
   modalidad_pago: string | null;
@@ -167,15 +170,19 @@ async function getMaderaCortadaById(id: string): Promise<MaderaCortadaRow | null
       id: found.id,
       cliente_id: found.cliente_id,
       fecha: found.fecha,
-      tipo_corte: "tabla",
-      total_pt: 10,
-      precio_por_pt: found.total / 10,
+      tipo_corte: found.tipo_corte ?? "tabla",
+      total_pt: found.total_pt ?? 0,
+      precio_por_pt: found.precio_por_pt ?? 0,
+      cantidad_piezas: found.cantidad_piezas ?? null,
+      precio_unitario_comercial: found.precio_unitario_comercial ?? null,
+      lineas_comprobante: found.lineas_comprobante ?? [],
+      tipo_comprobante: found.tipo_comprobante ?? "ninguno",
       total: found.total,
-      metodo_pago: "efectivo",
-      modalidad_pago: "contado",
-      tipo_entrega: "recojo",
-      direccion_entrega: null,
-      estado_entrega: "entregado",
+      metodo_pago: found.metodo_pago ?? null,
+      modalidad_pago: found.modalidad_pago ?? null,
+      tipo_entrega: found.tipo_entrega ?? null,
+      direccion_entrega: found.direccion_entrega ?? null,
+      estado_entrega: found.estado_entrega ?? null,
       correlativo: found.correlativo,
       costo_envio: 0,
       created_at: found.created_at,
@@ -325,11 +332,16 @@ export default async function ComprobantePage({
   let fechaVenta  = "—";
   let clienteNombre = "—";
   let clienteDoc    = "—";
-  let items: Array<{ desc: string; qty: string; unitario: string; total: string }> = [];
+  let items: Array<{ desc: string; qty: string; unitario: string; total: string; kind?: "producto" | "ajuste" }> = [];
   let totalSoles    = 0;
   let modalidad     = "—";
   let metodo        = "—";
   let entrega       = "—";
+  let storedMaderaDocType: "boleta" | "factura" | null = null;
+  const queryComprobante =
+    (typeof sParams?.tipoComprobante === "string" ? sParams.tipoComprobante : undefined) ||
+    (typeof sParams?.comprobante === "string" ? sParams.comprobante : undefined) ||
+    (typeof sParams?.tipo_comprobante === "string" ? sParams.tipo_comprobante : undefined);
 
   // New states for specific types
   let aserraderoServicio: ServicioAserraderoRow | null = null;
@@ -405,6 +417,8 @@ export default async function ComprobantePage({
   } else if (tipo === "madera") {
     const venta = await getMaderaCortadaById(id);
     if (!venta) notFound();
+    const printModel = buildMaderaCortadaPrintModel(venta, queryComprobante);
+    storedMaderaDocType = printModel.tipoComprobante;
 
     correlativo    = venta.correlativo ?? venta.id.slice(0, 8).toUpperCase();
     fechaVenta     = fmt(venta.fecha);
@@ -417,28 +431,7 @@ export default async function ComprobantePage({
     clienteNombre  = cli?.nombre ?? "—";
     clienteDoc     = cli?.ruc ?? cli?.documento ?? "—";
 
-    const cantidadPiezas = Number(venta.cantidad_piezas ?? 0);
-    const precioUnitarioComercial = Number(venta.precio_unitario_comercial ?? 0);
-    const usarPrecioComercial = cantidadPiezas > 0 && precioUnitarioComercial > 0;
-    const pt       = Number(venta.total_pt ?? 0).toFixed(2);
-    const ppt      = Number(venta.precio_por_pt ?? 0);
-    const tipoCorte = (venta.tipo_corte ?? "madera").replace(/_/g, " ");
-    items = [
-      {
-        desc: `Venta de madera cortada — ${tipoCorte}`,
-        qty: usarPrecioComercial ? `${cantidadPiezas} pzs` : `${pt} PT`,
-        unitario: usarPrecioComercial ? formatPen(precioUnitarioComercial) : formatPen(ppt) + "/PT",
-        total: formatPen(totalSoles),
-      },
-    ];
-    if (venta.costo_envio && Number(venta.costo_envio) > 0) {
-      items.push({
-        desc: "Costo de envío",
-        qty: "1",
-        unitario: formatPen(Number(venta.costo_envio)),
-        total: formatPen(Number(venta.costo_envio)),
-      });
-    }
+    items = printModel.items;
     if (venta.tipo_entrega && venta.tipo_entrega !== "recojo" && venta.direccion_entrega) {
       entrega = `${venta.tipo_entrega} — ${venta.direccion_entrega}`;
     }
@@ -483,13 +476,12 @@ export default async function ComprobantePage({
   }
 
   // Determine doc type (Factura, Boleta, Nota de Venta)
-  const queryComprobante =
-    (typeof sParams?.tipoComprobante === "string" ? sParams.tipoComprobante : undefined) ||
-    (typeof sParams?.comprobante === "string" ? sParams.comprobante : undefined) ||
-    (typeof sParams?.tipo_comprobante === "string" ? sParams.tipo_comprobante : undefined);
-
   let docType = "BOLETA DE VENTA";
-  if (queryComprobante === "factura") {
+  if (storedMaderaDocType === "factura") {
+    docType = "FACTURA DE VENTA";
+  } else if (storedMaderaDocType === "boleta") {
+    docType = "BOLETA DE VENTA";
+  } else if (queryComprobante === "factura") {
     docType = "FACTURA DE VENTA";
   } else if (queryComprobante === "boleta") {
     docType = "BOLETA DE VENTA";

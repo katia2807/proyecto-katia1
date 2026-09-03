@@ -71,6 +71,10 @@ import type { MutationFormState } from "@/lib/mutation-form-state";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole, Json } from "@/lib/supabase/types";
 import { roundMoney, safeDivide, parseDecimal } from "@/lib/utils";
+import {
+  buildMaderaCortadaVoucherLines,
+  parseMaderaCortadaCubicajeLines,
+} from "@/lib/madera-cortada-print-model";
 
 import { getEmpresaConfig } from "@/lib/company-config";
 import {
@@ -3967,6 +3971,13 @@ export async function createVentaMaderaCortada(formData: FormData) {
 
   await assertClientePuedeEmitirFactura(parsed.data.clienteId, parsed.data.tipoComprobante);
 
+  const lineasRaw = formData.get("lineas_cubicaje");
+  const lineas = parseMaderaCortadaCubicajeLines(lineasRaw);
+  const lineasComprobante = buildMaderaCortadaVoucherLines(lineas);
+  if (lineas.length === 0 || lineasComprobante.length === 0) {
+    throw new Error("No se pudo conservar el detalle de la venta. Revisa las piezas ingresadas antes de registrar.");
+  }
+
   let createdId = "";
   if (!hasSupabaseEnv()) {
     const row = demoCreateVentaMaderaCortada({
@@ -3978,6 +3989,8 @@ export async function createVentaMaderaCortada(formData: FormData) {
       precio_por_pt: parsed.data.precioPorPt,
       cantidad_piezas: parsed.data.cantidadPiezas,
       precio_unitario_comercial: parsed.data.precioUnitarioComercial,
+      lineas_comprobante: lineasComprobante,
+      tipo_comprobante: parsed.data.tipoComprobante,
       total: parsed.data.total,
       metodo_pago: parsed.data.metodoPago,
       modalidad_pago: parsed.data.modalidadPago,
@@ -3995,17 +4008,6 @@ export async function createVentaMaderaCortada(formData: FormData) {
       parsed.data.inventarioProductoId && parsed.data.inventarioProductoId.length > 0
         ? parsed.data.inventarioProductoId
         : null;
-
-    // Parse detailed pieces for multi-product stock verification
-    const lineasRaw = formData.get("lineas_cubicaje");
-    let lineas: Array<{ inventario_producto_id?: string | null; subtotalPT?: number }> = [];
-    if (typeof lineasRaw === "string" && lineasRaw.trim().length > 0) {
-      try {
-        lineas = JSON.parse(lineasRaw);
-      } catch (err) {
-        console.error("[createVentaMaderaCortada] Failed to parse lineas_cubicaje:", err);
-      }
-    }
 
     const productPtMap = new Map<string, number>();
     for (const linea of lineas) {
@@ -4070,6 +4072,8 @@ export async function createVentaMaderaCortada(formData: FormData) {
         precio_por_pt: parsed.data.precioPorPt,
         cantidad_piezas: parsed.data.cantidadPiezas || null,
         precio_unitario_comercial: parsed.data.precioUnitarioComercial || null,
+        lineas_comprobante: lineasComprobante as unknown as Json,
+        tipo_comprobante: parsed.data.tipoComprobante,
         total: parsed.data.total,
         metodo_pago: parsed.data.metodoPago,
         modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,

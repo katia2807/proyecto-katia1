@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readStoreFromDisk, writeStoreToDisk } from "@/lib/store-persistence";
 import { isDemoDatabaseMode } from "@/lib/demo-mode";
+import type { MaderaCortadaVoucherLine, TipoComprobanteVenta } from "@/lib/madera-cortada-print-model";
 
 export type MetodoPago =
   | "efectivo"
@@ -100,6 +101,18 @@ type VentaRow = {
   correlativo: string | null;
   created_at: string;
   created_by: string | null;
+  tipo_corte?: "tabla" | "liston" | "cuarton" | "poste";
+  total_pt?: number;
+  precio_por_pt?: number;
+  cantidad_piezas?: number;
+  precio_unitario_comercial?: number;
+  metodo_pago?: MetodoPago;
+  modalidad_pago?: ModalidadPago;
+  tipo_entrega?: TipoEntrega;
+  direccion_entrega?: string | null;
+  estado_entrega?: EstadoEntrega;
+  lineas_comprobante?: MaderaCortadaVoucherLine[];
+  tipo_comprobante?: TipoComprobanteVenta;
 };
 
 type CompraMaderaRow = {
@@ -1502,6 +1515,50 @@ function normalizeVenta(raw: unknown): VentaRow {
     correlativo: r.correlativo != null ? String(r.correlativo) : null,
     created_at: String(r.created_at ?? nowIso()),
     created_by: r.created_by != null ? String(r.created_by) : null,
+    tipo_corte:
+      r.tipo_corte === "liston" || r.tipo_corte === "cuarton" || r.tipo_corte === "poste"
+        ? r.tipo_corte
+        : r.tipo_corte === "tabla"
+          ? "tabla"
+          : undefined,
+    total_pt: r.total_pt != null ? Number(r.total_pt) : undefined,
+    precio_por_pt: r.precio_por_pt != null ? Number(r.precio_por_pt) : undefined,
+    cantidad_piezas: r.cantidad_piezas != null ? Number(r.cantidad_piezas) : undefined,
+    precio_unitario_comercial:
+      r.precio_unitario_comercial != null ? Number(r.precio_unitario_comercial) : undefined,
+    metodo_pago:
+      r.metodo_pago === "yape" ||
+      r.metodo_pago === "transferencia" ||
+      r.metodo_pago === "billetera_digital" ||
+      r.metodo_pago === "otro"
+        ? r.metodo_pago
+        : r.metodo_pago === "efectivo"
+          ? "efectivo"
+          : undefined,
+    modalidad_pago:
+      r.modalidad_pago === "adelanto" || r.modalidad_pago === "adelanto_saldo" || r.modalidad_pago === "credito"
+        ? r.modalidad_pago
+        : r.modalidad_pago === "contado"
+          ? "contado"
+          : undefined,
+    tipo_entrega:
+      r.tipo_entrega === "puesto_en_obra" || r.tipo_entrega === "entrega_local" || r.tipo_entrega === "envio"
+        ? r.tipo_entrega
+        : undefined,
+    direccion_entrega: r.direccion_entrega != null ? String(r.direccion_entrega) : null,
+    estado_entrega:
+      r.estado_entrega === "en_proceso" || r.estado_entrega === "entregado"
+        ? r.estado_entrega
+        : r.estado_entrega === "pendiente"
+          ? "pendiente"
+          : undefined,
+    lineas_comprobante: Array.isArray(r.lineas_comprobante)
+      ? (r.lineas_comprobante as MaderaCortadaVoucherLine[])
+      : undefined,
+    tipo_comprobante:
+      r.tipo_comprobante === "boleta" || r.tipo_comprobante === "factura" || r.tipo_comprobante === "ninguno"
+        ? r.tipo_comprobante
+        : undefined,
   };
 }
 
@@ -3019,6 +3076,8 @@ export function demoCreateVentaMaderaCortada(input: {
   precio_por_pt: number;
   cantidad_piezas?: number;
   precio_unitario_comercial?: number;
+  lineas_comprobante: MaderaCortadaVoucherLine[];
+  tipo_comprobante: TipoComprobanteVenta;
   total: number;
   metodo_pago: MetodoPago;
   modalidad_pago: ModalidadPago;
@@ -3040,6 +3099,18 @@ export function demoCreateVentaMaderaCortada(input: {
     correlativo: null,
     created_at: nowIso(),
     created_by: null,
+    tipo_corte: input.tipo_corte,
+    total_pt: input.total_pt,
+    precio_por_pt: input.precio_por_pt,
+    cantidad_piezas: input.cantidad_piezas,
+    precio_unitario_comercial: input.precio_unitario_comercial,
+    metodo_pago: input.metodo_pago,
+    modalidad_pago: input.modalidad_pago,
+    tipo_entrega: input.tipo_entrega,
+    direccion_entrega: input.direccion_entrega,
+    estado_entrega: input.estado_entrega,
+    lineas_comprobante: input.lineas_comprobante,
+    tipo_comprobante: input.tipo_comprobante,
   };
   store.ventas.unshift(venta);
 

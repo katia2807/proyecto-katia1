@@ -168,7 +168,7 @@ export function MaderaCortadaForm({
       // Open print ticket automatically
       if (state.id) {
         const isFactura = tipoComprobante === "factura" && hasRuc;
-        const printUrl = `/ventas/comprobante/venta-madera/${state.id}?tipoComprobante=${isFactura ? "factura" : "boleta"}`;
+        const printUrl = `/ventas/comprobante/madera/${state.id}?tipoComprobante=${isFactura ? "factura" : "boleta"}`;
         window.open(printUrl, "_blank");
       }
 

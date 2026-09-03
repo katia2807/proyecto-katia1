@@ -8,6 +8,7 @@ import { PrintButton } from "@/components/ui/print-button";
 import { PrintSelector } from "@/components/ui/print-selector";
 import { buildAserraderoPrintModel } from "@/lib/aserradero-print-model";
 import { AserraderoPrintA4Detail } from "@/components/sales/aserradero-print-a4-detail";
+import { buildMaderaCortadaPrintModel } from "@/lib/madera-cortada-print-model";
 
 type PrintA4VoucherProps = {
   id: string;
@@ -123,11 +124,12 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
   let fechaVenta  = "—";
   let clienteNombre = "—";
   let clienteDoc    = "—";
-  let items: Array<{ desc: string; qty: string; unitario: string; total: string }> = [];
+  let items: Array<{ desc: string; qty: string; unitario: string; total: string; kind?: "producto" | "ajuste" }> = [];
   let totalSoles    = 0;
   let modalidad     = "—";
   let metodo        = "—";
   let entrega       = "—";
+  let effectiveDocType: "boleta" | "factura" = docType;
 
   let aserraderoServicio: any = null;
   let aserraderoLineasEspeciales: Array<{ id: string; codigo: string; nombre: string; cantidad: number; tarifa: number; subtotal: number; tipo?: string }> = [];
@@ -195,6 +197,8 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
     }
   } else if (tipo === "madera") {
     const venta = saleRecord;
+    const printModel = buildMaderaCortadaPrintModel(venta, docType);
+    effectiveDocType = printModel.tipoComprobante;
     correlativo    = venta.correlativo ?? venta.id.slice(0, 8).toUpperCase();
     fechaVenta     = fmt(venta.fecha);
     totalSoles     = Number(venta.total);
@@ -206,25 +210,7 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
     clienteNombre  = cli?.nombre ?? "—";
     clienteDoc     = cli?.ruc ?? cli?.documento ?? "—";
 
-    const pt       = Number(venta.total_pt ?? 0).toFixed(2);
-    const ppt      = Number(venta.precio_por_pt ?? 0);
-    const tipoCorte = (venta.tipo_corte ?? "madera").replace(/_/g, " ");
-    items = [
-      {
-        desc: `Venta de madera cortada — ${tipoCorte}`,
-        qty: `${pt} PT`,
-        unitario: formatPen(ppt) + "/PT",
-        total: formatPen(totalSoles),
-      },
-    ];
-    if (venta.costo_envio && Number(venta.costo_envio) > 0) {
-      items.push({
-        desc: "Costo de envío",
-        qty: "1",
-        unitario: formatPen(Number(venta.costo_envio)),
-        total: formatPen(Number(venta.costo_envio)),
-      });
-    }
+    items = printModel.items;
     if (venta.tipo_entrega && venta.tipo_entrega !== "recojo" && venta.direccion_entrega) {
       entrega = `${venta.tipo_entrega} — ${venta.direccion_entrega}`;
     }
@@ -265,7 +251,7 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
     montoAdelanto = await getAdelantoFromCaja(id);
   }
 
-  const docTitle = docType === "factura" ? "FACTURA DE VENTA" : "BOLETA DE VENTA";
+  const docTitle = effectiveDocType === "factura" ? "FACTURA DE VENTA" : "BOLETA DE VENTA";
   const brandContactLines = [
     empresa.telefono ? `Tel: ${empresa.telefono}` : null,
     empresa.direccion ? `Dir: ${empresa.direccion}` : null,
@@ -304,7 +290,7 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
           <PrintSelector
             id={id}
             currentFormat="a4"
-            docType={docType}
+            docType={effectiveDocType}
             tipoSale={tipo}
           />
           <PrintButton />

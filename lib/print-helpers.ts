@@ -11,6 +11,10 @@ export type MaderaCortadaRow = {
   tipo_corte: string | null;
   total_pt: number | null;
   precio_por_pt: number | null;
+  cantidad_piezas: number | null;
+  precio_unitario_comercial: number | null;
+  lineas_comprobante: unknown;
+  tipo_comprobante: "boleta" | "factura" | "ninguno";
   total: number;
   metodo_pago: string | null;
   modalidad_pago: string | null;
@@ -83,15 +87,19 @@ export async function getMaderaCortadaById(id: string): Promise<MaderaCortadaRow
       id: found.id,
       cliente_id: found.cliente_id,
       fecha: found.fecha,
-      tipo_corte: "tabla",
-      total_pt: 10,
-      precio_por_pt: found.total / 10,
+      tipo_corte: found.tipo_corte ?? "tabla",
+      total_pt: found.total_pt ?? 0,
+      precio_por_pt: found.precio_por_pt ?? 0,
+      cantidad_piezas: found.cantidad_piezas ?? null,
+      precio_unitario_comercial: found.precio_unitario_comercial ?? null,
+      lineas_comprobante: found.lineas_comprobante ?? [],
+      tipo_comprobante: found.tipo_comprobante ?? "ninguno",
       total: found.total,
-      metodo_pago: "efectivo",
-      modalidad_pago: "contado",
-      tipo_entrega: "recojo",
-      direccion_entrega: null,
-      estado_entrega: "entregado",
+      metodo_pago: found.metodo_pago ?? null,
+      modalidad_pago: found.modalidad_pago ?? null,
+      tipo_entrega: found.tipo_entrega ?? null,
+      direccion_entrega: found.direccion_entrega ?? null,
+      estado_entrega: found.estado_entrega ?? null,
       correlativo: found.correlativo,
       costo_envio: 0,
       created_at: found.created_at,
