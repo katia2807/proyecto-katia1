@@ -75,6 +75,7 @@ import {
   buildMaderaCortadaVoucherLines,
   parseMaderaCortadaCubicajeLines,
 } from "@/lib/madera-cortada-print-model";
+import { isDetailedMaderaCortadaDescription } from "@/lib/madera-cortada-historical-review";
 
 import { getEmpresaConfig } from "@/lib/company-config";
 import {
@@ -6096,6 +6097,16 @@ function parseCorrectionLines(raw: FormDataEntryValue | null) {
     throw new Error("Debes completar al menos una línea para la boleta.");
   }
 
+  const lineIds = parsedRaw.map((value) => (
+    value && typeof value === "object" && "id" in value
+      ? Number(value.id)
+      : Number.NaN
+  ));
+  if (lineIds.some((id) => !Number.isInteger(id) || id <= 0)
+      || new Set(lineIds).size !== lineIds.length) {
+    throw new Error("La revisión de piezas no es válida. Vuelve a abrir la venta.");
+  }
+
   const lines = parseMaderaCortadaCubicajeLines(parsedRaw);
   if (lines.length !== parsedRaw.length) {
     throw new Error("Hay una línea incompleta o inválida. No se guardó ningún cambio.");
@@ -6112,7 +6123,28 @@ function parseCorrectionLines(raw: FormDataEntryValue | null) {
       `Completa la descripción, cantidad y las tres medidas de la pieza ${incompleteIndex + 1}.`,
     );
   }
-  return lines;
+  const genericDescriptionIndex = lines.findIndex(
+    (line) => !isDetailedMaderaCortadaDescription(line.descripcion),
+  );
+  if (genericDescriptionIndex >= 0) {
+    throw new Error(
+      `Completa una descripción clara para el cliente en la pieza ${genericDescriptionIndex + 1}.`,
+    );
+  }
+  return { lines, lineIds };
+}
+
+function parseConfirmedCorrectionPieces(raw: FormDataEntryValue | null) {
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map(Number)
+      .filter((id) => Number.isInteger(id) && id > 0);
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -6143,7 +6175,14 @@ export async function correctVentaMaderaCortadaHistorica(formData: FormData) {
     throw new Error("Ingresa el total manual que quedará en la boleta.");
   }
 
-  const lines = parseCorrectionLines(formData.get("lineas_cubicaje"));
+  const { lines, lineIds } = parseCorrectionLines(formData.get("lineas_cubicaje"));
+  const confirmedPieceIds = parseConfirmedCorrectionPieces(formData.get("piezas_confirmadas"));
+  const confirmedPieceIdSet = new Set(confirmedPieceIds);
+  if (confirmedPieceIds.length !== confirmedPieceIdSet.size
+      || lineIds.some((id) => !confirmedPieceIdSet.has(id))
+      || confirmedPieceIdSet.size !== lineIds.length) {
+    throw new Error("Confirma cada pieza por separado antes de guardar la corrección.");
+  }
   const voucherLines = buildMaderaCortadaVoucherLines(lines, parsed.data.precioPorPt);
   if (voucherLines.length !== lines.length) {
     throw new Error("Hay líneas incompletas. No se guardó ningún cambio.");

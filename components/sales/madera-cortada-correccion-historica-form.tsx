@@ -4,9 +4,14 @@ import { useCallback, useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, LockKeyhole } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CubicajeInput } from "@/components/sales/cubicaje-input";
+import {
+  MaderaCortadaPieceReviewEditor,
+  type HistoricalPieceReviewCalculation,
+  type HistoricalReviewPiece,
+} from "@/components/sales/madera-cortada-piece-review-editor";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import {
+  isDetailedMaderaCortadaDescription,
   maderaCortadaHistoricalStatusLabels,
   reviewMaderaCortadaHistoricalSale,
 } from "@/lib/madera-cortada-historical-review";
@@ -14,29 +19,9 @@ import {
   buildMaderaCortadaPrintModel,
   buildMaderaCortadaVoucherLines,
   getMaderaCortadaCustomerItems,
+  type MaderaCortadaVoucherLine,
 } from "@/lib/madera-cortada-print-model";
 import { formatDate, formatPen, roundMoney } from "@/lib/utils";
-
-type EditablePiece = {
-  id: number;
-  cantidad: number;
-  espesor: number;
-  ancho: number;
-  largo: number;
-  descripcion: string;
-  precioUnitarioComercial?: number | null;
-  inventario_producto_id?: string | null;
-};
-
-type Calculation = {
-  totalPT: number;
-  totalPC: number;
-  precioPorPT: number;
-  totalSoles: number;
-  totalCantidad: number;
-  precioUnitarioComercial: number;
-  piezas: EditablePiece[];
-};
 
 export type HistoricalMaderaSaleForCorrection = {
   id: string;
@@ -52,6 +37,7 @@ export type HistoricalMaderaSaleForCorrection = {
   tipo_comprobante: string;
   total: number;
   modalidad_pago: string | null;
+  metodo_pago?: string | null;
 };
 
 type Props = {
@@ -65,12 +51,50 @@ type Props = {
 const inputClass =
   "h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]";
 
-function completePiece(piece: EditablePiece) {
-  return Boolean(piece.descripcion.trim())
+function completePiece(piece: HistoricalReviewPiece) {
+  return isDetailedMaderaCortadaDescription(piece.descripcion)
     && piece.cantidad > 0
     && piece.espesor > 0
     && piece.ancho > 0
     && piece.largo > 0;
+}
+
+function StoredLineDetails({ lines }: { lines: MaderaCortadaVoucherLine[] }) {
+  if (lines.length === 0) {
+    return (
+      <p className="rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3 text-sm text-amber-800">
+        No hay detalle guardado por pieza. En el siguiente paso se cargarán únicamente los valores generales disponibles.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {lines.map((line, index) => (
+        <div
+          key={`${line.orden}-${index}`}
+          className="rounded-lg border border-[var(--color-border)] bg-[var(--bg-surface)] p-3 text-sm"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <p className="font-semibold">{line.descripcion.trim() || "Descripción no registrada"}</p>
+            <Badge variant={isDetailedMaderaCortadaDescription(line.descripcion) ? "neutral" : "warning"}>
+              Pieza {index + 1}
+            </Badge>
+          </div>
+          <div className="mt-2 grid gap-2 text-xs sm:grid-cols-4">
+            <div><span className="text-[var(--color-text-secondary)]">Cantidad:</span> <strong>{line.cantidad > 0 ? `${line.cantidad} pzs` : "No registrada"}</strong></div>
+            <div><span className="text-[var(--color-text-secondary)]">Espesor:</span> <strong>{line.espesor > 0 ? `${line.espesor}\"` : "No registrado"}</strong></div>
+            <div><span className="text-[var(--color-text-secondary)]">Ancho:</span> <strong>{line.ancho > 0 ? `${line.ancho}\"` : "No registrado"}</strong></div>
+            <div><span className="text-[var(--color-text-secondary)]">Largo:</span> <strong>{line.largo > 0 ? `${line.largo}'` : "No registrado"}</strong></div>
+          </div>
+          <div className="mt-2 flex flex-wrap justify-between gap-2 border-t border-[var(--color-border)] pt-2 text-xs">
+            <span>P. unit.: <strong>{formatPen(line.precio_unitario)}</strong></span>
+            <span>Subtotal: <strong>{formatPen(line.subtotal)}</strong></span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function MaderaCortadaCorreccionHistoricaForm({
@@ -81,7 +105,7 @@ export function MaderaCortadaCorreccionHistoricaForm({
   panelAction,
 }: Props) {
   const review = useMemo(() => reviewMaderaCortadaHistoricalSale(venta), [venta]);
-  const defaultPieces = useMemo<EditablePiece[]>(() => {
+  const defaultPieces = useMemo<HistoricalReviewPiece[]>(() => {
     if (review.storedLines.length === 0) {
       return [{
         id: 1,
@@ -91,6 +115,7 @@ export function MaderaCortadaCorreccionHistoricaForm({
         largo: 0,
         descripcion: "",
         inventario_producto_id: null,
+        persisted: false,
       }];
     }
     return review.storedLines.map((line, index) => ({
@@ -102,10 +127,11 @@ export function MaderaCortadaCorreccionHistoricaForm({
       descripcion: line.descripcion,
       precioUnitarioComercial: line.precio_unitario,
       inventario_producto_id: null,
+      persisted: true,
     }));
   }, [review.storedLines, venta.cantidad_piezas]);
   const [step, setStep] = useState(1);
-  const [calculation, setCalculation] = useState<Calculation>(() => ({
+  const [calculation, setCalculation] = useState<HistoricalPieceReviewCalculation>(() => ({
     totalPT: review.calculatedTotalPt,
     totalPC: review.calculatedTotalPt / 12,
     precioPorPT: Number(venta.precio_por_pt),
@@ -116,11 +142,14 @@ export function MaderaCortadaCorreccionHistoricaForm({
       : 0,
     piezas: defaultPieces,
   }));
+  const [reviewedPieceIds, setReviewedPieceIds] = useState<number[]>([]);
   const [totalMode, setTotalMode] = useState<"calculado" | "registrado" | "manual">("calculado");
   const [manualTotal, setManualTotal] = useState(String(venta.total));
   const [confirmed, setConfirmed] = useState(false);
 
   const allComplete = calculation.piezas.length > 0 && calculation.piezas.every(completePiece);
+  const allPiecesReviewed = calculation.piezas.length > 0
+    && calculation.piezas.every((piece) => reviewedPieceIds.includes(piece.id));
   const ptDifference = calculation.totalPT - Number(venta.total_pt);
   const ptMatches = Math.abs(ptDifference) <= 0.01;
   const nextTotal = totalMode === "registrado"
@@ -132,11 +161,18 @@ export function MaderaCortadaCorreccionHistoricaForm({
   const cashIsBlocked = changesTotal
     && venta.modalidad_pago === "contado"
     && (activeCashMovements.length !== 1 || activeCashMovements[0]?.periodo_cerrado);
-  const canReview = allComplete && ptMatches && calculation.precioPorPT > 0;
+  const canReview = allComplete
+    && allPiecesReviewed
+    && ptMatches
+    && calculation.precioPorPT > 0;
 
-  const updateCalculation = useCallback((nextCalculation: Calculation) => {
+  const updatePieceReview = useCallback((value: {
+    calculation: HistoricalPieceReviewCalculation;
+    reviewedPieceIds: number[];
+  }) => {
     setConfirmed(false);
-    setCalculation(nextCalculation);
+    setCalculation(value.calculation);
+    setReviewedPieceIds(value.reviewedPieceIds);
   }, []);
 
   const updateTotalMode = (mode: "calculado" | "registrado" | "manual") => {
@@ -163,7 +199,7 @@ export function MaderaCortadaCorreccionHistoricaForm({
       <input type="hidden" name="total_mode" value={totalMode} />
 
       <div className="grid gap-2 sm:grid-cols-3">
-        {["Revisar original", "Completar detalle", "Confirmar corrección"].map((label, index) => {
+        {["Ver registro original", "Revisar pieza por pieza", "Confirmar y guardar"].map((label, index) => {
           const number = index + 1;
           return (
             <div
@@ -186,8 +222,28 @@ export function MaderaCortadaCorreccionHistoricaForm({
         <div className="grid gap-3 rounded-xl border border-[var(--color-border)] p-4 sm:grid-cols-2 lg:grid-cols-4">
           <div><p className="text-xs text-[var(--color-text-secondary)]">Cliente</p><p className="font-semibold">{clienteNombre}</p></div>
           <div><p className="text-xs text-[var(--color-text-secondary)]">Fecha</p><p className="font-semibold">{formatDate(venta.fecha)}</p></div>
+          <div><p className="text-xs text-[var(--color-text-secondary)]">Tipo de corte</p><p className="font-semibold capitalize">{venta.tipo_corte || "No registrado"}</p></div>
+          <div><p className="text-xs text-[var(--color-text-secondary)]">Comprobante</p><p className="font-semibold capitalize">{venta.tipo_comprobante || "No registrado"}</p></div>
+          <div><p className="text-xs text-[var(--color-text-secondary)]">Modalidad</p><p className="font-semibold capitalize">{venta.modalidad_pago || "No registrada"}</p></div>
+          <div><p className="text-xs text-[var(--color-text-secondary)]">Método de pago</p><p className="font-semibold capitalize">{venta.metodo_pago || "No registrado"}</p></div>
           <div><p className="text-xs text-[var(--color-text-secondary)]">PT registrado</p><p className="font-semibold">{Number(venta.total_pt).toFixed(2)} PT</p></div>
+          <div><p className="text-xs text-[var(--color-text-secondary)]">Precio por PT</p><p className="font-semibold">{formatPen(Number(venta.precio_por_pt))}</p></div>
+          <div><p className="text-xs text-[var(--color-text-secondary)]">Cantidad general</p><p className="font-semibold">{Number(venta.cantidad_piezas ?? 0) > 0 ? `${Number(venta.cantidad_piezas)} pzs` : "No registrada"}</p></div>
+          <div><p className="text-xs text-[var(--color-text-secondary)]">Precio por pieza guardado</p><p className="font-semibold">{Number(venta.precio_unitario_comercial ?? 0) > 0 ? formatPen(Number(venta.precio_unitario_comercial)) : "No registrado"}</p></div>
           <div><p className="text-xs text-[var(--color-text-secondary)]">Total cobrado</p><p className="font-semibold">{formatPen(Number(venta.total))}</p></div>
+        </div>
+
+        <div
+          aria-label="Información guardada actualmente"
+          className="space-y-3 rounded-xl border border-[var(--color-border)] p-4"
+        >
+          <div>
+            <h3 className="font-semibold">Información guardada actualmente</h3>
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              Estos mismos valores aparecerán cargados para que Katia confirme o corrija únicamente lo necesario.
+            </p>
+          </div>
+          <StoredLineDetails lines={review.storedLines} />
         </div>
 
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
@@ -218,31 +274,33 @@ export function MaderaCortadaCorreccionHistoricaForm({
 
         <div className="flex justify-end">
           <Button type="button" onClick={() => setStep(2)}>
-            Completar detalle <ArrowRight className="size-4" />
+            Revisar pieza por pieza <ArrowRight className="size-4" />
           </Button>
         </div>
       </section>
 
       <section className={step === 2 ? "space-y-5" : "hidden"} aria-hidden={step !== 2}>
         <div>
-          <h3 className="font-semibold">Descripción, cantidad y medidas reales</h3>
+          <h3 className="font-semibold">Revisa y confirma cada pieza</h3>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            Escribe un detalle breve para el cliente, por ejemplo: “Roble”, 4 piezas, 1 × 8 × 10.
+            Los datos existentes ya están cargados. Corrige solo lo necesario y confirma cada pieza antes de continuar.
           </p>
         </div>
 
-        <CubicajeInput
-          defaultPiezas={defaultPieces}
-          defaultPrecioPorPT={String(venta.precio_por_pt)}
-          precioEditable
-          quantityMode="visible"
-          unitPriceMode="real-pt-calculated"
-          onChange={updateCalculation}
+        <MaderaCortadaPieceReviewEditor
+          defaultPieces={defaultPieces}
+          defaultPrecioPorPT={Number(venta.precio_por_pt)}
+          onChange={updatePieceReview}
         />
 
         {!allComplete ? (
           <p className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-sm text-amber-700">
             Completa la descripción, cantidad, espesor, ancho y largo de todas las piezas.
+          </p>
+        ) : null}
+        {allComplete && !allPiecesReviewed ? (
+          <p className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-sm text-amber-700">
+            Confirma las {calculation.piezas.length} piezas una por una. Llevas {reviewedPieceIds.length} confirmada(s).
           </p>
         ) : null}
         {!ptMatches ? (
@@ -272,33 +330,9 @@ export function MaderaCortadaCorreccionHistoricaForm({
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-[var(--color-border)] p-4">
             <h3 className="font-semibold">Antes</h3>
-            {review.storedLines.length > 0 ? (
-              <div aria-label="Detalle original de la venta" className="mt-3 space-y-2">
-                {review.storedLines.map((line, index) => (
-                  <div
-                    key={`${line.orden}-${index}`}
-                    className="rounded-lg border border-[var(--color-border)] bg-[var(--bg-surface)] p-3 text-sm"
-                  >
-                    <p className="font-semibold">
-                      {line.descripcion.trim() || "Sin descripción"}
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-                      {line.cantidad > 0 ? `${line.cantidad} pzs` : "Sin cantidad"}
-                      {" · "}
-                      {line.espesor > 0 && line.ancho > 0 && line.largo > 0
-                        ? `${line.espesor}\" × ${line.ancho}\" × ${line.largo}'`
-                        : "Medidas incompletas"}
-                    </p>
-                    <div className="mt-2 flex justify-between gap-3 text-xs">
-                      <span>P. unit.: {formatPen(line.precio_unitario)}</span>
-                      <span className="font-semibold">Subtotal: {formatPen(line.subtotal)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-[var(--color-text-secondary)]">Sin detalle guardado</p>
-            )}
+            <div aria-label="Detalle original de la venta" className="mt-3">
+              <StoredLineDetails lines={review.storedLines} />
+            </div>
             <dl className="mt-3 space-y-2 border-t border-[var(--color-border)] pt-3 text-sm">
               <div className="flex justify-between gap-3"><dt>Precio por PT</dt><dd>{formatPen(Number(venta.precio_por_pt))}</dd></div>
               <div className="flex justify-between gap-3 font-semibold"><dt>Total</dt><dd>{formatPen(Number(venta.total))}</dd></div>

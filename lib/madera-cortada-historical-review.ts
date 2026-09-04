@@ -15,6 +15,7 @@ export type MaderaCortadaHistoricalReviewIssue = {
   code:
     | "sin_detalle"
     | "descripcion_faltante"
+    | "descripcion_generica"
     | "cantidad_faltante"
     | "medidas_faltantes"
     | "precio_linea_incorrecto"
@@ -53,8 +54,31 @@ function nonNegativeNumber(value: unknown) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
+const genericDescriptions = new Set([
+  "madera cortada",
+  "venta de madera cortada",
+  "tabla de madera cortada",
+  "liston de madera cortada",
+  "cuarton de madera cortada",
+  "poste de madera cortada",
+]);
+
+function normalizedDescription(value: string) {
+  return value
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es-PE")
+    .replace(/\s+/g, " ");
+}
+
+export function isDetailedMaderaCortadaDescription(value: string) {
+  const normalized = normalizedDescription(value);
+  return normalized.length > 0 && !genericDescriptions.has(normalized);
+}
+
 function isCompleteLine(line: MaderaCortadaVoucherLine) {
-  return Boolean(line.descripcion.trim())
+  return isDetailedMaderaCortadaDescription(line.descripcion)
     && line.cantidad > 0
     && line.espesor > 0
     && line.ancho > 0
@@ -89,6 +113,12 @@ export function reviewMaderaCortadaHistoricalSale(
         code: "descripcion_faltante",
         lineIndex,
         message: `La pieza ${lineIndex + 1} no tiene descripción.`,
+      });
+    } else if (!isDetailedMaderaCortadaDescription(line.descripcion)) {
+      issues.push({
+        code: "descripcion_generica",
+        lineIndex,
+        message: `La pieza ${lineIndex + 1} necesita una descripción más clara para el cliente.`,
       });
     }
     if (line.cantidad <= 0) {
@@ -136,6 +166,7 @@ export function reviewMaderaCortadaHistoricalSale(
 
   if (storedLines.length > 0 && issues.every((issue) => ![
     "descripcion_faltante",
+    "descripcion_generica",
     "cantidad_faltante",
     "medidas_faltantes",
   ].includes(issue.code))) {
@@ -156,6 +187,7 @@ export function reviewMaderaCortadaHistoricalSale(
   const missingInformation = issues.some((issue) => [
     "sin_detalle",
     "descripcion_faltante",
+    "descripcion_generica",
     "cantidad_faltante",
     "medidas_faltantes",
   ].includes(issue.code));

@@ -69,6 +69,20 @@ describe("reviewMaderaCortadaHistoricalSale", () => {
     expect(review.calculatedSubtotal).toBe(0);
   });
 
+  it("pide reemplazar una descripción genérica por un detalle útil para el cliente", () => {
+    const review = reviewMaderaCortadaHistoricalSale(ventaHistorica({
+      lineas_comprobante: [{
+        ...detalleCorrecto,
+        descripcion: "Tabla de madera cortada",
+      }],
+    }));
+
+    expect(review.status).toBe("falta_informacion");
+    expect(review.issues).toEqual([
+      expect.objectContaining({ code: "descripcion_generica", lineIndex: 0 }),
+    ]);
+  });
+
   it("conserva las líneas incompletas para que Katia pueda verlas y corregirlas", () => {
     const review = reviewMaderaCortadaHistoricalSale(ventaHistorica({
       lineas_comprobante: [

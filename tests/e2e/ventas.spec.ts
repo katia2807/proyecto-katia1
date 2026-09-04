@@ -98,16 +98,31 @@ test.describe("ventas — madera, aserradero, mixer (demo DB)", () => {
 
     await expect(page.getByRole("heading", { name: "Corrección controlada de boleta" })).toBeVisible();
     await expect(page.getByText("Resultado de la revisión")).toBeVisible();
-    await page.getByRole("button", { name: /Completar detalle/ }).click();
-    await expect(page.getByText("Descripción, cantidad y medidas reales")).toBeVisible();
-    await expect(page.getByText("Total PT real: 26.67")).toBeVisible();
+    const storedInformation = page.getByLabel("Información guardada actualmente");
+    await expect(storedInformation.getByText("Roble histórico E2E", { exact: true })).toBeVisible();
+    await expect(storedInformation.getByText(/4 pzs/)).toBeVisible();
+    await expect(storedInformation.getByText(/26\.67|23\.33/).first()).toBeVisible();
+
+    await page.getByRole("button", { name: /Revisar pieza por pieza/ }).click();
+    await expect(page.getByText("Revisa y confirma cada pieza")).toBeVisible();
+    await expect(page.getByLabel("Descripción de la pieza 1")).toHaveValue("Roble histórico E2E");
+    await expect(page.getByLabel("Cantidad de la pieza 1")).toHaveValue("4");
+    await expect(page.getByLabel("Espesor de la pieza 1")).toHaveValue("1");
+    await expect(page.getByLabel("Ancho de la pieza 1")).toHaveValue("8");
+    await expect(page.getByLabel("Largo de la pieza 1")).toHaveValue("10");
+    await expect(page.getByText("26.67 PT").last()).toBeVisible();
+    await expect(page.getByRole("button", { name: /Revisar resultado/ })).toBeDisabled();
+    await page.getByLabel("Confirmar pieza 1").click();
+    await expect(page.getByText("Revisada", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: /Revisar resultado/ }).click();
 
     await expect(page.getByText("Vista previa para el cliente")).toBeVisible();
     const originalDetail = page.getByLabel("Detalle original de la venta");
     await expect(originalDetail.getByText("Roble histórico E2E", { exact: true })).toBeVisible();
     await expect(originalDetail.getByText(/4 pzs/)).toBeVisible();
-    await expect(originalDetail.getByText(/1\" × 8\" × 10'/)).toBeVisible();
+    await expect(originalDetail.getByText('1"', { exact: true })).toBeVisible();
+    await expect(originalDetail.getByText('8"', { exact: true })).toBeVisible();
+    await expect(originalDetail.getByText("10'", { exact: true })).toBeVisible();
     await expect(originalDetail.getByText(/P\. unit\.: S\/\s*23\.33/)).toBeVisible();
     await expect(originalDetail.getByText(/Subtotal: S\/\s*93\.33/)).toBeVisible();
     await expect(page.getByText(/S\/\s*14\.00 → S\/\s*93\.33/)).toBeVisible();
@@ -119,7 +134,10 @@ test.describe("ventas — madera, aserradero, mixer (demo DB)", () => {
     const saveCorrection = page.getByRole("button", { name: "Guardar corrección revisada" });
     await confirmation.check();
     await page.getByRole("button", { name: /Volver/ }).click();
-    await page.getByPlaceholder("Tabla, listón, especie...").fill("Roble histórico E2E revisado");
+    await page.getByLabel("Editar pieza 1").click();
+    await page.getByLabel("Descripción de la pieza 1").fill("Roble histórico E2E revisado");
+    await expect(page.getByRole("button", { name: /Revisar resultado/ })).toBeDisabled();
+    await page.getByLabel("Confirmar pieza 1").click();
     await page.getByRole("button", { name: /Revisar resultado/ }).click();
     await expect(confirmation).not.toBeChecked();
     await expect(saveCorrection).toBeDisabled();
