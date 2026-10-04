@@ -33,6 +33,8 @@ export default function RootLayout({
   return (
     <html
       lang="es"
+      suppressHydrationWarning
+      data-scroll-behavior="smooth"
       className={`${geist.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>

@@ -17,6 +17,7 @@ import {
 } from "@/lib/data";
 import { formatPen } from "@/lib/utils";
 import { computeEconomiaInterna } from "@/lib/cotizacion-calculos";
+import { parseCotizacionDetalle } from "@/lib/cotizacion-unificada-payload";
 
 
 function inMes(fecha: string, anio: number, mes: number) {
@@ -98,7 +99,7 @@ export default async function VentasDashboardPage() {
 
   const margenesUnificados = cotizacionesUnificadasMes
     .map((c) => {
-      const econ = computeEconomiaInterna(c.detalle as any);
+      const econ = computeEconomiaInterna(parseCotizacionDetalle(c.detalle));
       return econ.margenPct;
     })
     .filter((x): x is number => x != null);

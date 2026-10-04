@@ -12,7 +12,7 @@ import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { liteClientesToCompleto, MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
 import { formatPen } from "@/lib/utils";
 
-type Cliente = { id: string; nombre: string };
+type Cliente = { id: string; nombre: string; ruc?: string | null; documento?: string | null };
 type Producto = {
   id: string;
   nombre: string;
@@ -74,8 +74,8 @@ export function VentaMaderaForm({
   const selectedCliente = useMemo(() => {
     return todosLosClientes.find((c) => c.id === clienteId);
   }, [clienteId, todosLosClientes]);
-  const selectedClienteRuc = (selectedCliente as any)?.ruc || "";
-  const selectedClienteDoc = (selectedCliente as any)?.documento || "";
+  const selectedClienteRuc = selectedCliente?.ruc || "";
+  const selectedClienteDoc = selectedCliente?.documento || "";
   const hasRuc = !!(selectedClienteRuc && selectedClienteRuc.trim().length === 11);
 
   const effectiveProductos = useMemo((): Producto[] => {
@@ -242,14 +242,14 @@ export function VentaMaderaForm({
               Comprobante *
             </p>
             <div className="flex gap-2">
-              {[
+              {([
                 { value: "boleta", label: "Boleta" },
                 { value: "factura", label: "Factura" },
-              ].map((opt) => (
+              ] as const).map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => setTipoComprobante(opt.value as any)}
+                  onClick={() => setTipoComprobante(opt.value)}
                   className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
                     tipoComprobante === opt.value
                       ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"

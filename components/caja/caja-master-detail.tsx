@@ -76,7 +76,12 @@ export function CajaMasterDetail({
           <select
             id="tipo-comprobante-filter"
             value={filterComprobante}
-            onChange={(e) => setFilterComprobante(e.target.value as any)}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === "todos" || value === "factura" || value === "boleta" || value === "ninguno") {
+                setFilterComprobante(value);
+              }
+            }}
             className="rounded-lg border border-[var(--color-border)] bg-[var(--bg-surface)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)] transition-colors"
           >
             <option value="todos">Todos los comprobantes</option>

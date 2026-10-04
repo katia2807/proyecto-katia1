@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useActionState } from "react";
+import type { ComponentProps } from "react";
 import { submitUpdateServicioAserraderoForm } from "@/app/actions";
 import { AserraderoEditarForm } from "@/components/sales/aserradero-editar-form";
 import { useToast } from "@/components/ui/toast";
@@ -11,7 +12,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 type Cliente = { id: string; nombre: string; documento?: string | null; ruc?: string | null };
 
 type ClientWrapperProps = {
-  servicio: any;
+  servicio: ComponentProps<typeof AserraderoEditarForm>["servicio"] & { correlativo?: string | null };
   clientes: Cliente[];
   mockData: boolean;
 };

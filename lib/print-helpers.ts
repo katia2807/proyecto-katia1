@@ -1,8 +1,6 @@
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
-import { getClientesRows, getChoferesRows } from "@/lib/data";
-import { getEmpresaConfig } from "@/lib/company-config";
 
 export type MaderaCortadaRow = {
   id: string;
@@ -77,6 +75,9 @@ export type VentaMaderaLineaRow = {
   cantidad: number;
   precio_unitario: number;
 };
+
+export type VentaMaderaConLineas = VentaMaderaRow & { lineas: VentaMaderaLineaRow[] };
+type SaleDocumentRecord = MaderaCortadaRow | MuebleTerminadoRow | ServicioAserraderoRow | VentaMaderaConLineas;
 
 export async function getMaderaCortadaById(id: string): Promise<MaderaCortadaRow | null> {
   if (!hasSupabaseEnv()) {
@@ -225,7 +226,7 @@ export async function getAdelantoFromCaja(referenciaId: string): Promise<number>
 export async function resolveSaleDocument(id: string, searchTipo?: string) {
   // Parallel attempt to resolve from different tables if `searchTipo` is not provided
   let resolvedTipo = searchTipo;
-  let data: any = null;
+  let data: SaleDocumentRecord | null = null;
 
   if (resolvedTipo === "madera") {
     data = await getMaderaCortadaById(id);

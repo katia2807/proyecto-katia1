@@ -18,7 +18,7 @@ export type UrgenciaItem = {
   count: number;
 };
 
-export function UrgenciasPanel({ urgencias }: { urgencias: UrgenciaItem[] }) {
+export function UrgenciasPanel({ urgencias, verified }: { urgencias: UrgenciaItem[]; verified: boolean }) {
   const [seenKeys, setSeenKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -51,13 +51,14 @@ export function UrgenciasPanel({ urgencias }: { urgencias: UrgenciaItem[] }) {
   }
 
   if (urgencias.length === 0) {
+    if (!verified) return null;
     return (
       <div className="flex items-center gap-3 rounded-[var(--katia-radius-lg)] border border-[var(--katia-success)]/30 bg-[var(--katia-success)]/8 px-5 py-4">
         <span className="text-xl">✓</span>
         <div>
-          <p className="text-sm font-semibold text-[var(--katia-success)]">Sin urgencias hoy</p>
+          <p className="text-sm font-semibold text-[var(--katia-success)]">Sin pendientes</p>
           <p className="text-xs text-[var(--katia-text-secondary)]">
-            Stock, cobros, ventas y personal están al día.
+            No hay pendientes de stock, ventas, penalidades, alertas críticas ni adelantos.
           </p>
         </div>
         <Link
@@ -106,7 +107,7 @@ export function UrgenciasPanel({ urgencias }: { urgencias: UrgenciaItem[] }) {
                   seen ? "text-[var(--katia-warning)]" : "text-[var(--katia-danger)]"
                 }`}
               >
-                {seen ? "Ya revisado — click para ir →" : `${u.cta} →`}
+                {seen ? "Revisado; sigue pendiente →" : `${u.cta} →`}
               </p>
             </div>
           </Link>

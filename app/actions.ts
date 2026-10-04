@@ -4519,8 +4519,8 @@ export async function cerrarContratoAlquiler(formData: FormData) {
     revalidatePath("/alquiler");
     revalidatePath("/caja");
     return { ok: true };
-  } catch (e: any) {
-    return { ok: false, error: e.message || "Error al cerrar el contrato." };
+  } catch (e: unknown) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error al cerrar el contrato." };
   }
 }
 
@@ -5632,7 +5632,7 @@ export async function updateContratoAlquiler(
     revalidatePath("/alquiler");
     revalidatePath("/caja");
     return { ok: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       ok: false,
       error: err instanceof Error ? err.message : "Error desconocido al actualizar contrato.",
@@ -6006,7 +6006,7 @@ export async function deleteVentaMaderaCortada(
       }
       // Revertir movimientos de inventario asociados
       const invMovs = demoInventarioMovimientosRows().filter(
-        (m: any) => String(m.referencia ?? "").includes(id),
+        (m) => String(m.referencia ?? "").includes(id),
       );
       for (const m of invMovs) {
         demoDeleteOneById("inventarioMovimientos", m.id);

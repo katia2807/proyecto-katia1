@@ -17,14 +17,14 @@ type ServicioAserraderoRow = {
   pies_cubicos: number;
   costo_cubicaje: number;
   precio_cobrado: number;
-  lineas_json: any;
+  lineas_json: unknown;
   correlativo: string | null;
 };
 
 type AserraderoServiciosTableProps = {
   servicios: ServicioAserraderoRow[];
   clientesById: Record<string, string>;
-  clientesMap: Record<string, any>;
+  clientesMap: Record<string, { documento?: string | null; ruc?: string | null }>;
   canMutate: boolean;
 };
 
@@ -70,12 +70,18 @@ export function AserraderoServiciosTable({
                   ) : null}
                   {(() => {
                     try {
-                      const lineas = Array.isArray(s.lineas_json)
+                      const lineas: unknown = Array.isArray(s.lineas_json)
                         ? s.lineas_json
                         : typeof s.lineas_json === "string"
                         ? JSON.parse(s.lineas_json)
                         : [];
-                      const nota = lineas?.find((l: any) => l?.tipo === "nota_interna");
+                      const nota = Array.isArray(lineas) ? lineas.find(
+                        (linea: unknown): linea is { tipo: "nota_interna"; observaciones: string } => {
+                          if (!linea || typeof linea !== "object") return false;
+                          const item = linea as Record<string, unknown>;
+                          return item.tipo === "nota_interna" && typeof item.observaciones === "string";
+                        },
+                      ) : undefined;
                       if (nota?.observaciones) {
                         return (
                           <div className="mt-1 max-w-[200px] truncate text-[11px] font-semibold text-amber-600 dark:text-amber-400" title={nota.observaciones}>
@@ -83,7 +89,9 @@ export function AserraderoServiciosTable({
                           </div>
                         );
                       }
-                    } catch (e) {}
+                    } catch {
+                      // Los datos históricos inválidos no deben bloquear la tabla.
+                    }
                     return null;
                   })()}
                 </TD>

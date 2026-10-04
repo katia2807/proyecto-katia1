@@ -12,6 +12,7 @@ import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field, SelectField } from "@/components/ui/field";
 import { contratoClientesToCompleto } from "@/lib/combobox-mocks";
 import { formatPen, roundMoney } from "@/lib/utils";
+import type { Database } from "@/lib/supabase/types";
 
 type Cliente = { id: string; nombre: string; ruc?: string | null };
 type Maquina = { id: string; nombre: string; categoria: string };
@@ -22,7 +23,7 @@ type ContratoAlquilerFormProps = {
   mockData?: boolean;
   /** Acción enlazada con `useActionState` (submit + toast + cierre en el panel). */
   panelAction: FormActionProp;
-  contrato?: any;
+  contrato?: Database["public"]["Tables"]["alquileres"]["Row"];
 };
 
 const tarifas = [

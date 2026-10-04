@@ -30,6 +30,7 @@ import { ClientesMasivoTable } from "@/components/gerencial/clientes-masivo-tabl
 import type { ClienteCompleto } from "@/lib/combobox-mocks";
 import { CentroMandoTabs } from "@/components/gerencial/centro-mando-tabs";
 import { AlertasBannerHoy } from "@/components/gerencial/alertas-banner-hoy";
+import { AlertasCriticasView } from "@/components/inicio/alertas-criticas-view";
 import { InventarioTomaDecisionesCharts } from "@/components/inventario/inventario-toma-decisiones-charts";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +52,7 @@ function pct(current: number, previous: number) {
 }
 
 type GerencialPageProps = {
-  searchParams?: Promise<{ cliente?: string | string[]; mensaje?: string | string[]; tab?: string | string[] }>;
+  searchParams?: Promise<{ cliente?: string | string[]; mensaje?: string | string[]; tab?: string | string[]; alertas?: string | string[] }>;
 };
 
 function firstParam(value: string | string[] | undefined) {
@@ -67,6 +68,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
   }
 
   const activeTab = firstParam(params?.tab) || "hoy";
+  if (firstParam(params?.alertas) === "criticas") return <AlertasCriticasView />;
 
   const [caja, inventario, cotizacionesUnificadas, cotizacionesMueble, cobros, ventasMuebles, ventasMadera, clientes, ordenes, alquilerBundle, servicios] = await Promise.all([
     getCajaRows(),

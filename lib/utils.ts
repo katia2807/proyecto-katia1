@@ -26,21 +26,26 @@ export function formatPen(value: number | null | undefined): string {
   }).format(rounded);
 }
 
-export function formatDate(date: string | null | undefined) {
+export function formatDate(
+  date: string | null | undefined,
+  options: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "numeric" },
+) {
   const raw = date?.trim() ?? "";
   if (!raw) return "—";
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) {
     return raw;
   }
+  // Una fecha de calendario no representa un instante UTC: conservar su día.
+  // Las fechas con hora se presentan en Perú, también si el servidor usa UTC.
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
   return new Intl.DateTimeFormat("es-PE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
+    ...options,
+    timeZone: dateOnly ? "UTC" : "America/Lima",
   }).format(d);
 }
 
-export function parseDecimal(value: string | number | null | undefined): number {
+export function parseDecimal(value: unknown): number {
   if (value === null || value === undefined) return 0;
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : 0;
@@ -103,7 +108,7 @@ export function preprocessDecimal(label: string, isOptional: boolean = false) {
     if (val === null || val === undefined || val === "") {
       return isOptional ? undefined : 0;
     }
-    return parseDecimal(val as any);
+    return parseDecimal(val);
   }, isOptional ? z.number().min(0).optional() : z.number().min(0, { message: `El campo ${label} debe ser mayor o igual a 0.` }));
 }
 
@@ -123,7 +128,7 @@ export function decimalSchema(label: string, options?: { optional?: boolean; min
       if (val === null || val === undefined || val === "") {
         return undefined;
       }
-      return parseDecimal(val as any);
+      return parseDecimal(val);
     },
     options?.optional
       ? baseSchema.optional()

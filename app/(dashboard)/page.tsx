@@ -4,15 +4,8 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { OnboardingBanner } from "@/components/onboarding-banner";
 import { UrgenciasPanel } from "@/components/inicio/urgencias-panel";
-import {
-  DashboardDataUnavailableError,
-  emptyDashboardSnapshot,
-  getClientesRows,
-  getCotizacionesUnificadasRows,
-  getDashboardSnapshot,
-  getInventarioResumen,
-  getPersonalRows,
-} from "@/lib/data";
+import { ReintentarButton } from "@/components/inicio/reintentar-button";
+import { getInicioData, INICIO_SECTION_LABELS, type InicioValues } from "@/lib/inicio-data";
 import { getEmpresaConfig } from "@/lib/company-config";
 import { formatDate, formatPen } from "@/lib/utils";
 
@@ -27,31 +20,25 @@ function firstParam(value: string | string[] | undefined) {
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const mensaje = firstParam((await searchParams)?.mensaje);
-  let dashboardLoadError: string | null = null;
-  let snapshot = emptyDashboardSnapshot();
-  try {
-    snapshot = await getDashboardSnapshot();
-  } catch (e) {
-    dashboardLoadError =
-      e instanceof DashboardDataUnavailableError
-        ? e.message
-        : "No se pudieron cargar los datos del panel desde la base de datos.";
-  }
-
-  const { caja, ventas, alquileres, empleados, alertas, ingresosMesActual, egresosMesActual } = snapshot;
-
-  const [inventario, personal, clientes, cotizaciones, empresa] = await Promise.all([
-    getInventarioResumen(),
-    getPersonalRows(),
-    getClientesRows(),
-    getCotizacionesUnificadasRows(),
+  const [inicio, empresa] = await Promise.all([
+    getInicioData(),
     getEmpresaConfig().catch(() => null),
   ]);
-  const ventasBorrador = ventas.filter((venta) => venta.estado === "borrador").length;
-  const stockBajo = inventario.stockBajo.length;
-  const penalidadesActivas = alquileres.filter((row) => Number(row.penalidad) > 0 && row.estado !== "cerrado").length;
-  const adelantosPendientes = personal.adelantos.filter((row) => row.estado === "pendiente").length;
-  const alertasCriticas = alertas.filter((row) => row.prioridad === "alta").length;
+  const caja = inicio.caja.data ?? [];
+  const ventas = inicio.ventas.data ?? [];
+  const stockBajo = inicio.inventario.data?.stockBajo ?? 0;
+  const ventasBorrador = inicio.ventasBorrador.data ?? 0;
+  const penalidadesActivas = inicio.penalidadesActivas.data ?? 0;
+  const adelantosPendientes = inicio.adelantosPendientes.data ?? 0;
+  const alertasCriticas = inicio.alertasCriticas.data ?? 0;
+  const unavailable = (Object.keys(inicio) as (keyof InicioValues)[])
+    .filter((key) => !inicio[key].available).map((key) => INICIO_SECTION_LABELS[key]);
+  const verified = unavailable.length === 0;
+  const mes = inicio.mes.data;
+  const utilidad = mes ? mes.ingresos - mes.egresos : null;
+  const monthLabel = new Intl.DateTimeFormat("es-PE", {
+    timeZone: "America/Lima", month: "long", year: "numeric",
+  }).format(new Date());
 
   // Calcular urgencias para jerarquía visual
   const urgencias = [
@@ -67,7 +54,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       key: "alertas",
       titulo: "Alertas críticas",
       detalle: `${alertasCriticas} alerta(s) de prioridad alta`,
-      href: "/gerencial",
+      href: "/gerencial?alertas=criticas",
       cta: "Abrir Centro de Mando",
       count: alertasCriticas,
     },
@@ -75,15 +62,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       key: "ventas",
       titulo: "Ventas sin confirmar",
       detalle: `${ventasBorrador} venta(s) aún en borrador`,
-      href: "/ventas",
-      cta: "Ir a ventas",
+      href: "/ventas?estado=borrador",
+      cta: "Ver ventas sin confirmar",
       count: ventasBorrador,
     },
     penalidadesActivas > 0 && {
       key: "penalidades",
       titulo: "Penalidades activas",
       detalle: `${penalidadesActivas} contrato(s) con penalidad`,
-      href: "/ventas/alquiler-mixer",
+      href: "/ventas/alquiler-mixer?penalidades=activas#contratos-registrados",
       cta: "Revisar contratos",
       count: penalidadesActivas,
     },
@@ -91,13 +78,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       key: "adelantos",
       titulo: "Adelantos pendientes",
       detalle: `${adelantosPendientes} adelanto(s) por regularizar`,
-      href: "/personal",
-      cta: "Ir a personal",
+      href: "/personal?adelantos=pendiente#adelantos-pendientes",
+      cta: "Ver adelantos pendientes",
       count: adelantosPendientes,
     },
   ].filter(Boolean) as Array<{ key: string; titulo: string; detalle: string; href: string; cta: string; count: number }>;
 
-  const todoOk = urgencias.length === 0;
+  const statusMessage = !verified
+    ? urgencias.length > 0
+      ? "Hay pendientes y parte de la información aún no pudo verificarse."
+      : "No se pudo verificar si todo está al día."
+    : urgencias.length > 0
+      ? "Hay elementos que requieren tu atención."
+      : "Todo bajo control. No hay pendientes en las categorías verificadas.";
 
   return (
     <div className="space-y-6">
@@ -108,22 +101,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <CardDescription>Tu rol no tiene permisos para el módulo solicitado.</CardDescription>
         </Card>
       ) : null}
-      {dashboardLoadError ? (
-        <Card className="border-[var(--katia-danger)]/40 bg-[var(--katia-danger)]/5">
-          <CardTitle className="text-[var(--katia-danger)]">Error al cargar datos</CardTitle>
-          <CardDescription className="mt-2">{dashboardLoadError}</CardDescription>
-        </Card>
-      ) : null}
-
       {/* Checklist de primeros pasos (solo si hay pasos sin completar) */}
-      <OnboardingBanner
+      {inicio.inventario.available && inicio.clientes.available && inicio.cotizaciones.available && empresa ? <OnboardingBanner
         steps={[
           { label: "Configura empresa", done: Boolean(empresa?.nombre), href: "/configuracion" },
-          { label: "Agrega productos", done: inventario.productos.length > 0, href: "/inventario?tab=productos" },
-          { label: "Registra cliente", done: clientes.length > 0, href: "/ventas/clientes" },
-          { label: "Crea cotizacion", done: cotizaciones.length > 0, href: "/cotizacion" },
+          { label: "Agrega productos", done: inicio.inventario.data.total > 0, href: "/inventario?tab=productos" },
+          { label: "Registra cliente", done: inicio.clientes.data > 0, href: "/ventas/clientes" },
+          { label: "Crea cotización", done: inicio.cotizaciones.data > 0, href: "/cotizacion" },
         ]}
-      />
+      /> : null}
 
       {/* ── ZONA CRÍTICA: lo más importante primero ── */}
       <div>
@@ -131,7 +117,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Inicio</h2>
             <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
-              {todoOk ? "Todo bajo control. No hay urgencias hoy." : "Hay elementos que requieren tu atención."}
+              {statusMessage}
             </p>
           </div>
           <Link
@@ -143,31 +129,45 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
       </div>
 
+      {!verified ? (
+        <Card className="border-[var(--katia-warning)]/40 bg-[var(--katia-warning)]/5">
+          <div className="flex flex-wrap items-center justify-between gap-4" role="status">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-[var(--katia-warning)]">Verificación incompleta</CardTitle>
+              <CardDescription className="mt-2">
+                No se pudo cargar: {unavailable.join(", ")}. Los datos disponibles se muestran abajo.
+              </CardDescription>
+            </div>
+            <ReintentarButton />
+          </div>
+        </Card>
+      ) : null}
+
       {/* Urgencias — visible y prominentes solo si existen */}
-      <UrgenciasPanel urgencias={urgencias} />
+      <UrgenciasPanel urgencias={urgencias} verified={verified} />
 
       {/* ── MÉTRICAS DEL PERÍODO (secundario) ── */}
       <section>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[var(--katia-text-tertiary)]">Este período</p>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[var(--katia-text-tertiary)]">{monthLabel}</p>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-3">
             <p className="text-xs text-[var(--katia-text-tertiary)]">Ingresos del mes</p>
-            <p className="mt-1 font-mono text-lg font-bold text-[var(--katia-text-primary)]">{formatPen(ingresosMesActual)}</p>
+            <p className="mt-1 font-mono text-lg font-bold text-[var(--katia-text-primary)]">{mes ? formatPen(mes.ingresos) : "No disponible"}</p>
           </div>
           <div className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-3">
             <p className="text-xs text-[var(--katia-text-tertiary)]">Egresos del mes</p>
-            <p className="mt-1 font-mono text-lg font-bold text-[var(--katia-text-primary)]">{formatPen(egresosMesActual)}</p>
+            <p className="mt-1 font-mono text-lg font-bold text-[var(--katia-text-primary)]">{mes ? formatPen(mes.egresos) : "No disponible"}</p>
           </div>
           <div className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-3">
             <p className="text-xs text-[var(--katia-text-tertiary)]">Utilidad estimada</p>
-            <p className={`mt-1 font-mono text-lg font-bold ${ingresosMesActual - egresosMesActual >= 0 ? "text-[var(--katia-success)]" : "text-[var(--katia-danger)]"}`}>
-              {formatPen(ingresosMesActual - egresosMesActual)}
+            <p className={`mt-1 font-mono text-lg font-bold ${utilidad === null ? "text-[var(--katia-text-secondary)]" : utilidad >= 0 ? "text-[var(--katia-success)]" : "text-[var(--katia-danger)]"}`}>
+              {utilidad === null ? "No disponible" : formatPen(utilidad)}
             </p>
           </div>
           <div className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-3">
             <p className="text-xs text-[var(--katia-text-tertiary)]">Empleados activos</p>
             <p className="mt-1 font-mono text-lg font-bold text-[var(--katia-text-primary)]">
-              {empleados.filter((e) => e.activo).length}
+              {inicio.empleadosActivos.data ?? "No disponible"}
             </p>
           </div>
         </div>
@@ -214,10 +214,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 {caja.length === 0 ? (
                   <TRow>
                     <TD colSpan={4} className="text-center text-xs text-[var(--katia-text-tertiary)]">
-                      Sin movimientos aún.{" "}
-                      <Link href="/caja" className="text-[var(--katia-primary)] hover:underline">
-                        Ir a caja
-                      </Link>
+                      {inicio.caja.available ? <>Sin movimientos aún.{" "}
+                        <Link href="/caja" className="text-[var(--katia-primary)] hover:underline">Ir a caja</Link>
+                      </> : "No se pudieron cargar los movimientos de caja."}
                     </TD>
                   </TRow>
                 ) : null}
@@ -233,7 +232,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               Ver todas →
             </Link>
           </div>
-          <CardDescription>{ventas.length} venta(s) de madera registradas.</CardDescription>
+          <CardDescription>Últimas ventas de madera registradas.</CardDescription>
           <div className="mt-3 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
             <Table>
               <THead>
@@ -264,10 +263,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 {ventas.length === 0 ? (
                   <TRow>
                     <TD colSpan={4} className="text-center text-xs text-[var(--katia-text-tertiary)]">
-                      Sin ventas aún.{" "}
-                      <Link href="/ventas" className="text-[var(--katia-primary)] hover:underline">
-                        Registrar venta
-                      </Link>
+                      {inicio.ventas.available ? <>Sin ventas aún.{" "}
+                        <Link href="/ventas" className="text-[var(--katia-primary)] hover:underline">Registrar venta</Link>
+                      </> : "No se pudieron cargar las ventas recientes."}
                     </TD>
                   </TRow>
                 ) : null}

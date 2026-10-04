@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useActionState } from "react";
+import type { ComponentProps } from "react";
 import { submitUpdateVentaMaderaCortadaForm } from "@/app/actions";
 import { MaderaCortadaEditarForm } from "@/components/sales/madera-cortada-editar-form";
 import { useToast } from "@/components/ui/toast";
@@ -11,7 +12,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 type Cliente = { id: string; nombre: string; documento?: string | null; ruc?: string | null };
 
 type ClientWrapperProps = {
-  venta: any;
+  venta: ComponentProps<typeof MaderaCortadaEditarForm>["venta"] & { correlativo?: string | null };
   clientes: Cliente[];
   mockData: boolean;
 };

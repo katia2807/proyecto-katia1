@@ -29,6 +29,7 @@ import {
 import { VentasListWithFilters, UnifiedVenta } from "@/components/ventas/ventas-list-with-filters";
 import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
+import { VentasPendientesView } from "@/components/inicio/ventas-pendientes-view";
 
 type Tarjeta = {
   href: string;
@@ -77,7 +78,7 @@ const tarjetas: Tarjeta[] = [
 ];
 
 type VentasPageProps = {
-  searchParams?: Promise<{ quick?: string | string[] }>;
+  searchParams?: Promise<{ quick?: string | string[]; estado?: string | string[] }>;
 };
 
 function normalizeQuickParam(value: string | string[] | undefined) {
@@ -86,7 +87,9 @@ function normalizeQuickParam(value: string | string[] | undefined) {
 }
 
 export default async function VentasHubPage({ searchParams }: VentasPageProps) {
-  const quick = normalizeQuickParam((await searchParams)?.quick);
+  const params = await searchParams;
+  const quick = normalizeQuickParam(params?.quick);
+  if (normalizeQuickParam(params?.estado) === "borrador") return <VentasPendientesView />;
   const [
     clientes,
     proveedores,

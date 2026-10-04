@@ -29,12 +29,14 @@ type AlquilerMixerTableProps = {
   contratos: AlquilerContratoRow[];
   clientesById: Record<string, string>;
   canMutate: boolean;
+  emptyMessage?: string;
 };
 
 export function AlquilerMixerTable({
   contratos,
   clientesById,
   canMutate,
+  emptyMessage = 'Aún no hay contratos. Crea uno con "Nuevo contrato".',
 }: AlquilerMixerTableProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -119,7 +121,7 @@ export function AlquilerMixerTable({
             {contratos.length === 0 ? (
               <TRow>
                 <TD colSpan={9} className="text-center py-6 text-[var(--color-text-secondary)]">
-                  Aún no hay contratos. Crea uno con &quot;Nuevo contrato&quot;.
+                  {emptyMessage}
                 </TD>
               </TRow>
             ) : null}

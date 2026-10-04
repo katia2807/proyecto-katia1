@@ -17,7 +17,6 @@ type ContratoAbierto = {
   penalidad_retraso_pago_pct: number;
   penalidad_devolucion_tardia_pct: number;
   penalidad_danios_pct: number;
-  [key: string]: any;
 };
 
 type AlquilerMixerContextPanelsProps = {

@@ -6,11 +6,21 @@ import { getCurrentUserRole } from "@/lib/current-user-role";
 import { getPersonalRows } from "@/lib/data";
 import { canMutateRRHH } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
+import { FiltroActivo } from "@/components/inicio/filtro-activo";
+import { getAdelantosPendientesRows } from "@/lib/inicio-pendientes";
 
-export default async function PersonalPage() {
+export default async function PersonalPage({ searchParams }: {
+  searchParams?: Promise<{ adelantos?: string | string[] }>;
+}) {
+  const adelantosParam = (await searchParams)?.adelantos;
+  const soloPendientes = (Array.isArray(adelantosParam) ? adelantosParam[0] : adelantosParam) === "pendiente";
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
-  const { empleados, adelantos, sueldos } = await getPersonalRows();
+  const [personal, pendientes] = await Promise.all([
+    getPersonalRows(), soloPendientes ? getAdelantosPendientesRows() : Promise.resolve(null),
+  ]);
+  const { empleados, sueldos } = personal;
+  const adelantos = pendientes ?? personal.adelantos;
   const role = await getCurrentUserRole();
   const canMutate = canMutateRRHH(role);
 
@@ -44,8 +54,9 @@ export default async function PersonalPage() {
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card id="adelantos-pendientes">
-          <CardTitle>Adelantos recientes</CardTitle>
+        <Card id="adelantos-pendientes" className="scroll-mt-24">
+          <CardTitle>{soloPendientes ? "Adelantos pendientes" : "Adelantos recientes"}</CardTitle>
+          {pendientes ? <div className="mt-4"><FiltroActivo label="Adelantos por regularizar" total={pendientes.length} clearHref="/personal#adelantos-pendientes" clearLabel="Ver todos los adelantos" /></div> : null}
           <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
             <Table>
               <THead>
@@ -70,6 +81,7 @@ export default async function PersonalPage() {
                     </TRow>
                   );
                 })}
+                {adelantos.length === 0 ? <TRow><TD colSpan={4} className="py-6 text-center text-[var(--katia-text-secondary)]">{soloPendientes ? "No hay adelantos pendientes." : "Aún no hay adelantos registrados."}</TD></TRow> : null}
               </tbody>
             </Table>
           </div>

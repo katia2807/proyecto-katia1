@@ -1935,8 +1935,38 @@ export function demoSnapshot() {
 export function demoVentasRows() {
   return [...store.ventas].sort((a, b) => b.fecha.localeCompare(a.fecha));
 }
+
+/** Resumen de Inicio con todos los pendientes, independiente de demoSnapshot(). */
+export function demoInicioData() {
+  const visible = (row: object) => !("deleted_at" in row && row.deleted_at);
+  const productos = store.inventarioProductos.filter((row) => row.activo && visible(row));
+  const monthParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Lima", year: "numeric", month: "numeric",
+  }).formatToParts(new Date());
+  const year = Number(monthParts.find((part) => part.type === "year")?.value);
+  const month = Number(monthParts.find((part) => part.type === "month")?.value);
+  const mes = demoUtilidad().find((row) => row.anio === year && row.mes === month);
+  return {
+    inventario: { total: productos.length, stockBajo: productos.filter((row) => row.stock_actual <= row.stock_minimo).length },
+    ventasBorrador: store.ventas.filter((row) => row.estado === "borrador" && visible(row)).length,
+    penalidadesActivas: store.alquileres.filter((row) => row.penalidad > 0 && row.estado !== "cerrado" && visible(row)).length,
+    alertasCriticas: store.alertas.filter((row) => row.prioridad === "alta" && row.estado !== "resuelta").length,
+    adelantosPendientes: store.adelantos.filter((row) => row.estado === "pendiente").length,
+    empleadosActivos: store.empleados.filter((row) => row.activo).length,
+    mes: { ingresos: Number(mes?.ingresos ?? 0), egresos: Number(mes?.egresos ?? 0) },
+    caja: demoCajaRows().filter(visible).slice(0, 4),
+    ventas: demoVentasRows().filter(visible).slice(0, 4),
+    clientes: store.clientes.filter(visible).length,
+    cotizaciones: store.cotizacionesUnificadas.filter(visible).length,
+  };
+}
 export function demoClientesRows() {
   return [...store.clientes].sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+export function demoAlertasCriticasRows() {
+  return [...store.alertas]
+    .filter((row) => row.prioridad === "alta" && row.estado !== "resuelta")
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 export function demoProveedoresRows() {
   return [...store.proveedores].sort((a, b) => a.nombre.localeCompare(b.nombre));

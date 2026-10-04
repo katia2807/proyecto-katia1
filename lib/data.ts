@@ -590,26 +590,35 @@ async function loadInventarioProductosRows(includeInactive: boolean): Promise<{
   usedFallback: boolean;
 }> {
   if (!hasSupabaseEnv()) {
-    const rows = demoInventarioProductosRows();
+    const rows = demoInventarioProductosRows().filter((row) => !("deleted_at" in row && row.deleted_at));
     const out = includeInactive ? rows : rows.filter((row) => row.activo !== false);
     return { rows: out, usedFallback: false };
   }
 
-  try {
+  async function loadPages(columns: string): Promise<InventarioProductoRow[]> {
     const supabase = getSupabaseServerClient();
-    let query = supabase
-      .from("inventario_productos")
-      .select(INVENTARIO_PRODUCTOS_SELECT)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .order("nombre");
-    if (!includeInactive) {
-      query = query.eq("activo", true);
-    }
-    const { data, error } = await query;
-    if (error) {
-      throw new Error(error.message);
-    }
-    const rows = (data ?? []) as InventarioProductoRow[];
+    const rows: InventarioProductoRow[] = [];
+    const signal = AbortSignal.timeout(10_000);
+    let expectedTotal: number | null = null;
+    do {
+      let query = supabase.from("inventario_productos")
+        .select(columns, { count: "exact" })
+        .eq("organization_id", DEFAULT_ORG_ID).is("deleted_at", null)
+        .order("nombre").order("id").range(rows.length, rows.length + 499).abortSignal(signal);
+      if (!includeInactive) query = query.eq("activo", true);
+      const { data, count, error } = await query;
+      if (error) throw new Error(error.message);
+      if (data === null || count === null) throw new Error("No se pudo verificar el catálogo de inventario.");
+      if (expectedTotal !== null && expectedTotal !== count) throw new Error("El catálogo cambió durante la consulta. Vuelve a intentarlo.");
+      expectedTotal = count;
+      if (data.length === 0 && rows.length < count) throw new Error("El catálogo de inventario está incompleto.");
+      rows.push(...data as unknown as InventarioProductoRow[]);
+    } while (rows.length < expectedTotal);
+    return rows;
+  }
+
+  try {
+    const rows = await loadPages(INVENTARIO_PRODUCTOS_SELECT);
     return { rows, usedFallback: false };
   } catch (e) {
     console.log(
@@ -617,20 +626,8 @@ async function loadInventarioProductosRows(includeInactive: boolean): Promise<{
       e instanceof Error ? e.message : String(e)
     );
     try {
-      const supabase = getSupabaseServerClient();
-      let query = supabase
-        .from("inventario_productos")
-        .select("id,organization_id,codigo,nombre,categoria,unidad,stock_actual,stock_minimo,activo,created_at")
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .order("nombre");
-      if (!includeInactive) {
-        query = query.eq("activo", true);
-      }
-      const { data, error } = await query;
-      if (error) {
-        throw new Error(error.message);
-      }
-      const rows = (data ?? []).map((row) => ({
+      const data = await loadPages("id,organization_id,codigo,nombre,categoria,unidad,stock_actual,stock_minimo,activo,created_at");
+      const rows = data.map((row) => ({
         ...row,
         foto_url: null,
       })) as InventarioProductoRow[];

@@ -6,14 +6,21 @@ import { getCurrentUserRole } from "@/lib/current-user-role";
 import { getAlquilerRows, getClientesRows, getInventarioProductosRows } from "@/lib/data";
 import { canMutateVentas } from "@/lib/permissions";
 import { formatPen } from "@/lib/utils";
+import { FiltroActivo } from "@/components/inicio/filtro-activo";
+import { getAlquileresConPenalidadRows } from "@/lib/inicio-pendientes";
 
-export default async function AlquilerMixerPage() {
+export default async function AlquilerMixerPage({ searchParams }: {
+  searchParams?: Promise<{ penalidades?: string | string[] }>;
+}) {
+  const penalidades = (await searchParams)?.penalidades;
+  const soloPenalidades = (Array.isArray(penalidades) ? penalidades[0] : penalidades) === "activas";
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
-  const [clientes, alquilerResult, inventarioProductos] = await Promise.all([
+  const [clientes, alquilerResult, inventarioProductos, pendientes] = await Promise.all([
     getClientesRows(),
     getAlquilerRows(),
     getInventarioProductosRows(true),
+    soloPenalidades ? getAlquileresConPenalidadRows() : Promise.resolve(null),
   ]);
   const contratos = alquilerResult.rows;
   const alquilerLoadWarning = alquilerResult.loadWarning;
@@ -81,9 +88,10 @@ export default async function AlquilerMixerPage() {
         </div>
       </Card>
 
-      <Card>
-        <CardTitle>Contratos registrados</CardTitle>
-        <CardDescription>Historial de alquileres de bomba mixer.</CardDescription>
+      <Card id="contratos-registrados" className="scroll-mt-24">
+        <CardTitle>{soloPenalidades ? "Contratos con penalidad activa" : "Contratos registrados"}</CardTitle>
+        <CardDescription>{soloPenalidades ? "Contratos sin cerrar que tienen una penalidad mayor a cero." : "Historial de alquileres de bomba mixer."}</CardDescription>
+        {pendientes ? <div className="mt-4"><FiltroActivo label="Penalidades activas" total={pendientes.length} clearHref="/ventas/alquiler-mixer#contratos-registrados" clearLabel="Ver todos los contratos" /></div> : null}
         {alquilerLoadWarning ? (
           <p
             role="alert"
@@ -94,9 +102,10 @@ export default async function AlquilerMixerPage() {
         ) : null}
         <div className="mt-3">
           <AlquilerMixerTable
-            contratos={contratos}
+            contratos={pendientes ?? contratos}
             clientesById={Object.fromEntries(clientes.map((c) => [c.id, c.nombre]))}
             canMutate={canMutate}
+            emptyMessage={soloPenalidades ? "No hay contratos con penalidad activa." : undefined}
           />
         </div>
       </Card>

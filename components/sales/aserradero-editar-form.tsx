@@ -19,7 +19,7 @@ type AserraderoEditarFormProps = {
     pies_cubicos: number;
     costo_cubicaje: number;
     precio_cobrado: number;
-    lineas_json: any;
+    lineas_json: unknown;
   };
   clientes: Cliente[];
   mockData?: boolean;

@@ -5,7 +5,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { getClientesRows, getChoferesRows } from "@/lib/data";
 import { hasSupabaseEnv } from "@/lib/runtime";
-import { formatPen } from "@/lib/utils";
+import { formatDate, formatPen } from "@/lib/utils";
 import { PrintButton } from "@/components/ui/print-button";
 import { PrintSelector } from "@/components/ui/print-selector";
 import { buildAserraderoPrintModel } from "@/lib/aserradero-print-model";
@@ -19,11 +19,7 @@ import {
 type Params = { tipo: string; id: string };
 
 function fmt(date: string) {
-  try {
-    return new Date(date).toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" });
-  } catch {
-    return date;
-  }
+  return formatDate(date, { day: "2-digit", month: "long", year: "numeric" });
 }
 const decorativeQrCells = [
   1, 1, 1, 0, 1, 0, 1, 1, 1,
@@ -348,7 +344,7 @@ export default async function ComprobantePage({
 
   // New states for specific types
   let aserraderoServicio: ServicioAserraderoRow | null = null;
-  let aserraderoLineasEspeciales: Array<{ id: string; codigo: string; nombre: string; cantidad: number; tarifa: number; subtotal: number }> = [];
+  let aserraderoLineasEspeciales: Array<{ id: string; codigo: string; nombre: string; cantidad: number; tarifa: number; subtotal: number; tipo?: string }> = [];
   let aserraderoLineasCubicaje: LineaCubicajeAserradero[] = [];
 
   let ventaMadera: VentaMaderaRow & { lineas: VentaMaderaLineaRow[] } | null = null;
@@ -689,7 +685,7 @@ export default async function ComprobantePage({
                   <tbody>
                     {(() => {
                       const lineasEfectivas = aserraderoLineasEspeciales.filter(
-                        (linea: any) => linea.tipo !== "nota_interna" && linea.tipo !== "extra_madera_cliente"
+                        (linea) => linea.tipo !== "nota_interna" && linea.tipo !== "extra_madera_cliente"
                       );
                       
                       return (
@@ -717,7 +713,7 @@ export default async function ComprobantePage({
               {/* Madera del Cliente (Extras) */}
               {(() => {
                 const extrasCliente = aserraderoLineasEspeciales.filter(
-                  (linea: any) => linea.tipo === "extra_madera_cliente"
+                  (linea) => linea.tipo === "extra_madera_cliente"
                 );
                 if (extrasCliente.length === 0) return null;
                 return (
@@ -734,7 +730,7 @@ export default async function ComprobantePage({
                         </tr>
                       </thead>
                       <tbody>
-                        {extrasCliente.map((linea: any, i) => (
+                        {extrasCliente.map((linea, i) => (
                           <tr key={linea.id || i} className={i % 2 === 0 ? "bg-[var(--color-primary-soft,rgba(0,0,0,0.01))]" : ""}>
                             <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-left">{linea.nombre?.replace("Madera cliente: ", "") || linea.nombre}</td>
                             <td className="voucher-td py-2 text-sm text-[var(--color-text-primary,#1e293b)] text-right">{linea.cantidad}</td>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useActionState } from "react";
+import type { ComponentProps } from "react";
 import { submitUpdateContratoAlquilerForm } from "@/app/actions";
 import { ContratoAlquilerForm } from "@/components/sales/contrato-alquiler-form";
 import { useToast } from "@/components/ui/toast";
@@ -9,12 +10,10 @@ import { useRouter } from "next/navigation";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 
 type Cliente = { id: string; nombre: string; ruc?: string | null };
-type Maquina = { id: string; nombre: string; category?: string };
-
 type ClientWrapperProps = {
-  contrato: any;
+  contrato: NonNullable<ComponentProps<typeof ContratoAlquilerForm>["contrato"]>;
   clientes: Cliente[];
-  maquinas: any[];
+  maquinas: ComponentProps<typeof ContratoAlquilerForm>["maquinas"];
   mockData: boolean;
 };
 

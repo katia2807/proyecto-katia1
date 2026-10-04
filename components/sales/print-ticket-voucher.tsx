@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { getEmpresaConfig } from "@/lib/company-config";
 import { getClientesRows } from "@/lib/data";
-import { formatPen } from "@/lib/utils";
+import { formatDate, formatPen } from "@/lib/utils";
 import { resolveSaleDocument, getProductoMaderaById, getAdelantoFromCaja, getMuebleNombre } from "@/lib/print-helpers";
+import type { MaderaCortadaRow, MuebleTerminadoRow, ServicioAserraderoRow, VentaMaderaConLineas } from "@/lib/print-helpers";
 import { PrintButton } from "@/components/ui/print-button";
 import { PrintSelector } from "@/components/ui/print-selector";
 import { buildAserraderoPrintModel } from "@/lib/aserradero-print-model";
@@ -19,11 +20,11 @@ type PrintTicketVoucherProps = {
 };
 
 function fmt(date: string) {
-  try {
-    return new Date(date).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return date;
-  }
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(date.trim());
+  return formatDate(date, {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    ...(dateOnly ? {} : { hour: "2-digit", minute: "2-digit" }),
+  });
 }
 const decorativeQrCells = [
   1, 1, 1, 0, 1, 0, 1, 1, 1,
@@ -66,7 +67,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
   if (tipo === "aserradero") {
     const customer = clienteMap.get(saleRecord.cliente_id);
     const model = buildAserraderoPrintModel({
-      service: saleRecord,
+      service: saleRecord as ServicioAserraderoRow,
       customer,
       tipoComprobante: docType,
     });
@@ -90,12 +91,12 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
   let entrega       = "—";
   let effectiveDocType: "boleta" | "factura" = docType;
 
-  let aserraderoServicio: any = null;
+  let aserraderoServicio: ServicioAserraderoRow | null = null;
   let aserraderoLineasEspeciales: Array<{ id: string; codigo: string; nombre: string; cantidad: number; tarifa: number; subtotal: number; tipo?: string }> = [];
   const ventaMaderaLineasResueltas: Array<{ desc: string; qty: string; unidad: string; unitario: string; total: string }> = [];
 
   if (tipo === "aserradero") {
-    aserraderoServicio = saleRecord;
+    aserraderoServicio = saleRecord as ServicioAserraderoRow;
     correlativo = aserraderoServicio.correlativo ?? aserraderoServicio.id.slice(0, 8).toUpperCase();
     fechaVenta  = fmt(aserraderoServicio.fecha);
     totalSoles  = Number(aserraderoServicio.precio_cobrado);
@@ -120,7 +121,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
       }
     }
   } else if (tipo === "venta-madera") {
-    const ventaMadera = saleRecord;
+    const ventaMadera = saleRecord as VentaMaderaConLineas;
     correlativo = ventaMadera.correlativo ?? ventaMadera.id.slice(0, 8).toUpperCase();
     fechaVenta  = fmt(ventaMadera.fecha);
     totalSoles  = Number(ventaMadera.total);
@@ -151,7 +152,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
       });
     }
   } else if (tipo === "madera") {
-    const venta = saleRecord;
+    const venta = saleRecord as MaderaCortadaRow;
     const printModel = buildMaderaCortadaPrintModel(venta, docType);
     effectiveDocType = printModel.tipoComprobante;
     correlativo    = venta.correlativo ?? venta.id.slice(0, 8).toUpperCase();
@@ -170,7 +171,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo }: PrintTicke
       entrega = `${venta.tipo_entrega} — ${venta.direccion_entrega}`;
     }
   } else {
-    const venta = saleRecord;
+    const venta = saleRecord as MuebleTerminadoRow;
     correlativo   = venta.correlativo ?? venta.id.slice(0, 8).toUpperCase();
     fechaVenta    = fmt(venta.fecha);
     totalSoles    = Number(venta.total);

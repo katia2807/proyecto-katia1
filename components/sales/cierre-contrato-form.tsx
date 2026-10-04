@@ -74,8 +74,8 @@ export function CierreContratoForm({ contratos }: CierreContratoFormProps) {
             window.location.reload();
           }, 1500);
         }
-      } catch (err: any) {
-        setErrorMessage(err.message || "Error al procesar la solicitud.");
+      } catch (err: unknown) {
+        setErrorMessage(err instanceof Error ? err.message : "Error al procesar la solicitud.");
       }
     });
   };

@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.1.16";
-export const APP_LAST_UPDATE = "23/07/2026";
+export const APP_VERSION = "1.1.17";
+export const APP_LAST_UPDATE = "03/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Servicio Aserradero ahora usa un flujo de tres pasos, tarifa final editable y comprobantes A4 y térmicos compactos y consistentes.";
+  "Inicio muestra todos los pendientes y abre listas filtradas. Corregimos el catálogo de stock y las fechas de listas y comprobantes. Cada actualización, incluso mínima, tendrá notas de parche fáciles de leer.";

@@ -101,7 +101,6 @@ describe("buildMaderaCortadaPrintModel", () => {
   it("usa un fallback histórico solo con los datos existentes", () => {
     const model = buildMaderaCortadaPrintModel(
       {
-        id: "venta-historica",
         tipo_corte: "tabla",
         total_pt: 26.6667,
         precio_por_pt: 3.5,

@@ -371,7 +371,7 @@ export default async function MueblesTerminadosPage({
               {ventas.length === 0 ? (
                 <TRow>
                   <TD colSpan={8} className="text-center text-[var(--color-text-secondary)]">
-                    Aún no hay ventas. Usa "Vender mueble" para registrar una.
+                    Aún no hay ventas. Usa &quot;Vender mueble&quot; para registrar una.
                   </TD>
                 </TRow>
               ) : null}

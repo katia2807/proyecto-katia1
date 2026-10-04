@@ -116,13 +116,26 @@ describe("margen de ganancia configurable", () => {
 describe("formatDate", () => {
   test("formatea fecha ISO a formato legible", () => {
     const result = formatDate("2026-05-15");
-    // Debe contener día y año
-    expect(result).toMatch(/\d/);
+    expect(result).toBe("15/05/2026");
   });
 
   test("maneja strings de fecha con hora", () => {
     const result = formatDate("2026-05-15T10:30:00.000Z");
-    expect(result).toMatch(/\d/);
+    expect(result).toBe("15/05/2026");
+  });
+
+  test("conserva el día guardado al mostrar un documento en Perú", () => {
+    expect(formatDate("2026-04-26", { day: "2-digit", month: "long", year: "numeric" }))
+      .toBe("26 de abril de 2026");
+  });
+
+  test("convierte los instantes con hora a la fecha local de Perú", () => {
+    expect(formatDate("2026-05-15T02:00:00.000Z")).toBe("14/05/2026");
+  });
+
+  test("conserva los estados vacíos e inválidos", () => {
+    expect(formatDate(null)).toBe("—");
+    expect(formatDate("no-es-fecha")).toBe("no-es-fecha");
   });
 });
 
