@@ -62,11 +62,11 @@ export default async function CotizacionPage({ searchParams }: CotizacionPagePro
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Nueva venta guiada</h2>
+        <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">{modoGuiado ? "Cotización guiada" : "Nueva cotización"}</h2>
         <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
           {modoGuiado
-            ? "Completa los datos paso a paso. Usa Siguiente para avanzar y revisa el total antes de guardar."
-            : "Crea una cotizacion, imprime el documento y conviertela a venta cuando el cliente acepte."}
+            ? "Prepara la cotización paso a paso. Después de la aceptación del cliente, podrás convertirla en venta y registrar el cobro."
+            : "Crea una cotización, imprímela y conviértela en venta con registro del cobro cuando el cliente la acepte."}
         </p>
       </div>
 
@@ -76,18 +76,18 @@ export default async function CotizacionPage({ searchParams }: CotizacionPagePro
             <div className="inline-flex items-center rounded-full bg-[var(--katia-primary)] px-2.5 py-1 text-xs font-bold text-white">
               Recomendado para encargados
             </div>
-            <CardTitle className="mt-3 text-xl">Modo rapido para encargados</CardTitle>
+            <CardTitle className="mt-3 text-xl">Cotiza en cuatro pasos</CardTitle>
             <CardDescription className="mt-2 text-sm leading-6">
               {modoGuiado
-                ? "Completa los datos paso a paso. Usa Siguiente para avanzar y revisa el total antes de guardar."
-                : "Usa este flujo si solo necesitas registrar una venta o cotizacion con los datos basicos. Las opciones avanzadas siguen disponibles en el mismo formulario."}
+                ? "Elige el cliente y lo que necesita, revisa el total y guarda la cotización para presentársela."
+                : "Prepara una cotización con los datos básicos. Puedes añadir medidas y condiciones en las opciones avanzadas."}
             </CardDescription>
           </div>
           <a
             href="#cotizacion-wizard"
             className="inline-flex h-11 items-center rounded-xl bg-[var(--color-accent)] px-5 text-sm font-bold text-[var(--color-on-accent)] transition hover:brightness-110"
           >
-            Empezar rápido
+            Empezar cotización
           </a>
         </div>
         <div className="mt-5 grid gap-3 md:grid-cols-4">
@@ -95,7 +95,7 @@ export default async function CotizacionPage({ searchParams }: CotizacionPagePro
             "Cliente",
             "Producto o servicio",
             "Total",
-            "Confirmar",
+            "Revisar y guardar",
           ].map((step, index) => (
             <div key={step} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
               <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">Paso {index + 1}</p>

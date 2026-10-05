@@ -25,7 +25,7 @@ import { mutationFormInitialState } from "@/lib/mutation-form-state";
 describe("submitCreateClienteForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.requireAuthContext.mockResolvedValue(undefined);
+    mocks.requireAuthContext.mockResolvedValue({ role: "owner_admin", uiRole: "owner_admin" });
     mocks.hasSupabaseEnv.mockReturnValue(false);
     mocks.demoCreateCliente.mockReturnValue("11111111-1111-4111-8111-111111111111");
     mocks.redirect.mockImplementation((destination: string) => {

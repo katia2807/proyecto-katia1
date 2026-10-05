@@ -166,6 +166,7 @@ export type CotizacionUnificadaRow = {
   estado_flujo: "pendiente" | "lista_produccion" | "en_produccion" | "terminado" | "entregado" | "cobrada" | "inactivo" | "deudor";
   detalle: Record<string, unknown>;
   created_at: string;
+  deleted_at?: string | null;
 };
 
 type CorteRow = {
@@ -1675,6 +1676,7 @@ function normalizeCotizacionUnificada(raw: unknown): CotizacionUnificadaRow {
         : "pendiente",
     detalle: r.detalle && typeof r.detalle === "object" ? (r.detalle as Record<string, unknown>) : {},
     created_at: String(r.created_at ?? nowIso()),
+    deleted_at: typeof r.deleted_at === "string" ? r.deleted_at : null,
   };
 }
 
@@ -1984,11 +1986,11 @@ export function demoCotizacionesRows() {
 }
 
 export function demoCotizacionesUnificadasRows() {
-  return [...store.cotizacionesUnificadas].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  return store.cotizacionesUnificadas.filter(c => !c.deleted_at).sort((a, b) => b.fecha.localeCompare(a.fecha));
 }
 
 export function demoGetCotizacionUnificada(id: string): CotizacionUnificadaRow | undefined {
-  return store.cotizacionesUnificadas.find((c) => c.id === id);
+  return store.cotizacionesUnificadas.find((c) => c.id === id && !c.deleted_at);
 }
 
 export function demoCreateCotizacionUnificada(

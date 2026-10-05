@@ -198,7 +198,11 @@ async function getMaderaCortadaById(id: string): Promise<MaderaCortadaRow | null
 }
 
 async function getMuebleTerminadoById(id: string): Promise<MuebleTerminadoRow | null> {
-  if (!hasSupabaseEnv()) return null;
+  if (!hasSupabaseEnv()) {
+    const { demoVentasMuebleTerminadoRows } = await import("@/lib/demo-store");
+    const found = demoVentasMuebleTerminadoRows().find((row) => row.id === id);
+    return found ? { ...found, estado: null } : null;
+  }
   const supabase = getSupabaseServerClient();
   const { data } = await supabase
     .from("ventas_mueble_terminado")
@@ -210,7 +214,12 @@ async function getMuebleTerminadoById(id: string): Promise<MuebleTerminadoRow | 
 }
 
 async function getMuebleNombre(id: string): Promise<string | null> {
-  if (!hasSupabaseEnv() || !id) return null;
+  if (!id) return null;
+  if (!hasSupabaseEnv()) {
+    const { demoMueblesCatalogoRows } = await import("@/lib/demo-store");
+    const mueble = demoMueblesCatalogoRows().find((row) => row.id === id);
+    return mueble ? `${mueble.codigo} — ${mueble.nombre}` : null;
+  }
   const supabase = getSupabaseServerClient();
   const { data } = await supabase
     .from("muebles_catalogo")

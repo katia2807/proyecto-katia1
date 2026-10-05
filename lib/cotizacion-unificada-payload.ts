@@ -33,6 +33,17 @@ export type CotizacionResumenCalculo = {
   totalFinal: number;
 };
 
+export const condicionesPagoCotizacionSchema = z.object({
+  metodo: z.enum(["efectivo", "transferencia", "yape", "billetera_digital", "otro"]),
+  modalidad: z.enum(["", "contado", "adelanto", "adelanto_saldo", "credito"]),
+  adelanto: z.number().finite().nonnegative().optional(),
+  plazo: z.number().finite().nonnegative().optional(),
+  plazoUnidad: z.enum(["dias", "meses"]).optional(),
+});
+
+/** Condiciones acordadas en la propuesta; no prueban que se haya recibido dinero. */
+export type CondicionesPagoCotizacion = z.infer<typeof condicionesPagoCotizacionSchema>;
+
 export type CotizacionDetalleV1 = {
   version: 1;
   rubros: RubrosState;
@@ -44,12 +55,14 @@ export type CotizacionDetalleV1 = {
   muebles_lineas: MuebleLineaMadera[];
   /** Texto libre para el bloque NOTA al pie (condiciones, exclusiones, etc.). */
   notas_generales: string;
+  condiciones_pago?: CondicionesPagoCotizacion;
   /**
    * Descripción visible al cliente en la cotización formal.
-   * Si se deja vacío, se genera automáticamente a partir del tipo de mueble/material.
+   * El modo automático sigue los datos del servicio; el manual conserva incluso un texto vacío.
    * NO incluye datos técnicos internos (PT, dimensiones en pulgadas, etc.).
    */
   descripcion_cliente?: string;
+  descripcion_modo?: "automatica" | "manual";
   aserradero: {
     modo: "hora" | "total";
     precioHora: number;
@@ -138,7 +151,9 @@ export const cotizacionDetalleV1Schema = z.object({
   costoManoObra: z.number().nonnegative().optional().default(0),
   muebles_lineas: z.array(lineaMaderaSchema),
   notas_generales: z.string().optional().default(""),
+  condiciones_pago: condicionesPagoCotizacionSchema.optional(),
   descripcion_cliente: z.string().optional(),
+  descripcion_modo: z.enum(["automatica", "manual"]).optional(),
   aserradero: aserraderoSchema,
   alquiler: alquilerSchema,
   resumenCalculo: resumenCalculoSchema.optional(),
@@ -187,6 +202,9 @@ export function parseCotizacionDetalle(raw: unknown): CotizacionDetalleV1 {
     }
     if (typeof r.descripcion_cliente === "string") {
       base.descripcion_cliente = r.descripcion_cliente;
+    }
+    if (r.descripcion_modo === "automatica" || r.descripcion_modo === "manual") {
+      base.descripcion_modo = r.descripcion_modo;
     }
   }
   return base;

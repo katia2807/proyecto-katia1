@@ -27,7 +27,7 @@ export async function VentasPendientesView() {
                   <TD>{clientesById.get(row.cliente_id) ?? "—"}</TD>
                   <TD><Badge variant="warning">Sin confirmar</Badge></TD>
                   <TD className="text-right font-semibold">{formatPen(Number(row.total))}</TD>
-                  <TD><Link href={`/ventas/comprobante/venta-madera/${row.id}`} className="text-[var(--katia-primary)] hover:underline">Ver detalle</Link></TD>
+                  <TD><Link href={`/ventas/detalle/venta-madera/${row.id}`} className="text-[var(--katia-primary)] hover:underline">Ver detalle</Link></TD>
                 </TRow>
               ))}
               {ventas.length === 0 ? <TRow><TD colSpan={5} className="py-6 text-center text-[var(--katia-text-secondary)]">No hay ventas sin confirmar.</TD></TRow> : null}

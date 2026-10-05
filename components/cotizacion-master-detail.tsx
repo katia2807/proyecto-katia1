@@ -9,6 +9,7 @@ import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { formatDate, formatPen } from "@/lib/utils";
 import { parseCotizacionDetalle } from "@/lib/cotizacion-unificada-payload";
 import { cambiarEstadoCotizacion } from "@/app/actions";
+import { lineasCondicionesPagoCotizacion } from "@/lib/cotizacion-pago";
 
 type Cotizacion = {
   id: string;
@@ -50,23 +51,8 @@ function EstadoBadge({ estado }: { estado: string }) {
   );
 }
 
-function DetalleVisual({ detalle }: { detalle: unknown }) {
+function DetalleVisual({ detalle, total }: { detalle: unknown; total: number }) {
   const d = useMemo(() => parseCotizacionDetalle(detalle), [detalle]);
-
-  const metodoLabel: Record<string, string> = {
-    efectivo: "Efectivo",
-    yape: "Yape / Plin",
-    transferencia: "Transferencia bancaria",
-    billetera_digital: "Billetera digital",
-    otro: "Otro",
-  };
-
-  const modalidadLabel: Record<string, string> = {
-    contado: "Contado",
-    adelanto: "Adelanto",
-    adelanto_saldo: "Adelanto + saldo",
-    credito: "Crédito",
-  };
 
   // Extraer info de pago de notas_generales si fue guardada ahí
   const notasLineas = (d.notas_generales ?? "")
@@ -74,11 +60,12 @@ function DetalleVisual({ detalle }: { detalle: unknown }) {
     .map((l) => l.trim())
     .filter(Boolean);
 
-  const notasPago = notasLineas.filter((l) =>
+  const notasPagoHistoricas = notasLineas.filter((l) =>
     l.startsWith("Modalidad:") || l.startsWith("Monto adelantado:") ||
     l.startsWith("Saldo pendiente:") || l.startsWith("Plazo")
   );
-  const notasCliente = notasLineas.filter((l) => !notasPago.includes(l));
+  const notasPago = d.condiciones_pago ? lineasCondicionesPagoCotizacion(d.condiciones_pago, total) : notasPagoHistoricas;
+  const notasCliente = notasLineas.filter((l) => !notasPagoHistoricas.includes(l));
 
   return (
     <div className="space-y-4 text-sm">
@@ -386,7 +373,7 @@ export function CotizacionMasterDetail({
                 <EstadoBadge estado={selected.estado_flujo} />
               </div>
 
-              {canMutate && (
+              {canMutate && selected.estado_flujo !== "cobrada" && (
                 <form
                   onSubmit={handleSaveEstado}
                   action={cambiarEstadoCotizacion}
@@ -424,7 +411,7 @@ export function CotizacionMasterDetail({
             </div>
 
             {/* Detalle visual legible */}
-            <DetalleVisual detalle={selected.detalle} />
+            <DetalleVisual detalle={selected.detalle} total={parseTotalSeguro(selected.total)} />
           </div>
         ) : null}
       </DetailDrawer>

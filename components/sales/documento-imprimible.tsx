@@ -46,7 +46,8 @@ export function DocumentoImprimible({
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
         .doc-paper h1, .doc-paper h2, .doc-paper h3 { color: #111; }
-        .doc-paper table { width: 100%; border-collapse: collapse; }
+        .doc-paper table { width: 100%; border-collapse: collapse; background: white; color: #111; }
+        .doc-paper thead { background: #f4f4f5; }
         .doc-paper th, .doc-paper td {
           border: 1px solid #444;
           padding: 6px 8px;

@@ -24,6 +24,7 @@ type ContratoAlquilerFormProps = {
   /** Acción enlazada con `useActionState` (submit + toast + cierre en el panel). */
   panelAction: FormActionProp;
   contrato?: Database["public"]["Tables"]["alquileres"]["Row"];
+  completarDatos?: boolean;
 };
 
 const tarifas = [
@@ -46,9 +47,10 @@ export function ContratoAlquilerForm({
   mockData = false,
   panelAction,
   contrato,
+  completarDatos = false,
 }: ContratoAlquilerFormProps) {
   const hoy = new Date().toISOString().slice(0, 10);
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(completarDatos && contrato?.cliente_id && contrato.activo ? 3 : 1);
 
   // Paso 1 State
   const [clienteId, setClienteId] = useState(contrato?.cliente_id ?? "");
@@ -66,9 +68,9 @@ export function ContratoAlquilerForm({
   const [fechaInicio, setFechaInicio] = useState(contrato?.fecha_inicio ?? hoy);
   const [fechaTermino, setFechaTermino] = useState(contrato?.fecha_termino ?? "");
   const [tarifa, setTarifa] = useState(contrato?.tarifa ?? 0);
-  const [dias, setDias] = useState(contrato?.dias_alquiler ?? 1);
-  const [tarifaUnidad, setTarifaUnidad] = useState<(typeof tarifas)[number]["value"]>(
-    contrato?.tarifa_unidad ?? "hora_maquina"
+  const [dias, setDias] = useState<number | "">(contrato?.dias_alquiler ?? (completarDatos ? "" : 1));
+  const [tarifaUnidad, setTarifaUnidad] = useState<(typeof tarifas)[number]["value"] | "">(
+    contrato?.tarifa_unidad ?? (completarDatos ? "" : "hora_maquina")
   );
   const [montoAdelanto, setMontoAdelanto] = useState(contrato?.deposito_30 ? String(contrato.deposito_30) : "");
 
@@ -78,8 +80,8 @@ export function ContratoAlquilerForm({
   const [daniosPct, setDaniosPct] = useState(contrato?.penalidad_danios_pct ?? 3);
 
   const montoTotal = useMemo(() => {
-    return roundMoney(tarifa * dias);
-  }, [tarifa, dias]);
+    return tarifaUnidad ? roundMoney(tarifa * Number(dias)) : 0;
+  }, [tarifa, dias, tarifaUnidad]);
 
   const deposito30 = useMemo(() => {
     return roundMoney(montoTotal * 0.3);
@@ -95,7 +97,8 @@ export function ContratoAlquilerForm({
   // Validaciones visuales (sin bloqueos)
   const hasStep1Warning = !clienteId;
   const hasStep2Warning = !activo.trim();
-  const hasStep3Warning = !fechaInicio || tarifa <= 0 || dias <= 0;
+  const hasStep3Warning = !fechaInicio || !tarifaUnidad || tarifa <= 0 || Number(dias) <= 0 || !Number.isInteger(Number(dias));
+  const totalPorDefinir = !tarifaUnidad || tarifa <= 0 || Number(dias) <= 0;
 
   function handleClienteCreado(id: string, nombre: string) {
     setClientesLocales((prev) => [...prev, { id, nombre }]);
@@ -122,8 +125,10 @@ export function ContratoAlquilerForm({
               (item.n === 2 && hasStep2Warning) ||
               (item.n === 3 && hasStep3Warning);
             return (
-              <div
+              <button
                 key={item.n}
+                type="button"
+                aria-current={isActive ? "step" : undefined}
                 className="flex flex-1 items-center cursor-pointer select-none"
                 onClick={() => setStep(item.n)}
               >
@@ -164,7 +169,7 @@ export function ContratoAlquilerForm({
                     }`}
                   />
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
@@ -269,6 +274,7 @@ export function ContratoAlquilerForm({
                     : "border-[var(--color-border)]"
                 }`}
               >
+                {activo && !maquinas.some((m) => m.nombre === activo) ? <option value={activo}>{activo}</option> : null}
                 {maquinas.map((m) => (
                   <option key={m.id} value={m.nombre}>
                     {m.nombre}
@@ -373,8 +379,9 @@ export function ContratoAlquilerForm({
                 name="tarifa_unidad"
                 label="Unidad de tarifa"
                 value={tarifaUnidad}
-                onChange={(e) => setTarifaUnidad(e.target.value as (typeof tarifas)[number]["value"])}
+                onChange={(e) => setTarifaUnidad(e.target.value as (typeof tarifas)[number]["value"] | "")}
               >
+                {completarDatos ? <option value="" disabled>Seleccionar unidad</option> : null}
                 {tarifas.map((t) => (
                   <option key={t.value} value={t.value}>
                     {t.label}
@@ -385,7 +392,7 @@ export function ContratoAlquilerForm({
               <div className="space-y-1">
                 <Field
                   name="tarifa"
-                  label={`Tarifa (S/ por ${tarifaUnidad === "hora_maquina" ? "hora" : tarifaUnidad === "m3" ? "m³" : "día"})`}
+                  label={tarifaUnidad ? `Tarifa (S/ por ${tarifaUnidad === "hora_maquina" ? "hora" : tarifaUnidad === "m3" ? "m³" : "día"})` : "Tarifa (S/)"}
                   type="number"
                   min="0"
                   step="0.01"
@@ -409,12 +416,13 @@ export function ContratoAlquilerForm({
                   min="1"
                   step="1"
                   value={dias || ""}
-                  onChange={(e) => setDias(Number(e.target.value) || 0)}
-                  className={dias <= 0 ? "!border-red-500/80 focus-visible:!border-red-500 focus-visible:!ring-red-500/40" : ""}
+                  onChange={(e) => setDias(e.target.value === "" ? "" : Number(e.target.value))}
+                  required
+                  className={Number(dias) <= 0 || !Number.isInteger(Number(dias)) ? "!border-red-500/80 focus-visible:!border-red-500 focus-visible:!ring-red-500/40" : ""}
                 />
-                {dias <= 0 && (
+                {(Number(dias) <= 0 || !Number.isInteger(Number(dias))) && (
                   <p className="text-xs text-red-500 mt-1 flex items-center gap-1 font-medium">
-                    ⚠️ La cantidad debe ser al menos 1.
+                    La cantidad debe ser un número entero de al menos 1.
                   </p>
                 )}
               </div>
@@ -423,11 +431,11 @@ export function ContratoAlquilerForm({
             <div className="grid gap-4 md:grid-cols-2 pt-2">
               <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
                 <p className="text-xs text-[var(--color-text-secondary)]">Monto total</p>
-                <p className="text-2xl font-bold">{formatPen(montoTotal)}</p>
+                <p className="text-2xl font-bold">{totalPorDefinir ? "Total por definir" : formatPen(montoTotal)}</p>
               </div>
               <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-primary-soft)]/40 p-3">
                 <p className="text-xs text-[var(--color-text-secondary)]">Depósito 30%</p>
-                <p className="text-2xl font-black">{formatPen(deposito30)}</p>
+                <p className="text-2xl font-black">{totalPorDefinir ? "Por definir" : formatPen(deposito30)}</p>
               </div>
             </div>
             <input type="hidden" name="monto_total" value={montoTotal.toFixed(2)} />
@@ -531,7 +539,7 @@ export function ContratoAlquilerForm({
           {hasStep1Warning || hasStep2Warning || hasStep3Warning ? (
             <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-red-600 dark:text-red-400 space-y-2">
               <p className="text-sm font-bold flex items-center gap-1.5">
-                ⚠️ Faltan datos obligatorios para registrar el contrato
+                Faltan datos obligatorios para {contrato ? "guardar los cambios" : "registrar el contrato"}
               </p>
               <ul className="list-disc list-inside text-xs space-y-1 font-medium">
                 {hasStep1Warning && <li>Debes seleccionar un cliente en el Paso 1.</li>}
@@ -539,8 +547,9 @@ export function ContratoAlquilerForm({
                 {hasStep3Warning && (
                   <>
                     {!fechaInicio && <li>Debes ingresar la fecha de inicio en el Paso 3.</li>}
+                    {!tarifaUnidad && <li>Selecciona la unidad de tarifa en el Paso 3.</li>}
                     {tarifa <= 0 && <li>Debes ingresar una tarifa mayor a 0 en el Paso 3.</li>}
-                    {dias <= 0 && <li>Debes ingresar una cantidad mayor a 0 en el Paso 3.</li>}
+                    {(Number(dias) <= 0 || !Number.isInteger(Number(dias))) && <li>Ingresa una cantidad entera mayor a 0 en el Paso 3.</li>}
                   </>
                 )}
               </ul>
@@ -550,8 +559,8 @@ export function ContratoAlquilerForm({
             </div>
           ) : (
             <div className="rounded-xl border border-[var(--color-success)]/30 bg-[var(--color-success)]/5 p-4 text-[var(--color-success)]">
-              <p className="text-sm font-semibold flex items-center gap-1.5">✓ Todo listo para registrar</p>
-              <p className="text-xs">Por favor, revisa el resumen a continuación antes de proceder a crear el contrato de alquiler.</p>
+              <p className="text-sm font-semibold flex items-center gap-1.5">{contrato ? "✓ Todo listo para guardar" : "✓ Todo listo para registrar"}</p>
+              <p className="text-xs">Revisa el resumen y los datos de pago antes de {contrato ? "guardar los cambios" : "crear el contrato de alquiler"}.</p>
             </div>
           )}
 
@@ -606,12 +615,12 @@ export function ContratoAlquilerForm({
               <div className="border-t border-[var(--color-border)] pt-3 space-y-2">
                 <h4 className="font-bold text-xs uppercase text-[var(--color-text-secondary)] tracking-wider">Cálculo de Tarifas & Penalidades</h4>
                 <div className="flex justify-between text-sm">
-                  <span className="text-[var(--color-text-secondary)]">Tarifa ({tarifas.find(t => t.value === tarifaUnidad)?.label}):</span>
+                  <span className="text-[var(--color-text-secondary)]">Tarifa{tarifaUnidad ? ` (${tarifas.find(t => t.value === tarifaUnidad)?.label})` : ""}:</span>
                   <span className="font-semibold">{formatPen(tarifa)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-[var(--color-text-secondary)]">{labelCantidad(tarifaUnidad)}:</span>
-                  <span className="font-semibold">{dias}</span>
+                  <span className="font-semibold">{dias === "" ? "Por definir" : dias}</span>
                 </div>
                 <div className="flex justify-between text-xs text-[var(--color-text-secondary)] border-t border-dashed border-[var(--color-border)] pt-1.5 mt-1">
                   <span>Penalidad retraso de pago ({retrasoPct.toFixed(1)}%):</span>
@@ -627,11 +636,11 @@ export function ContratoAlquilerForm({
                 </div>
                 <div className="flex justify-between text-base font-black border-t border-[var(--color-border)] pt-2 text-[var(--color-primary)]">
                   <span>MONTO TOTAL:</span>
-                  <span>{formatPen(montoTotal)}</span>
+                  <span>{totalPorDefinir ? "Total por definir" : formatPen(montoTotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-bold text-[var(--color-success)] bg-[var(--color-success)]/10 px-2 py-1.5 rounded-lg border border-[var(--color-success)]/20 mt-1">
                   <span>Depósito de garantía (30%):</span>
-                  <span>{formatPen(montoAdelanto !== "" ? Number(montoAdelanto) : deposito30)}</span>
+                  <span>{totalPorDefinir ? "Por definir" : formatPen(montoAdelanto !== "" ? Number(montoAdelanto) : deposito30)}</span>
                 </div>
               </div>
             </div>
@@ -652,7 +661,7 @@ export function ContratoAlquilerForm({
             disabled={hasStep1Warning || hasStep2Warning || hasStep3Warning}
             className="px-8 shadow-lg shadow-[var(--color-primary)]/25 hover:shadow-[var(--color-primary)]/35 transition-all"
           >
-            Crear contrato ✓
+            {contrato ? "Guardar cambios ✓" : "Crear contrato ✓"}
           </Button>
         </div>
       </div>

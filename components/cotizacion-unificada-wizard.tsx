@@ -1,13 +1,12 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createClienteCotizacionRapida,
   deleteCotizacionUnificada,
   marcarListaProduccionCotizacion,
   pasarCotizacionAProduccion,
-  registrarCobroCotizacionUnificada,
   saveCotizacionUnificada,
   cambiarEstadoCotizacionUnificada,
 } from "@/app/actions";
@@ -27,9 +26,15 @@ import {
   type MuebleLineaPieza,
 } from "@/lib/cotizacion-unificada-payload";
 import { CotizacionResumenFormal } from "@/components/sales/cotizacion-resumen-formal";
+import { CobroCotizacionDialog } from "@/components/sales/cobro-cotizacion-dialog";
+import { notasDocumentoCotizacion, validarCondicionesPagoCotizacion } from "@/lib/cotizacion-pago";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Combobox } from "@/components/ui/Combobox";
-import { buildLineasResumen } from "@/lib/cotizacion-unificada-lineas";
+import {
+  buildDescripcionComercialSugerida,
+  buildLineasResumen,
+  getDescripcionPersonalizada,
+} from "@/lib/cotizacion-unificada-lineas";
 import type { ClienteCompleto } from "@/lib/combobox-mocks";
 import {
   MOCK_INVENTARIO_PRODUCTOS,
@@ -141,6 +146,12 @@ type MuebleTemplate = {
 
 type CotizacionDraft = {
   savedAt: string;
+  detalle?: CotizacionDetalleV1;
+  clienteId?: string | null;
+  guardadaId?: string | null;
+  descripcionPersonalizada?: string | null;
+  montoAdelantoUI?: string;
+  selectedPiezaIndexUI?: number;
   tipoCliente: "natural" | "empresa";
   nombreCliente: string;
   documento: string;
@@ -499,6 +510,7 @@ export function CotizacionUnificadaWizard({
   const [maxStep, setMaxStep] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [cotizacionParaCobrar, setCotizacionParaCobrar] = useState<CotizacionUnificadaRow | null>(null);
   const [tipoCotizacionPreset, setTipoCotizacionPreset] = useState<
     "muebles" | "aserradero" | "alquiler" | "general"
   >("muebles");
@@ -547,8 +559,8 @@ export function CotizacionUnificadaWizard({
   const [muebleTemplates, setMuebleTemplates] = useState<MuebleTemplate[]>(() => [getDefaultGerenciaTemplate()]);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const [descripcionManual, setDescripcionManual] = useState<string>("");
-  const [isDescriptionInitialized, setIsDescriptionInitialized] = useState(false);
+  const [descripcionPersonalizada, setDescripcionPersonalizada] = useState<string | null>(null);
+  const editarIdCargado = useRef<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -643,7 +655,7 @@ export function CotizacionUnificadaWizard({
 
   const effectiveStepIndex = Math.min(stepIndex, Math.max(0, steps.length - 1));
   const currentStepId = steps[effectiveStepIndex] ?? "cliente";
-  const guidedStepLabels = ["Cliente", "Producto o servicio", "Total", "Confirmar"];
+  const guidedStepLabels = ["Cliente", "Producto o servicio", "Total", "Revisar y guardar"];
   const guidedStepIndex = currentStepId === "cliente"
     ? 0
     : currentStepId === "rubros"
@@ -659,9 +671,12 @@ export function CotizacionUnificadaWizard({
   const calculoDocumentoGuardado = useMemo(
     () =>
       cotizacionGuardadaParaCalculo
-        ? resolverCalculoDocumentoCotizacion(detalle, cotizacionGuardadaParaCalculo.total)
+        ? resolverCalculoDocumentoCotizacion(
+            parseCotizacionDetalle(cotizacionGuardadaParaCalculo.detalle),
+            cotizacionGuardadaParaCalculo.total,
+          )
         : null,
-    [cotizacionGuardadaParaCalculo, detalle],
+    [cotizacionGuardadaParaCalculo],
   );
   const margenGananciaPct =
     calculoDocumentoGuardado?.margenPctAplicado ?? empresa.margen_ganancia_default_pct;
@@ -670,9 +685,16 @@ export function CotizacionUnificadaWizard({
     () => calcularContratoCotizacion(detalle, margenGananciaPct),
     [detalle, margenGananciaPct],
   );
-  const resumenCotizacion = calculoDocumentoGuardado ?? calculoCotizacionActual;
+  const resumenCotizacion = calculoDocumentoGuardado?.margenPctAplicado === null
+    ? calculoDocumentoGuardado
+    : calculoCotizacionActual;
   const totalGral = resumenCotizacion.totalFinal;
   const totalGralSafe = Number.isFinite(totalGral) ? totalGral : 0;
+  const descripcionComercialSugerida = useMemo(
+    () => buildDescripcionComercialSugerida(detalle),
+    [detalle],
+  );
+  const descripcionManual = descripcionPersonalizada ?? descripcionComercialSugerida;
   const conversionMedidasUI = useMemo(() => {
     const esp = parseDecimalInput(medidaEspesorUI);
     const anc = parseDecimalInput(medidaAnchoUI);
@@ -1043,8 +1065,21 @@ export function CotizacionUnificadaWizard({
   ]);
 
   const saveDraft = useCallback(() => {
+    const tieneContenido = Boolean(
+      nombreCliente.trim() || documento.trim() || telefono.trim() || direccion.trim() ||
+      tipoMuebleVista || tipoMaderaUI || medidaEspesorUI || medidaAnchoUI || medidaLargoUI ||
+      parseDecimalInput(costoAcabadoSolesUI) || parseDecimalInput(costoManoObraUI) ||
+      tipoCotizacionPreset !== "muebles" || descripcionPersonalizada !== null || guardadaId,
+    );
+    if (!tieneContenido) return;
     const draft: CotizacionDraft = {
       savedAt: new Date().toISOString(),
+      detalle,
+      clienteId,
+      guardadaId,
+      descripcionPersonalizada,
+      montoAdelantoUI,
+      selectedPiezaIndexUI,
       tipoCliente,
       nombreCliente,
       documento,
@@ -1077,6 +1112,12 @@ export function CotizacionUnificadaWizard({
       // Ignore localStorage errors.
     }
   }, [
+    detalle,
+    clienteId,
+    guardadaId,
+    descripcionPersonalizada,
+    montoAdelantoUI,
+    selectedPiezaIndexUI,
     acabadoOtroUI,
     acabadoUI,
     costoAcabadoSolesUI,
@@ -1112,6 +1153,13 @@ export function CotizacionUnificadaWizard({
     emitWizardDraftChanged();
   }, []);
 
+  const clearEditingQuery = useCallback(() => {
+    if (!searchParams.has("editar")) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("editar");
+    router.replace(`/cotizacion${params.size ? `?${params.toString()}` : ""}#cotizacion-wizard`, { scroll: false });
+  }, [router, searchParams]);
+
   const restoreDraft = useCallback(() => {
     const draft = loadDraftFromStorage();
     if (!draft) {
@@ -1125,6 +1173,11 @@ export function CotizacionUnificadaWizard({
     setDireccion(draft.direccion);
     setFecha(draft.fecha);
     applyCotizacionPreset(draft.tipoCotizacionPreset);
+    setGuardadaId(draft.guardadaId ?? null);
+    setClienteId(draft.clienteId ?? null);
+    setSelectedPiezaIndexUI(draft.selectedPiezaIndexUI ?? 0);
+    setMontoAdelantoUI(draft.montoAdelantoUI ?? "");
+    clearEditingQuery();
     setUnidadEspesorUI(draft.unidadEspesorUI || "cm");
     setUnidadAnchoUI(draft.unidadAnchoUI || "cm");
     setUnidadLargoUI(draft.unidadLargoUI || "cm");
@@ -1138,27 +1191,35 @@ export function CotizacionUnificadaWizard({
     setAcabadoOtroUI(draft.acabadoOtroUI);
     setCostoAcabadoSolesUI(draft.costoAcabadoSolesUI ?? "0");
     setCostoManoObraUI(draft.costoManoObraUI ?? "0");
-    setDetalle((d) => ({
-      ...d,
-      costoAcabadoSoles: parseDecimalInput(draft.costoAcabadoSolesUI),
-      costoManoObra: parseDecimalInput(draft.costoManoObraUI ?? "0"),
-    }));
+    if (draft.detalle) {
+      setDetalle(parseCotizacionDetalle(draft.detalle));
+    } else {
+      setDetalle((d) => ({
+        ...d,
+        costoAcabadoSoles: parseDecimalInput(draft.costoAcabadoSolesUI),
+        costoManoObra: parseDecimalInput(draft.costoManoObraUI ?? "0"),
+      }));
+    }
     setPagoMetodoUI(draft.pagoMetodoUI);
     setPagoModalidadUI(draft.pagoModalidadUI);
     setPlazoDiasUI(draft.plazoDiasUI);
     setPlazoUnidadUI(draft.plazoUnidadUI);
-    setDescripcionManual("");
-    setIsDescriptionInitialized(false);
+    setDescripcionPersonalizada(draft.descripcionPersonalizada ?? null);
+    setStepIndex(0);
+    setMaxStep(0);
     setError("Borrador recuperado.");
-  }, [applyCotizacionPreset]);
+  }, [applyCotizacionPreset, clearEditingQuery]);
 
   const resetWizardFast = useCallback(() => {
+    setGuardadaId(null);
+    clearEditingQuery();
     setClienteId(null);
     setNombreCliente("");
     setDocumento("");
     setTelefono("");
     setDireccion("");
     setTipoCliente("natural");
+    setFecha(new Date().toISOString().slice(0, 10));
     setTipoCotizacionPreset("muebles");
     setDetalle(() => {
       const d = defaultCotizacionDetalleV1();
@@ -1172,6 +1233,11 @@ export function CotizacionUnificadaWizard({
     setMedidaEspesorUI("");
     setMedidaAnchoUI("");
     setMedidaLargoUI("");
+    setSelectedPiezaIndexUI(0);
+    setSelectedMuebleTemplateId("");
+    setAsrMedidaEspesorUI("");
+    setAsrMedidaAnchoUI("");
+    setAsrMedidaLargoUI("");
     setTipoMuebleVista("");
     setTipoMaderaUI("");
     setPrecioVentaPtUI("");
@@ -1181,17 +1247,20 @@ export function CotizacionUnificadaWizard({
     setAcabadoOtroUI("");
     setPagoMetodoUI("efectivo");
     setPagoModalidadUI("");
+    setMontoAdelantoUI("");
     setPlazoDiasUI("15");
     setPlazoUnidadUI("dias");
-    setDescripcionManual("");
-    setIsDescriptionInitialized(false);
+    setDescripcionPersonalizada(null);
     setStepIndex(0);
     setMaxStep(0);
     clearDraft();
     setError("");
-  }, [clearDraft]);
+  }, [clearDraft, clearEditingQuery]);
 
+  const initialDraftSaver = useRef(saveDraft);
   useEffect(() => {
+    // Abrir o recargar el formulario vacío no debe sobrescribir el borrador anterior.
+    if (saveDraft === initialDraftSaver.current) return;
     const timer = window.setTimeout(() => {
       saveDraft();
     }, 800);
@@ -1230,7 +1299,19 @@ export function CotizacionUnificadaWizard({
   }, [resetWizardFast, restoreDraft, saveDraft]);
 
   const detalleParaLineas = useMemo(() => {
-    let d = { ...detalle };
+    let d = {
+      ...detalle,
+      descripcion_cliente: descripcionManual,
+      descripcion_modo: descripcionPersonalizada === null ? "automatica" as const : "manual" as const,
+      condiciones_pago: pagoModalidadUI || pagoMetodoUI !== "efectivo" ? {
+        metodo: pagoMetodoUI,
+        modalidad: pagoModalidadUI,
+        ...(pagoModalidadUI === "adelanto" || pagoModalidadUI === "adelanto_saldo"
+          ? { adelanto: Number(montoAdelantoUI) || 0 } : {}),
+        ...(pagoModalidadUI === "credito" || pagoModalidadUI === "adelanto" || pagoModalidadUI === "adelanto_saldo"
+          ? { plazo: Number(plazoDiasUI) || 0, plazoUnidad: plazoUnidadUI } : {}),
+      } : undefined,
+    };
     if (!d.rubros.muebles) {
       d = { ...d, muebles_lineas: [] };
     }
@@ -1241,7 +1322,7 @@ export function CotizacionUnificadaWizard({
       d = { ...d, alquiler: null };
     }
     return d;
-  }, [detalle]);
+  }, [detalle, descripcionManual, descripcionPersonalizada, pagoMetodoUI, pagoModalidadUI, montoAdelantoUI, plazoDiasUI, plazoUnidadUI]);
 
   const lineasFormal = useMemo(
     () =>
@@ -1261,25 +1342,6 @@ export function CotizacionUnificadaWizard({
       })),
     [lineasFormal],
   );
-  const descripcionComercialSugerida = useMemo(() => {
-    const parts = lineasFormalSafe.flatMap((linea) => [
-      linea.titulo,
-      ...linea.bullets,
-    ]);
-    return parts
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .filter((part, index, arr) => arr.indexOf(part) === index)
-      .join("\n");
-  }, [lineasFormalSafe]);
-
-  useEffect(() => {
-    if (!isDescriptionInitialized && descripcionComercialSugerida) {
-      setDescripcionManual(descripcionComercialSugerida);
-      setIsDescriptionInitialized(true);
-    }
-  }, [descripcionComercialSugerida, isDescriptionInitialized]);
-
   const correlativoMostrar = useMemo(() => {
     if (guardadaId) {
       const row = cotizacionesGuardadas.find((c) => c.id === guardadaId);
@@ -1304,10 +1366,17 @@ export function CotizacionUnificadaWizard({
     () => (guardadaId ? cotizacionesGuardadas.find((c) => c.id === guardadaId) ?? null : null),
     [guardadaId, cotizacionesGuardadas],
   );
+  const totalPendienteDeGuardar = guardadaRow != null && guardadaRow.total !== totalGral;
+  const pagoPendienteDeGuardar = guardadaRow != null &&
+    JSON.stringify(parseCotizacionDetalle(guardadaRow.detalle).condiciones_pago ?? null) !==
+    JSON.stringify(detalleParaLineas.condiciones_pago ?? null);
   const puedeRegistrarCobro = Boolean(
     guardadaRow &&
-    guardadaRow.estado_flujo !== "pendiente",
+    (guardadaRow.estado_flujo === "lista_produccion" || guardadaRow.estado_flujo === "en_produccion") &&
+    !totalPendienteDeGuardar && !pagoPendienteDeGuardar,
   );
+  const puedeGuardarCotizacion = canSave && guardadaRow?.estado_flujo !== "cobrada" &&
+    calculoDocumentoGuardado?.margenPctAplicado !== null;
   const stepLabels: Record<string, string> = useMemo(
     () => ({
       cliente: "Cliente",
@@ -1447,7 +1516,6 @@ export function CotizacionUnificadaWizard({
 
   const ensureCliente = useCallback(async () => {
     if (clienteId) return { ok: true as const, id: clienteId };
-    setBusy(true);
     const res = await createClienteCotizacionRapida({
       nombre: nombreCliente,
       documento,
@@ -1455,7 +1523,6 @@ export function CotizacionUnificadaWizard({
       direccion,
       tipoPersona: tipoCliente,
     });
-    setBusy(false);
     if (!res.ok) {
       return { ok: false as const, error: res.error };
     }
@@ -1465,11 +1532,15 @@ export function CotizacionUnificadaWizard({
 
   const handleGuardar = useCallback(
     async (estadoFlujo: "pendiente" | "lista_produccion" = "pendiente", imprimir?: boolean) => {
-      if (!canSave) {
-        setError("Tu rol no puede guardar cotizaciones.");
+      if (!puedeGuardarCotizacion) {
+        setError(!canSave ? "Tu rol no puede guardar cotizaciones."
+          : guardadaRow?.estado_flujo === "cobrada" ? "Esta cotización ya está cobrada y no se puede editar."
+            : "Esta cotización histórica no tiene un margen verificable para recalcularla.");
         return;
       }
       setError("");
+      const errorPago = validarCondicionesPagoCotizacion(detalleParaLineas.condiciones_pago, totalGral);
+      if (errorPago) { setError(errorPago); return; }
       setBusy(true);
       const cli = await ensureCliente();
       if (!cli.ok) {
@@ -1478,7 +1549,7 @@ export function CotizacionUnificadaWizard({
         return;
       }
 
-      let det = { ...detalle, descripcion_cliente: descripcionManual };
+      let det = { ...detalleParaLineas };
       if (!det.rubros.muebles) {
         det = { ...det, muebles_lineas: [] };
       }
@@ -1512,7 +1583,7 @@ export function CotizacionUnificadaWizard({
         window.open(`/cotizacion/unificada/${res.id}/pdf`, "_blank");
       }
     },
-    [canSave, clearDraft, detalle, ensureCliente, fecha, guardadaId, router, tipoCliente, totalGral, descripcionManual],
+    [puedeGuardarCotizacion, canSave, guardadaRow?.estado_flujo, clearDraft, detalleParaLineas, ensureCliente, fecha, guardadaId, router, tipoCliente, totalGral],
   );
 
   const loadCotizacion = useCallback((row: CotizacionUnificadaRow) => {
@@ -1521,13 +1592,12 @@ export function CotizacionUnificadaWizard({
     setTipoCliente(row.tipo_cliente);
     setFecha(row.fecha);
     setDetalle(d);
-    if (d.descripcion_cliente !== undefined && d.descripcion_cliente !== null) {
-      setDescripcionManual(d.descripcion_cliente);
-      setIsDescriptionInitialized(true);
-    } else {
-      setDescripcionManual("");
-      setIsDescriptionInitialized(false);
-    }
+    setPagoMetodoUI(d.condiciones_pago?.metodo ?? "efectivo");
+    setPagoModalidadUI(d.condiciones_pago?.modalidad ?? "");
+    setMontoAdelantoUI(d.condiciones_pago?.adelanto != null ? String(d.condiciones_pago.adelanto) : "");
+    setPlazoDiasUI(String(d.condiciones_pago?.plazo ?? 15));
+    setPlazoUnidadUI(d.condiciones_pago?.plazoUnidad ?? "dias");
+    setDescripcionPersonalizada(getDescripcionPersonalizada(d));
     setClienteId(row.cliente_id);
     const cl = effectiveClientes.find((c) => c.id === row.cliente_id);
     setNombreCliente(cl?.nombre ?? "");
@@ -1561,6 +1631,7 @@ export function CotizacionUnificadaWizard({
       }
     }
     setCostoManoObraUI(String(d.costoManoObra ?? 0));
+    setCostoAcabadoSolesUI(String(d.costoAcabadoSoles ?? 0));
     setSelectedPiezaIndexUI(0);
     const baseSteps: string[] = ["cliente", "rubros"];
     if (d.rubros.muebles) baseSteps.push("muebles");
@@ -1574,13 +1645,15 @@ export function CotizacionUnificadaWizard({
   }, [effectiveClientes]);
 
   const handleGuardarDescripcion = async () => {
-    setDetalle((d) => ({ ...d, descripcion_cliente: descripcionManual }));
+    const errorPago = validarCondicionesPagoCotizacion(detalleParaLineas.condiciones_pago, totalGral);
+    if (errorPago) { setError(errorPago); return; }
+    setDetalle(detalleParaLineas);
 
     if (guardadaId) {
       setBusy(true);
       setError("");
       try {
-        let det = { ...detalle, descripcion_cliente: descripcionManual };
+        let det = { ...detalleParaLineas };
         if (!det.rubros.muebles) {
           det = { ...det, muebles_lineas: [] };
         }
@@ -1615,11 +1688,13 @@ export function CotizacionUnificadaWizard({
       setBusy(false);
     }
 
-    setToastMessage("¡Descripción guardada correctamente!");
+    setToastMessage(guardadaId
+      ? "Descripción guardada correctamente."
+      : "Descripción lista. Guarda la cotización para conservarla.");
   };
 
   const handleRestablecerDescripcion = () => {
-    const hasUnsavedChanges = descripcionManual !== (detalle.descripcion_cliente ?? "");
+    const hasUnsavedChanges = descripcionPersonalizada !== null && descripcionManual !== (detalle.descripcion_cliente ?? "");
     if (hasUnsavedChanges) {
       if (
         !confirm(
@@ -1629,14 +1704,15 @@ export function CotizacionUnificadaWizard({
         return;
       }
     }
-    setDescripcionManual(descripcionComercialSugerida);
+    setDescripcionPersonalizada(null);
     setToastMessage("¡Descripción restablecida a la sugerida!");
   };
 
   useEffect(() => {
-    if (editarId) {
+    if (editarId && editarIdCargado.current !== editarId) {
       const found = cotizacionesGuardadas.find((c) => c.id === editarId);
       if (found) {
+        editarIdCargado.current = editarId;
         loadCotizacion(found);
         setTimeout(() => {
           const element = document.getElementById("cotizacion-wizard");
@@ -1655,13 +1731,20 @@ export function CotizacionUnificadaWizard({
 
   return (
     <div id="cotizacion-wizard" className="space-y-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 md:p-6">
+      {cotizacionParaCobrar ? (
+        <CobroCotizacionDialog
+          cotizacion={cotizacionParaCobrar}
+          onClose={() => setCotizacionParaCobrar(null)}
+          onSuccess={() => { setCotizacionParaCobrar(null); router.refresh(); }}
+        />
+      ) : null}
       <Card className="border-2 border-[var(--katia-primary)] bg-[var(--katia-primary)]/5 p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-2xl">
             <p className="text-xs font-bold uppercase tracking-wide text-[var(--katia-primary)]">Flujo guiado</p>
-            <CardTitle className="mt-1 text-lg">Venta guiada paso a paso</CardTitle>
+            <CardTitle className="mt-1 text-lg">Cotización paso a paso</CardTitle>
             <CardDescription className="mt-1">
-              Completa cliente, producto o servicio, total y confirmacion. Usa Siguiente y Anterior para avanzar sin perder las opciones avanzadas.
+              Completa los datos, revisa el total y guarda la cotización. Cuando el cliente la acepte, podrás convertirla en venta y registrar el cobro.
             </CardDescription>
           </div>
           <div className="grid w-full gap-2 text-xs sm:grid-cols-4 lg:w-auto">
@@ -2380,10 +2463,12 @@ export function CotizacionUnificadaWizard({
             ) : null}
 
             <div className="space-y-2">
-              <span className="inline-flex rounded-md bg-[var(--color-primary-soft)] px-4 py-2 text-sm font-bold text-[var(--color-text-primary)]">Tipo de pago y modalidad</span>
+              <span className="inline-flex rounded-md bg-[var(--color-primary-soft)] px-4 py-2 text-sm font-bold text-[var(--color-text-primary)]">Condiciones de pago acordadas</span>
+              <p className="text-xs text-[var(--color-text-secondary)]">Estos datos describen la propuesta. Guardarlos no registra dinero recibido.</p>
               <div className="grid grid-cols-2 gap-2">
                 <select
                   className={`${inputClass} h-11`}
+                  aria-label="Medio de pago acordado"
                   value={pagoMetodoUI}
                   onChange={(e) =>
                     setPagoMetodoUI(
@@ -2391,7 +2476,6 @@ export function CotizacionUnificadaWizard({
                     )
                   }
                 >
-                  <option value="efectivo">Pago (metodo)</option>
                   <option value="efectivo">Efectivo</option>
                   <option value="transferencia">Transferencia</option>
                   <option value="yape">Yape</option>
@@ -2400,6 +2484,7 @@ export function CotizacionUnificadaWizard({
                 </select>
                 <select
                   className={`${inputClass} h-11`}
+                  aria-label="Modalidad de pago"
                   value={pagoModalidadUI}
                   onChange={(e) =>
                     setPagoModalidadUI(e.target.value as "" | "contado" | "adelanto" | "adelanto_saldo" | "credito")
@@ -2419,14 +2504,17 @@ export function CotizacionUnificadaWizard({
                   </span>
                   <input
                     type="number"
-                    min={0}
+                    min={1}
+                    step={1}
+                    aria-label="Plazo de pago"
                     className={`${inputClass} h-11`}
                     value={plazoDiasUI}
                     onChange={(e) => setPlazoDiasUI(e.target.value)}
-                    placeholder="Cada cuánto pagará"
+                    placeholder="Plazo de pago"
                   />
                   <select
                     className={`${inputClass} h-11 max-w-[120px]`}
+                    aria-label="Unidad del plazo"
                     value={plazoUnidadUI}
                     onChange={(e) => setPlazoUnidadUI(e.target.value as "dias" | "meses")}
                   >
@@ -2439,7 +2527,7 @@ export function CotizacionUnificadaWizard({
                 <div className="space-y-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-primary-soft)]/20 p-3">
                   <label className="block space-y-1">
                     <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
-                      Monto de adelanto que deja el cliente (S/)
+                      Adelanto acordado (S/)
                     </span>
                     <input
                       type="number"
@@ -2447,16 +2535,13 @@ export function CotizacionUnificadaWizard({
                       step={0.01}
                       className={`${inputClass} h-11`}
                       value={montoAdelantoUI}
-                      onChange={(e) => {
-                        setMontoAdelantoUI(e.target.value);
-                        setDetalle((d) => ({ ...d, monto_adelanto: Number(e.target.value) || 0 }));
-                      }}
+                      onChange={(e) => setMontoAdelantoUI(e.target.value)}
                       placeholder="Ej: 500.00"
                     />
                   </label>
                   {montoAdelantoUI && Number(montoAdelantoUI) > 0 ? (
                     <p className="text-xs font-semibold text-[var(--color-accent)]">
-                      Saldo pendiente:{" "}
+                      Saldo previsto:{" "}
                       <strong>
                         {formatPen(Math.max(0, totalGralSafe - (Number(montoAdelantoUI) || 0)))}
                       </strong>
@@ -3246,7 +3331,7 @@ export function CotizacionUnificadaWizard({
               {!guardadaId ? " (previsualización; al guardar se confirma el número)" : null}
             </CardDescription>
             <p className="mt-2 text-xs text-[var(--color-text-secondary)]">
-              Revisa cliente, producto o servicio y total. Luego guarda la cotización, imprímela o conviértela a venta cuando esté aceptada.
+              Revisa cliente, producto o servicio y total. Guarda o imprime la cotización para el cliente; después de su aceptación, podrás convertirla en venta y registrar el cobro.
             </p>
           </div>
 
@@ -3258,25 +3343,7 @@ export function CotizacionUnificadaWizard({
               tipoCliente={tipoCliente}
               documentoCliente={documento.trim() || null}
               lineas={lineasFormalSafe}
-              notasGenerales={(() => {
-                const base = "";
-                if (pagoModalidadUI === "adelanto" && montoAdelantoUI && Number(montoAdelantoUI) > 0) {
-                  const adelanto = Number(montoAdelantoUI);
-                  const saldo = Math.max(0, totalGralSafe - adelanto);
-                  const lineasPago = [
-                    `Modalidad: Adelanto`,
-                    `Monto adelantado: S/ ${adelanto.toFixed(2)}`,
-                    `Saldo pendiente: S/ ${saldo.toFixed(2)}`,
-                    ...(plazoDiasUI ? [`Plazo para saldo: ${plazoDiasUI} ${plazoUnidadUI}`] : []),
-                  ].join("\n");
-                  return base ? `${base}\n${lineasPago}` : lineasPago;
-                }
-                if (pagoModalidadUI === "credito" && plazoDiasUI) {
-                  const lineaCredito = `Modalidad: Crédito · Plazo ${plazoDiasUI} ${plazoUnidadUI}`;
-                  return base ? `${base}\n${lineaCredito}` : lineaCredito;
-                }
-                return base;
-              })()}
+              notasGenerales={notasDocumentoCotizacion(detalleParaLineas, totalGral)}
               total={totalGral}
               empresa={empresa}
               embedded
@@ -3325,17 +3392,22 @@ export function CotizacionUnificadaWizard({
                 className={`${inputClass} min-h-[88px] py-2`}
                 placeholder="Ej: Acabado barniz natural. Incluye instalación en obra. No incluye bisagras ni cerraduras..."
                 value={descripcionManual}
-                onChange={(e) => setDescripcionManual(e.target.value)}
+                onChange={(e) => setDescripcionPersonalizada(e.target.value)}
               />
             </label>
+            <p className="text-xs text-[var(--color-text-secondary)]">
+              {descripcionPersonalizada === null
+                ? "La descripción se actualiza con los datos de la cotización. Puedes editarla si necesitas añadir condiciones."
+                : "Tu descripción personalizada se conserva al cambiar los datos. Puedes volver a la descripción automática."}
+            </p>
             <div className="flex gap-2">
               <button
                 type="button"
-                disabled={busy}
+                disabled={!puedeGuardarCotizacion || busy}
                 onClick={handleGuardarDescripcion}
                 className="h-9 rounded-lg bg-[var(--color-primary-soft)]/20 px-3 text-xs font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-primary-soft)]/35 transition-colors border border-[var(--color-border)]"
               >
-                Guardar descripción
+                {guardadaId ? "Guardar descripción" : "Aplicar descripción"}
               </button>
               <button
                 type="button"
@@ -3354,9 +3426,23 @@ export function CotizacionUnificadaWizard({
           </div>
 
           <div className="flex flex-wrap gap-2 border-t border-[var(--color-border)] px-5 py-4">
+            <p className="w-full text-sm text-[var(--color-text-secondary)]">
+              Guardar conserva la propuesta. Marcarla como aceptada confirma la aprobación del cliente.
+              Convertirla en venta registra el cobro del total en Caja.
+            </p>
+            {totalPendienteDeGuardar || pagoPendienteDeGuardar ? (
+              <p className="w-full text-sm text-[var(--color-text-secondary)]">
+                Guarda los cambios del total o las condiciones de pago antes de registrar el cobro.
+              </p>
+            ) : null}
+            {calculoDocumentoGuardado?.margenPctAplicado === null ? (
+              <p className="w-full text-sm text-[var(--color-text-secondary)]">
+                El importe de esta cotización histórica se conserva. Su margen no puede verificarse, por lo que puedes consultarla e imprimirla, pero no recalcularla.
+              </p>
+            ) : null}
             <button
               type="button"
-              disabled={!canSave || busy}
+              disabled={!puedeGuardarCotizacion || busy}
               onClick={() => handleGuardar("pendiente")}
               className="h-10 rounded-xl bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-on-accent)] disabled:opacity-50"
             >
@@ -3364,7 +3450,7 @@ export function CotizacionUnificadaWizard({
             </button>
             <button
               type="button"
-              disabled={!canSave || busy}
+              disabled={!puedeGuardarCotizacion || busy}
               onClick={() => handleGuardar("lista_produccion")}
               className="h-10 rounded-xl border border-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-accent)] disabled:opacity-50"
             >
@@ -3372,7 +3458,7 @@ export function CotizacionUnificadaWizard({
             </button>
             <button
               type="button"
-              disabled={!canSave || busy}
+              disabled={!puedeGuardarCotizacion || busy}
               onClick={() => handleGuardar("pendiente", true)}
               className="h-10 rounded-xl border border-[var(--color-border)] px-4 text-sm font-semibold disabled:opacity-50"
             >
@@ -3388,23 +3474,15 @@ export function CotizacionUnificadaWizard({
             </button>
             <button
               type="button"
-              disabled={!guardadaId || !canSave || busy || guardadaRow?.estado_flujo === "pendiente"}
-              onClick={async () => {
-                if (!guardadaId) return;
-                if (!confirm("¿Convertir esta cotización aceptada a venta y registrar el ingreso en caja?")) return;
-                setBusy(true);
-                const r = await registrarCobroCotizacionUnificada(guardadaId);
-                setBusy(false);
-                if (!r.ok) setError(r.error);
-                else window.location.reload();
-              }}
+              disabled={!puedeRegistrarCobro || !canSave || busy}
+              onClick={() => guardadaRow && setCotizacionParaCobrar(guardadaRow)}
               className="h-10 rounded-xl bg-[var(--color-success)] px-4 text-sm font-semibold text-white disabled:opacity-50"
             >
-              Convertir a venta
+              Convertir a venta y cobrar
             </button>
             {tipoCotizacionPreset === "muebles" ? (
               <p className="w-full pt-1 text-xs text-[var(--color-text-secondary)]">
-                Mueble personalizado se mantiene en estado pendiente.
+                Marca la cotización del mueble como aceptada cuando el cliente apruebe la propuesta.
               </p>
             ) : null}
           </div>
@@ -3447,20 +3525,7 @@ export function CotizacionUnificadaWizard({
                 <button
                   type="button"
                   disabled={!canSave || busy}
-                  onClick={async () => {
-                    if (
-                      !confirm(
-                        "Registrar cobro: se creará un ingreso en caja por el total de la cotización y el estado pasará a cobrada.",
-                      )
-                    ) {
-                      return;
-                    }
-                    setBusy(true);
-                    const r = await registrarCobroCotizacionUnificada(guardadaId);
-                    setBusy(false);
-                    if (!r.ok) setError(r.error);
-                    else window.location.reload();
-                  }}
+                  onClick={() => guardadaRow && setCotizacionParaCobrar(guardadaRow)}
                   className="h-9 rounded-lg bg-teal-50 px-3 text-xs font-semibold text-teal-900"
                 >
                   Registrar cobro (caja)
@@ -3622,20 +3687,9 @@ export function CotizacionUnificadaWizard({
                       <button
                         type="button"
                         className="text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline"
-                        onClick={async () => {
-                          if (
-                            !confirm(
-                              `¿Registrar cobro de ${c.correlativo ?? c.id.slice(0, 8)}? Se guardará un ingreso en caja.`,
-                            )
-                          ) {
-                            return;
-                          }
-                          const r = await registrarCobroCotizacionUnificada(c.id);
-                          if (!r.ok) setError(r.error);
-                          else window.location.reload();
-                        }}
+                        onClick={() => setCotizacionParaCobrar(c)}
                       >
-                        Convertir a venta
+                        Convertir a venta y cobrar
                       </button>
                     ) : null}
                     {c.estado_flujo !== "cobrada" && canSave ? (

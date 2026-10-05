@@ -56,7 +56,7 @@ function inputCotizacion(total: unknown) {
 describe('saveCotizacionUnificada', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.requireAuthContext.mockResolvedValue(undefined);
+    mocks.requireAuthContext.mockResolvedValue({ role: 'owner_admin', uiRole: 'owner_admin' });
     mocks.getEmpresaConfig.mockResolvedValue({ margen_ganancia_default_pct: 30 });
     mocks.nextCorrelativo.mockResolvedValue('N°0026');
     mocks.demoCreateCotizacionUnificada.mockReturnValue({
@@ -159,10 +159,53 @@ describe('saveCotizacionUnificada', () => {
     expect(mocks.insert).not.toHaveBeenCalled();
   });
 
+  test.each(['lista_produccion', 'en_produccion', 'terminado', 'entregado'])(
+    'guardar una edición conserva el estado existente: %s', async (estado) => {
+      mocks.hasSupabaseEnv.mockReturnValue(false);
+      mocks.demoGetCotizacionUnificada.mockReturnValue({
+        estado_flujo: estado, total: 312, detalle: inputCotizacion(312).detalle,
+      });
+      await expect(saveCotizacionUnificada({
+        ...inputCotizacion(312), id: '44444444-4444-4444-8444-444444444444',
+      })).resolves.toMatchObject({ ok: true });
+      expect(mocks.demoUpdateCotizacionUnificada).toHaveBeenCalledWith(
+        '44444444-4444-4444-8444-444444444444',
+        expect.objectContaining({ estado_flujo: estado }),
+      );
+    },
+  );
+
+  test('rechaza editar una cotización cobrada sin modificarla', async () => {
+    mocks.hasSupabaseEnv.mockReturnValue(false);
+    mocks.demoGetCotizacionUnificada.mockReturnValue({ estado_flujo: 'cobrada' });
+    await expect(saveCotizacionUnificada({
+      ...inputCotizacion(312), id: '44444444-4444-4444-8444-444444444444',
+    })).resolves.toMatchObject({ ok: false });
+    expect(mocks.demoUpdateCotizacionUnificada).not.toHaveBeenCalled();
+  });
+
   test.each([NaN, Infinity, '', '312'])('rechaza total inválido antes de persistir: %s', async (total) => {
     mocks.hasSupabaseEnv.mockReturnValue(false);
 
     await expect(saveCotizacionUnificada(inputCotizacion(total))).resolves.toMatchObject({ ok: false });
+    expect(mocks.demoCreateCotizacionUnificada).not.toHaveBeenCalled();
+  });
+
+  test('guarda las condiciones acordadas tanto en demo como en Supabase', async () => {
+    const input = inputCotizacion(312);
+    input.detalle.condiciones_pago = { metodo: 'yape', modalidad: 'adelanto_saldo', adelanto: 100, plazo: 15, plazoUnidad: 'dias' };
+    mocks.hasSupabaseEnv.mockReturnValue(false);
+    expect(await saveCotizacionUnificada(input)).toMatchObject({ ok: true });
+    expect(mocks.demoCreateCotizacionUnificada).toHaveBeenCalledWith(expect.objectContaining({ detalle: expect.objectContaining({ condiciones_pago: input.detalle.condiciones_pago }) }));
+    mocks.hasSupabaseEnv.mockReturnValue(true);
+    expect(await saveCotizacionUnificada(input)).toMatchObject({ ok: true });
+    expect(mocks.insert).toHaveBeenCalledWith(expect.objectContaining({ detalle: expect.objectContaining({ condiciones_pago: input.detalle.condiciones_pago }) }));
+  });
+  test.each([0, 312.01])('rechaza el adelanto %s antes de escribir', async (adelanto) => {
+    mocks.hasSupabaseEnv.mockReturnValue(false);
+    const input = inputCotizacion(312);
+    input.detalle.condiciones_pago = { metodo: 'yape', modalidad: 'adelanto', adelanto, plazo: 15, plazoUnidad: 'dias' };
+    expect(await saveCotizacionUnificada(input)).toMatchObject({ ok: false });
     expect(mocks.demoCreateCotizacionUnificada).not.toHaveBeenCalled();
   });
 });

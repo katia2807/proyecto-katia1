@@ -57,6 +57,7 @@ import {
   demoUpdateInventarioProducto,
   demoUpdateCotizacionUnificada,
   demoUpdateServicioEspecialTarifa,
+  type CotizacionUnificadaRow,
 } from "@/lib/demo-store";
 import {
   cotizacionDetalleV1Schema,
@@ -76,6 +77,7 @@ import {
   parseMaderaCortadaCubicajeLines,
 } from "@/lib/madera-cortada-print-model";
 import { isDetailedMaderaCortadaDescription } from "@/lib/madera-cortada-historical-review";
+import { validarCondicionesPagoCotizacion } from "@/lib/cotizacion-pago";
 
 import { getEmpresaConfig } from "@/lib/company-config";
 import {
@@ -459,10 +461,14 @@ const rrhhRoles: readonly AppRole[] = ["owner_admin", "gerencia", "rrhh"];
 const liderazgoRoles: readonly AppRole[] = ["owner_admin", "gerencia"];
 
 async function requireMutationAccess(allowedRoles: readonly AppRole[]) {
-  return requireAuthContext({
+  const context = await requireAuthContext({
     allowedRoles,
     redirectTo: null,
   });
+  if (context.uiRole === "readonly") {
+    throw new Error("Acceso denegado: tu usuario tiene permiso de solo lectura.");
+  }
+  return context;
 }
 
 function parseBoolPersonalImport(f: FilaImportada): boolean {
@@ -1333,7 +1339,7 @@ export async function saveCotizacionUnificada(input: {
     const det = detParsed.data;
     const supabase = hasSupabaseEnv() ? getSupabaseServerClient() : null;
     let cotizacionAnterior: {
-      estado_flujo: string;
+      estado_flujo: CotizacionUnificadaRow["estado_flujo"];
       total: number;
       detalle: unknown;
     } | null = null;
@@ -1341,7 +1347,7 @@ export async function saveCotizacionUnificada(input: {
     if (input.id) {
       if (!supabase) {
         const previaDemo = demoGetCotizacionUnificada(input.id);
-        if (!previaDemo) {
+        if (!previaDemo || previaDemo.deleted_at) {
           return { ok: false, error: "La cotización ya no existe." };
         }
         cotizacionAnterior = previaDemo;
@@ -1351,6 +1357,7 @@ export async function saveCotizacionUnificada(input: {
           .select("estado_flujo,total,detalle")
           .eq("id", input.id)
           .eq("organization_id", DEFAULT_ORG_ID)
+          .is("deleted_at", null)
           .maybeSingle();
         if (!previaSupabase) {
           return { ok: false, error: "La cotización ya no existe." };
@@ -1382,11 +1389,18 @@ export async function saveCotizacionUnificada(input: {
     if (!totalClienteCoincideConServidor(input.total, calculo.totalFinal)) {
       return { ok: false, error: "El total no coincide con el detalle. Revisa los importes." };
     }
+    const errorPago = validarCondicionesPagoCotizacion(det.condiciones_pago, calculo.totalFinal);
+    if (errorPago) return { ok: false, error: errorPago };
     const detalleConResumen = {
       ...det,
       resumenCalculo: crearInstantaneaCalculoCotizacion(calculo),
     };
     const detalleRecord = JSON.parse(JSON.stringify(detalleConResumen)) as Record<string, unknown>;
+    // Guardar cambios no devuelve a pendiente una propuesta ya aceptada o en producción.
+    const estadoFlujo = cotizacionAnterior && (
+      input.estadoFlujo === "pendiente" ||
+      !["pendiente", "lista_produccion"].includes(cotizacionAnterior.estado_flujo)
+    ) ? cotizacionAnterior.estado_flujo : input.estadoFlujo;
 
     if (!supabase) {
       if (input.id) {
@@ -1395,7 +1409,7 @@ export async function saveCotizacionUnificada(input: {
           tipo_cliente: input.tipoCliente,
           fecha: input.fecha,
           total: calculo.totalFinal,
-          estado_flujo: input.estadoFlujo,
+          estado_flujo: estadoFlujo,
           detalle: detalleRecord,
         });
         revalidatePath("/cotizacion");
@@ -1417,21 +1431,26 @@ export async function saveCotizacionUnificada(input: {
     }
 
     if (input.id) {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from("cotizaciones_unificadas")
         .update({
           cliente_id: input.clienteId,
           tipo_cliente: input.tipoCliente,
           fecha: input.fecha,
           total: calculo.totalFinal,
-          estado_flujo: input.estadoFlujo,
+          estado_flujo: estadoFlujo,
           detalle: detalleConResumen as unknown as Json,
         })
         .eq("id", input.id)
-        .eq("organization_id", DEFAULT_ORG_ID);
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .eq("estado_flujo", cotizacionAnterior!.estado_flujo)
+        .eq("total", cotizacionAnterior!.total)
+        .is("deleted_at", null)
+        .select("id");
       if (error) {
         return { ok: false, error: error.message };
       }
+      if (!updated?.length) return { ok: false, error: "La cotización cambió o ya está cobrada. Actualiza antes de guardar." };
       revalidatePath("/cotizacion");
       return { ok: true, id: input.id };
     }
@@ -1479,18 +1498,23 @@ export async function deleteCotizacionUnificada(
       .select("estado_flujo")
       .eq("id", id)
       .eq("organization_id", DEFAULT_ORG_ID)
+      .is("deleted_at", null)
       .maybeSingle();
     if (!row || row.estado_flujo === "cobrada") {
       return { ok: false, error: "No se pueden eliminar cotizaciones ya cobradas." };
     }
-    const { error } = await supabase
+    const { data: deleted, error } = await supabase
       .from("cotizaciones_unificadas")
       .delete()
       .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID);
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .neq("estado_flujo", "cobrada")
+      .is("deleted_at", null)
+      .select("id");
     if (error) {
       return { ok: false, error: error.message };
     }
+    if (!deleted?.length) return { ok: false, error: "La cotización cambió o ya está cobrada. Actualiza antes de eliminar." };
     revalidatePath("/cotizacion");
     return { ok: true };
   } catch (e) {
@@ -1504,24 +1528,32 @@ export async function cambiarEstadoCotizacionUnificada(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     await requireMutationAccess(ventasRoles);
+    if (!["pendiente", "lista_produccion", "en_produccion", "terminado", "entregado", "inactivo", "deudor"].includes(nuevoEstado)) {
+      return { ok: false, error: "Para marcarla como cobrada, registra el cobro total en Caja." };
+    }
     if (!hasSupabaseEnv()) {
       const row = demoGetCotizacionUnificada(id);
-      if (!row) {
+      if (!row || row.deleted_at) {
         return { ok: false, error: "Cotización no encontrada." };
       }
+      if (row.estado_flujo === "cobrada") return { ok: false, error: "No se puede cambiar el estado de una cotización ya cobrada." };
       demoUpdateCotizacionUnificada(id, { estado_flujo: nuevoEstado });
       revalidatePath("/cotizacion");
       return { ok: true };
     }
     const supabase = getSupabaseServerClient();
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("cotizaciones_unificadas")
       .update({ estado_flujo: nuevoEstado as string })
       .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID);
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .is("deleted_at", null)
+      .neq("estado_flujo", "cobrada")
+      .select("id");
     if (error) {
       return { ok: false, error: error.message };
     }
+    if (!updated?.length) return { ok: false, error: "La cotización no existe o ya está cobrada." };
     revalidatePath("/cotizacion");
     return { ok: true };
   } catch (e) {
@@ -1536,7 +1568,7 @@ export async function marcarListaProduccionCotizacion(
     await requireMutationAccess(ventasRoles);
     if (!hasSupabaseEnv()) {
       const row = demoGetCotizacionUnificada(id);
-      if (!row) {
+      if (!row || row.deleted_at) {
         return { ok: false, error: "Cotización no encontrada." };
       }
       if (row.estado_flujo === "cobrada") {
@@ -1552,6 +1584,7 @@ export async function marcarListaProduccionCotizacion(
       .select("estado_flujo")
       .eq("id", id)
       .eq("organization_id", DEFAULT_ORG_ID)
+      .is("deleted_at", null)
       .maybeSingle();
     if (!prevLista) {
       return { ok: false, error: "Cotización no encontrada." };
@@ -1559,14 +1592,18 @@ export async function marcarListaProduccionCotizacion(
     if (prevLista.estado_flujo === "cobrada") {
       return { ok: false, error: "No se puede cambiar el estado de una cotización ya cobrada." };
     }
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("cotizaciones_unificadas")
       .update({ estado_flujo: "lista_produccion" })
       .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID);
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .is("deleted_at", null)
+      .neq("estado_flujo", "cobrada")
+      .select("id");
     if (error) {
       return { ok: false, error: error.message };
     }
+    if (!updated?.length) return { ok: false, error: "La cotización cambió o ya está cobrada. Actualiza antes de continuar." };
     revalidatePath("/cotizacion");
     return { ok: true };
   } catch (e) {
@@ -1581,7 +1618,7 @@ export async function pasarCotizacionAProduccion(
     const actor = await requireMutationAccess(ventasRoles);
     if (!hasSupabaseEnv()) {
       const row = demoGetCotizacionUnificada(id);
-      if (!row) {
+      if (!row || row.deleted_at) {
         return { ok: false, error: "Cotización no encontrada." };
       }
       if (row.estado_flujo === "cobrada") {
@@ -1610,6 +1647,7 @@ export async function pasarCotizacionAProduccion(
       .select("*")
       .eq("id", id)
       .eq("organization_id", DEFAULT_ORG_ID)
+      .is("deleted_at", null)
       .maybeSingle();
     if (!row) {
       return { ok: false, error: "Cotización no encontrada." };
@@ -1636,14 +1674,18 @@ export async function pasarCotizacionAProduccion(
     const debeActualizarFlujo = prevEstado !== "en_produccion";
 
     if (debeActualizarFlujo) {
-      const { error: upErr } = await supabase
+      const { data: updated, error: upErr } = await supabase
         .from("cotizaciones_unificadas")
         .update({ estado_flujo: "en_produccion" })
         .eq("id", id)
-        .eq("organization_id", DEFAULT_ORG_ID);
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .is("deleted_at", null)
+        .neq("estado_flujo", "cobrada")
+        .select("id");
       if (upErr) {
         return { ok: false, error: upErr.message };
       }
+      if (!updated?.length) return { ok: false, error: "La cotización cambió o ya está cobrada. Actualiza antes de continuar." };
     }
 
     const correlativo = await nextCorrelativo("orden_produccion");
@@ -1685,7 +1727,8 @@ export async function pasarCotizacionAProduccion(
           .from("cotizaciones_unificadas")
           .update({ estado_flujo: prevEstado })
           .eq("id", id)
-          .eq("organization_id", DEFAULT_ORG_ID);
+          .eq("organization_id", DEFAULT_ORG_ID)
+          .neq("estado_flujo", "cobrada");
       }
       return { ok: false, error: ordenErr.message };
     }
@@ -1700,14 +1743,17 @@ export async function pasarCotizacionAProduccion(
 
 export async function registrarCobroCotizacionUnificada(
   id: string,
+  cobro: { medio: "efectivo" | "banco" | "yape" | "otro"; totalEsperado: number },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     await requireMutationAccess(ventasRoles);
-    const fecha = new Date().toISOString().slice(0, 10);
+    const datosCobro = z.object({ medio: z.enum(["efectivo", "banco", "yape", "otro"]), totalEsperado: z.number().finite().positive() }).safeParse(cobro);
+    if (!datosCobro.success) return { ok: false, error: "Confirma el importe y un medio de cobro válido." };
+    const fecha = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
     if (!hasSupabaseEnv()) {
       const row = demoGetCotizacionUnificada(id);
-      if (!row) {
+      if (!row || row.deleted_at) {
         return { ok: false, error: "Cotización no encontrada." };
       }
       if (row.estado_flujo !== "lista_produccion" && row.estado_flujo !== "en_produccion") {
@@ -1716,33 +1762,49 @@ export async function registrarCobroCotizacionUnificada(
           error: "Solo se puede cobrar una cotización en lista de producción o en producción.",
         };
       }
+      const total = Number(row.total);
+      if (!Number.isFinite(total) || total <= 0 || !totalClienteCoincideConServidor(datosCobro.data.totalEsperado, total)) {
+        return { ok: false, error: "El total cambió o no es válido. Actualiza la cotización antes de cobrar." };
+      }
+      const { demoCajaRows } = await import("@/lib/demo-store");
+      if (demoCajaRows().some((mov) => mov.organization_id === DEFAULT_ORG_ID && mov.referencia_id === id &&
+          mov.modulo_origen === "cotizacion_unificada" && mov.tipo === "ingreso" && !mov.voided_at)) {
+        return { ok: false, error: "Esta cotización ya tiene un cobro registrado en Caja." };
+      }
+      const estadoAnterior = row.estado_flujo;
       demoUpdateCotizacionUnificada(id, { estado_flujo: "cobrada" });
       const label = row.correlativo ?? id.slice(0, 8);
-      demoCreateCaja({
+      try { demoCreateCaja({
         organization_id: DEFAULT_ORG_ID,
         fecha,
         tipo: "ingreso",
-        medio: "efectivo",
+        medio: datosCobro.data.medio,
         categoria: "cotizaciones",
-        monto: Number(row.total),
+        monto: total,
         descripcion: `Cobro cotización ${label}`,
         modulo_origen: "cotizacion_unificada",
         referencia_id: id,
         es_personal: false,
-      });
+      }); } catch (error) {
+        demoUpdateCotizacionUnificada(id, { estado_flujo: estadoAnterior });
+        throw error;
+      }
       revalidatePath("/cotizacion");
       revalidatePath("/caja");
+      revalidatePath("/ventas");
       return { ok: true };
     }
 
     const supabase = getSupabaseServerClient();
-    const { data: row } = await supabase
+    const { data: row, error: lecturaError } = await supabase
       .from("cotizaciones_unificadas")
       .select("estado_flujo,total,correlativo")
       .eq("id", id)
       .eq("organization_id", DEFAULT_ORG_ID)
+      .is("deleted_at", null)
       .maybeSingle();
 
+    if (lecturaError) return { ok: false, error: lecturaError.message };
     if (!row) {
       return { ok: false, error: "Cotización no encontrada." };
     }
@@ -1753,6 +1815,15 @@ export async function registrarCobroCotizacionUnificada(
       };
     }
 
+    const total = Number(row.total);
+    if (!Number.isFinite(total) || total <= 0 || !totalClienteCoincideConServidor(datosCobro.data.totalEsperado, total)) {
+      return { ok: false, error: "El total cambió o no es válido. Actualiza la cotización antes de cobrar." };
+    }
+    const { data: cobrosPrevios, error: lecturaCajaError } = await supabase.from("movimientos_caja")
+      .select("id").eq("organization_id", DEFAULT_ORG_ID).eq("referencia_id", id)
+      .eq("modulo_origen", "cotizacion_unificada").eq("tipo", "ingreso").is("voided_at", null).limit(1);
+    if (lecturaCajaError) return { ok: false, error: lecturaCajaError.message };
+    if (cobrosPrevios?.length) return { ok: false, error: "Esta cotización ya tiene un cobro registrado en Caja." };
     const prevEstado = row.estado_flujo;
     const label = row.correlativo ?? id.slice(0, 8);
 
@@ -1761,6 +1832,8 @@ export async function registrarCobroCotizacionUnificada(
       .update({ estado_flujo: "cobrada" })
       .eq("id", id)
       .eq("organization_id", DEFAULT_ORG_ID)
+      .is("deleted_at", null)
+      .eq("total", total)
       .in("estado_flujo", ["lista_produccion", "en_produccion"])
       .select("id");
 
@@ -1768,16 +1841,16 @@ export async function registrarCobroCotizacionUnificada(
       return { ok: false, error: upErr.message };
     }
     if (!updatedRows?.length) {
-      return { ok: false, error: "No se pudo actualizar el estado (¿ya cobrada?)." };
+      return { ok: false, error: "La cotización cambió o ya está cobrada. Actualiza antes de cobrar." };
     }
 
     const { error: cajaErr } = await supabase.from("movimientos_caja").insert({
       organization_id: DEFAULT_ORG_ID,
       fecha,
       tipo: "ingreso",
-      medio: "efectivo",
+      medio: datosCobro.data.medio,
       categoria: "cotizaciones",
-      monto: Number(row.total),
+      monto: total,
       descripcion: `Cobro cotización ${label}`,
       modulo_origen: "cotizacion_unificada",
       referencia_id: id,
@@ -1789,12 +1862,14 @@ export async function registrarCobroCotizacionUnificada(
         .from("cotizaciones_unificadas")
         .update({ estado_flujo: prevEstado })
         .eq("id", id)
-        .eq("organization_id", DEFAULT_ORG_ID);
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .eq("estado_flujo", "cobrada");
       return { ok: false, error: cajaErr.message };
     }
 
     revalidatePath("/cotizacion");
     revalidatePath("/caja");
+    revalidatePath("/ventas");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
@@ -1802,22 +1877,13 @@ export async function registrarCobroCotizacionUnificada(
 }
 
 export async function cambiarEstadoCotizacion(formData: FormData) {
-  await requireMutationAccess(ventasRoles);
   const id = String(formData.get("id") ?? "");
   const nuevoEstado = String(formData.get("nuevo_estado") ?? "");
   const estadosValidos = ["pendiente", "lista_produccion", "en_produccion", "terminado", "entregado", "inactivo", "deudor"];
   if (!id) throw new Error("Cotización inválida.");
   if (!estadosValidos.includes(nuevoEstado)) throw new Error("Estado inválido.");
-  if (!hasSupabaseEnv()) throw new Error("No implementado en demo.");
-  const supabase = getSupabaseServerClient();
-  const { error } = await supabase
-    .from("cotizaciones_unificadas")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .update({ estado_flujo: nuevoEstado as any })
-    .eq("id", id)
-    .eq("organization_id", DEFAULT_ORG_ID);
-  if (error) throw new Error(error.message);
-  revalidatePath("/cotizacion");
+  const resultado = await cambiarEstadoCotizacionUnificada(id, nuevoEstado as "pendiente" | "lista_produccion" | "en_produccion" | "terminado" | "entregado" | "inactivo" | "deudor");
+  if (!resultado.ok) throw new Error(resultado.error);
 }
 
 export async function createChofer(formData: FormData) {
@@ -5463,36 +5529,39 @@ export async function updateContratoAlquiler(
     if (!hasSupabaseEnv()) {
       const { demoAlquilerRows, demoCajaRows, demoCreateCaja, demoDeleteOneById, persistStore } = await import("@/lib/demo-store");
       const row = demoAlquilerRows().find((x) => x.id === id);
-      if (row) {
-        if (row.estado === "cerrado") {
-          return { ok: false, error: "El contrato ya está cerrado y no se puede modificar." };
-        }
-        row.cliente_id = parsed.data.clienteId;
-        row.activo = parsed.data.activo;
-        row.fecha_inicio = parsed.data.fechaInicio;
-        row.fecha_termino = parsed.data.fechaTermino || null;
-        row.dias_alquiler = parsed.data.diasAlquiler ?? null;
-        row.tarifa_unidad = parsed.data.tarifaUnidad;
-        row.tarifa = parsed.data.tarifa;
-        row.monto_total = parsed.data.montoTotal;
-        row.deposito_30 = deposito30;
-        row.representante = parsed.data.representante || null;
-        row.ruc_empresa = parsed.data.rucEmpresa || null;
-        row.direccion_ejecucion = parsed.data.direccionEjecucion || null;
-        row.metodo_pago = parsed.data.metodoPago;
-        row.modalidad_pago = parsed.data.modalidadPago;
-        row.fecha_pago_credito = parsed.data.fechaPagoCredito || null;
-        row.penalidad_retraso_pago_pct = parsed.data.penalidadRetrasoPagoPct;
-        row.penalidad_devolucion_tardia_pct = parsed.data.penalidadDevolucionTardiaPct;
-        row.penalidad_danios_pct = parsed.data.penalidadDaniosPct;
+      if (!row) {
+        return { ok: false, error: "No se encontró el contrato de alquiler." };
+      }
+      if (row.estado === "cerrado") {
+        return { ok: false, error: "El contrato ya está cerrado y no se puede modificar." };
       }
 
-      // Sync movements:
+      // Comprobar el bloqueo de caja antes de modificar cualquier dato del contrato.
       const cRow = demoCajaRows().find((c) => c.referencia_id === id && c.modulo_origen === "ventas_alquiler");
+      if (cRow?.periodo_cerrado) {
+        return { ok: false, error: "El movimiento de caja pertenece a un período cerrado y no se puede editar." };
+      }
+
+      row.cliente_id = parsed.data.clienteId;
+      row.activo = parsed.data.activo;
+      row.fecha_inicio = parsed.data.fechaInicio;
+      row.fecha_termino = parsed.data.fechaTermino || null;
+      row.dias_alquiler = parsed.data.diasAlquiler ?? null;
+      row.tarifa_unidad = parsed.data.tarifaUnidad;
+      row.tarifa = parsed.data.tarifa;
+      row.monto_total = parsed.data.montoTotal;
+      row.deposito_30 = deposito30;
+      row.representante = parsed.data.representante || null;
+      row.ruc_empresa = parsed.data.rucEmpresa || null;
+      row.direccion_ejecucion = parsed.data.direccionEjecucion || null;
+      row.metodo_pago = parsed.data.metodoPago;
+      row.modalidad_pago = parsed.data.modalidadPago;
+      row.fecha_pago_credito = parsed.data.fechaPagoCredito || null;
+      row.penalidad_retraso_pago_pct = parsed.data.penalidadRetrasoPagoPct;
+      row.penalidad_devolucion_tardia_pct = parsed.data.penalidadDevolucionTardiaPct;
+      row.penalidad_danios_pct = parsed.data.penalidadDaniosPct;
+
       if (cRow) {
-        if (cRow.periodo_cerrado) {
-          return { ok: false, error: "El movimiento de caja pertenece a un período cerrado y no se puede editar." };
-        }
         if (deposito30 > 0) {
           cRow.monto = deposito30;
           cRow.fecha = parsed.data.fechaInicio;
@@ -5518,15 +5587,37 @@ export async function updateContratoAlquiler(
     } else {
       const supabase = getSupabaseServerClient();
 
-      const { data: currentContract } = await supabase
+      const { data: currentContract, error: contractSelectErr } = await supabase
         .from("alquileres")
         .select("estado")
         .eq("id", id)
         .eq("organization_id", DEFAULT_ORG_ID)
         .maybeSingle();
 
-      if (currentContract && currentContract.estado === "cerrado") {
+      if (contractSelectErr) {
+        return { ok: false, error: contractSelectErr.message };
+      }
+      if (!currentContract) {
+        return { ok: false, error: "No se encontró el contrato de alquiler." };
+      }
+      if (currentContract.estado === "cerrado") {
         return { ok: false, error: "El contrato ya está cerrado y no se puede modificar." };
+      }
+
+      // Resolver los errores de lectura y el cierre de caja antes de guardar el contrato.
+      const { data: existingCaja, error: cajaSelectErr } = await supabase
+        .from("movimientos_caja")
+        .select("id, periodo_cerrado")
+        .eq("referencia_id", id)
+        .eq("modulo_origen", "ventas_alquiler")
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .maybeSingle();
+
+      if (cajaSelectErr) {
+        return { ok: false, error: cajaSelectErr.message };
+      }
+      if (existingCaja?.periodo_cerrado) {
+        return { ok: false, error: "El movimiento de caja pertenece a un período cerrado y no se puede editar." };
       }
 
       const { error: updErr } = await supabase
@@ -5558,23 +5649,7 @@ export async function updateContratoAlquiler(
         return { ok: false, error: updErr.message };
       }
 
-      // Sync movements using the exact requested pattern:
-      // - Buscar: SELECT id FROM movimientos_caja WHERE referencia_id = p_id AND modulo_origen = 'x'
-      const { data: existingCaja, error: cajaSelectErr } = await supabase
-        .from("movimientos_caja")
-        .select("id, periodo_cerrado")
-        .eq("referencia_id", id)
-        .eq("modulo_origen", "ventas_alquiler")
-        .maybeSingle();
-
-      if (cajaSelectErr) {
-        return { ok: false, error: cajaSelectErr.message };
-      }
-
       if (existingCaja) {
-        if (existingCaja.periodo_cerrado) {
-          return { ok: false, error: "El movimiento de caja pertenece a un período cerrado y no se puede editar." };
-        }
         if (deposito30 > 0) {
           // - Si existe -> UPDATE
           const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);

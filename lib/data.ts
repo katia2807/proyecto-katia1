@@ -36,6 +36,11 @@ import type { Database } from "@/lib/supabase/types";
 
 type CajaRow = Database["public"]["Tables"]["movimientos_caja"]["Row"];
 type VentaRow = Database["public"]["Tables"]["ventas_madera"]["Row"];
+type VentaHistorialRow = VentaRow & {
+  comprobanteTipo: "madera" | "venta-madera";
+  tipo_entrega?: string | null;
+  modalidad_pago?: string | null;
+};
 type AlquilerRow = Database["public"]["Tables"]["alquileres"]["Row"];
 type ChoferDbRow = Database["public"]["Tables"]["choferes"]["Row"];
 type ZonaEntregaDbRow = Database["public"]["Tables"]["zonas_entrega"]["Row"];
@@ -265,7 +270,10 @@ export async function getCajaRows() {
 
 export async function getVentasRows() {
   if (!hasSupabaseEnv()) {
-    return demoVentasRows();
+    return demoVentasRows().map((row) => ({
+      ...row,
+      comprobanteTipo: row.tipo_corte ? "madera" as const : "venta-madera" as const,
+    }));
   }
   const supabase = getSupabaseServerClient();
   return safeQuery(async () => {
@@ -283,9 +291,12 @@ export async function getVentasRows() {
         .order("fecha", { ascending: false })
         .limit(80),
     ]);
-    const base = vm ?? fallback.ventas;
+    const base: VentaHistorialRow[] = (vm ?? fallback.ventas).map((row) => ({
+      ...row,
+      comprobanteTipo: "venta-madera",
+    }));
     const cortadaRows = vc ?? [];
-    const cortadaAsVentas: VentaRow[] = cortadaRows.map((row) => ({
+    const cortadaAsVentas: VentaHistorialRow[] = cortadaRows.map((row) => ({
       id: row.id,
       organization_id: row.organization_id,
       cliente_id: row.cliente_id,
@@ -295,11 +306,12 @@ export async function getVentasRows() {
       correlativo: null,
       created_at: row.created_at,
       created_by: row.created_by,
+      comprobanteTipo: "madera",
     }));
     return [...cortadaAsVentas, ...base]
       .sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0))
       .slice(0, 50);
-  }, fallback.ventas);
+  }, [] as VentaHistorialRow[]);
 }
 
 /** Historial exclusivo del módulo de madera cortada (sin mezclar ventas clásicas). */
@@ -439,6 +451,7 @@ export async function getCotizacionesUnificadasRows(): Promise<CotizacionUnifica
       .from("cotizaciones_unificadas")
       .select("*")
       .eq("organization_id", DEFAULT_ORG_ID)
+      .is("deleted_at", null)
       .order("fecha", { ascending: false })
       .limit(100);
     if (error) {
@@ -451,7 +464,7 @@ export async function getCotizacionesUnificadasRows(): Promise<CotizacionUnifica
 export async function getCotizacionUnificadaById(id: string): Promise<CotizacionUnificadaRow | null> {
   if (!hasSupabaseEnv()) {
     const row = demoGetCotizacionUnificada(id);
-    return row ? (row as CotizacionUnificadaRow) : null;
+    return row && !row.deleted_at ? (row as CotizacionUnificadaRow) : null;
   }
   const supabase = getSupabaseServerClient();
   const { data } = await supabase
@@ -459,6 +472,7 @@ export async function getCotizacionUnificadaById(id: string): Promise<Cotizacion
     .select("*")
     .eq("id", id)
     .eq("organization_id", DEFAULT_ORG_ID)
+    .is("deleted_at", null)
     .maybeSingle();
   return data ?? null;
 }
@@ -480,6 +494,7 @@ export async function getAlquilerRows(): Promise<AlquilerRowsResult> {
       .select("*")
       .eq("organization_id", DEFAULT_ORG_ID)
       .order("fecha_inicio", { ascending: false })
+      .abortSignal(AbortSignal.timeout(10_000))
       .limit(100);
     if (error) {
       throw new Error(error.message);
@@ -496,9 +511,19 @@ export async function getAlquilerRows(): Promise<AlquilerRowsResult> {
   }
 }
 
-export async function getAlquilerById(id: string) {
-  const result = await getAlquilerRows();
-  return result.rows.find((x) => x.id === id) ?? null;
+export async function getAlquilerById(id: string, organizationId = DEFAULT_ORG_ID) {
+  if (!hasSupabaseEnv()) {
+    return demoAlquilerRows().find((row) => row.id === id && row.organization_id === organizationId) ?? null;
+  }
+  const { data, error } = await getSupabaseServerClient()
+    .from("alquileres")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("id", id)
+    .abortSignal(AbortSignal.timeout(10_000))
+    .maybeSingle();
+  if (error) throw new Error("No se pudo cargar el contrato de alquiler.");
+  return data;
 }
 
 

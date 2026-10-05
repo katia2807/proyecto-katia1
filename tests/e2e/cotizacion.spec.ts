@@ -9,7 +9,7 @@ test.describe("cotización unificada (demo DB)", () => {
 
   test("crea cotización aserradero, guarda y muestra correlativo N°…", async ({ page }) => {
     await page.goto("/cotizacion");
-    await expect(page.getByRole("heading", { name: "Nueva venta guiada", exact: true, level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Nueva cotización", exact: true, level: 2 })).toBeVisible();
 
     await page.getByRole("button", { name: "Empresa" }).click();
     await page.getByRole("button", { name: "Siguiente" }).click();
@@ -33,7 +33,7 @@ test.describe("cotización unificada (demo DB)", () => {
 
     await page.getByRole("button", { name: "Guardar cotización", exact: true }).click();
 
-    await expect(page.getByRole("heading", { name: "Nueva venta guiada", exact: true, level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Nueva cotización", exact: true, level: 2 })).toBeVisible();
     const correlativoCell = page.getByRole("cell", { name: /^N°\d{4}$/ }).first();
     await expect(correlativoCell).toBeVisible();
     const historialRow = correlativoCell.locator("..");

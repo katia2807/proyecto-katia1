@@ -22,11 +22,11 @@ import {
   getOrdenesProduccionRows,
   getProveedoresRows,
   getServiciosAserraderoRows,
-  getVentasMuebleTerminadoRows,
-  getVentasRows,
-  getAlquilerRows,
 } from "@/lib/data";
-import { VentasListWithFilters, UnifiedVenta } from "@/components/ventas/ventas-list-with-filters";
+import { VentasListWithFilters } from "@/components/ventas/ventas-list-with-filters";
+import { getVentasHistorial } from "@/lib/ventas-historial-data";
+import { normalizeHistorialPaginas } from "@/lib/ventas-historial-navigation";
+import { requireAuthContext } from "@/lib/auth";
 import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 import { VentasPendientesView } from "@/components/inicio/ventas-pendientes-view";
@@ -78,7 +78,7 @@ const tarjetas: Tarjeta[] = [
 ];
 
 type VentasPageProps = {
-  searchParams?: Promise<{ quick?: string | string[]; estado?: string | string[] }>;
+  searchParams?: Promise<{ quick?: string | string[]; estado?: string | string[]; historial?: string | string[] }>;
 };
 
 function normalizeQuickParam(value: string | string[] | undefined) {
@@ -90,80 +90,31 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
   const params = await searchParams;
   const quick = normalizeQuickParam(params?.quick);
   if (normalizeQuickParam(params?.estado) === "borrador") return <VentasPendientesView />;
+  const auth = await requireAuthContext();
+  const paginas = normalizeHistorialPaginas(normalizeQuickParam(params?.historial));
   const [
     clientes,
     proveedores,
     choferes,
     muebles,
-    ventasMuebles,
     ordenes,
     serviciosAserradero,
     cobrosVencidos,
-    ventasMadera,
-    alquilerBundle,
+    historial,
   ] = await Promise.all([
     getClientesRows(),
     getProveedoresRows(),
     getChoferesRows(),
     getMueblesCatalogoRows(),
-    getVentasMuebleTerminadoRows(),
     getOrdenesProduccionRows(),
     getServiciosAserraderoRows(),
     getCobrosVencidos(),
-    getVentasRows(),
-    getAlquilerRows(),
+    getVentasHistorial(paginas, auth.organizationId),
   ]);
   const totalCobrosVencidos = cobrosVencidos.reduce((acc, c) => acc + c.monto, 0);
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);
   const clientesById = new Map(clientes.map((c) => [c.id, c.nombre]));
-
-  // Mapear todas las categorías de ventas a una estructura uniforme
-  const listMuebles = ventasMuebles.map((v) => {
-    const mueble = muebles.find((m) => m.id === v.mueble_catalogo_id);
-    return {
-      id: v.id,
-      fecha: v.fecha,
-      clienteNombre: clientesById.get(v.cliente_id) ?? "Cliente Desconocido",
-      concepto: `Mueble: ${mueble?.nombre ?? "Mueble terminado"} (x${v.cantidad})`,
-      total: Number(v.total),
-      categoria: "muebles" as const,
-    };
-  });
-
-  const listMadera = ventasMadera.map((v) => ({
-    id: v.id,
-    fecha: v.fecha,
-    clienteNombre: clientesById.get(v.cliente_id) ?? "Cliente Desconocido",
-    concepto: `Madera: ${v.correlativo ?? "Venta de Madera"}`.trim(),
-    total: Number(v.total),
-    categoria: "madera" as const,
-  }));
-
-  const listAserradero = serviciosAserradero.map((v) => ({
-    id: v.id,
-    fecha: v.fecha,
-    clienteNombre: clientesById.get(v.cliente_id) ?? "Cliente Desconocido",
-    concepto: `Servicio Aserradero (${v.pies_cubicos.toFixed(2)} PT)`,
-    total: Number(v.precio_cobrado),
-    categoria: "aserradero" as const,
-  }));
-
-  const listAlquileres = alquilerBundle.rows.map((v) => ({
-    id: v.id,
-    fecha: v.fecha_inicio,
-    clienteNombre: clientesById.get(v.cliente_id) ?? "Cliente Desconocido",
-    concepto: `Alquiler Mixer: ${v.activo} (${v.codigo ?? "Contrato"})`,
-    total: Number(v.monto_total),
-    categoria: "alquileres" as const,
-  }));
-
-  const allVentas: UnifiedVenta[] = [
-    ...listMuebles,
-    ...listMadera,
-    ...listAserradero,
-    ...listAlquileres,
-  ].sort((a, b) => b.fecha.localeCompare(a.fecha));
 
   return (
     <div className="space-y-6">
@@ -171,7 +122,7 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Ventas</h2>
           <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
-            Usa el flujo guiado para registrar ventas con menos pasos y menos decisiones manuales.
+            Prepara una cotización paso a paso y conviértela en venta cuando el cliente la acepte.
           </p>
           <p className="text-sm text-[var(--katia-text-secondary)]">
             También puedes entrar directamente a cada módulo especializado.
@@ -181,7 +132,7 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
           <Link href="/cotizacion?modo=guiado#cotizacion-wizard">
             <Button variant="secondary">
               <PlusCircle className="mr-2 size-4" />
-              Nueva venta guiada
+              Nueva cotización guiada
             </Button>
           </Link>
           <Link href="/ventas/dashboard">
@@ -224,17 +175,16 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
             <div className="inline-flex items-center rounded-full bg-[var(--katia-primary)] px-2.5 py-1 text-xs font-bold text-white">
               Recomendado para uso diario
             </div>
-            <CardTitle className="mt-3 text-xl">Nueva venta guiada</CardTitle>
+            <CardTitle className="mt-3 text-xl">Cotización guiada</CardTitle>
             <CardDescription className="mt-2 text-sm leading-6">
-              Empieza aquí para registrar ventas de forma más fácil: eliges o creas el cliente, agregas lo que necesita
-              y dejas la operación lista para cobrar o convertir desde cotización. Es el camino recomendado para la
-              atención diaria.
+              Elige el cliente, agrega el producto o servicio y revisa el total. Guarda o imprime la cotización;
+              cuando el cliente acepte, podrás convertirla en venta y registrar el cobro.
             </CardDescription>
           </div>
           <Link href="/cotizacion?modo=guiado#cotizacion-wizard">
             <Button className="h-12 px-6 text-base font-bold shadow-sm">
               <PlusCircle className="mr-2 size-4" />
-              Crear venta
+              Empezar cotización
             </Button>
           </Link>
         </div>
@@ -281,7 +231,7 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <VentasListWithFilters ventas={allVentas} />
+          <VentasListWithFilters ventas={historial.ventas} hasMore={historial.hasMore} paginas={historial.paginas} failedCategories={historial.failedCategories} cotizacionesLoadFailed={historial.cotizacionesLoadFailed} />
         </div>
         <div>
           <Card className="h-full">

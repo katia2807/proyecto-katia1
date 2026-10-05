@@ -5,6 +5,7 @@ import { getEmpresaConfig } from "@/lib/company-config";
 import { resolverCalculoDocumentoCotizacion } from "@/lib/cotizacion-calculos";
 import { buildLineasResumen } from "@/lib/cotizacion-unificada-lineas";
 import { parseCotizacionDetalle } from "@/lib/cotizacion-unificada-payload";
+import { notasDocumentoCotizacion } from "@/lib/cotizacion-pago";
 import { getCotizacionUnificadaById, getClientesRows } from "@/lib/data";
 
 type PdfPageProps = { params: Promise<{ id: string }> };
@@ -40,7 +41,7 @@ export default async function CotizacionUnificadaPdfPage({ params }: PdfPageProp
         tipoCliente={cot.tipo_cliente}
         documentoCliente={cliente?.documento ?? null}
         lineas={lineas}
-        notasGenerales={detalle.notas_generales}
+        notasGenerales={notasDocumentoCotizacion(detalle, total)}
         total={total}
         empresa={empresa}
       />

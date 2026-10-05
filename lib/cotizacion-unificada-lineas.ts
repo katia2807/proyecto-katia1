@@ -4,7 +4,6 @@ import {
   round2,
 } from "@/lib/cotizacion-calculos";
 import type { CotizacionDetalleV1 } from "@/lib/cotizacion-unificada-payload";
-import { formatPen } from "@/lib/utils";
 
 export type LineaFormal = {
   cantidad: number;
@@ -46,6 +45,10 @@ export function buildLineasResumen(
   totalFinal?: number,
 ): LineaFormal[] {
   const lineas: LineaFormal[] = [];
+  const descripcionPersonalizada = getDescripcionPersonalizada(detalle);
+  const bulletsPersonalizados = descripcionPersonalizada === null
+    ? null
+    : descripcionPersonalizada.trim() ? [descripcionPersonalizada.trim()] : [];
 
   if (detalle.rubros.muebles && detalle.muebles_lineas.length > 0) {
     // Calcular total de todas las líneas de madera juntas para mostrar un solo ítem
@@ -66,10 +69,10 @@ export function buildLineasResumen(
     totalCantidad = Math.max(1, totalCantidad);
 
     // Descripción visible al cliente: usa el campo editable si existe (incluso si está vacío), sino genera texto limpio
-    const hasManualDesc = detalle.descripcion_cliente !== undefined && detalle.descripcion_cliente !== null;
+    const hasManualDesc = bulletsPersonalizados !== null;
     const bullets: string[] = [];
     if (hasManualDesc) {
-      const descCliente = (detalle.descripcion_cliente ?? "").trim();
+      const descCliente = (descripcionPersonalizada ?? "").trim();
       if (descCliente) {
         // Katia escribió una descripción personalizada → mostrarla tal cual
         bullets.push(descCliente);
@@ -137,14 +140,14 @@ export function buildLineasResumen(
       bullets.push(desc);
     }
     if (a.modo === "hora") {
-      bullets.push(`S/ ${a.precioHora.toFixed(2)} × ${a.horas} h`);
+      bullets.push(`Servicio por tiempo: ${a.horas} h`);
     } else {
-      bullets.push(`Monto acordado: ${formatPen(a.montoTotalFijo)}`);
+      bullets.push("Servicio a precio cerrado");
     }
     lineas.push({
       cantidad: 1,
       titulo: "SERVICIO ASERRADERO / MANO DE OBRA",
-      bullets,
+      bullets: lineas.length === 0 && bulletsPersonalizados !== null ? bulletsPersonalizados : bullets,
       precioUnit: tot,
       precioTotal: tot,
     });
@@ -156,7 +159,7 @@ export function buildLineasResumen(
     const cant = Math.max(1, al.unidades_tiempo || 1);
     const nombre = (al.nombre_maquinaria || "Maquinaria").trim().toUpperCase();
     const bullets: string[] = [
-      `Cobro por ${al.tarifaUnidad === "hora" ? "hora" : "día"}: ${formatPen(al.tarifa)} × ${al.unidades_tiempo} ${al.tarifaUnidad === "hora" ? "h" : "día(s)"}`,
+      `Alquiler por ${al.tarifaUnidad === "hora" ? "hora" : "día"}: ${al.unidades_tiempo} ${al.tarifaUnidad === "hora" ? "h" : "día(s)"}`,
     ];
     const notasAlq = (al.notas ?? "").trim();
     if (notasAlq) {
@@ -165,7 +168,7 @@ export function buildLineasResumen(
     lineas.push({
       cantidad: cant,
       titulo: `ALQUILER — ${nombre}`,
-      bullets,
+      bullets: lineas.length === 0 && bulletsPersonalizados !== null ? bulletsPersonalizados : bullets,
       precioUnit: round2(base / cant),
       precioTotal: base,
     });
@@ -181,4 +184,20 @@ export function buildLineasResumen(
   }
 
   return reconciliarLineasConTotal(lineas, totalFinal);
+}
+
+/** Los documentos anteriores sin modo explícito conservan su texto como personalizado. */
+export function getDescripcionPersonalizada(detalle: CotizacionDetalleV1): string | null {
+  if (detalle.descripcion_modo === "automatica") return null;
+  return detalle.descripcion_cliente ?? null;
+}
+
+export function buildDescripcionComercialSugerida(detalle: CotizacionDetalleV1): string {
+  const lineas = buildLineasResumen({
+    ...detalle,
+    descripcion_cliente: undefined,
+    descripcion_modo: "automatica",
+  });
+  const partes = lineas.flatMap((linea) => [linea.titulo, ...linea.bullets]);
+  return [...new Set(partes.map((parte) => parte.trim()).filter(Boolean))].join("\n");
 }
