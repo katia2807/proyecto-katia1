@@ -11,7 +11,6 @@ import { getDashboardSession } from "@/lib/current-user-role";
 import {
   getCajaRows,
   getClientesRows,
-  getCotizacionesRows,
   getCobrosVencidos,
   getCotizacionesUnificadasRows,
   getInventarioRobustoData,
@@ -19,13 +18,14 @@ import {
   getVentasMuebleTerminadoRows,
   getVentasRows,
   getAlquilerRows,
-  getServiciosAserraderoRows,
 } from "@/lib/data";
 import { canAccessGerencial } from "@/lib/permissions";
 import { deleteCliente, forzarEliminarClienteCompleto } from "@/app/actions";
 import { formatDate, formatPen, roundMoney, safeDivide } from "@/lib/utils";
 import { GerencialClienteSearchSelect } from "@/components/gerencial/cliente-search-select";
 import { ClienteEstadoForm } from "@/components/gerencial/cliente-estado-form";
+import { documentoCliente, etiquetaTipoCliente, etiquetaEstadoCliente } from "@/lib/clientes-model";
+import { getClienteHistorial, resumenClientes, cobrosClientes, type ClienteResumen } from "@/lib/clientes-data";
 import { ClientesMasivoTable } from "@/components/gerencial/clientes-masivo-table";
 import type { ClienteCompleto } from "@/lib/combobox-mocks";
 import { CentroMandoTabs } from "@/components/gerencial/centro-mando-tabs";
@@ -70,18 +70,17 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
   const activeTab = firstParam(params?.tab) || "hoy";
   if (firstParam(params?.alertas) === "criticas") return <AlertasCriticasView />;
 
-  const [caja, inventario, cotizacionesUnificadas, cotizacionesMueble, cobros, ventasMuebles, ventasMadera, clientes, ordenes, alquilerBundle, servicios] = await Promise.all([
+  const [caja, inventario, cotizacionesUnificadas, cobros, ventasMuebles, ventasMadera, clientes, ordenes, alquilerBundle, historialClientes] = await Promise.all([
     getCajaRows(),
     getInventarioRobustoData(),
     getCotizacionesUnificadasRows(),
-    getCotizacionesRows(),
     getCobrosVencidos(),
     getVentasMuebleTerminadoRows(),
     getVentasRows(),
     getClientesRows(),
     getOrdenesProduccionRows(),
     getAlquilerRows(),
-    getServiciosAserraderoRows(),
+    activeTab === "clientes360" ? getClienteHistorial() : Promise.resolve(null),
   ]);
 
   const currentKey = monthKey();
@@ -173,66 +172,49 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
   }));
 
   // Para la tabla masiva de clientes
+  const resumenPorCliente = historialClientes ? resumenClientes(historialClientes) : new Map<string, ClienteResumen>();
   const clientesMasivo = clientes.map((cliente) => {
-    const totalFacturado =
-      ventasMuebles.filter((v) => v.cliente_id === cliente.id).reduce((a, v) => a + Number(v.total), 0) +
-      ventasMadera.filter((v) => v.cliente_id === cliente.id).reduce((a, v) => a + Number(v.total), 0) +
-      alquilerBundle.rows.filter((c) => c.cliente_id === cliente.id).reduce((a, c) => a + Number(c.monto_total ?? c.tarifa), 0) +
-      servicios.filter((s) => s.cliente_id === cliente.id).reduce((a, s) => a + Number(s.precio_cobrado), 0);
-    const totalOperaciones =
-      cotizacionesUnificadas.filter((c) => c.cliente_id === cliente.id).length +
-      ventasMuebles.filter((v) => v.cliente_id === cliente.id).length +
-      ventasMadera.filter((v) => v.cliente_id === cliente.id).length;
-    const cobrosVencidos = cobros.filter((c) => c.cliente_id === cliente.id).length;
+    const resumen = resumenPorCliente.get(cliente.id);
     return {
       id: cliente.id,
       nombre: cliente.nombre,
-      documento: cliente.documento ?? null,
+      documento: documentoCliente(cliente),
       telefono: (cliente as Record<string, unknown>).telefono as string | null ?? null,
       estado: (cliente as Record<string, unknown>).estado as string | null ?? null,
       tipo_persona: (cliente as Record<string, unknown>).tipo_persona as string | null ?? null,
-      totalFacturado,
-      totalOperaciones,
-      cobrosVencidos,
+      totalFacturado: resumen?.total ?? 0,
+      importesPorDefinir: resumen?.importesPorDefinir ?? 0,
+      totalOperaciones: resumen?.operaciones ?? 0,
+      cobrosVencidos: resumen?.cobrosVencidos ?? 0,
     };
   });
 
   const message = firstParam(params?.mensaje).trim();
   const selectedClienteId = firstParam(params?.cliente).trim();
   const selectedCliente = selectedClienteId ? clientes.find((c) => c.id === selectedClienteId) ?? null : null;
-  const clienteCotizacionesUnificadas = selectedCliente ? cotizacionesUnificadas.filter((c) => c.cliente_id === selectedCliente.id) : [];
-  const clienteCotizacionesMueble = selectedCliente ? cotizacionesMueble.filter((c) => c.cliente_id === selectedCliente.id) : [];
-  const clienteVentasMuebles = selectedCliente ? ventasMuebles.filter((v) => v.cliente_id === selectedCliente.id) : [];
-  const clienteVentasMadera = selectedCliente ? ventasMadera.filter((v) => v.cliente_id === selectedCliente.id) : [];
-  const clienteContratos = selectedCliente ? alquilerBundle.rows.filter((c) => c.cliente_id === selectedCliente.id) : [];
-  const clienteServicios = selectedCliente ? servicios.filter((s) => s.cliente_id === selectedCliente.id) : [];
-  const clienteCobrosVencidos = selectedCliente ? cobros.filter((c) => c.cliente_id === selectedCliente.id) : [];
-  const totalFacturadoCliente =
-    clienteVentasMuebles.reduce((a, v) => a + Number(v.total), 0) +
-    clienteVentasMadera.reduce((a, v) => a + Number(v.total), 0) +
-    clienteContratos.reduce((a, c) => a + Number(c.monto_total ?? c.tarifa), 0) +
-    clienteServicios.reduce((a, s) => a + Number(s.precio_cobrado), 0);
-  const totalOperacionesCliente =
-    clienteCotizacionesUnificadas.length +
-    clienteCotizacionesMueble.length +
-    clienteVentasMuebles.length +
-    clienteVentasMadera.length +
-    clienteContratos.length +
-    clienteServicios.length;
+  const porCliente = <T extends { cliente_id: string | null }>(rows: T[]) => selectedCliente ? rows.filter(c => c.cliente_id === selectedCliente.id) : [];
+  const clienteCotizacionesUnificadas = porCliente(historialClientes?.cotizaciones.filter(c => c.actual) ?? []);
+  const clienteCotizacionesMueble = porCliente(historialClientes?.cotizaciones.filter(c => !c.actual) ?? []);
+  const clienteVentasMuebles = porCliente(historialClientes?.ventasMuebles ?? []);
+  const clienteVentasMadera = porCliente(historialClientes?.ventasMadera ?? []);
+  const clienteContratos = porCliente(historialClientes?.contratos ?? []);
+  const clienteServicios = porCliente(historialClientes?.servicios ?? []);
+  const clienteCobrosVencidos = porCliente(historialClientes ? cobrosClientes(historialClientes) : []);
+  const resumenCliente = selectedCliente ? resumenPorCliente.get(selectedCliente.id) : null;
+  const totalFacturadoCliente = resumenCliente?.total ?? 0;
+  const totalOperacionesCliente = resumenCliente?.operaciones ?? 0;
   const relatedDependencies = [
     { label: "Cotizaciones de muebles", count: clienteCotizacionesMueble.length, href: "/ventas/muebles-personalizados" },
     { label: "Cotizaciones unificadas", count: clienteCotizacionesUnificadas.length, href: "/cotizacion" },
     { label: "Ventas de muebles terminados", count: clienteVentasMuebles.length, href: "/ventas/muebles-terminados" },
-    { label: "Ventas de madera cortada", count: clienteVentasMadera.length, href: "/ventas/madera-cortada" },
+    { label: "Ventas de madera", count: clienteVentasMadera.length, href: "/ventas?categoria=madera#historial-ventas" },
     { label: "Contratos de alquiler", count: clienteContratos.length, href: "/ventas/alquiler-mixer" },
     { label: "Servicios de aserradero", count: clienteServicios.length, href: "/ventas/aserradero-servicios" },
     { label: "Cobros vencidos", count: clienteCobrosVencidos.length, href: "/reportes#cobros-vencidos" },
-    { label: "Órdenes de producción", count: selectedCliente ? ordenes.filter((o) => o.cliente_id === selectedCliente.id).length : 0, href: "/ventas/muebles-personalizados" },
+    { label: "Órdenes de producción", count: porCliente(historialClientes?.ordenes ?? []).length, href: "/ventas/muebles-personalizados" },
   ];
   const hasRelatedDependencies = relatedDependencies.some((dependency) => dependency.count > 0);
-  const pedidosActivosCliente = selectedCliente
-    ? ordenes.filter((o) => o.cliente_id === selectedCliente.id && o.estado !== "entregado" && o.estado !== "terminado").length
-    : 0;
+  const pedidosActivosCliente = resumenCliente?.pedidosActivos ?? 0;
   const pagosPendientesCliente = selectedCliente ? clienteCobrosVencidos.length : 0;
 
   return (
@@ -628,7 +610,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                 <div>
                   <h3 className="text-lg font-semibold text-[var(--katia-text-primary)]">{selectedCliente.nombre}</h3>
                   <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
-                    {selectedCliente.tipo_persona === "empresa" ? "Empresa" : "Persona natural"} · {selectedCliente.documento ?? "Sin documento"}
+                    {etiquetaTipoCliente(selectedCliente.tipo_persona)} · {documentoCliente(selectedCliente)}
                   </p>
                 </div>
                 <Link href={`/ventas/clientes/${selectedCliente.id}`}>
@@ -643,7 +625,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-[var(--katia-text-tertiary)]">Estado</p>
-                  <p className="mt-1 text-sm text-[var(--katia-text-primary)]">{selectedCliente.estado ?? "—"}</p>
+                  <p className="mt-1 text-sm text-[var(--katia-text-primary)]">{etiquetaEstadoCliente(selectedCliente.estado)}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wide text-[var(--katia-text-tertiary)]">Cobros vencidos</p>
@@ -655,8 +637,10 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
 
               <div className="mt-6 grid gap-4 lg:grid-cols-3">
                 <Card>
-                  <CardTitle>Total facturado</CardTitle>
+                  <CardTitle>Total registrado</CardTitle>
                   <p className="mt-1 font-mono text-2xl font-bold text-[var(--katia-text-primary)]">{formatPen(totalFacturadoCliente)}</p>
+                  <p className="mt-2 text-xs text-[var(--katia-text-tertiary)]">Importes de ventas confirmadas y servicios registrados; las propuestas pendientes no se suman.</p>
+                  {(resumenCliente?.importesPorDefinir ?? 0) > 0 ? <p className="mt-1 text-xs text-[var(--katia-text-tertiary)]">{resumenCliente?.importesPorDefinir} importe(s) por definir.</p> : null}
                 </Card>
                 <Card>
                   <CardTitle>Operaciones</CardTitle>
@@ -674,7 +658,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                   <div className="mt-3 space-y-2 text-sm text-[var(--katia-text-secondary)]">
                     <p>Teléfono: {selectedCliente.telefono ?? "Sin teléfono"}</p>
                     <p>Dirección: {selectedCliente.direccion ?? "Sin dirección"}</p>
-                    <p>Tipo: {selectedCliente.tipo_persona ?? "No definido"}</p>
+                    <p>Tipo: {etiquetaTipoCliente(selectedCliente.tipo_persona)}</p>
                   </div>
                 </div>
                 <div className="space-y-4">
@@ -682,6 +666,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                     <CardTitle>Actualizar estado</CardTitle>
                     <CardDescription>Cambia el estado del cliente.</CardDescription>
                     <ClienteEstadoForm
+                      key={`${selectedCliente.id}:${selectedCliente.estado ?? ""}`}
                       clienteId={selectedCliente.id}
                       estadoActual={selectedCliente.estado ?? null}
                     />

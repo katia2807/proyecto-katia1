@@ -101,7 +101,7 @@ describe("submitCreateClienteForm", () => {
 
     await expect(submitCreateClienteForm(mutationFormInitialState, formData)).resolves.toEqual({
       success: false,
-      error: "Datos de cliente inválidos.",
+      error: "El nombre debe tener al menos 3 caracteres, sin contar espacios.",
       message: null,
     });
     expect(mocks.demoCreateCliente).not.toHaveBeenCalled();
@@ -128,5 +128,24 @@ describe("submitCreateClienteForm", () => {
     });
     expect(mocks.demoCreateCliente).toHaveBeenCalledTimes(1);
     expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  test.each(["natural", "empresa"])("registra %s con los campos reales del formulario condicional", async tipo => {
+    const fd = new FormData();
+    fd.set("nombre", "  Cliente del formulario  ");
+    fd.set("tipo_persona", tipo);
+    fd.set(tipo === "empresa" ? "ruc" : "documento", tipo === "empresa" ? "20000000001" : "00000001");
+    const result = await submitCreateClienteForm(mutationFormInitialState, fd);
+    expect(result.success).toBe(true);
+    expect(mocks.demoCreateCliente).toHaveBeenCalledTimes(1);
+    expect(mocks.demoCreateCliente).toHaveBeenCalledWith(expect.objectContaining({ nombre: "Cliente del formulario", documento: tipo === "empresa" ? "20000000001" : "00000001", estado: "activo", tipo_persona: tipo }));
+  });
+
+  test("rechaza un nombre solo con espacios sin crear una fila", async () => {
+    const fd = new FormData(); fd.set("nombre", "   ");
+    const result = await submitCreateClienteForm(mutationFormInitialState, fd);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("sin contar espacios");
+    expect(mocks.demoCreateCliente).not.toHaveBeenCalled();
   });
 });

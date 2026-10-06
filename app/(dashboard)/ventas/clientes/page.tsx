@@ -8,20 +8,15 @@ import { NuevoClienteInline } from "@/components/ventas/nuevo-cliente-inline";
 import { RegistrarChoferInline, ChoferRowWrapper } from "@/components/ventas/registrar-chofer-inline";
 import { RegistrarProveedorInline, ProveedorRowWrapper } from "@/components/ventas/registrar-proveedor-inline";
 import {
-  getAlquilerRows,
   getChoferesRows,
   getChoferTiposVehiculo,
   getClientesRows,
-  getCotizacionesRows,
-  getCobrosVencidos,
-  getOrdenesProduccionRows,
   getProveedoresRows,
   getProveedorTipos,
-  getServiciosAserraderoRows,
-  getVentasMuebleTerminadoRows,
-  getVentasRows,
 } from "@/lib/data";
 import { cn } from "@/lib/utils";
+import { getClienteHistorial, resumenClientes } from "@/lib/clientes-data";
+import { CLIENTE_ESTADOS, clientesHref, coincideCliente, filtrosClientes } from "@/lib/clientes-model";
 
 type PageProps = {
   searchParams?: Promise<{
@@ -32,11 +27,6 @@ type PageProps = {
   }>;
 };
 
-function first(value: string | string[] | undefined, fallback = "") {
-  const v = Array.isArray(value) ? value[0] : value;
-  return (v ?? fallback).trim().toLowerCase();
-}
-
 const TABS = [
   { id: "compradores", label: "Compradores y clientes" },
   { id: "base_datos",  label: "Choferes / Proveedores" },
@@ -44,74 +34,34 @@ const TABS = [
 
 export default async function ClientesPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const tab    = first(params?.tab, "compradores");
-  const q      = first(params?.q);
-  const tipo   = first(params?.tipo);
-  const estado = first(params?.estado);
+  const filtros = filtrosClientes(params);
+  const { tab, q, tipo, estado } = filtros;
 
-  const [clientes, ventasMuebles, ventasMadera, alquilerBundle, servicios, cotizaciones, ordenes, cobros, choferes, proveedores, tiposChofer, tiposProveedor] =
+  const [clientes, historial, choferes, proveedores, tiposChofer, tiposProveedor] =
     await Promise.all([
       getClientesRows(),
-      getVentasMuebleTerminadoRows(),
-      getVentasRows(),
-      getAlquilerRows(),
-      getServiciosAserraderoRows(),
-      getCotizacionesRows(),
-      getOrdenesProduccionRows(),
-      getCobrosVencidos(),
+      getClienteHistorial(),
       getChoferesRows(),
       getProveedoresRows(),
       getChoferTiposVehiculo(),
       getProveedorTipos(),
     ]);
-  const contratos = alquilerBundle.rows;
-
-  const totales = new Map<string, { ops: number; total: number; tipos: Set<string> }>();
-  const addTotales = (clienteId: string, amount: number, tipoLabel: string) => {
-    const acc = totales.get(clienteId) ?? { ops: 0, total: 0, tipos: new Set<string>() };
-    acc.ops += 1; acc.total += amount; acc.tipos.add(tipoLabel);
-    totales.set(clienteId, acc);
-  };
-  for (const v of ventasMuebles) addTotales(v.cliente_id, Number(v.total), "Mueble");
-  for (const v of ventasMadera)  addTotales(v.cliente_id, Number(v.total), "Madera");
-  for (const c of contratos)     addTotales(c.cliente_id, Number(c.monto_total ?? c.tarifa), "Alquiler");
-  for (const s of servicios)     if (s.cliente_id) addTotales(s.cliente_id, Number(s.precio_cobrado), "Servicio");
-  for (const c of cotizaciones)  addTotales(c.cliente_id, 0, "Cotización");
-
-  const pedidosActivos = new Map<string, number>();
-  for (const o of ordenes)
-    if (o.estado !== "entregado" && o.estado !== "terminado")
-      pedidosActivos.set(o.cliente_id, (pedidosActivos.get(o.cliente_id) ?? 0) + 1);
-
-  const pagosPendientes = new Map<string, number>();
-  for (const c of cobros)
-    pagosPendientes.set(c.cliente_id, (pagosPendientes.get(c.cliente_id) ?? 0) + 1);
-
-  const cotizacionesPorCliente = new Map<string, { id: string; fecha: string; monto: number; estado: string; href: string }[]>();
-  for (const c of cotizaciones) {
-    const rows = cotizacionesPorCliente.get(c.cliente_id) ?? [];
-    rows.push({ id: c.id, fecha: c.fecha, monto: Number(c.precio_acordado), estado: c.estado, href: `/ventas/muebles-personalizados/${c.id}/pdf` });
-    cotizacionesPorCliente.set(c.cliente_id, rows);
-  }
+  const totales = resumenClientes(historial);
+  const cobros = clientes.reduce((acc, c) => acc + (totales.get(c.id)?.cobrosVencidos ?? 0), 0);
 
   const filtrados = clientes
-    .filter((c) => {
-      if (q && !(c.nombre.toLowerCase().includes(q) || (c.documento ?? "").toLowerCase().includes(q) || (c.telefono ?? "").toLowerCase().includes(q))) return false;
-      if (tipo   && c.tipo_persona !== tipo)  return false;
-      if (estado && c.estado      !== estado) return false;
-      return true;
-    })
+    .filter((c) => coincideCliente(c, filtros))
     .sort((a, b) => (totales.get(b.id)?.total ?? 0) - (totales.get(a.id)?.total ?? 0));
 
   const clientesDetalle = filtrados.map((c) => {
-    const t = totales.get(c.id) ?? { ops: 0, total: 0, tipos: new Set<string>() };
+    const t = totales.get(c.id);
     return {
       ...c,
-      operaciones:     t.ops,
-      facturado:       t.total,
-      pedidosActivos:  pedidosActivos.get(c.id)  ?? 0,
-      pagosPendientes: pagosPendientes.get(c.id) ?? 0,
-      cotizaciones:    (cotizacionesPorCliente.get(c.id) ?? []).slice(0, 5),
+      operaciones: t?.operaciones ?? 0,
+      facturado: t?.total ?? 0,
+      importesPorDefinir: t?.importesPorDefinir ?? 0,
+      pedidosActivos: t?.pedidosActivos ?? 0,
+      pagosPendientes: t?.cobrosVencidos ?? 0,
     };
   });
 
@@ -120,7 +70,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
     base_datos:  choferes.length + proveedores.length,
   };
 
-  const tabHref = (id: string) => `/ventas/clientes?tab=${id}`;
+  const tabHref = (id: "compradores" | "base_datos") => clientesHref({ ...filtros, tab: id });
 
   return (
     <div className="space-y-6">
@@ -172,16 +122,16 @@ export default async function ClientesPage({ searchParams }: PageProps) {
       {/* ── COMPRADORES ── */}
       {tab === "compradores" && (
         <>
-          {cobros.length > 0 && (
+          {cobros > 0 && (
             <div className="flex items-center gap-2 rounded-[var(--katia-radius-md)] border border-[var(--katia-danger)]/30 bg-[var(--katia-danger)]/5 px-3 py-2 text-xs font-semibold text-[var(--katia-danger)]">
-              ⚠ {cobros.length} cobro(s) vencido(s) — revisa el estado de cada cliente.
+              ⚠ {cobros} cobro(s) vencido(s) — revisa el estado de cada cliente.
             </div>
           )}
           <Card>
             <CardTitle>Buscar y filtrar</CardTitle>
             <form className="mt-3 grid items-end gap-3 sm:grid-cols-2 md:grid-cols-4" method="get">
               <input type="hidden" name="tab" value="compradores" />
-              <Field name="q" label="Búsqueda" defaultValue={q} placeholder="Nombre, DNI, teléfono…" />
+              <Field name="q" label="Búsqueda" defaultValue={q} placeholder="Nombre, DNI, RUC, teléfono…" />
               <SelectField name="tipo" label="Tipo" defaultValue={tipo}>
                 <option value="">Todos los tipos</option>
                 <option value="empresa">Empresa</option>
@@ -189,10 +139,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
               </SelectField>
               <SelectField name="estado" label="Estado" defaultValue={estado}>
                 <option value="">Todos los estados</option>
-                <option value="activo">Activo</option>
-                <option value="inactivo">Inactivo</option>
-                <option value="moroso">Con deuda</option>
-                <option value="vip">VIP</option>
+                {Object.entries(CLIENTE_ESTADOS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </SelectField>
               <Button type="submit">Filtrar</Button>
             </form>
@@ -210,7 +157,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                 <p className="text-xs text-[var(--katia-text-tertiary)]">Clic en una fila para ver el detalle</p>
               </div>
               <div className="mt-4">
-                <ClientesMasterDetail clientes={clientesDetalle} />
+                <ClientesMasterDetail clientes={clientesDetalle} volver={clientesHref(filtros)} />
               </div>
             </Card>
           )}
@@ -243,7 +190,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                 </p>
               </div>
             ) : (
-              <div className="mt-4 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
+              <div className="mt-4 overflow-x-auto rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]" role="region" tabIndex={0} aria-label="Choferes registrados">
                 <Table>
                   <THead><tr><TH>Nombre</TH><TH>Teléfono</TH><TH>Placa</TH><TH>Tipo vehículo</TH><TH>Estado</TH><TH className="w-20">Acción</TH></tr></THead>
                   <tbody>
@@ -277,7 +224,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                 </p>
               </div>
             ) : (
-              <div className="mt-4 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
+              <div className="mt-4 overflow-x-auto rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]" role="region" tabIndex={0} aria-label="Proveedores registrados">
                 <Table>
                   <THead><tr><TH>Nombre / Razón social</TH><TH>Documento / RUC</TH><TH>Teléfono</TH><TH>Tipo</TH><TH>Registrado</TH><TH className="w-20">Acción</TH></tr></THead>
                   <tbody>

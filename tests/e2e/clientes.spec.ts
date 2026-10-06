@@ -22,18 +22,6 @@ test.describe("clientes — hub ventas (demo DB)", () => {
     await dialog.getByLabel("DNI / Documento").fill(doc);
     await dialog.getByLabel("Teléfono").fill("987654321");
     await dialog.getByLabel("Dirección").fill("Jr. Prueba E2E 123");
-    // Zod 4: optional string no acepta null; sin campo `ruc` FormData devuelve null y falla el parse en el server action.
-    await dialog.evaluate((root) => {
-      const form = root?.querySelector("form");
-      if (!(form instanceof HTMLFormElement)) return;
-      if (!form.querySelector('input[name="ruc"]')) {
-        const h = document.createElement("input");
-        h.type = "hidden";
-        h.name = "ruc";
-        h.value = "";
-        form.appendChild(h);
-      }
-    });
     await dialog.getByRole("button", { name: "Guardar cliente" }).click();
     await expect(dialog).toBeHidden();
 

@@ -171,11 +171,11 @@ const sueldoSchema = z.object({
 });
 
 const clienteSchema = z.object({
-  nombre: z.string().min(3),
-  documento: z.string().optional(),
-  telefono: z.string().optional(),
-  ruc: z.string().optional(),
-  direccion: z.string().optional(),
+  nombre: z.string().trim().min(3),
+  documento: z.string().trim().optional(),
+  telefono: z.string().trim().optional(),
+  ruc: z.string().trim().optional(),
+  direccion: z.string().trim().optional(),
   tipoPersona: z.enum(["natural", "empresa", ""]).optional(),
 });
 
@@ -1095,14 +1095,16 @@ export async function createCliente(formData: FormData) {
   await requireMutationAccess(writerRoles);
   const parsed = clienteSchema.safeParse({
     nombre: formData.get("nombre"),
-    documento: formData.get("documento"),
-    telefono: formData.get("telefono"),
-    ruc: formData.get("ruc"),
-    direccion: formData.get("direccion"),
-    tipoPersona: formData.get("tipo_persona"),
+    documento: formData.get("documento") ?? "",
+    telefono: formData.get("telefono") ?? "",
+    ruc: formData.get("ruc") ?? "",
+    direccion: formData.get("direccion") ?? "",
+    tipoPersona: formData.get("tipo_persona") ?? "",
   });
   if (!parsed.success) {
-    throw new Error("Datos de cliente inválidos.");
+    throw new Error(parsed.error.issues.some(issue => issue.path[0] === "nombre")
+      ? "El nombre debe tener al menos 3 caracteres, sin contar espacios."
+      : "Datos de cliente inválidos.");
   }
   const tipoPersona =
     parsed.data.tipoPersona === "natural" || parsed.data.tipoPersona === "empresa"
@@ -1112,13 +1114,15 @@ export async function createCliente(formData: FormData) {
     const newId = demoCreateCliente({
       organization_id: DEFAULT_ORG_ID,
       nombre: parsed.data.nombre,
-      documento: parsed.data.documento || null,
+      documento: parsed.data.documento || parsed.data.ruc || null,
       telefono: parsed.data.telefono || null,
       ruc: parsed.data.ruc || null,
       direccion: parsed.data.direccion || null,
       tipo_persona: tipoPersona,
+      estado: "activo",
     });
     revalidatePath("/ventas");
+    revalidatePath("/ventas/clientes");
     revalidatePath("/alquiler");
     const skipRedirect = formData.get("skip_redirect") === "true";
     if (skipRedirect) return { id: newId, nombre: parsed.data.nombre };
@@ -1143,6 +1147,7 @@ export async function createCliente(formData: FormData) {
       throw new Error(error.message);
     }
     revalidatePath("/ventas");
+    revalidatePath("/ventas/clientes");
     revalidatePath("/alquiler");
     const skipRedirect = formData.get("skip_redirect") === "true";
     if (skipRedirect) return { id: newCliente.id, nombre: parsed.data.nombre };
@@ -5093,18 +5098,19 @@ export async function updateClienteEstado(formData: FormData) {
   await requireMutationAccess(ventasRoles);
   const id = String(formData.get("id") ?? "");
   const estado = String(formData.get("estado") ?? "");
-  if (!id || !["activo", "inactivo", "moroso"].includes(estado)) {
+  if (!id || !["activo", "inactivo", "moroso", "vip"].includes(estado)) {
     throw new Error("Datos inválidos.");
   }
   if (!hasSupabaseEnv()) {
-    demoUpdateClienteEstado(id, estado as "activo" | "inactivo" | "moroso");
+    demoUpdateClienteEstado(id, estado as "activo" | "inactivo" | "moroso" | "vip");
   } else {
     const supabase = getSupabaseServerClient();
     const { error } = await supabase
       .from("clientes")
       .update({ estado })
       .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID);
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .is("deleted_at", null);
     if (error) {
       throw new Error(error.message);
     }

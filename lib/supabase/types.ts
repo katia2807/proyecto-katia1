@@ -50,6 +50,7 @@ export type Database = {
       clientes: {
         Row: {
           id: string;
+          deleted_at?: string | null;
           organization_id: string;
           nombre: string;
           documento: string | null;
@@ -57,11 +58,12 @@ export type Database = {
           ruc: string | null;
           direccion: string | null;
           tipo_persona: "natural" | "empresa" | null;
-            estado?: "activo" | "inactivo" | "moroso" | null;
+          estado?: "activo" | "inactivo" | "moroso" | "vip" | null;
           created_at: string;
         };
         Insert: {
           id?: string;
+          deleted_at?: string | null;
           organization_id: string;
           nombre: string;
           documento?: string | null;
@@ -69,17 +71,18 @@ export type Database = {
           ruc?: string | null;
           direccion?: string | null;
           tipo_persona?: "natural" | "empresa" | null;
-            estado?: "activo" | "inactivo" | "moroso" | null;
+          estado?: "activo" | "inactivo" | "moroso" | "vip" | null;
           created_at?: string;
         };
         Update: {
+          deleted_at?: string | null;
           nombre?: string;
           documento?: string | null;
           telefono?: string | null;
           ruc?: string | null;
           direccion?: string | null;
           tipo_persona?: "natural" | "empresa" | null;
-            estado?: "activo" | "inactivo" | "moroso" | null;
+          estado?: "activo" | "inactivo" | "moroso" | "vip" | null;
         };
       };
       choferes: {

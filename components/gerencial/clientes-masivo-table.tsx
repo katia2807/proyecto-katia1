@@ -6,6 +6,7 @@ import { IconSearch, IconExternalLink, IconTrash, IconUser } from "@tabler/icons
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { formatPen } from "@/lib/utils";
 import { deleteCliente } from "@/app/actions";
+import { CLIENTE_ESTADOS, etiquetaEstadoCliente } from "@/lib/clientes-model";
 
 type ClienteRow = {
   id: string;
@@ -15,6 +16,7 @@ type ClienteRow = {
   estado: string | null;
   tipo_persona: string | null;
   totalFacturado: number;
+  importesPorDefinir?: number;
   totalOperaciones: number;
   cobrosVencidos: number;
 };
@@ -27,6 +29,8 @@ type Props = {
 const ESTADO_COLORS: Record<string, string> = {
   activo: "bg-[var(--katia-success)]/15 text-[var(--katia-success)]",
   inactivo: "bg-[var(--katia-text-tertiary)]/15 text-[var(--katia-text-tertiary)]",
+  moroso: "bg-[var(--katia-danger)]/15 text-[var(--katia-danger)]",
+  vip: "bg-[var(--katia-primary)]/15 text-[var(--katia-primary)]",
   bloqueado: "bg-[var(--katia-danger)]/15 text-[var(--katia-danger)]",
   potencial: "bg-[var(--katia-warning)]/15 text-[var(--katia-warning)]",
 };
@@ -90,10 +94,7 @@ export function ClientesMasivoTable({ clientes, isOwner }: Props) {
           className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-bg-overlay)] px-3 py-2 text-sm text-[var(--katia-text-primary)] outline-none focus:border-[var(--katia-primary)]"
         >
           <option value="todos">Todos los estados</option>
-          <option value="activo">Activo</option>
-          <option value="inactivo">Inactivo</option>
-          <option value="potencial">Potencial</option>
-          <option value="bloqueado">Bloqueado</option>
+          {Object.entries(CLIENTE_ESTADOS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <p className="text-xs text-[var(--katia-text-tertiary)]">
           {filtered.length} de {clientes.length} cliente(s)
@@ -114,7 +115,7 @@ export function ClientesMasivoTable({ clientes, isOwner }: Props) {
             Agregar primer cliente →
           </Link>        </div>
       ) : (
-        <div className="overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
+        <div className="overflow-x-auto rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]" role="region" tabIndex={0} aria-label="Gestión de clientes">
           <Table>
             <THead>
               <TRow>
@@ -122,7 +123,7 @@ export function ClientesMasivoTable({ clientes, isOwner }: Props) {
                 <TH>Documento</TH>
                 <TH>Teléfono</TH>
                 <TH>Estado</TH>
-                <TH className="text-right">Facturado</TH>
+                <TH className="text-right">Total registrado</TH>
                 <TH className="text-right">Ops.</TH>
                 <TH className="text-right">Deuda</TH>
                 <TH className="text-right">Acciones</TH>
@@ -147,11 +148,14 @@ export function ClientesMasivoTable({ clientes, isOwner }: Props) {
                         ESTADO_COLORS[c.estado ?? ""] ?? "bg-[var(--katia-text-tertiary)]/10 text-[var(--katia-text-tertiary)]"
                       }`}
                     >
-                      {c.estado ?? "sin estado"}
+                      {etiquetaEstadoCliente(c.estado)}
                     </span>
                   </TD>
                   <TD className="text-right font-mono text-sm font-semibold">
-                    {c.totalFacturado > 0 ? formatPen(c.totalFacturado) : "—"}
+                    {formatPen(c.totalFacturado)}
+                    {(c.importesPorDefinir ?? 0) > 0 ? (
+                      <span className="mt-1 block text-xs font-normal text-[var(--katia-text-tertiary)]">{c.importesPorDefinir} importe(s) por definir</span>
+                    ) : null}
                   </TD>
                   <TD className="text-right text-sm">{c.totalOperaciones > 0 ? c.totalOperaciones : "—"}</TD>
                   <TD className="text-right text-sm">

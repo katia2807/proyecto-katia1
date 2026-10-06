@@ -48,6 +48,7 @@ type CajaRow = {
 
 type ClienteRow = {
   id: string;
+  deleted_at?: string | null;
   organization_id: string;
   nombre: string;
   documento: string | null;
@@ -55,7 +56,7 @@ type ClienteRow = {
   ruc: string | null;
   direccion: string | null;
   tipo_persona: "natural" | "empresa" | null;
-  estado?: "activo" | "inactivo" | "moroso" | null;
+  estado?: "activo" | "inactivo" | "moroso" | "vip" | null;
   created_at: string;
 };
 
@@ -1582,6 +1583,8 @@ function normalizeCliente(raw: unknown): ClienteRow {
     direccion: r.direccion != null ? String(r.direccion) : null,
     tipo_persona:
       r.tipo_persona === "natural" || r.tipo_persona === "empresa" ? r.tipo_persona : null,
+    estado: r.estado === "activo" || r.estado === "inactivo" || r.estado === "moroso" || r.estado === "vip" ? r.estado : null,
+    deleted_at: typeof r.deleted_at === "string" ? r.deleted_at : null,
   };
 }
 
@@ -1978,7 +1981,7 @@ export function demoInicioData() {
   };
 }
 export function demoClientesRows() {
-  return [...store.clientes].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  return store.clientes.filter(row => !row.deleted_at).sort((a, b) => a.nombre.localeCompare(b.nombre));
 }
 export function demoAlertasCriticasRows() {
   return [...store.alertas]
@@ -2211,6 +2214,7 @@ export function demoCreateCliente(input: Omit<ClienteRow, "id" | "created_at">):
     id,
     created_at: nowIso(),
     ...input,
+    estado: input.estado === undefined ? "activo" : input.estado,
     ruc: input.ruc ?? null,
     direccion: input.direccion ?? null,
     tipo_persona: input.tipo_persona ?? null,
@@ -3208,8 +3212,8 @@ function mapMetodoPagoToMedio(metodo: MetodoPago): CajaRow["medio"] {
   }
 }
 
-export function demoUpdateClienteEstado(id: string, estado: "activo" | "inactivo" | "moroso") {
-  const idx = store.clientes.findIndex((c) => c.id === id);
+export function demoUpdateClienteEstado(id: string, estado: "activo" | "inactivo" | "moroso" | "vip") {
+  const idx = store.clientes.findIndex((c) => c.id === id && !c.deleted_at);
   if (idx !== -1) {
     store.clientes[idx].estado = estado;
     persistStore();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   submitCreateClienteForm,
@@ -12,7 +12,6 @@ import { ClienteFormFields } from "@/components/sales/cliente-form-fields";
 import { ProveedorFormFields } from "@/components/ventas/registrar-proveedor-inline";
 import { ChoferFormFields } from "@/components/ventas/registrar-chofer-inline";
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 
@@ -24,7 +23,23 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
   const router = useRouter();
   const [openCliente, setOpenCliente] = useState(quick === "cliente");
   const [clienteFormKey, setClienteFormKey] = useState(0);
-  const [clienteState, clienteFormAction] = useActionState(submitCreateClienteForm, mutationFormInitialState);
+  const [clienteState, setClienteState] = useState(mutationFormInitialState);
+  const [clienteLoading, setClienteLoading] = useState(false);
+
+  async function handleClienteSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (clienteLoading) return;
+    const formData = new FormData(event.currentTarget);
+    setClienteLoading(true);
+    setClienteState(mutationFormInitialState);
+    try {
+      setClienteState(await submitCreateClienteForm(mutationFormInitialState, formData));
+    } catch (e) {
+      setClienteState({ success: false, message: null, error: e instanceof Error ? e.message : "No se pudo registrar el cliente." });
+    } finally {
+      setClienteLoading(false);
+    }
+  }
 
   const [openProveedor, setOpenProveedor] = useState(quick === "proveedor");
   const [proveedorFormKey, setProveedorFormKey] = useState(0);
@@ -37,18 +52,14 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
   const { showToast } = useToast();
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (quick === "cliente") setOpenCliente(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (quick === "proveedor") setOpenProveedor(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (quick === "chofer") setOpenChofer(true);
   }, [quick]);
 
   useEffect(() => {
     if (clienteState.success && clienteState.message) {
       showToast({ variant: "success", message: clienteState.message });
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenCliente(false);
       setClienteFormKey((k) => k + 1);
       router.refresh();
@@ -61,7 +72,6 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
   useEffect(() => {
     if (proveedorState.success && proveedorState.message) {
       showToast({ variant: "success", message: proveedorState.message });
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenProveedor(false);
       setProveedorFormKey((k) => k + 1);
       router.refresh();
@@ -74,7 +84,6 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
   useEffect(() => {
     if (choferState.success && choferState.message) {
       showToast({ variant: "success", message: choferState.message });
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpenChofer(false);
       setChoferFormKey((k) => k + 1);
       router.refresh();
@@ -99,11 +108,11 @@ export function VentasHubContextPanels({ quick }: VentasHubContextPanelsProps) {
         }}
         replacePathOnClose="/ventas"
       >
-        <form key={clienteFormKey} action={clienteFormAction} className="space-y-3">
+        <form key={clienteFormKey} onSubmit={handleClienteSubmit} className="space-y-3">
           <ClienteFormFields />
-          <input type="hidden" name="return_to" value="/ventas" />
+          {clienteState.error ? <p role="alert" className="text-sm text-[var(--katia-danger)]">{clienteState.error}</p> : null}
           <div>
-            <Button>Guardar cliente</Button>
+            <Button disabled={clienteLoading}>{clienteLoading ? "Guardando…" : "Guardar cliente"}</Button>
           </div>
         </form>
       </ContextActionPanel>

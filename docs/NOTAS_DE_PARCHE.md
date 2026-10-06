@@ -1,5 +1,13 @@
 # Notas de parche
 
+## 1.1.53 — 06/10/2026
+
+Clientes registra personas y empresas sin perder datos al fallar. Su historial incluye cotizaciones y ventas de madera, permite buscar por RUC y conserva filtros, con tablas legibles en celular y estados coherentes.
+
+## 1.1.52 — 06/10/2026
+
+Se documentó la revisión de Clientes y se ordenaron los errores de registro, historial, búsqueda y diseño en celular. Esto permite corregirlos por prioridad, conservando la forma habitual de trabajar.
+
 ## 1.1.51 — 06/10/2026
 
 Cotizaciones evita clientes duplicados, muestra estados e importes coherentes y mejora la lectura en celular. También usa la fecha de Perú y avisa si el historial falla o no incluye todos los registros.

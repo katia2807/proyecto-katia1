@@ -36,6 +36,7 @@ import type { Database } from "@/lib/supabase/types";
 import { getInventarioHistorialAviso } from "@/lib/inventario-historial";
 import { getInventarioAlertasMovimiento, getInventarioDiasSinMovimiento } from "@/lib/inventario-alertas";
 import { fechaHoyPeru } from "@/lib/utils";
+import { readClientesTable } from "@/lib/clientes-data";
 
 type CajaRow = Database["public"]["Tables"]["movimientos_caja"]["Row"];
 type VentaRow = Database["public"]["Tables"]["ventas_madera"]["Row"];
@@ -338,15 +339,10 @@ export async function getVentasMaderaCortadaRows() {
 
 export async function getClientesRows() {
   if (!hasSupabaseEnv()) {
-    return demoClientesRows();
+    return demoClientesRows().filter(row => row.organization_id === DEFAULT_ORG_ID);
   }
-  const supabase = getSupabaseServerClient();
-  const { data } = await supabase
-    .from("clientes")
-    .select("*")
-    .eq("organization_id", DEFAULT_ORG_ID)
-    .order("nombre");
-  return data ?? fallback.clientes;
+  const rows = await readClientesTable("clientes", true);
+  return rows.sort((a, b) => a.nombre.localeCompare(b.nombre));
 }
 
 export async function getProveedoresRows() {

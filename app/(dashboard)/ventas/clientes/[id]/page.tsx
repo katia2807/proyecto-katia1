@@ -6,62 +6,35 @@ import { MetricCard } from "@/components/metric-card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
-  getAlquilerRows,
   getClientesRows,
-  getCobrosVencidos,
-  getCotizacionesRows,
   getMueblesCatalogoRows,
-  getServiciosAserraderoRows,
-  getVentasMuebleTerminadoRows,
-  getVentasRows,
 } from "@/lib/data";
 import { formatDate, formatPen } from "@/lib/utils";
+import { getClienteHistorial, resumenClientes, cobrosClientes } from "@/lib/clientes-data";
+import { documentoCliente, etiquetaEstadoCliente, etiquetaTipoCliente, importeCliente, safeClientesReturn } from "@/lib/clientes-model";
+import { etiquetaEstadoCotizacion } from "@/lib/cotizacion-estados";
 
 type Params = Promise<{ id: string }>;
 
-export default async function ClienteDetallePage({ params }: { params: Params }) {
+export default async function ClienteDetallePage({ params, searchParams }: { params: Params; searchParams?: Promise<{ volver?: string | string[] }> }) {
   const { id } = await params;
-  const [
-    clientes,
-    cotizaciones,
-    ventasMuebles,
-    ventasMadera,
-    alquilerBundle,
-    servicios,
-    catalogo,
-    cobrosVencidos,
-  ] = await Promise.all([
+  const volver = safeClientesReturn((await searchParams)?.volver);
+  const [clientes, historial, catalogo] = await Promise.all([
     getClientesRows(),
-    getCotizacionesRows(),
-    getVentasMuebleTerminadoRows(),
-    getVentasRows(),
-    getAlquilerRows(),
-    getServiciosAserraderoRows(),
+    getClienteHistorial(id),
     getMueblesCatalogoRows(),
-    getCobrosVencidos(),
   ]);
 
   const cliente = clientes.find((c) => c.id === id);
   if (!cliente) notFound();
 
-  const contratos = alquilerBundle.rows;
-
-  const cotizCliente = cotizaciones.filter((c) => c.cliente_id === id);
-  const vMuebles = ventasMuebles.filter((v) => v.cliente_id === id);
-  const vMadera = ventasMadera.filter((v) => v.cliente_id === id);
-  const cContratos = contratos.filter((c) => c.cliente_id === id);
-  const sServicios = servicios.filter((s) => s.cliente_id === id);
+  const { cotizaciones: cotizCliente, ventasMuebles: vMuebles, ventasMadera: vMadera, contratos: cContratos, servicios: sServicios } = historial;
   const muebleById = new Map(catalogo.map((m) => [m.id, m]));
-  const cobrosCliente = cobrosVencidos.filter((c) => c.cliente_id === id);
-
-  const totalFacturado =
-    vMuebles.reduce((a, v) => a + Number(v.total), 0) +
-    vMadera.reduce((a, v) => a + Number(v.total), 0) +
-    cContratos.reduce((a, c) => a + Number(c.monto_total ?? c.tarifa), 0) +
-    sServicios.reduce((a, s) => a + Number(s.precio_cobrado), 0);
-
-  const totalOperaciones =
-    cotizCliente.length + vMuebles.length + vMadera.length + cContratos.length + sServicios.length;
+  const cobrosCliente = cobrosClientes(historial);
+  const resumen = resumenClientes(historial).get(id);
+  const totalFacturado = resumen?.total ?? 0;
+  const totalOperaciones = resumen?.operaciones ?? 0;
+  const importeTexto = (monto: unknown) => { const valor = importeCliente(monto); return valor === null ? "Por definir" : formatPen(valor); };
 
   return (
     <div className="space-y-6">
@@ -70,22 +43,22 @@ export default async function ClienteDetallePage({ params }: { params: Params })
           <h2 className="text-xl font-bold flex items-center gap-2">
             {cliente.nombre}
             {cliente.estado ? (
-              <Badge variant={cliente.estado === "activo" ? "success" : cliente.estado === "moroso" ? "danger" : "warning"}>{cliente.estado}</Badge>
+              <Badge variant={cliente.estado === "activo" ? "success" : cliente.estado === "moroso" ? "danger" : "warning"}>{etiquetaEstadoCliente(cliente.estado)}</Badge>
             ) : null}
           </h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            {cliente.tipo_persona === "empresa" ? "Empresa" : "Persona natural"} ·{" "}
-            {cliente.documento ?? "Sin documento"} · {cliente.telefono ?? "Sin teléfono"}
+            {etiquetaTipoCliente(cliente.tipo_persona)} ·{" "}
+            {documentoCliente(cliente)} · {cliente.telefono?.trim() || "Sin teléfono"}
           </p>
           {cliente.direccion ? (
             <p className="text-xs text-[var(--color-text-secondary)]">{cliente.direccion}</p>
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/ventas/clientes" className="text-sm font-semibold underline">
+          <Link href={volver} className="text-sm font-semibold underline">
             ← Listado
           </Link>
-          <Link href={`/gerencial?cliente=${cliente.id}`}>
+          <Link href={`/gerencial?tab=clientes360&cliente=${cliente.id}`}>
             <Button variant="secondary">Gestionar en Panel Gerencial</Button>
           </Link>
         </div>
@@ -101,12 +74,16 @@ export default async function ClienteDetallePage({ params }: { params: Params })
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Tipo</p>
-            <p className="mt-1 text-sm text-[var(--color-text-primary)]">{cliente.tipo_persona ?? "No definido"}</p>
+            <p className="mt-1 text-sm text-[var(--color-text-primary)]">{etiquetaTipoCliente(cliente.tipo_persona)}</p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Documento</p>
-            <p className="mt-1 text-sm text-[var(--color-text-primary)]">{cliente.documento ?? "Sin documento"}</p>
+            <p className="mt-1 text-sm text-[var(--color-text-primary)]">{documentoCliente(cliente)}</p>
           </div>
+          {cliente.documento?.trim() && cliente.ruc?.trim() && cliente.ruc.trim() !== cliente.documento.trim() ? <div>
+            <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">RUC</p>
+            <p className="mt-1 text-sm">{cliente.ruc}</p>
+          </div> : null}
           <div>
             <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Teléfono</p>
             <p className="mt-1 text-sm text-[var(--color-text-primary)]">{cliente.telefono ?? "Sin teléfono"}</p>
@@ -117,16 +94,16 @@ export default async function ClienteDetallePage({ params }: { params: Params })
           </div>
           <div className="sm:col-span-2">
             <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Estado</p>
-            <p className="mt-1 text-sm text-[var(--color-text-primary)]">{cliente.estado ?? "desconocido"}</p>
+            <p className="mt-1 text-sm text-[var(--color-text-primary)]">{etiquetaEstadoCliente(cliente.estado)}</p>
           </div>
         </div>
       </Card>
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Total facturado"
+          label="Total registrado"
           value={formatPen(totalFacturado)}
-          hint="Suma de todas las operaciones cerradas"
+          hint={resumen?.importesPorDefinir ? `${resumen.importesPorDefinir} importe(s) por definir, no incluidos en el total` : "Ventas confirmadas, alquileres cerrados, servicios y cotizaciones cobradas"}
         />
         <MetricCard
           label="Operaciones"
@@ -136,21 +113,21 @@ export default async function ClienteDetallePage({ params }: { params: Params })
         <MetricCard
           label="Cotizaciones"
           value={String(cotizCliente.length)}
-          hint="Personalizadas y de corte"
+          hint="Actuales y anteriores"
         />
         <MetricCard
           label="Cobros vencidos"
           value={String(cobrosCliente.length)}
           hint={
             cobrosCliente.length > 0
-              ? `Total ${formatPen(cobrosCliente.reduce((a, c) => a + c.monto, 0))}`
-              : "Sin pendientes"
+              ? `${cobrosCliente.some(c => c.monto === null) ? "Importe conocido" : "Total"} ${formatPen(cobrosCliente.reduce((a, c) => a + (c.monto ?? 0), 0))}`
+              : "Sin cobros vencidos"
           }
         />
       </section>
 
       {cobrosCliente.length > 0 ? (
-        <Card className="border-[var(--color-danger)] bg-red-50">
+        <Card className="border-[var(--color-danger)] bg-[var(--color-surface)]">
           <CardTitle className="text-[var(--color-danger)]">⚠ Cobros pendientes</CardTitle>
           <CardDescription>Contacta al cliente cuanto antes.</CardDescription>
           <ul className="mt-2 space-y-1 text-sm">
@@ -159,7 +136,7 @@ export default async function ClienteDetallePage({ params }: { params: Params })
                 <span>
                   {c.referencia} · vence {formatDate(c.fecha_vencimiento)}
                 </span>
-                <span className="font-semibold">{formatPen(c.monto)}</span>
+                <span className="font-semibold">{importeTexto(c.monto)}</span>
               </li>
             ))}
           </ul>
@@ -169,7 +146,7 @@ export default async function ClienteDetallePage({ params }: { params: Params })
       <Card>
         <CardTitle>Cotizaciones</CardTitle>
         <CardDescription>{cotizCliente.length} cotizaciones registradas.</CardDescription>
-        <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
+        <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--color-border)]" tabIndex={0} role="region" aria-label="Cotizaciones del cliente">
           <Table>
             <THead>
               <TRow>
@@ -184,17 +161,17 @@ export default async function ClienteDetallePage({ params }: { params: Params })
             <tbody>
               {cotizCliente.map((c) => (
                 <TRow key={c.id}>
-                  <TD className="font-mono text-xs">{c.correlativo ?? "—"}</TD>
+                  <TD className="font-mono text-xs"><Link className="underline" href={c.href}>{c.correlativo ?? c.id.slice(0, 8)}</Link></TD>
                   <TD>{formatDate(c.fecha)}</TD>
                   <TD className="capitalize">{c.tipo.replace(/_/g, " ")}</TD>
                   <TD>{c.especie_madera}</TD>
                   <TD>
                     <Badge variant={c.estado === "confirmada" ? "success" : "neutral"}>
-                      {c.estado}
+                      {c.actual ? etiquetaEstadoCotizacion(c.estado) : c.estado === "confirmada" ? "Confirmada" : "Borrador"}
                     </Badge>
                   </TD>
                   <TD className="text-right font-semibold">
-                    {formatPen(Number(c.precio_acordado))}
+                    {importeTexto(c.monto)}
                   </TD>
                 </TRow>
               ))}
@@ -211,9 +188,23 @@ export default async function ClienteDetallePage({ params }: { params: Params })
       </Card>
 
       <Card>
+        <CardTitle>Ventas de madera</CardTitle>
+        <CardDescription>{vMadera.length} operaciones.</CardDescription>
+        <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--color-border)]" tabIndex={0} role="region" aria-label="Ventas de madera del cliente">
+          <Table><THead><TRow><TH>N°</TH><TH>Fecha</TH><TH>Tipo</TH><TH>Estado</TH><TH className="text-right">Total</TH></TRow></THead>
+            <tbody>{vMadera.map(v => <TRow key={`${v.comprobanteTipo}-${v.id}`}>
+              <TD><Link className="underline" href={`/ventas/detalle/${v.comprobanteTipo}/${v.id}`}>{v.correlativo ?? v.id.slice(0, 8)}</Link></TD>
+              <TD>{formatDate(v.fecha)}</TD><TD>{v.comprobanteTipo === "madera" ? "Madera cortada" : "Madera"}</TD>
+              <TD>{v.estado === "confirmada" ? "Confirmada" : "Borrador"}</TD><TD className="text-right">{importeTexto(v.total)}</TD>
+            </TRow>)}{vMadera.length === 0 ? <TRow><TD colSpan={5} className="text-center">Sin ventas de madera.</TD></TRow> : null}</tbody>
+          </Table>
+        </div>
+      </Card>
+
+      <Card>
         <CardTitle>Ventas de muebles terminados</CardTitle>
         <CardDescription>{vMuebles.length} operaciones.</CardDescription>
-        <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
+        <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--color-border)]" tabIndex={0} role="region" aria-label="Ventas de muebles del cliente">
           <Table>
             <THead>
               <TRow>
@@ -251,7 +242,7 @@ export default async function ClienteDetallePage({ params }: { params: Params })
       <Card>
         <CardTitle>Contratos de alquiler Mixer</CardTitle>
         <CardDescription>{cContratos.length} contratos.</CardDescription>
-        <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
+        <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--color-border)]" tabIndex={0} role="region" aria-label="Alquileres del cliente">
           <Table>
             <THead>
               <TRow>
@@ -270,7 +261,7 @@ export default async function ClienteDetallePage({ params }: { params: Params })
                   <TD className="capitalize">{c.estado}</TD>
                   <TD className="text-right">{formatPen(Number(c.tarifa))}</TD>
                   <TD className="text-right font-semibold">
-                    {formatPen(Number(c.monto_total ?? c.tarifa))}
+                    {importeTexto(c.monto_total)}
                   </TD>
                 </TRow>
               ))}
@@ -289,7 +280,7 @@ export default async function ClienteDetallePage({ params }: { params: Params })
       <Card>
         <CardTitle>Servicios de aserradero</CardTitle>
         <CardDescription>{sServicios.length} servicios.</CardDescription>
-        <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
+        <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--color-border)]" tabIndex={0} role="region" aria-label="Servicios del cliente">
           <Table>
             <THead>
               <TRow>

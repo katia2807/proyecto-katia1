@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { createCliente } from "@/app/actions";
+import { submitCreateClienteForm } from "@/app/actions";
+import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { Field, SelectField } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 
@@ -14,10 +15,11 @@ export function NuevoClienteInline() {
     setLoading(true);
     setError(null);
     try {
-      await createCliente(formData);
-      setOpen(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al crear el cliente.");
+      const result = await submitCreateClienteForm(mutationFormInitialState, formData);
+      if (result.success) setOpen(false);
+      else setError(result.error ?? "No se pudo registrar el cliente.");
+    } catch {
+      setError("No se pudo registrar el cliente. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -49,7 +51,10 @@ export function NuevoClienteInline() {
       </div>
 
       <form
-        action={handleSubmit}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!loading) void handleSubmit(new FormData(event.currentTarget));
+        }}
         className="mt-4 grid gap-3 sm:grid-cols-2"
       >
         <Field
@@ -70,7 +75,7 @@ export function NuevoClienteInline() {
         </SelectField>
 
         {error ? (
-          <p className="sm:col-span-2 text-xs text-[var(--katia-danger)]">{error}</p>
+          <p role="alert" className="sm:col-span-2 text-xs text-[var(--katia-danger)]">{error}</p>
         ) : null}
 
         <div className="sm:col-span-2 flex justify-end gap-2">
