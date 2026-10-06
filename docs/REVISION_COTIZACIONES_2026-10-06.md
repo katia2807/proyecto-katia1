@@ -1,8 +1,8 @@
 # Revisión y correcciones de Cotizaciones
 
-Fecha: 06/10/2026. Base del diagnóstico: 1.1.49, commit `5dcdf8a`; registro documental 1.1.50. Correcciones: 1.1.51, compiladas y comprobadas en local, pendientes de publicación y revisión en producción.
+Fecha: 06/10/2026. Base del diagnóstico: 1.1.49, commit `5dcdf8a`; registro documental 1.1.50. Correcciones: 1.1.51, compiladas y comprobadas en local; publicadas con `5c087ed` y verificadas por lectura en producción.
 
-Se revisó el formulario habitual, el alta rápida de cliente, guardado, reapertura, resumen, vista de impresión, estados del historial y diseño en celular. Las seis incidencias del diagnóstico inicial se corrigieron sin cambiar el uso habitual. No se migraron datos, no se fusionaron clientes existentes ni se abrió Cotizaciones en producción.
+Se revisó el formulario habitual, el alta rápida de cliente, guardado, reapertura, resumen, vista de impresión, estados del historial y diseño en celular. Las seis incidencias del diagnóstico inicial se corrigieron sin cambiar el uso habitual. Las operaciones se comprobaron en datos locales aislados; la revisión posterior de producción fue de lectura, sin migraciones ni fusión de clientes existentes.
 
 ## Correcciones locales 1.1.51
 
@@ -24,6 +24,16 @@ Se revisó el formulario habitual, el alta rápida de cliente, guardado, reapert
 - No se detectaron errores ni advertencias de consola en los recorridos inspeccionados; log de errores del servidor temporal vacío.
 - `data/store.json` conservó SHA-256 `19FA05D7758DB65EF8854D7DC143F26A55BBD2F8100EA9105B398CC5B2472CC9`. La copia habitual `temp/inventario-1.1.47-preview/store.json` conservó `AF94DF15EC2DFC6A0CC3BBBD4802404168A1FC9C22B4ACF76C850A42E8FB336E`.
 - Versión local 1.1.51; aviso e historial de notas de parche coincidentes. Evidencias locales en `temp/cotizacion-1.1.51-*` (pruebas, revisión de código, compilación, datos aislados y captura del cobro de prueba). No son dependencias del programa.
+
+## Publicación y comprobación de producción
+
+- Publicación autorizada por el usuario. Commit funcional `5c087ed1672673bebec9518c654e235339f044ac` enviado a `main` en `katia2807/proyecto-katia1`. GitHub/Vercel confirmó estado `success` para el despliegue `GDRr6sFyqAxahfSXBaMdomvjZ3sa` del proyecto habitual.
+- Antes de navegar se comprobaron la página, el layout, sus consultas auxiliares y los efectos del formulario: las cargas realizadas no guardan registros del negocio ni consumen correlativos. No se pulsaron acciones de guardado, aceptación, eliminación o cobro.
+- `/cotizacion` y `/cotizacion?modo=guiado` cargaron con una sesión real. Footer y aviso mostraron 1.1.51; la nota visible coincidió con la del código y el historial. Fecha inicial: 06/10/2026.
+- Se abrió el historial adicional y se consultaron sus opciones de estado. El historial mostró cero cotizaciones antes y después de publicar, sin aviso de consulta fallida en la nueva versión. No se crearon datos para poder revisar un detalle o documento real; esos recorridos quedaron comprobados en la copia local.
+- `editar=enlace-no-valido` mostró el aviso correspondiente y no presentó el formulario de nueva cotización. Se regresó al historial normalmente. Sin errores ni advertencias de consola detectados durante los recorridos inspeccionados.
+- `/api/health` respondió HTTP 200 con `demoMode=false`, `supabaseConfigured=true` y `supabaseServerDataReady=true`. La extensión bloqueó abrir ese JSON como página; se consultó directamente mediante una petición GET al diagnóstico público, sin usar ni extraer credenciales del navegador.
+- Evidencias locales: `temp/cotizacion-1.1.51-produccion.png`, `temp/cotizacion-1.1.51-health-produccion.json` y `temp/cotizacion-1.1.51-produccion-antes.json`. El conteo visible no equivale a una auditoría de cada tabla o campo de la base. Este registro pertenece a la misma entrega 1.1.51; no incorpora otro cambio funcional.
 
 ## Hallazgos del diagnóstico inicial — base 1.1.49
 
@@ -62,4 +72,4 @@ Las tecnologías siguen siendo las registradas en [Estado del proyecto](ESTADO_D
 
 ## Límites de esta revisión
 
-Las seis incidencias identificadas C1–C6 están corregidas dentro del alcance local comprobado; no se afirma que el programa carezca de cualquier otro error. La publicación y verificación de lectura en producción quedan pendientes de la siguiente instrucción del usuario. No se comprobaron escrituras reales, triggers de PostgreSQL, todos los roles en navegador, alquileres completos, restauración de borradores ni eliminación. Se comprobó la vista de impresión, sin generar un archivo PDF ni usar una impresora física. Las pruebas de Supabase usan respuestas ficticias; no sustituyen una comprobación de sus permisos y triggers reales. Inicio, Ventas, Caja e Inventario conservan su estado anterior dentro del alcance ya comprobado.
+Las seis incidencias identificadas C1–C6 están corregidas y publicadas dentro del alcance comprobado; no se afirma que el programa carezca de cualquier otro error. La lectura del apartado en producción quedó verificada; no se comprobaron escrituras reales, triggers de PostgreSQL, todos los roles en navegador, alquileres completos, restauración de borradores ni eliminación. Se comprobó la vista de impresión local, sin generar un archivo PDF ni usar una impresora física. Las pruebas de operaciones con Supabase usan respuestas ficticias; no sustituyen una comprobación de sus permisos y triggers reales. Inicio, Ventas, Caja e Inventario conservan su estado anterior dentro del alcance ya comprobado.
