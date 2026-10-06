@@ -1,5 +1,15 @@
 # Instrucciones del proyecto
 
+## Continuidad y alcance de las revisiones
+
+- El punto de entrada es `docs/ESTADO_DEL_PROYECTO.md`: resume lo revisado, lo pendiente, las tecnologías y los archivos principales. Consultar primero el apartado afectado; no releer todo el historial para cada cambio.
+- Trabajar por apartados y conservar la forma de trabajo acordada con el usuario. Priorizar errores y problemas de diseño; no añadir funciones ni rediseñar lo que funciona sin una petición que lo justifique.
+- Actualizar el estado solo del apartado trabajado, con fecha, versión, cambios concretos y comprobaciones realmente realizadas. Distinguir revisión local, publicación y verificación en producción; los demás apartados siguen sin evaluación completa.
+- Una revisión cerrada describe su alcance comprobado, no garantiza que no existan otros errores. Registrar también las incidencias nuevas que afecten a funciones compartidas, aunque se descubran desde otro apartado.
+- Antes de revisar producción, comprobar que la ruta y sus funciones auxiliares sean de lectura: una carga de página también puede ejecutar escrituras. Usar datos locales aislados para operaciones que puedan modificar registros; no cambiar datos del negocio para verificar una pantalla.
+- La documentación es una referencia para continuar, no una dependencia del programa ni una obligación de repetir pruebas completas sin motivo. Elegir verificaciones proporcionales al cambio y a los riesgos encontrados.
+- Limpiar solo documentos sustituidos o archivos temporales claramente prescindibles. Conservar evidencias útiles, respaldos y documentación importante o de apartados aún no revisados. Verificar referencias y rutas antes de borrar; no eliminar dependencias ni archivos usados por el servidor local.
+
 ## Notas de parche obligatorias
 
 - Cada actualización entregable debe incluir una nota de parche, aunque el cambio sea mínimo, visual, de documentación o una corrección.

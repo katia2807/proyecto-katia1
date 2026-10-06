@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.39 — 05/10/2026
+
+Se registra el estado de Inicio, Ventas y Caja y los pendientes de Inventario, con pautas para continuar por partes. Se retira documentación desactualizada para evitar repetir errores y cambios innecesarios.
+
 ## 1.1.38 — 05/10/2026
 
 Inicio incluye las ventas de madera cortada y evita recortes en celular. Ventas conserva la búsqueda al volver del comprobante y Clientes abre su listado, para consultar los datos sin perder el contexto.

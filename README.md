@@ -3,6 +3,10 @@
 Sistema de gestión privado para ventas, inventario, caja, cotizaciones y reportes.
 Diseñado para negocios de madera, muebles y servicios relacionados.
 
+## Estado actual y continuidad
+
+Para retomar el trabajo por apartados, consultar [Estado del proyecto](docs/ESTADO_DEL_PROYECTO.md) y las [instrucciones de mantenimiento](AGENTS.md). La [revisión de Inventario](docs/REVISION_INVENTARIO_2026-10-05.md) contiene sus correcciones pendientes. Los informes fechados anteriores se conservan como evidencia histórica; no sustituyen el estado actual ni obligan a repetir toda la revisión.
+
 ## Stack
 
 - **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS v4
