@@ -18,6 +18,7 @@ export type EstadoEntrega = "pendiente" | "en_proceso" | "entregado";
 
 type CajaRow = {
   id: string;
+  deleted_at?: string | null;
   organization_id: string;
   fecha: string;
   tipo: "ingreso" | "egreso" | "transferencia";
@@ -259,6 +260,7 @@ type VentaMuebleTerminadoRow = {
 
 type OrdenProduccionRow = {
   id: string;
+  deleted_at?: string | null;
   organization_id: string;
   cliente_id: string;
   cotizacion_id: string | null;
@@ -1432,6 +1434,7 @@ function normalizeCaja(raw: unknown): CajaRow {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   return {
     id: String(r.id ?? randomUUID()),
+    deleted_at: typeof r.deleted_at === "string" ? r.deleted_at : null,
     organization_id: String(r.organization_id ?? orgId),
     fecha: String(r.fecha ?? new Date().toISOString().slice(0, 10)),
     tipo: (r.tipo === "ingreso" || r.tipo === "egreso" || r.tipo === "transferencia"
@@ -1638,6 +1641,7 @@ function normalizeOrdenProduccion(raw: unknown): OrdenProduccionRow {
   const est = r.estado;
   return {
     id: String(r.id),
+    deleted_at: typeof r.deleted_at === "string" ? r.deleted_at : null,
     organization_id: String(r.organization_id),
     cliente_id: String(r.cliente_id),
     cotizacion_id: r.cotizacion_id != null ? String(r.cotizacion_id) : null,
@@ -1917,6 +1921,11 @@ export function demoCajaRows() {
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
 }
 
+/** Incluye anulados y eliminados para no recrearlos al reintentar un envío. */
+export function demoCajaMovimientoById(id: string, organizationId: string) {
+  return store.caja.find(row => row.id === id && row.organization_id === organizationId);
+}
+
 export function demoSnapshot() {
   const now = new Date();
   const utilidadRows = demoUtilidad();
@@ -2152,6 +2161,7 @@ type DemoCreateCajaInput = Omit<
   | "url_comprobante"
   | "tipo_comprobante"
 > & {
+  id?: string;
   referencia_id?: string | null;
   es_personal?: boolean;
   url_comprobante?: string | null;
@@ -2159,8 +2169,11 @@ type DemoCreateCajaInput = Omit<
 };
 
 export function demoCreateCaja(input: DemoCreateCajaInput) {
+  if (input.id && store.caja.some(row => row.id === input.id)) {
+    throw new Error("Este movimiento ya está registrado.");
+  }
   const row: CajaRow = {
-    id: randomUUID(),
+    id: input.id ?? randomUUID(),
     created_at: nowIso(),
     updated_at: nowIso(),
     created_by: null,

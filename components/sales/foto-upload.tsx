@@ -1,12 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
-import { compressImage } from "@/lib/image-compress";
+import { useEffect, useRef, useState } from "react";
+import { subirArchivo, type EstadoArchivoUpload, type BucketArchivo } from "@/lib/archivo-upload";
 
 type FotoUploadProps = {
   /** Bucket destino dentro de data/uploads/. */
-  bucket: "muebles" | "caja" | "compras" | "comprobantes";
+  bucket: BucketArchivo;
   /** Nombre del input hidden que reportará la URL guardada. */
   name: string;
   /** Etiqueta del campo. */
@@ -14,15 +14,17 @@ type FotoUploadProps = {
   /** URL inicial cuando se está editando un recurso existente. */
   defaultUrl?: string;
   disabled?: boolean;
+  onStateChange?: (estado: EstadoArchivoUpload) => void;
 };
 
 /**
  * Sube un archivo (imagen/PDF) a `/api/uploads`, muestra un preview y mantiene
  * la URL resultante en un input hidden listo para enviarse al server action.
  */
-export function FotoUpload({ bucket, name, label, defaultUrl = "", disabled = false }: FotoUploadProps) {
+export function FotoUpload({ bucket, name, label, defaultUrl = "", disabled = false, onStateChange }: FotoUploadProps) {
   const [url, setUrl] = useState(defaultUrl);
-  const [estado, setEstado] = useState<"idle" | "subiendo" | "ok" | "error">("idle");
+  const [estado, setEstado] = useState<EstadoArchivoUpload>("idle");
+  const subiendo = useRef(false);
   const [mensaje, setMensaje] = useState<string>("");
 
   useEffect(() => {
@@ -30,37 +32,31 @@ export function FotoUpload({ bucket, name, label, defaultUrl = "", disabled = fa
   }, [defaultUrl]);
 
   async function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file || subiendo.current) return;
+    subiendo.current = true;
     setEstado("subiendo");
+    onStateChange?.("subiendo");
     setMensaje("Preparando archivo...");
     try {
-      let fileToUpload = file;
-      if (file.type.startsWith("image/")) {
-        setMensaje("Optimizando imagen...");
-        fileToUpload = await compressImage(file);
-      }
-
-      const fd = new FormData();
-      fd.append("bucket", bucket);
-      fd.append("file", fileToUpload);
-
-      setMensaje("Subiendo archivo...");
-      const res = await fetch("/api/uploads", { method: "POST", body: fd });
-      const json = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !json.url) {
-        throw new Error(json.error ?? `Error ${res.status}`);
-      }
-      setUrl(json.url);
+      const nuevaUrl = await subirArchivo(file, bucket);
+      setUrl(nuevaUrl);
       setEstado("ok");
+      onStateChange?.("ok");
       setMensaje("Archivo guardado con éxito.");
     } catch (err) {
       setEstado("error");
+      onStateChange?.("error");
       setMensaje(
         err instanceof Error && err.message
-          ? `Error al subir: ${err.message}`
+          ? err.message
           : "No se pudo subir el archivo. Intenta de nuevo.",
       );
+      // Permite volver a elegir el mismo archivo tras un fallo de conexión.
+      input.value = "";
+    } finally {
+      subiendo.current = false;
     }
   }
 
@@ -74,16 +70,16 @@ export function FotoUpload({ bucket, name, label, defaultUrl = "", disabled = fa
           type="file"
           accept="image/*,application/pdf"
           onChange={handleChange}
-          disabled={disabled}
+          disabled={disabled || estado === "subiendo"}
           className="block w-full text-sm text-[var(--color-text-primary)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--color-accent)] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[var(--color-on-accent)] disabled:opacity-50 disabled:pointer-events-none"
         />
       </label>
       <input type="hidden" name={name} value={url} />
       {estado === "subiendo" ? (
-        <p className="text-xs text-[var(--color-text-secondary)]">Subiendo…</p>
+        <p role="status" className="text-xs text-[var(--color-text-secondary)]">Subiendo…</p>
       ) : null}
       {estado === "error" ? (
-        <p className="text-xs text-[var(--color-danger)]">{mensaje}</p>
+        <p role="alert" className="text-xs text-[var(--color-danger)]">{mensaje}</p>
       ) : null}
       {url ? (
         <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] p-2">

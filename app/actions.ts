@@ -11,6 +11,8 @@ import {
   demoCerrarContratoAlquiler,
   demoCerrarMes,
   demoClientesRows,
+  demoCajaRows,
+  demoCajaMovimientoById,
   demoCreateAdelanto,
   demoCreateAlquiler,
   demoCreateCaja,
@@ -68,6 +70,9 @@ import { nextCorrelativo } from "@/lib/numeracion";
 import type { FilaImportada } from "@/lib/importar";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { inventarioCostoUnitarioOpcionalSchema } from "@/lib/inventario-validation";
+import { cajaMovimientoSchema } from "@/lib/caja-movimiento-validation";
+import { cajaEliminacionBloqueo } from "@/lib/caja-eliminacion";
+import { cajaReintentoCoincide, CAJA_REINTENTO_CONFLICTO } from "@/lib/caja-reintento";
 import type { MutationFormState } from "@/lib/mutation-form-state";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole, Json } from "@/lib/supabase/types";
@@ -99,18 +104,6 @@ const moneySchema = (schema: z.ZodType<number>) => z.preprocess(preprocessDecima
 
 const margenGananciaConfigSchema = z.object({
   margenGananciaDefaultPct: z.preprocess(preprocessDecimal, z.coerce.number().nonnegative()),
-});
-
-const cajaSchema = z.object({
-  fecha: z.string().min(1),
-  tipo: z.enum(["ingreso", "egreso", "transferencia"]),
-  medio: z.enum(["efectivo", "banco", "yape", "otro"]),
-  categoria: z.string().min(2),
-  monto: moneySchema(z.number().positive()),
-  descripcion: z.string().optional(),
-  esPersonal: z.coerce.boolean().optional(),
-  urlComprobante: z.string().optional(),
-  tipoComprobante: z.enum(["factura", "boleta", "ninguno"]).default("ninguno"),
 });
 
 const ventaSchema = z.object({
@@ -518,8 +511,9 @@ function maybeRedirectToQuickStep(formData: FormData) {
 }
 
 export async function createCajaMovimiento(formData: FormData) {
-  await requireMutationAccess(cajaRoles);
-  const parsed = cajaSchema.safeParse({
+  const actor = await requireMutationAccess(cajaRoles);
+  const parsed = cajaMovimientoSchema.safeParse({
+    movimientoId: formData.get("movimiento_id"),
     fecha: formData.get("fecha"),
     tipo: formData.get("tipo"),
     medio: formData.get("medio"),
@@ -532,41 +526,39 @@ export async function createCajaMovimiento(formData: FormData) {
   });
 
   if (!parsed.success) {
-    throw new Error("Datos de caja inválidos.");
+    throw new Error(parsed.error.issues[0]?.message ?? "Revisa los datos del movimiento.");
   }
 
+  const payload = {
+    id: parsed.data.movimientoId ?? randomUUID(),
+    organization_id: actor.organizationId,
+    fecha: parsed.data.fecha,
+    tipo: parsed.data.tipo,
+    medio: parsed.data.medio,
+    categoria: parsed.data.categoria,
+    monto: parsed.data.monto,
+    descripcion: parsed.data.descripcion,
+    modulo_origen: "caja",
+    es_personal: parsed.data.esPersonal,
+    url_comprobante: parsed.data.urlComprobante,
+    tipo_comprobante: parsed.data.tipoComprobante,
+  };
+
   if (!hasSupabaseEnv()) {
-    demoCreateCaja({
-      organization_id: DEFAULT_ORG_ID,
-      fecha: parsed.data.fecha,
-      tipo: parsed.data.tipo,
-      medio: parsed.data.medio,
-      categoria: parsed.data.categoria,
-      monto: parsed.data.monto,
-      descripcion: parsed.data.descripcion ?? null,
-      modulo_origen: "caja",
-      es_personal: parsed.data.esPersonal ?? false,
-      url_comprobante: parsed.data.urlComprobante ?? null,
-      tipo_comprobante: parsed.data.tipoComprobante,
-    });
+    const previa = demoCajaMovimientoById(payload.id, actor.organizationId);
+    if (previa) {
+      if (!cajaReintentoCoincide(previa, payload)) throw new Error(CAJA_REINTENTO_CONFLICTO);
+    } else demoCreateCaja(payload);
   } else {
     const supabase = getSupabaseServerClient();
-    const { error } = await supabase.from("movimientos_caja").insert({
-      organization_id: DEFAULT_ORG_ID,
-      fecha: parsed.data.fecha,
-      tipo: parsed.data.tipo,
-      medio: parsed.data.medio,
-      categoria: parsed.data.categoria,
-      monto: parsed.data.monto,
-      descripcion: parsed.data.descripcion ?? null,
-      modulo_origen: "caja",
-      es_personal: parsed.data.esPersonal ?? false,
-      url_comprobante: parsed.data.urlComprobante ?? null,
-      tipo_comprobante: parsed.data.tipoComprobante,
-    });
-    if (error) {
-      throw new Error(error.message);
-    }
+    // La clave primaria existente garantiza un solo registro incluso con envíos simultáneos.
+    const { error } = await supabase.from("movimientos_caja").insert(payload);
+    if (error?.code === "23505") {
+      const { data: previa, error: lecturaError } = await supabase.from("movimientos_caja")
+        .select("*").eq("id", payload.id).eq("organization_id", actor.organizationId).maybeSingle();
+      if (lecturaError) throw new Error("No se pudo confirmar el primer envío. Vuelve a intentarlo sin cerrar este formulario.");
+      if (!previa || !cajaReintentoCoincide(previa, payload)) throw new Error(CAJA_REINTENTO_CONFLICTO);
+    } else if (error) throw new Error("No se pudo confirmar el guardado. Vuelve a intentarlo sin cerrar este formulario.");
   }
 
   revalidatePath("/caja");
@@ -5391,12 +5383,16 @@ export async function deleteCajaMovimiento(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    await requireMutationAccess(["owner_admin"]);
+    const actor = await requireMutationAccess(["owner_admin"]);
     const parsedId = z.string().uuid().safeParse(id);
     if (!parsedId.success) {
       return { ok: false, error: "Identificador inválido." };
     }
     if (!hasSupabaseEnv()) {
+      const row = demoCajaRows().find(movimiento => movimiento.id === id && movimiento.organization_id === actor.organizationId && !movimiento.deleted_at);
+      if (!row) return { ok: false, error: "Movimiento no encontrado o ya no disponible." };
+      const bloqueo = cajaEliminacionBloqueo(row);
+      if (bloqueo) return { ok: false, error: bloqueo };
       const res = demoDeleteOneById("caja", id);
       if (res.eliminados === 0) {
         return { ok: false, error: "Movimiento no encontrado o no se pudo eliminar." };
@@ -5406,14 +5402,35 @@ export async function deleteCajaMovimiento(
       return { ok: true };
     }
     const supabase = getSupabaseServerClient();
-    const { error } = await supabase
+    const { data: row, error: lecturaError } = await supabase
+      .from("movimientos_caja")
+      .select("periodo_cerrado,modulo_origen,referencia_id")
+      .eq("id", id)
+      .eq("organization_id", actor.organizationId)
+      .is("deleted_at", null)
+      .is("voided_at", null)
+      .maybeSingle();
+    if (lecturaError) return { ok: false, error: "No se pudo comprobar el movimiento. Intenta nuevamente." };
+    if (!row) return { ok: false, error: "Movimiento no encontrado o ya no disponible." };
+    const bloqueo = cajaEliminacionBloqueo(row);
+    if (bloqueo) return { ok: false, error: bloqueo };
+    // Comprobar de nuevo al eliminar evita borrar un registro cerrado o enlazado
+    // desde otra pestaña después de cargar la confirmación.
+    const { data: eliminados, error } = await supabase
       .from("movimientos_caja")
       .delete()
       .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID);
+      .eq("organization_id", actor.organizationId)
+      .eq("periodo_cerrado", false)
+      .is("referencia_id", null)
+      .or("modulo_origen.is.null,modulo_origen.eq.caja")
+      .is("deleted_at", null)
+      .is("voided_at", null)
+      .select("id");
     if (error) {
-      return { ok: false, error: error.message };
+      return { ok: false, error: "No se pudo eliminar el movimiento. Intenta nuevamente." };
     }
+    if (!eliminados?.length) return { ok: false, error: "El movimiento cambió o ya no está disponible. Actualiza Caja para revisarlo." };
     revalidatePath("/caja");
     revalidatePath("/");
     return { ok: true };

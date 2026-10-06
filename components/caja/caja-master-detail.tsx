@@ -3,14 +3,17 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { DetailDrawer, DetailField } from "@/components/ui/detail-drawer";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { formatDate, formatPen } from "@/lib/utils";
-import { Trash2 } from "lucide-react";
+import { Info, LockKeyhole, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { deleteCajaMovimiento } from "@/app/actions";
 import type { AppRole } from "@/lib/supabase/types";
+import { cajaComprobante, CAJA_COMPROBANTE_LABELS } from "@/lib/caja-filtros";
+import { cajaOrigenLink } from "@/lib/caja-origen-navigation";
+import { cajaCategoriaLabel, cajaMedioLabel, cajaOrigenLabel, cajaTipoLabel } from "@/lib/caja-presentacion";
+import { cajaEliminacionBloqueo } from "@/lib/caja-eliminacion";
 
 type CajaRow = {
   id: string;
@@ -25,122 +28,63 @@ type CajaRow = {
   referencia_id: string | null;
   url_comprobante: string | null;
   tipo_comprobante: string | null;
+  periodo_cerrado: boolean;
 };
 
 export function CajaMasterDetail({
   rows,
   userRole,
+  cajaHref = "/caja#movimientos-caja",
+  canOpenOrigen = false,
+  emptyMessage = "No hay movimientos que coincidan. Prueba otros filtros o límpialos para ver el historial.",
 }: {
   rows: CajaRow[];
   userRole: AppRole | null;
+  cajaHref?: string;
+  canOpenOrigen?: boolean;
+  emptyMessage?: string;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [movimientoAEliminar, setMovimientoAEliminar] = useState<CajaRow | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  // Local state for voucher type filtering (defaults to "todos")
-  const [filterComprobante, setFilterComprobante] = useState<"todos" | "factura" | "boleta" | "ninguno">("todos");
-
-  const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
-      if (filterComprobante === "todos") return true;
-      if (filterComprobante === "factura") return row.tipo_comprobante === "factura";
-      if (filterComprobante === "boleta") return row.tipo_comprobante === "boleta";
-      if (filterComprobante === "ninguno") {
-        return !row.tipo_comprobante || row.tipo_comprobante === "ninguno";
-      }
-      return true;
-    });
-  }, [rows, filterComprobante]);
-
   const selected = useMemo(() => rows.find((row) => row.id === selectedId) ?? null, [rows, selectedId]);
-
-  if (rows.length === 0) {
-    return (
-      <EmptyState
-        title="Aun no hay movimientos de caja"
-        description="Caja registra ingresos, egresos, comprobantes y notas para auditoria diaria."
-        actionLabel="Registrar movimiento"
-        actionHref="/caja"
-      />
-    );
-  }
+  const origen = selected ? cajaOrigenLink(selected, cajaHref) : null;
+  const bloqueo = selected ? cajaEliminacionBloqueo(selected) : null;
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-        <div className="flex items-center gap-2">
-          <label htmlFor="tipo-comprobante-filter" className="text-sm font-medium text-[var(--color-text-secondary)]">
-            Filtrar por Comprobante:
-          </label>
-          <select
-            id="tipo-comprobante-filter"
-            value={filterComprobante}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === "todos" || value === "factura" || value === "boleta" || value === "ninguno") {
-                setFilterComprobante(value);
-              }
-            }}
-            className="rounded-lg border border-[var(--color-border)] bg-[var(--bg-surface)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)] transition-colors"
-          >
-            <option value="todos">Todos los comprobantes</option>
-            <option value="factura">Factura</option>
-            <option value="boleta">Boleta</option>
-            <option value="ninguno">Sin comprobante (No)</option>
-          </select>
-        </div>
-      </div>
-
       <div className="overflow-hidden rounded-xl border border-[var(--color-border)]">
         <Table>
           <THead>
             <TRow>
               <TH>Fecha</TH>
               <TH>Tipo</TH>
-              <TH>Medio</TH>
-              <TH>Categoria</TH>
-              <TH>Marca</TH>
+              <TH>Medio de pago</TH>
+              <TH>Categoría</TH>
+              <TH>Empresa / Personal</TH>
               <TH>Comprobante</TH>
               <TH className="text-right">Monto</TH>
               {userRole === "owner_admin" && (
-                <TH className="w-12 text-center">Acciones</TH>
+                <TH className="w-28 text-center">Acciones</TH>
               )}
             </TRow>
           </THead>
           <tbody>
-            {filteredRows.map((row) => (
+            {rows.map((row) => {
+              const protegido = cajaEliminacionBloqueo(row);
+              return (
               <TRow key={row.id} className="cursor-pointer" onClick={() => setSelectedId(row.id)}>
                 <TD>{formatDate(row.fecha)}</TD>
-                <TD className="capitalize">{row.tipo}</TD>
-                <TD className="capitalize">{row.medio}</TD>
+                <TD>{cajaTipoLabel(row.tipo)}</TD>
+                <TD>{cajaMedioLabel(row.medio)}</TD>
                 <TD>
-                  {row.categoria}
+                  {cajaCategoriaLabel(row.categoria)}
                   {row.descripcion ? <p className="text-xs text-[var(--color-text-secondary)]">{row.descripcion}</p> : null}
                 </TD>
                 <TD>{row.es_personal ? "Personal" : "Empresa"}</TD>
-                <TD>
-                  {(() => {
-                    const tipo = row.tipo_comprobante;
-                    const desc = (row.descripcion || "").toLowerCase();
-                    const mod = (row.modulo_origen || "").toLowerCase();
-                    
-                    if (tipo === "factura") return "Factura";
-                    if (tipo === "boleta") return "Boleta";
-                    
-                    // Si no tiene tipo_comprobante pero tiene url_comprobante, es Sí
-                    if (row.url_comprobante) {
-                      return "Sí";
-                    }
-                    
-                    // Si es una compra de inventario/madera, verificar si la nota o descripción infiere boleta/factura
-                    if (desc.includes("factura") || desc.includes("f001")) return "Factura";
-                    if (desc.includes("boleta") || desc.includes("b001")) return "Boleta";
-                    if (desc.includes("comprobante") || desc.includes("recibo") || desc.includes("r001")) return "Recibo";
-                    
-                    return "No";
-                  })()}
-                </TD>
+                <TD>{CAJA_COMPROBANTE_LABELS[cajaComprobante(row)]}</TD>
                 <TD className="text-right font-semibold">{formatPen(Number(row.monto))}</TD>
                 {userRole === "owner_admin" && (
                   <TD className="text-center" onClick={(e) => e.stopPropagation()}>
@@ -148,21 +92,28 @@ export function CajaMasterDetail({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setMovimientoAEliminar(row);
+                        if (protegido) {
+                          setSelectedId(row.id);
+                        } else {
+                          setDeleteError(null);
+                          setMovimientoAEliminar(row);
+                        }
                       }}
-                      className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors"
-                      title="Eliminar movimiento"
+                      className={protegido ? "inline-flex items-center gap-1 rounded-lg p-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--bg-surface)]" : "p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors"}
+                      title={protegido || "Eliminar movimiento"}
+                      aria-label={`${protegido ? "Ver protección del movimiento" : "Eliminar movimiento"}: ${row.descripcion || cajaCategoriaLabel(row.categoria)}`}
                     >
-                      <Trash2 className="size-4" />
+                      {protegido ? <><LockKeyhole className="size-4" aria-hidden="true" />Protegido</> : <Trash2 className="size-4" aria-hidden="true" />}
                     </button>
                   </TD>
                 )}
               </TRow>
-            ))}
-            {filteredRows.length === 0 && (
+              );
+            })}
+            {rows.length === 0 && (
               <TRow>
                 <TD colSpan={userRole === "owner_admin" ? 8 : 7} className="text-center py-6 text-sm text-[var(--color-text-secondary)]">
-                  Sin resultados para el filtro seleccionado.
+                  {emptyMessage}
                 </TD>
               </TRow>
             )}
@@ -172,7 +123,7 @@ export function CajaMasterDetail({
 
       <DetailDrawer
         open={Boolean(selected)}
-        title={selected ? `${selected.tipo} · ${formatPen(Number(selected.monto))}` : "Movimiento"}
+        title={selected ? `${cajaTipoLabel(selected.tipo)} · ${formatPen(Number(selected.monto))}` : "Movimiento"}
         description="Detalle de caja"
         onClose={() => {
           setSelectedId(null);
@@ -181,41 +132,49 @@ export function CajaMasterDetail({
         {selected ? (
           <div className="space-y-3">
             <DetailField label="Fecha" value={formatDate(selected.fecha)} />
-            <DetailField label="Tipo" value={selected.tipo} />
+            <DetailField label="Tipo" value={cajaTipoLabel(selected.tipo)} />
             <DetailField label="Monto" value={formatPen(Number(selected.monto))} />
-            <DetailField label="Categoria" value={selected.categoria} />
-            <DetailField label="Descripcion / notas" value={selected.descripcion ?? "Sin notas"} />
-            <DetailField label="Modulo origen" value={selected.modulo_origen ?? "Manual"} />
+            <DetailField label="Medio de pago" value={cajaMedioLabel(selected.medio)} />
+            <DetailField label="Empresa / Personal" value={selected.es_personal ? "Personal" : "Empresa"} />
+            <DetailField label="Categoría" value={cajaCategoriaLabel(selected.categoria)} />
+            <DetailField label="Descripción / notas" value={selected.descripcion?.trim() || "Sin notas"} />
+            <DetailField label="Origen" value={cajaOrigenLabel(selected.modulo_origen)} />
+            <div className="rounded-xl border border-[var(--color-border)] p-3 space-y-2">
+              <p className="text-sm font-semibold">Operación relacionada</p>
+              {origen && canOpenOrigen ? (
+                <>
+                  <Link href={origen.href} target="_blank" rel="noopener noreferrer" prefetch={false} className="inline-flex rounded-lg bg-[var(--katia-primary)] px-3 py-2 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2">
+                    {origen.label}
+                  </Link>
+                  <p className="text-xs text-[var(--katia-text-secondary)]">Se abre en otra pestaña. Caja conserva tus filtros y la página actual.</p>
+                </>
+              ) : (
+                <p className="text-sm text-[var(--katia-text-secondary)]">{origen ? "Tu rol permite consultar Caja, pero no abrir la operación relacionada." : "Este movimiento no tiene una venta o cotización enlazada. Consulta su descripción y notas."}</p>
+              )}
+            </div>
             <DetailField
               label="Comprobante"
-              value={(() => {
-                const tipo = selected.tipo_comprobante;
-                const desc = (selected.descripcion || "").toLowerCase();
-                if (tipo === "factura") return "Factura";
-                if (tipo === "boleta") return "Boleta";
-                if (selected.url_comprobante) return "Sí";
-                if (desc.includes("factura") || desc.includes("f001")) return "Factura";
-                if (desc.includes("boleta") || desc.includes("b001")) return "Boleta";
-                if (desc.includes("comprobante") || desc.includes("recibo") || desc.includes("r001")) return "Recibo";
-                return "Ninguno";
-              })()}
+              value={CAJA_COMPROBANTE_LABELS[cajaComprobante(selected)]}
             />
             {selected.url_comprobante ? (
               <DetailField
-                label="Archivo Comprobante"
+                label="Comprobante adjunto"
                 value={
-                  <Link className="underline text-[var(--color-accent)]" href={selected.url_comprobante} target="_blank">
+                  <Link className="underline text-[var(--color-accent)]" href={selected.url_comprobante} target="_blank" rel="noopener noreferrer">
                     Ver comprobante adjunto
                   </Link>
                 }
               />
             ) : null}
             
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--bg-surface)] p-3 text-xs text-[var(--color-text-secondary)] flex items-center gap-2">
-              <span>🔒</span>
-              <p>
-                Este movimiento está cerrado. Los registros de caja son inmutables para preservar la auditoría y control de flujo del negocio. Para correcciones, realice un contra-movimiento o anulación autorizada.
-              </p>
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--bg-surface)] p-3 text-xs text-[var(--color-text-secondary)] flex items-start gap-2">
+              <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <div className="space-y-1">
+                <p className="font-semibold">{bloqueo ? "Movimiento protegido" : "Si necesitas corregirlo"}</p>
+                <p>
+                  {bloqueo || `Los datos no se editan desde este detalle. ${userRole === "owner_admin" ? "La eliminación está disponible en la papelera del historial; revisa la confirmación antes de continuar." : "Si encuentras un error, pide al administrador que lo revise."}`}
+                </p>
+              </div>
             </div>
           </div>
         ) : null}
@@ -235,6 +194,7 @@ export function CajaMasterDetail({
           if (!movimientoAEliminar) return;
           const res = await deleteCajaMovimiento(movimientoAEliminar.id);
           if (!res.ok) {
+            setDeleteError(res.error);
             showToast({ message: res.error, variant: "error" });
             return false;
           }
@@ -247,13 +207,16 @@ export function CajaMasterDetail({
         }}
       >
         <p className="text-sm text-[var(--color-text-secondary)]">
-          ¿Eliminar este movimiento? Esta acción no se puede deshacer.
+          El movimiento dejará de aparecer en el historial y los totales de Caja se actualizarán. Esta acción no se puede deshacer desde el programa.
         </p>
+        {deleteError ? <p role="alert" className="text-sm text-[var(--color-danger)]">No se eliminó el movimiento. {deleteError}</p> : null}
         {movimientoAEliminar && (
           <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--bg-surface)] p-3 text-xs space-y-1">
             <p><strong>Fecha:</strong> {formatDate(movimientoAEliminar.fecha)}</p>
-            <p className="capitalize"><strong>Tipo:</strong> {movimientoAEliminar.tipo}</p>
-            <p><strong>Categoría:</strong> {movimientoAEliminar.categoria}</p>
+            <p><strong>Tipo:</strong> {cajaTipoLabel(movimientoAEliminar.tipo)}</p>
+            <p><strong>Medio de pago:</strong> {cajaMedioLabel(movimientoAEliminar.medio)}</p>
+            <p><strong>Empresa / Personal:</strong> {movimientoAEliminar.es_personal ? "Personal" : "Empresa"}</p>
+            <p><strong>Categoría:</strong> {cajaCategoriaLabel(movimientoAEliminar.categoria)}</p>
             {movimientoAEliminar.descripcion && (
               <p><strong>Descripción:</strong> {movimientoAEliminar.descripcion}</p>
             )}

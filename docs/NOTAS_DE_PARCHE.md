@@ -1,5 +1,37 @@
 # Notas de parche
 
+## 1.1.37 — 05/10/2026
+
+Caja espera a que termine la subida del comprobante antes de guardar y permite reintentarlo si falla, conservando los datos. También corrige el adjunto para el rol Caja y evita recortes del formulario en celular.
+
+## 1.1.36 — 05/10/2026
+
+Caja evita que un reintento del mismo formulario registre dos veces un ingreso o gasto. Si se pierde la conexión, conserva los datos y permite confirmar el envío; mientras guarda, protege el formulario.
+
+## 1.1.35 — 05/10/2026
+
+Caja protege los movimientos de períodos cerrados y los cobros vinculados a otras operaciones. El detalle explica dónde revisarlos y conserva la papelera para registros manuales abiertos, evitando errores.
+
+## 1.1.34 — 05/10/2026
+
+Registrar en Caja permite elegir Empresa o Personal y revisar cómo cambia su saldo antes de guardar. Valida montos y fechas y conserva los datos si ocurre un error, para corregir sin volver a escribir.
+
+## 1.1.33 — 04/10/2026
+
+El detalle de Caja muestra nombres claros, medio de pago y la marca Empresa o Personal. Los avisos de corrección y eliminación explican cada acción, y los filtros mantienen un enlace limpio al volver a usarlos.
+
+## 1.1.32 — 04/10/2026
+
+Desde el detalle de Caja puedes abrir la venta o cotización relacionada en otra pestaña. Los filtros quedan guardados y los movimientos sin vínculo o con un documento no disponible muestran un aviso claro.
+
+## 1.1.31 — 04/10/2026
+
+Caja permite buscar movimientos y filtrar por fechas, tipo, medio de pago y comprobante. Los filtros se conservan al cambiar de vista y pueden limpiarse de una vez, mientras el saldo general sigue mostrando todo el historial.
+
+## 1.1.30 — 04/10/2026
+
+Caja muestra ingresos, gastos y saldo de todo el historial, con fechas claras y movimientos personales separados. El resumen incluye operaciones antiguas y avisa si falla la carga para evitar cifras incompletas.
+
 ## 1.1.29 — 04/10/2026
 
 Ventas deja fuera los registros eliminados e impide cobrar propuestas descartadas. El acceso de solo lectura bloquea cambios y cobros; una eliminación desde otra pestaña respeta las cotizaciones ya cobradas.

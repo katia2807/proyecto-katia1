@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { CajaContextPanels } from "@/components/caja/caja-context-panels";
 import { CajaMasterDetail } from "@/components/caja/caja-master-detail";
+import { CajaResumen } from "@/components/caja/caja-resumen";
+import { CajaFiltrosForm } from "@/components/caja/caja-filtros-form";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { getCurrentUserRole } from "@/lib/current-user-role";
-import { getCajaRows } from "@/lib/data";
-import { canMutateCaja } from "@/lib/permissions";
-import { formatPen, roundMoney } from "@/lib/utils";
+import { getAuthContext } from "@/lib/auth";
+import { getCajaPanelData } from "@/lib/caja-resumen-data";
+import { canAccessPath, canMutateCaja } from "@/lib/permissions";
+import { formatPen } from "@/lib/utils";
+import { buildCajaHref, cajaFiltrosError, cajaTieneFiltros, CAJA_HISTORY_PAGE_SIZE, normalizeCajaFiltros } from "@/lib/caja-filtros";
+import type { CajaSearchParams } from "@/lib/caja-filtros";
 
 type CajaPageProps = {
-  searchParams?: Promise<{ vista?: string | string[] }>;
+  searchParams?: Promise<CajaSearchParams>;
 };
 
 function normalizeVista(value: string | string[] | undefined): "todos" | "personal" | "empresa" {
@@ -18,31 +22,22 @@ function normalizeVista(value: string | string[] | undefined): "todos" | "person
 }
 
 export default async function CajaPage({ searchParams }: CajaPageProps) {
-  const vista = normalizeVista((await searchParams)?.vista);
-  const allRows = await getCajaRows();
-  const role = await getCurrentUserRole();
-  const canMutate = canMutateCaja(role);
-
-  const rows = allRows.filter((r) => {
-    if (vista === "personal") return r.es_personal === true;
-    if (vista === "empresa") return r.es_personal !== true;
-    return true;
-  });
-
-  const totalEmpresa = allRows
-    .filter((r) => !r.es_personal)
-    .reduce((acc, r) => {
-      const term = r.tipo === "ingreso" ? Number(r.monto) : -Number(r.monto);
-      return roundMoney(acc + roundMoney(term));
-    }, 0);
-  const totalPersonal = allRows
-    .filter((r) => r.es_personal)
-    .reduce((acc, r) => roundMoney(acc + roundMoney(Number(r.monto))), 0);
+  const params = await searchParams;
+  const vista = normalizeVista(params?.vista);
+  const filtros = normalizeCajaFiltros(params);
+  const filtrosActivos = cajaTieneFiltros(filtros);
+  const filtrosError = cajaFiltrosError(filtros);
+  const context = await getAuthContext();
+  const role = context?.role ?? null;
+  const canMutate = canMutateCaja(role, context?.uiRole);
+  const data = await getCajaPanelData(vista, context?.organizationId, filtros);
+  const resumen = vista === "personal" ? data.personal : data.empresa;
+  const rows = data.rows;
 
   const tabs: { value: typeof vista; label: string; hint: string }[] = [
-    { value: "todos", label: "Todos", hint: `${allRows.length} movimientos` },
-    { value: "empresa", label: "Empresa", hint: `Saldo neto ${formatPen(totalEmpresa)}` },
-    { value: "personal", label: "Personal", hint: `Total ${formatPen(totalPersonal)} separado` },
+    { value: "todos", label: "Todos", hint: data.ok ? `${data.empresa.movimientos + data.personal.movimientos} ${data.empresa.movimientos + data.personal.movimientos === 1 ? "movimiento" : "movimientos"}` : "No disponible" },
+    { value: "empresa", label: "Empresa", hint: data.ok ? `Saldo ${formatPen(data.empresa.saldo)}` : "No disponible" },
+    { value: "personal", label: "Personal", hint: data.ok ? `${data.personal.movimientos} ${data.personal.movimientos === 1 ? "movimiento separado" : "movimientos separados"}` : "No disponible" },
   ];
 
   return (
@@ -50,12 +45,11 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
       <div>
         <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Caja</h2>
         <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
-          Registro de ingresos y egresos. Saldo empresa:{" "}
-          <span className={totalEmpresa >= 0 ? "font-semibold text-[var(--katia-success)]" : "font-semibold text-[var(--katia-danger)]"}>
-            {formatPen(totalEmpresa)}
-          </span>
+          Consulta el dinero registrado en la empresa y los movimientos personales por separado.
         </p>
       </div>
+
+      <CajaResumen resumen={resumen} vista={vista} />
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -64,7 +58,7 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
         </div>
         {canMutate ? (
           <div className="flex flex-wrap gap-2">
-            <CajaContextPanels />
+            <CajaContextPanels vista={vista} />
           </div>
         ) : (
           <p className="rounded-xl border border-amber-500/20 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-300">
@@ -76,10 +70,10 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
       <div className="flex flex-wrap gap-2">
         {tabs.map((tab) => {
           const activo = tab.value === vista;
-          const href = tab.value === "todos" ? "/caja" : `/caja?vista=${tab.value}`;
+          const href = buildCajaHref(tab.value, filtros);
           return (
-            <Link key={tab.value} href={href}>
-              <button
+            <Link key={tab.value} href={href} aria-current={activo ? "page" : undefined} className="rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]">
+              <div
                 className={`rounded-xl border px-3 py-2 text-left ${
                   activo
                     ? "border-[var(--color-accent)] bg-[var(--color-primary-soft)]/40"
@@ -88,23 +82,41 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
               >
                 <p className="text-sm font-semibold">{tab.label}</p>
                 <p className="text-xs text-[var(--color-text-secondary)]">{tab.hint}</p>
-              </button>
+              </div>
             </Link>
           );
         })}
       </div>
 
-      <Card>
-        <CardTitle>Movimientos ({rows.length})</CardTitle>
+      <Card id="movimientos-caja" className="scroll-mt-20 space-y-4">
+        <CardTitle>Movimientos</CardTitle>
         <CardDescription>
           {vista === "personal"
-            ? "Solo gastos personales de la jefa, separados de la utilidad empresarial."
+            ? "Solo movimientos personales, separados de la empresa."
             : vista === "empresa"
-              ? "Movimientos que si afectan la utilidad neta del taller."
+              ? "Ingresos y gastos registrados de la empresa."
               : "Vista combinada de personal y empresa."}
         </CardDescription>
-        <div className="mt-4">
-          <CajaMasterDetail rows={rows} userRole={role} />
+        <CajaFiltrosForm key={buildCajaHref(vista, filtros, data.ok ? data.pagina : filtros.pagina)} filtros={filtros} vista={vista} />
+        <p className="text-xs text-[var(--katia-text-secondary)]">Los filtros solo cambian esta lista. El resumen superior y el saldo de Empresa incluyen todo el historial.</p>
+        <div>
+          {data.ok ? (
+            <>
+              <p role="status" className="mb-3 text-sm text-[var(--katia-text-secondary)]">
+                {filtrosError ? "Corrige las fechas para consultar los resultados." : `${data.totalResultados} ${data.totalResultados === 1 ? "movimiento encontrado" : "movimientos encontrados"}${filtrosActivos ? " con estos filtros" : ""}.${data.totalResultados > CAJA_HISTORY_PAGE_SIZE ? ` Mostrando ${(data.pagina - 1) * CAJA_HISTORY_PAGE_SIZE + 1}–${(data.pagina - 1) * CAJA_HISTORY_PAGE_SIZE + rows.length}, del más reciente al más antiguo.` : ""}`}
+              </p>
+              {!filtrosError && <CajaMasterDetail rows={rows} cajaHref={buildCajaHref(vista, filtros, data.pagina)} canOpenOrigen={Boolean(context && (canAccessPath(context.role, context.uiRole, "/ventas") || canAccessPath(context.role, context.uiRole, "/cotizacion")))} emptyMessage={data.totalVista === 0 ? "Aún no hay movimientos en esta vista de Caja." : undefined} userRole={context?.uiRole === "readonly" ? "vendedor" : role} />}
+              {!filtrosError && data.totalResultados > CAJA_HISTORY_PAGE_SIZE && (
+                <nav aria-label="Páginas de movimientos de Caja" className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+                  {data.pagina > 1 ? <Link href={buildCajaHref(vista, filtros, data.pagina - 1)} className="rounded-lg border border-[var(--color-border)] px-3 py-2 font-semibold focus-visible:outline-2">Anterior</Link> : <span />}
+                  <span>Página {data.pagina} de {Math.ceil(data.totalResultados / CAJA_HISTORY_PAGE_SIZE)}</span>
+                  {data.pagina * CAJA_HISTORY_PAGE_SIZE < data.totalResultados ? <Link href={buildCajaHref(vista, filtros, data.pagina + 1)} className="rounded-lg border border-[var(--color-border)] px-3 py-2 font-semibold focus-visible:outline-2">Siguiente</Link> : <span />}
+                </nav>
+              )}
+            </>
+          ) : (
+            <p role="status" className="text-sm text-[var(--katia-text-secondary)]">Movimientos no disponibles. Usa Reintentar en el resumen para volver a cargarlos.</p>
+          )}
         </div>
       </Card>
     </div>

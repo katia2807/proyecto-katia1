@@ -24,6 +24,8 @@ type ContextActionPanelProps = {
   /** Modo controlado: `open` + `onOpenChange` (p. ej. cerrar tras guardar con éxito). */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Impide descartar el formulario mientras su guardado está en curso. */
+  busy?: boolean;
   /**
    * drawer: panel lateral derecho.
    * dialog: ventana centrada (por defecto; evita recortes por el layout y el cierre con X funciona siempre).
@@ -46,6 +48,7 @@ export function ContextActionPanel({
   openByDefault = false,
   open: controlledOpen,
   onOpenChange,
+  busy = false,
   presentation = "dialog",
   replacePathOnClose,
 }: ContextActionPanelProps) {
@@ -74,11 +77,12 @@ export function ContextActionPanel({
   const isDialog = presentation === "dialog";
 
   const handleClose = useCallback(() => {
+    if (busy) return;
     setOpen(false);
     if (replacePathOnClose) {
       router.replace(replacePathOnClose);
     }
-  }, [replacePathOnClose, router, setOpen]);
+  }, [busy, replacePathOnClose, router, setOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -112,6 +116,7 @@ export function ContextActionPanel({
         type="button"
         variant="secondary"
         onClick={handleClose}
+        disabled={busy}
         className="h-9 shrink-0 px-3"
         aria-label="Cerrar"
       >
@@ -121,7 +126,7 @@ export function ContextActionPanel({
   );
 
   const body = (
-    <div className="max-h-[min(72dvh,34rem)] overflow-y-auto px-6 py-5">
+    <div className="min-h-0 max-h-[min(72dvh,34rem)] overflow-y-auto px-6 py-5">
       <div className="pb-2">{children}</div>
     </div>
   );
@@ -146,7 +151,7 @@ export function ContextActionPanel({
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
-          "fixed left-1/2 top-1/2 flex h-fit w-[min(calc(100vw-1.5rem),42rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.55)] transition duration-200 ease-out motion-reduce:transition-none",
+          "fixed left-1/2 top-1/2 flex h-fit max-h-[calc(100dvh-1.5rem)] w-[min(calc(100vw-1.5rem),42rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.55)] transition duration-200 ease-out motion-reduce:transition-none",
           PANEL_Z,
           open
             ? "pointer-events-auto scale-100 opacity-100"

@@ -4,10 +4,10 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireApiAuth } from "@/lib/api-auth";
 import { WRITER_ROLES } from "@/lib/auth";
+import { canMutateCaja } from "@/lib/permissions";
 import { getServerWritableDataDir } from "@/lib/server-data-dir";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import { DEFAULT_ORG_ID } from "@/lib/constants";
 
 const UPLOAD_ROOT = path.join(getServerWritableDataDir(), "uploads");
 const ALLOWED_BUCKETS = new Set(["muebles", "caja", "compras", "comprobantes"]);
@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
  * Si es modo demo/offline, lo guarda localmente en data/uploads/<bucket>/<uuid>.<ext>.
  */
 export async function POST(request: Request) {
-  const auth = await requireApiAuth(WRITER_ROLES);
+  const auth = await requireApiAuth();
   if (auth.response) {
     return auth.response;
   }
@@ -40,6 +40,12 @@ export async function POST(request: Request) {
 
   if (!ALLOWED_BUCKETS.has(bucket)) {
     return NextResponse.json({ error: "Bucket no permitido." }, { status: 400 });
+  }
+  const permitido = bucket === "caja"
+    ? canMutateCaja(auth.context.role, auth.context.uiRole)
+    : WRITER_ROLES.includes(auth.context.role);
+  if (!permitido) {
+    return NextResponse.json({ error: "No tienes permisos para adjuntar este archivo." }, { status: 403 });
   }
   if (!(file instanceof File) || file.size === 0) {
     return NextResponse.json({ error: "Archivo inválido." }, { status: 400 });
@@ -61,7 +67,7 @@ export async function POST(request: Request) {
   if (hasSupabaseEnv()) {
     try {
       const supabase = getSupabaseServerClient();
-      const storagePath = `${DEFAULT_ORG_ID}/${filename}`;
+      const storagePath = `${auth.context.organizationId}/${filename}`;
       const buffer = Buffer.from(await file.arrayBuffer());
 
       // Intentar subir el archivo al bucket
