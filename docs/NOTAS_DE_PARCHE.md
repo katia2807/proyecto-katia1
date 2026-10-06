@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.49 — 06/10/2026
+
+La documentación de Inventario registra la descarga comprobada del Excel de stock y la confirmación de Kardex. Queda claro qué se verificó para continuar el mantenimiento sin repetir pruebas ni alterar registros.
+
 ## 1.1.48 — 06/10/2026
 
 Inventario ya incluye las correcciones de indicadores, filtros, alertas y archivos Excel, manteniendo el registro habitual. La documentación reúne lo revisado y sus límites para continuar el mantenimiento sin repetir trabajo.

@@ -1,6 +1,6 @@
 # Revisión de Inventario — 05/10/2026
 
-Base del diagnóstico: 1.1.38, commit `bcdc338`. Actualizado el 06/10/2026: I1–I11 se publicaron en 1.1.47, commit `cfd7ef3`, y se comprobaron sus pantallas y filtros en producción mediante lectura. Registro 1.1.48; la descarga real de Excel en producción sigue pendiente de confirmación manual. Se conserva el diagnóstico original debajo de cada corrección para distinguir la base del resultado comprobado.
+Base del diagnóstico: 1.1.38, commit `bcdc338`. Actualizado el 06/10/2026: I1–I11 se publicaron en 1.1.47, commit `cfd7ef3`, y se comprobaron sus pantallas y filtros en producción mediante lectura. Registro 1.1.49: el Excel real de stock se abrió y verificó, y el usuario confirmó la descarga de Kardex; no se inspeccionó el contenido de este último. Se conserva el diagnóstico original debajo de cada corrección para distinguir la base del resultado comprobado.
 
 ## Alcance y límites
 
@@ -146,4 +146,4 @@ La búsqueda sí filtra los productos y las alertas locales coinciden con los m�
 
 ## Próximo paso
 
-La publicación funcional 1.1.47 está confirmada en Vercel y visible en producción. Se comprobaron Resumen, Productos, búsqueda conservada al recargar, filtros y enlace de Kardex, Alertas y Reportes, sin ejecutar operaciones del negocio. El detalle y los límites están en [Estado del proyecto](ESTADO_DEL_PROYECTO.md). Falta confirmar manualmente que la descarga Excel publicada termina en el navegador: la herramienta no logró observarla. Conservar los demás límites: no se probaron todas las escrituras reales ni los triggers contra PostgreSQL, el historial continúa acotado y otros apartados no se consideran terminados por estas comprobaciones.
+La publicación funcional 1.1.47 está confirmada en Vercel y visible en producción. Se comprobaron Resumen, Productos, búsqueda conservada al recargar, filtros y enlace de Kardex, Alertas y Reportes, sin ejecutar operaciones del negocio. El Excel real de stock descargado en 1.1.48 se abrió: 64 productos, S/ 17,021.00 de valor conocido, 58 productos con stock sin costo y totales sin mezclar unidades. El usuario confirmó la descarga de Kardex; no se identificó su archivo para inspeccionar el contenido. Esta distinción queda registrada en 1.1.49 y en [Estado del proyecto](ESTADO_DEL_PROYECTO.md). No se detectó un fallo funcional que requiera nuevos cambios. Conservar los límites: no se probaron todas las escrituras reales ni los triggers contra PostgreSQL, el historial continúa acotado y otros apartados no se consideran terminados por estas comprobaciones.
