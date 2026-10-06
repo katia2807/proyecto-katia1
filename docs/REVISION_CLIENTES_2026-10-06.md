@@ -1,6 +1,25 @@
 # Revisión de Clientes — 06/10/2026
 
-Diagnóstico documental 1.1.52 sobre la base ejecutada 1.1.51, commit `d8759ed`. Correcciones CL1–CL7 implementadas y comprobadas localmente en **1.1.53**. La revisión se cierra dentro de ese alcance; la publicación y comprobación de producción siguen pendientes. Se conserva la forma de trabajo actual.
+Diagnóstico documental 1.1.52 sobre la base ejecutada 1.1.51, commit `d8759ed`. Correcciones CL1–CL7 implementadas, comprobadas localmente y **publicadas en 1.1.53**. Se completó la comprobación de producción por lectura. La revisión se cierra dentro del alcance descrito y conserva la forma habitual de trabajo; las escrituras reales y los límites indicados abajo no se dan por verificados.
+
+## Publicación y lectura de producción — 06/10/2026, 1.1.53
+
+Publicación autorizada por el usuario: commit `75a5254d83bc0a5e70df8ca04cb3cd3470e74494` en `main` de `katia2807/proyecto-katia1`. La integración GitHub/Vercel confirmó el despliegue `4nZ8HAtdHiPegWPxWRVUu9BdYbKL` en el proyecto/equipo utilizados en las publicaciones anteriores (`project-ukk6w` / `grupo-ark-ccatun-rumi-sac`). URL comprobada: `https://proyecto-katia.vercel.app/ventas/clientes`. La conexión directa de Vercel de esta sesión no tiene acceso a ese equipo; el estado se confirmó por la integración de GitHub y la versión realmente servida por el dominio del programa.
+
+Se revisaron primero las rutas y sus consultas auxiliares para evitar escrituras al cargar una pantalla. Se reutilizó la sesión autenticada existente de Edge; no se recuperaron ni modificaron credenciales.
+
+| Recorrido | Evidencia en producción |
+| --- | --- |
+| Publicación y aviso | Vercel success para el commit y dominio mostrando versión 1.1.53, fecha 06/10/2026 y la misma nota del código/historial. |
+| UI → consulta → listado | 11 clientes visibles antes y después, con los mismos nombres y estados. Las fuentes de historial se consultaron sin activar el aviso de carga fallida. No se afirma una comparación de cada campo de toda la base. |
+| Búsqueda y navegación | Buscar un RUC existente con Empresa/Activo mostró un resultado; abrir ficha y regresar conservó los tres filtros. Cambiar a Choferes/Proveedores y regresar también los conservó; esa pestaña mostró cero registros. |
+| Ficha e indicadores | Seis ventas de madera cortada confirmadas sumaron S/ 2,706, coincidentes con listado y Clientes 360°. La ficha enseñó las seis filas. Su enlace de madera abrió el detalle correcto por S/ 700. Cero cotizaciones, alquileres, muebles y servicios para ese cliente; los casos con propuestas actuales/alquiler sin total están comprobados en la copia local, no con nuevas operaciones reales. |
+| Gestión | Acceso directo a Clientes 360° con el cliente seleccionado y selector Activo/Inactivo/Moroso/VIP. No se pulsó Guardar estado ni se ejecutaron eliminaciones. |
+| Formularios | Alta directa abierta/cerrada sin guardar. Formulario compartido de Ventas: campos de persona natural y empresa observados al cambiar la selección y cerrar; no se escribieron ni enviaron datos nuevos. |
+| Celular | Listado a 320/360 px: página sin desbordamiento y tabla con desplazamiento horizontal; flecha derecha movió 40 px el contenido. Ficha a 320 px: sus cinco tablas desplazables dentro del ancho de página. Tamaño normal restablecido. |
+| Disponibilidad y consola | Salud HTTP 200, modo demo desactivado, Supabase configurado y servidor listo para datos reales. No se detectaron errores ni advertencias de consola en los recorridos inspeccionados. No se inspeccionaron logs privados de ejecución de Vercel. |
+
+Evidencias locales ignoradas por Git: `temp/clientes-1.1.53-produccion.png`, `temp/clientes-1.1.53-produccion-{antes,despues,comparacion,console,health}.json`. Los archivos `data/store.json` y `temp/inventario-1.1.47-preview/store.json` conservaron sus huellas. No se crearon clientes, cambiaron estados, guardaron ventas ni modificaron registros del negocio durante esta comprobación. La documentación posterior pertenece a la misma entrega 1.1.53, sin nuevos cambios funcionales ni otra nota de parche.
 
 ## Correcciones y comprobación local — 1.1.53
 
@@ -18,9 +37,9 @@ Diagnóstico documental 1.1.52 sobre la base ejecutada 1.1.51, commit `d8759ed`.
 
 **Entorno:** escrituras exclusivamente en `temp/clientes-1.1.53-preview`, copia adicional de la instancia habitual, con Supabase ignorado para datos y sesión local autenticada. Se conservó `store-base.json`. Quedaron 11 clientes físicos: cinco de partida, tres muestras preparadas y tres altas válidas; se muestran 10 porque una muestra está archivada. No hay nombres vacíos. Cotizaciones y alquiler/madera añadidos son ficticios. No se ejecutaron eliminaciones ni movimientos financieros. El original y `temp/inventario-1.1.47-preview/store.json` conservaron las huellas indicadas más abajo. El servidor temporal 3002 se detuvo al terminar; 3001 quedó mostrando la versión corregida con los cinco clientes habituales, consultados solo por lectura.
 
-**Evidencia:** `temp/clientes-1.1.53-ficha.png`, `temp/clientes-1.1.53-console.json`, resultados `temp/clientes-1.1.53-final-tests.log`, `temp/clientes-1.1.53-final-build.log`, `temp/clientes-1.1.53-source-lint.log` y logs `temp/clientes-1.1.53-final-{local,audit}.{stdout,stderr}.log`. No hubo errores/advertencias de consola detectados en los recorridos inspeccionados; los archivos finales de errores del servidor quedaron vacíos. La versión 1.1.53 y su nota están disponibles en local, sin publicación.
+**Evidencia local:** `temp/clientes-1.1.53-ficha.png`, `temp/clientes-1.1.53-console.json`, resultados `temp/clientes-1.1.53-final-tests.log`, `temp/clientes-1.1.53-final-build.log`, `temp/clientes-1.1.53-source-lint.log` y logs `temp/clientes-1.1.53-final-{local,audit}.{stdout,stderr}.log`. No hubo errores/advertencias de consola detectados en los recorridos inspeccionados; los archivos finales de errores del servidor quedaron vacíos. Al entregar la corrección local todavía no se había publicado; la comprobación posterior se registra arriba.
 
-**Límites:** no se abrió ni modificó producción. La paginación y los fallos Supabase se comprobaron con respuestas aisladas del SDK, no con PostgreSQL remoto. No se verificaron todas las escrituras reales, roles, eliminaciones, políticas de base o triggers. Las páginas de Choferes/Proveedores solo recibieron la corrección de sus contenedores y conservación del contexto; sus procesos no tienen una revisión completa. El ajuste a Gerencial se limita al bloque Clientes 360° y su formulario de estado; no cierra la revisión de los demás bloques. No se añadieron edición completa de clientes ni funciones nuevas, ni se garantiza la ausencia de cualquier otro error.
+**Límites:** en esta etapa local no se abrió producción; después se completó la comprobación por lectura descrita arriba. La paginación extensa y los fallos Supabase se comprobaron con respuestas aisladas del SDK; la producción comprobó las consultas reales del listado/ficha/gestión, con el volumen existente. No se verificaron todas las escrituras reales, roles, eliminaciones, políticas de base o triggers. Las páginas de Choferes/Proveedores solo recibieron la corrección de sus contenedores y conservación del contexto; sus procesos no tienen una revisión completa. El ajuste a Gerencial se limita al bloque Clientes 360° y su formulario de estado; no cierra la revisión de los demás bloques. No se añadieron edición completa de clientes ni funciones nuevas, ni se garantiza la ausencia de cualquier otro error.
 
 ## Diagnóstico previo conservado — registro 1.1.52
 
