@@ -179,8 +179,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </section>
 
       {/* ── ACTIVIDAD RECIENTE (compacto) ── */}
-      <section className="grid gap-4 xl:grid-cols-2">
-        <Card>
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <Card className="min-w-0">
           <div className="flex items-center justify-between gap-3">
             <CardTitle>Caja reciente</CardTitle>
             <Link href="/caja" className="text-xs font-semibold text-[var(--katia-primary)] hover:underline">
@@ -188,7 +188,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </Link>
           </div>
           <CardDescription>Últimos movimientos registrados.</CardDescription>
-          <div className="mt-3 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
+          <div className="mt-3 overflow-x-auto rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
             <Table>
               <THead>
                 <TRow>
@@ -225,7 +225,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <div className="flex items-center justify-between gap-3">
             <CardTitle>Ventas recientes</CardTitle>
             <Link href="/ventas" className="text-xs font-semibold text-[var(--katia-primary)] hover:underline">
@@ -233,7 +233,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </Link>
           </div>
           <CardDescription>Últimas ventas de madera registradas.</CardDescription>
-          <div className="mt-3 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
+          <div className="mt-3 overflow-x-auto rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
             <Table>
               <THead>
                 <TRow>
@@ -245,7 +245,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </THead>
               <tbody>
                 {ventas.slice(0, 4).map((row) => (
-                  <TRow key={row.id}>
+                  <TRow key={`${row.tipo}:${row.id}`}>
                     <TD>{formatDate(row.fecha)}</TD>
                     <TD>
                       <span className={`text-xs font-medium ${row.estado === "borrador" ? "text-[var(--katia-warning)]" : "text-[var(--katia-success)]"}`}>
@@ -254,7 +254,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     </TD>
                     <TD className="text-right font-mono font-semibold">{formatPen(Number(row.total))}</TD>
                     <TD className="text-right">
-                      <Link href="/ventas/madera-cortada" className="text-xs text-[var(--katia-primary)] hover:underline">
+                      <Link href={`/ventas/detalle/${row.tipo}/${row.id}`} className="text-xs text-[var(--katia-primary)] hover:underline">
                         Abrir
                       </Link>
                     </TD>

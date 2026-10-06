@@ -229,17 +229,17 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
           );
         })}
       </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="min-w-0 lg:col-span-2">
           <VentasListWithFilters ventas={historial.ventas} hasMore={historial.hasMore} paginas={historial.paginas} failedCategories={historial.failedCategories} cotizacionesLoadFailed={historial.cotizacionesLoadFailed} />
         </div>
-        <div>
+        <div className="min-w-0">
           <Card className="h-full">
             <CardTitle>Órdenes de producción activas</CardTitle>
             <CardDescription>
               {ordenes.filter((o) => o.estado !== "entregado").length} órdenes en curso.
             </CardDescription>
-            <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
+            <div className="mt-4 overflow-x-auto rounded-xl border border-[var(--color-border)]">
               <Table>
                 <THead>
                   <TRow>
@@ -296,7 +296,7 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
           Datos maestros que alimentan los formularios de cada sub-flujo.
         </CardDescription>
         <div className="mt-3 grid gap-3 md:grid-cols-4">
-          <Resumen titulo="Clientes" valor={clientes.length} href="/gerencial" />
+          <Resumen titulo="Clientes" valor={clientes.length} href="/ventas/clientes" />
           <Resumen titulo="Proveedores" valor={proveedores.length} href="/ventas/proveedores-comparador" />
           <Resumen titulo="Choferes" valor={choferes.length} href="/ventas/zonas-entrega" />
           <Resumen titulo="Muebles en catálogo" valor={muebles.length} href="/ventas/muebles-terminados" />

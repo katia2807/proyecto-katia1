@@ -6,6 +6,13 @@ import type { Database } from "@/lib/supabase/types";
 
 type Tables = Database["public"]["Tables"];
 export type InicioSection<T> = { data: T; available: true } | { data: null; available: false };
+export type InicioVentaReciente = {
+  id: string;
+  fecha: string;
+  estado: string;
+  total: number;
+  tipo: "venta-madera" | "madera";
+};
 
 export type InicioValues = {
   inventario: { total: number; stockBajo: number };
@@ -16,7 +23,7 @@ export type InicioValues = {
   empleadosActivos: number;
   mes: { ingresos: number; egresos: number };
   caja: Tables["movimientos_caja"]["Row"][];
-  ventas: Tables["ventas_madera"]["Row"][];
+  ventas: InicioVentaReciente[];
   clientes: number;
   cotizaciones: number;
 };
@@ -121,9 +128,22 @@ export async function getInicioData(): Promise<InicioData> {
     caja: (signal) => rows<Tables["movimientos_caja"]["Row"]>(query("movimientos_caja").select("*")
       .eq("organization_id", DEFAULT_ORG_ID).is("voided_at", null).is("deleted_at", null)
       .order("fecha", { ascending: false }).order("id").limit(4).abortSignal(signal)),
-    ventas: (signal) => rows<Tables["ventas_madera"]["Row"]>(query("ventas_madera").select("*")
-      .eq("organization_id", DEFAULT_ORG_ID).is("deleted_at", null)
-      .order("fecha", { ascending: false }).order("id").limit(4).abortSignal(signal)),
+    ventas: async (signal) => {
+      // Cuatro filas por origen bastan para obtener las cuatro más recientes
+      // del conjunto. Si falla un origen, no presentar un historial parcial.
+      const [madera, cortada] = await Promise.all([
+        rows<Pick<Tables["ventas_madera"]["Row"], "id" | "fecha" | "estado" | "total">>(query("ventas_madera")
+          .select("id,fecha,estado,total").eq("organization_id", DEFAULT_ORG_ID).is("deleted_at", null)
+          .order("fecha", { ascending: false }).order("id", { ascending: false }).limit(4).abortSignal(signal)),
+        rows<Pick<Tables["ventas_madera_cortada"]["Row"], "id" | "fecha" | "total">>(query("ventas_madera_cortada")
+          .select("id,fecha,total").eq("organization_id", DEFAULT_ORG_ID).is("deleted_at", null)
+          .order("fecha", { ascending: false }).order("id", { ascending: false }).limit(4).abortSignal(signal)),
+      ]);
+      return [
+        ...madera.map(({ id, fecha, estado, total }) => ({ id, fecha, estado, total, tipo: "venta-madera" as const })),
+        ...cortada.map(({ id, fecha, total }) => ({ id, fecha, total, estado: "registrada", tipo: "madera" as const })),
+      ].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id.localeCompare(a.id) || a.tipo.localeCompare(b.tipo)).slice(0, 4);
+    },
   };
 
   const entries = await Promise.all(

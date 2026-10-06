@@ -2,12 +2,12 @@ import { PrintA4Voucher } from "@/components/sales/print-a4-voucher";
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tipo?: string }>;
+  searchParams: Promise<{ tipo?: string; volver?: string | string[] }>;
 };
 
 export default async function A4BoletaPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { tipo } = await searchParams;
+  const { tipo, volver } = await searchParams;
 
-  return <PrintA4Voucher id={id} docType="boleta" searchTipo={tipo} />;
+  return <PrintA4Voucher id={id} docType="boleta" searchTipo={tipo} volver={volver} />;
 }

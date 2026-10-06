@@ -1966,7 +1966,13 @@ export function demoInicioData() {
     empleadosActivos: store.empleados.filter((row) => row.activo).length,
     mes: { ingresos: Number(mes?.ingresos ?? 0), egresos: Number(mes?.egresos ?? 0) },
     caja: demoCajaRows().filter(visible).slice(0, 4),
-    ventas: demoVentasRows().filter(visible).slice(0, 4),
+    ventas: demoVentasRows().filter(visible)
+      .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id.localeCompare(a.id)).slice(0, 4)
+      .map(row => ({
+        id: row.id, fecha: row.fecha, total: row.total,
+        estado: row.tipo_corte ? "registrada" : row.estado,
+        tipo: row.tipo_corte ? "madera" as const : "venta-madera" as const,
+      })),
     clientes: store.clientes.filter(visible).length,
     cotizaciones: store.cotizacionesUnificadas.filter(visible).length,
   };

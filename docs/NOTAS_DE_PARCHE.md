@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.38 — 05/10/2026
+
+Inicio incluye las ventas de madera cortada y evita recortes en celular. Ventas conserva la búsqueda al volver del comprobante y Clientes abre su listado, para consultar los datos sin perder el contexto.
+
 ## 1.1.37 — 05/10/2026
 
 Caja espera a que termine la subida del comprobante antes de guardar y permite reintentarlo si falla, conservando los datos. También corrige el adjunto para el rol Caja y evita recortes del formulario en celular.

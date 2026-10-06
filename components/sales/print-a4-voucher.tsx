@@ -7,6 +7,7 @@ import { resolveSaleDocument, getProductoMaderaById, getAdelantoFromCaja, getMue
 import type { MaderaCortadaRow, MuebleTerminadoRow, ServicioAserraderoRow, VentaMaderaConLineas } from "@/lib/print-helpers";
 import { PrintButton } from "@/components/ui/print-button";
 import { PrintSelector } from "@/components/ui/print-selector";
+import { safeHistorialHref } from "@/lib/ventas-historial-navigation";
 import { buildAserraderoPrintModel } from "@/lib/aserradero-print-model";
 import { AserraderoPrintA4Detail } from "@/components/sales/aserradero-print-a4-detail";
 import {
@@ -18,6 +19,7 @@ type PrintA4VoucherProps = {
   id: string;
   docType: "boleta" | "factura";
   searchTipo?: string;
+  volver?: string | string[];
 };
 
 type LineaCubicajeAserradero = {
@@ -88,7 +90,8 @@ function DecorativeQr({ className = "" }: { className?: string }) {
     </div>
   );
 }
-export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4VoucherProps) {
+export async function PrintA4Voucher({ id, docType, searchTipo, volver }: PrintA4VoucherProps) {
+  const historialHref = volver == null ? "/ventas" : safeHistorialHref(volver);
   const { tipo, data: saleRecord } = await resolveSaleDocument(id, searchTipo);
   if (!saleRecord) {
     notFound();
@@ -283,7 +286,7 @@ export async function PrintA4Voucher({ id, docType, searchTipo }: PrintA4Voucher
 
       {/* Toolbar */}
       <div className="no-print sticky top-0 z-50 flex items-center justify-between gap-4 bg-[#1e293b] border-b border-[#334155] px-6 py-3 shadow">
-        <a href="/ventas" className="text-sm text-[#94a3b8] hover:text-white transition-colors">
+        <a href={historialHref} className="text-sm text-[#94a3b8] hover:text-white transition-colors">
           ← Volver
         </a>
         <div className="flex items-center gap-4">

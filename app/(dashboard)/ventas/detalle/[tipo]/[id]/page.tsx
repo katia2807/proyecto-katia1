@@ -34,7 +34,7 @@ export default async function VentaDetallePage({ params, searchParams }: PagePro
           <h2 className="text-2xl font-semibold text-[var(--katia-text-primary)]">Detalle de la operación</h2>
           {detalle.referencia ? <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">{detalle.referencia}</p> : null}
         </div>
-        <Link href={detalle.impresionHref} prefetch={false} className="inline-flex items-center gap-2 rounded-xl border border-[var(--katia-border-default)] px-4 py-2.5 text-sm font-semibold text-[var(--katia-text-primary)] hover:bg-[var(--color-primary-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--katia-primary)]">
+        <Link href={withHistorialReturn(detalle.impresionHref, historialHref)} prefetch={false} className="inline-flex items-center gap-2 rounded-xl border border-[var(--katia-border-default)] px-4 py-2.5 text-sm font-semibold text-[var(--katia-text-primary)] hover:bg-[var(--color-primary-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--katia-primary)]">
           <Printer className="size-4" aria-hidden="true" />
           {detalle.impresionLabel}
         </Link>

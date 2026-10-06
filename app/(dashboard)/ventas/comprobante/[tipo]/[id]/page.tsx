@@ -5,6 +5,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { getClientesRows, getChoferesRows } from "@/lib/data";
 import { hasSupabaseEnv } from "@/lib/runtime";
+import { safeHistorialHref } from "@/lib/ventas-historial-navigation";
 import { formatDate, formatPen } from "@/lib/utils";
 import { PrintButton } from "@/components/ui/print-button";
 import { PrintSelector } from "@/components/ui/print-selector";
@@ -324,6 +325,7 @@ export default async function ComprobantePage({
 }) {
   const { tipo, id } = await params;
   const sParams = await searchParams;
+  const historialHref = sParams.volver == null ? "/ventas" : safeHistorialHref(sParams.volver);
 
   if (!["madera", "mueble", "aserradero", "venta-madera"].includes(tipo)) notFound();
 
@@ -545,7 +547,7 @@ export default async function ComprobantePage({
 
       {/* Toolbar */}
       <div className="no-print sticky top-0 z-50 flex items-center justify-between gap-4 bg-[var(--color-surface,#1e293b)] border-b border-[var(--color-border,#334155)] px-6 py-3 shadow">
-        <a href="/ventas" className="text-sm text-[var(--color-text-secondary,#94a3b8)] hover:text-[var(--color-text-primary,#f8fafc)] transition-colors">
+        <a href={historialHref} className="text-sm text-[var(--color-text-secondary,#94a3b8)] hover:text-[var(--color-text-primary,#f8fafc)] transition-colors">
           ← Volver
         </a>
         <div className="flex items-center gap-4">

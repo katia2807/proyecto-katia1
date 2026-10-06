@@ -99,6 +99,50 @@ describe("Inicio: totales y estados de carga", () => {
     expect((await getVentasBorradorRows()).map((row) => row.id)).toEqual(["pendiente-antigua"]);
   });
 
+  test("muestra madera cortada aunque no existan ventas en la tabla anterior y abre su detalle", async () => {
+    tables.ventas_madera_cortada = [fixture("cortada-reciente", { fecha: "2026-10-05", total: 8355.83 })];
+    const inicio = await getInicioData();
+    expect(inicio.ventas).toEqual({ available: true, data: [{
+      id: "cortada-reciente", fecha: "2026-10-05", total: 8355.83, estado: "registrada", tipo: "madera",
+    }] });
+    const html = renderToStaticMarkup(await DashboardPage({}));
+    expect(html).not.toContain("Sin ventas aún");
+    expect(html).toContain('href="/ventas/detalle/madera/cortada-reciente"');
+    expect(html).toContain("8,355.83");
+  });
+
+  test("combina los dos orígenes por fecha y muestra sólo cuatro ventas vigentes de la empresa", async () => {
+    tables.ventas_madera = [
+      fixture("legado-reciente", { fecha: "2026-10-07", total: 100, estado: "confirmada" }),
+      fixture("legado-antiguo", { fecha: "2026-09-01", total: 90, estado: "borrador" }),
+    ];
+    tables.ventas_madera_cortada = Array.from({ length: 6 }, (_, index) => fixture(`cortada-${index + 1}`, {
+      fecha: `2026-10-0${index + 1}`, total: 200,
+    }));
+    tables.ventas_madera_cortada.push(
+      fixture("cortada-eliminada", { fecha: "2026-10-31", total: 500, deleted_at: "2026-10-01" }),
+      fixture("cortada-otra-empresa", { fecha: "2026-10-30", total: 500, organization_id: "otra" }),
+    );
+    const inicio = await getInicioData();
+    expect(inicio.ventas.data?.map(row => row.id)).toEqual(["legado-reciente", "cortada-6", "cortada-5", "cortada-4"]);
+    const html = renderToStaticMarkup(await DashboardPage({}));
+    expect(html).toContain('href="/ventas/detalle/venta-madera/legado-reciente"');
+    expect(html).toContain('href="/ventas/detalle/madera/cortada-6"');
+  });
+
+  test("un fallo de madera cortada avisa de carga incompleta en vez de mostrar un resumen parcial", async () => {
+    tables.ventas_madera = [fixture("legado-visible", { fecha: "2026-10-05", total: 100, estado: "confirmada" })];
+    failures.add("ventas_madera_cortada");
+    const inicio = await getInicioData();
+    expect(inicio.ventas).toEqual({ data: null, available: false });
+    expect(inicio.ventasBorrador).toEqual({ data: 0, available: true });
+    const html = renderToStaticMarkup(await DashboardPage({}));
+    expect(html).toContain("Verificación incompleta");
+    expect(html).toContain("No se pudieron cargar las ventas recientes.");
+    expect(html).not.toContain("Sin ventas aún");
+    expect(html).not.toContain('href="/ventas/detalle/venta-madera/legado-visible"');
+  });
+
   test("incluye penalidades y adelantos antiguos; excluye alertas resueltas", async () => {
     tables.alquileres = Array.from({ length: 12 }, (_, index) => fixture(`cerrado-${index}`, { estado: "cerrado", penalidad: 50 }));
     tables.alquileres.push(fixture("abierto-antiguo", { estado: "abierto", penalidad: 100 }));
