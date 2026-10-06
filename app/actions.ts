@@ -19,6 +19,7 @@ import {
   demoCreateChofer,
   demoUpdateChofer,
   demoCreateCliente,
+  demoUpdateClienteDatos,
   demoCreateCompraMadera,
   demoCreateCotizacionUnificada,
   demoCreateContratoAlquiler,
@@ -1230,6 +1231,53 @@ export async function createClienteCotizacionRapida(input: {
     return { ok: true, id: data.id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
+  }
+}
+
+export async function updateClienteCotizacionRapida(
+  clienteId: string,
+  input: Parameters<typeof createClienteCotizacionRapida>[0],
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  try {
+    await requireMutationAccess(ventasRoles);
+    const parsed = z.object({
+      id: z.string().uuid("El cliente registrado no es válido."),
+      nombre: z.string().trim().min(2, "Ingresa el nombre o razón social."),
+      documento: z.string().trim(),
+      telefono: z.string().trim(),
+      direccion: z.string().trim(),
+      tipoPersona: z.enum(["natural", "empresa"]),
+    }).safeParse({ ...input, id: clienteId });
+    if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+    const datos = {
+      nombre: parsed.data.nombre,
+      documento: parsed.data.documento || null,
+      telefono: parsed.data.telefono || null,
+      direccion: parsed.data.direccion || null,
+      tipo_persona: parsed.data.tipoPersona,
+      ruc: parsed.data.tipoPersona === "empresa" ? parsed.data.documento || null : null,
+    };
+    if (!hasSupabaseEnv()) {
+      if (!demoUpdateClienteDatos(clienteId, DEFAULT_ORG_ID, datos)) {
+        return { ok: false, error: "No se encontró el cliente registrado. Vuelve a seleccionarlo." };
+      }
+    } else {
+      const supabase = getSupabaseServerClient();
+      const { data, error } = await supabase.from("clientes")
+        .update(datos)
+        .eq("id", clienteId)
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .is("deleted_at", null)
+        .select("id")
+        .maybeSingle();
+      if (error) return { ok: false, error: error.message };
+      if (!data) return { ok: false, error: "No se encontró el cliente registrado. Vuelve a seleccionarlo." };
+    }
+    revalidatePath("/cotizacion");
+    revalidatePath("/ventas");
+    return { ok: true, id: clienteId };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Ocurrió un problema, intenta de nuevo." };
   }
 }
 

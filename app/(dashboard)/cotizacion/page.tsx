@@ -4,18 +4,21 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { DEFAULT_EMPRESA_CONFIG, getEmpresaConfig } from "@/lib/company-config";
 import {
   getClientesRows,
-  getCotizacionesUnificadasRows,
+  getCotizacionesUnificadasHistorial,
+  getCotizacionUnificadaById,
+  COTIZACIONES_HISTORIAL_LIMITE,
   getInventarioProductosRows,
   getMueblesCatalogoRows,
 } from "@/lib/data";
 import { getDashboardSession } from "@/lib/current-user-role";
 import { previewCorrelativo } from "@/lib/numeracion";
 import { canMutateVentas } from "@/lib/permissions";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
 type CotizacionPageProps = {
-  searchParams?: Promise<{ modo?: string | string[] }>;
+  searchParams?: Promise<{ modo?: string | string[]; editar?: string | string[]; cotizacion?: string | string[] }>;
 };
 
 function normalizeModoParam(value: string | string[] | undefined) {
@@ -24,7 +27,9 @@ function normalizeModoParam(value: string | string[] | undefined) {
 }
 
 export default async function CotizacionPage({ searchParams }: CotizacionPageProps) {
-  const modo = normalizeModoParam((await searchParams)?.modo);
+  const params = await searchParams;
+  const modo = normalizeModoParam(params?.modo);
+  const seleccionId = normalizeModoParam(params?.editar) || normalizeModoParam(params?.cotizacion);
   const modoGuiado = modo === "guiado";
   const session = await getDashboardSession();
   const role = session?.role ?? null;
@@ -32,7 +37,7 @@ export default async function CotizacionPage({ searchParams }: CotizacionPagePro
   const canSave = canMutateVentas(role, uiRole);
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
-  const [productos, mueblesCatalogo, clientes, cotizacionesGuardadas, empresa] = await Promise.all([
+  const [productos, mueblesCatalogo, clientes, historial, empresa] = await Promise.all([
     getInventarioProductosRows().catch((error) => {
       console.error("[cotizacion/page] getInventarioProductosRows failed:", error);
       return [];
@@ -45,15 +50,27 @@ export default async function CotizacionPage({ searchParams }: CotizacionPagePro
       console.error("[cotizacion/page] getClientesRows failed:", error);
       return [];
     }),
-    getCotizacionesUnificadasRows().catch((error) => {
-      console.error("[cotizacion/page] getCotizacionesUnificadasRows failed:", error);
-      return [];
-    }),
+    getCotizacionesUnificadasHistorial(),
     getEmpresaConfig().catch((error) => {
       console.error("[cotizacion/page] getEmpresaConfig failed:", error);
       return DEFAULT_EMPRESA_CONFIG;
     }),
   ]);
+  const cotizacionesGuardadas = [...historial.rows];
+  let seleccionError: string | null = null;
+  if (seleccionId && !cotizacionesGuardadas.some((row) => row.id === seleccionId)) {
+    if (!z.string().uuid().safeParse(seleccionId).success) {
+      seleccionError = "El enlace de la cotización no es válido. Vuelve al historial y selecciona una cotización.";
+    } else {
+      try {
+        const seleccionada = await getCotizacionUnificadaById(seleccionId, { throwOnError: true });
+        if (seleccionada) cotizacionesGuardadas.unshift(seleccionada);
+        else seleccionError = "No se encontró la cotización solicitada. Puede haber sido eliminada o no estar disponible.";
+      } catch {
+        seleccionError = "No se pudo cargar la cotización solicitada. Recarga la página antes de intentar editarla.";
+      }
+    }
+  }
   const correlativoPreview = await previewCorrelativo("cotizacion").catch((error) => {
     console.error("[cotizacion/page] previewCorrelativo failed:", error);
     return "N 0001";
@@ -108,7 +125,12 @@ export default async function CotizacionPage({ searchParams }: CotizacionPagePro
         </p>
       </Card>
 
-      <CotizacionUnificadaWizard
+      {seleccionError ? (
+        <div role="alert" className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <p>{seleccionError}</p>
+          <a href="/cotizacion#historial-cotizaciones" className="mt-2 inline-block font-semibold text-[var(--color-accent)]">Volver al historial</a>
+        </div>
+      ) : <CotizacionUnificadaWizard
         canSave={canSave}
         correlativoPreview={correlativoPreview}
         productos={productos}
@@ -117,16 +139,21 @@ export default async function CotizacionPage({ searchParams }: CotizacionPagePro
         cotizacionesGuardadas={cotizacionesGuardadas}
         empresa={empresa}
         mockData={comboMock}
-      />
+        historialLoadWarning={historial.loadWarning}
+      />}
 
-      <Card>
+      <Card id="historial-cotizaciones">
         <CardTitle>Historial de cotizaciones</CardTitle>
         <CardDescription>
-          {cotizacionesGuardadas.length} cotización{cotizacionesGuardadas.length !== 1 ? "es" : ""} registrada{cotizacionesGuardadas.length !== 1 ? "s" : ""}.
-          Abre una fila para revisar detalle, estado o convertirla a venta.
+          {historial.loadWarning ? "Historial temporalmente no disponible."
+            : historial.totalCount === null ? `Se muestran ${cotizacionesGuardadas.length} cotizaciones; el historial carga hasta ${COTIZACIONES_HISTORIAL_LIMITE} recientes.`
+              : historial.totalCount > cotizacionesGuardadas.length ? `Mostrando ${cotizacionesGuardadas.length} de ${historial.totalCount} cotizaciones. El historial carga las ${COTIZACIONES_HISTORIAL_LIMITE} más recientes; la abierta por enlace también se incluye.`
+                : `${cotizacionesGuardadas.length} ${cotizacionesGuardadas.length === 1 ? "cotización registrada" : "cotizaciones registradas"}.`}
+          {!historial.loadWarning && " Abre una fila para revisar detalle, estado o convertirla a venta."}
         </CardDescription>
+        {historial.loadWarning && <p role="alert" className="mt-3 text-sm text-[var(--color-text-secondary)]">{historial.loadWarning}</p>}
         <div className="mt-3">
-          <CotizacionMasterDetail
+          {(!historial.loadWarning || cotizacionesGuardadas.length > 0) && <CotizacionMasterDetail
             canMutate={canSave}
             cotizaciones={cotizacionesGuardadas.map((row) => ({
               id: row.id,
@@ -139,7 +166,7 @@ export default async function CotizacionPage({ searchParams }: CotizacionPagePro
               detalle: row.detalle,
               created_at: row.created_at,
             }))}
-          />
+          />}
         </div>
       </Card>
     </div>

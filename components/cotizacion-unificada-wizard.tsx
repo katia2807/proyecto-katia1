@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createClienteCotizacionRapida,
+  updateClienteCotizacionRapida,
   deleteCotizacionUnificada,
   marcarListaProduccionCotizacion,
   pasarCotizacionAProduccion,
@@ -44,13 +45,15 @@ import {
 } from "@/lib/combobox-mocks";
 import type { EmpresaConfig } from "@/lib/company-config";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
-import { formatPen, parseDecimal } from "@/lib/utils";
+import { fechaHoyPeru, formatPen, parseDecimal } from "@/lib/utils";
+import { COTIZACION_ESTADOS, coincideEstadoCotizacion, type CotizacionEstado } from "@/lib/cotizacion-estados";
 import type { Database } from "@/lib/supabase/types";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 
 type InventarioProductoRow = Database["public"]["Tables"]["inventario_productos"]["Row"];
 type MuebleCatalogoRow = Database["public"]["Tables"]["muebles_catalogo"]["Row"];
 type ClienteRow = Database["public"]["Tables"]["clientes"]["Row"];
+type ClienteCotizacionDatos = Parameters<typeof createClienteCotizacionRapida>[0];
 type CotizacionUnificadaRow = Database["public"]["Tables"]["cotizaciones_unificadas"]["Row"];
 
 type CotizacionUnificadaWizardProps = {
@@ -64,6 +67,7 @@ type CotizacionUnificadaWizardProps = {
   empresa: EmpresaConfig;
   /** Usa datos mock locales para combobox / inventario (desarrollo sin Supabase). */
   mockData?: boolean;
+  historialLoadWarning?: string | null;
 };
 
 function clienteRowToCompleto(r: ClienteRow): ClienteCompleto {
@@ -74,6 +78,20 @@ function clienteRowToCompleto(r: ClienteRow): ClienteCompleto {
     telefono: r.telefono,
     direccion: r.direccion,
     ruc: r.ruc,
+  };
+}
+
+function clienteCreadoRow(id: string, datos: ClienteCotizacionDatos): ClienteRow {
+  return {
+    id,
+    organization_id: DEFAULT_ORG_ID,
+    nombre: datos.nombre.trim(),
+    documento: datos.documento.trim() || null,
+    telefono: datos.telefono.trim() || null,
+    direccion: datos.direccion.trim() || null,
+    tipo_persona: datos.tipoPersona,
+    ruc: datos.tipoPersona === "empresa" ? datos.documento.trim() || null : null,
+    created_at: new Date().toISOString(),
   };
 }
 
@@ -365,9 +383,11 @@ function loadDraftFromStorage(): CotizacionDraft | null {
 
 // ─── Componente auxiliar: nuevo cliente rápido dentro del wizard ─────────────
 function NuevoClienteRapidoInline({
+  tipoCliente,
   onCreated,
 }: {
-  onCreated: (nombre: string, documento: string, telefono: string) => void;
+  tipoCliente: "natural" | "empresa";
+  onCreated: (cliente: ClienteRow) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -393,15 +413,16 @@ function NuevoClienteRapidoInline({
     setLoading(true);
     setErr("");
     try {
-      const res = await createClienteCotizacionRapida({
+      const datos: ClienteCotizacionDatos = {
         nombre: nombre.trim(),
         documento: documento.trim(),
         telefono: telefono.trim(),
         direccion: "",
-        tipoPersona: "natural",
-      });
+        tipoPersona: tipoCliente,
+      };
+      const res = await createClienteCotizacionRapida(datos);
       if (!res.ok) { setErr(res.error); return; }
-      onCreated(nombre.trim(), documento.trim(), telefono.trim());
+      onCreated(clienteCreadoRow(res.id, datos));
       setNombre(""); setDocumento(""); setTelefono("");
       setOpen(false);
     } catch {
@@ -434,12 +455,12 @@ function NuevoClienteRapidoInline({
           />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-medium text-[var(--color-text-secondary)]">DNI / Documento</span>
+          <span className="text-xs font-medium text-[var(--color-text-secondary)]">{tipoCliente === "empresa" ? "RUC / Documento" : "DNI / Documento"}</span>
           <input
             className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
             value={documento}
             onChange={(e) => setDocumento(e.target.value)}
-            placeholder="DNI"
+            placeholder={tipoCliente === "empresa" ? "RUC" : "DNI"}
             inputMode="numeric"
             maxLength={11}
           />
@@ -480,10 +501,16 @@ export function CotizacionUnificadaWizard({
   cotizacionesGuardadas,
   empresa,
   mockData = false,
+  historialLoadWarning = null,
 }: CotizacionUnificadaWizardProps) {
+  const [clientesCreados, setClientesCreados] = useState<ClienteRow[]>([]);
   const effectiveClientes = useMemo(
-    () => ((mockData && clientes.length === 0) ? mockClientesAsRows(DEFAULT_ORG_ID) : clientes),
-    [mockData, clientes],
+    () => {
+      const registrados = (mockData && clientes.length === 0) ? mockClientesAsRows(DEFAULT_ORG_ID) : clientes;
+      const idsRegistrados = new Set(registrados.map((cliente) => cliente.id));
+      return [...clientesCreados.filter((cliente) => !idsRegistrados.has(cliente.id)), ...registrados];
+    },
+    [mockData, clientes, clientesCreados],
   );
   const effectiveProductos = useMemo(
     () => ((mockData && productos.length === 0) ? MOCK_INVENTARIO_PRODUCTOS : productos),
@@ -498,7 +525,7 @@ export function CotizacionUnificadaWizard({
   const [telefono, setTelefono] = useState("");
   const [direccion, setDireccion] = useState("");
   const [clienteId, setClienteId] = useState<string | null>(null);
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => fechaHoyPeru());
   const [detalle, setDetalle] = useState<CotizacionDetalleV1>(() => {
     const d = defaultCotizacionDetalleV1();
     d.rubros.muebles = true;
@@ -542,17 +569,7 @@ export function CotizacionUnificadaWizard({
   const [asrMedidaAnchoUI, setAsrMedidaAnchoUI] = useState("");
   const [asrMedidaLargoUI, setAsrMedidaLargoUI] = useState("");
   const [filterText, setFilterText] = useState("");
-  const [filterEstado, setFilterEstado] = useState<
-    | "todos"
-    | "pendiente"
-    | "lista_produccion"
-    | "produccion"
-    | "terminado"
-    | "entregado"
-    | "cobrada"
-    | "inactivo"
-    | "deudor"
-  >("todos");
+  const [filterEstado, setFilterEstado] = useState<"todos" | CotizacionEstado>("todos");
   const [filterFechaDesde, setFilterFechaDesde] = useState("");
   const [filterFechaHasta, setFilterFechaHasta] = useState("");
   /** Misma lista en servidor y primer paint cliente; luego se sincroniza con localStorage en useEffect. */
@@ -1219,7 +1236,7 @@ export function CotizacionUnificadaWizard({
     setTelefono("");
     setDireccion("");
     setTipoCliente("natural");
-    setFecha(new Date().toISOString().slice(0, 10));
+    setFecha(fechaHoyPeru());
     setTipoCotizacionPreset("muebles");
     setDetalle(() => {
       const d = defaultCotizacionDetalleV1();
@@ -1357,7 +1374,7 @@ export function CotizacionUnificadaWizard({
     let aceptadas = 0;
     for (const c of cotizacionesGuardadas) {
       if (c.estado_flujo === "pendiente") pend += 1;
-      else aceptadas += 1;
+      else if (c.estado_flujo === "lista_produccion") aceptadas += 1;
     }
     return { pend, aceptadas };
   }, [cotizacionesGuardadas]);
@@ -1396,10 +1413,7 @@ export function CotizacionUnificadaWizard({
   const cotizacionesFiltradas = useMemo(() => {
     const q = filterText.trim().toLowerCase();
     return cotizacionesGuardadas.filter((c) => {
-      if (filterEstado !== "todos") {
-        if (filterEstado === "pendiente" && c.estado_flujo !== "pendiente") return false;
-        if (filterEstado === "lista_produccion" && c.estado_flujo === "pendiente") return false;
-      }
+      if (!coincideEstadoCotizacion(c.estado_flujo, filterEstado)) return false;
       if (filterFechaDesde) {
         const fecha = String(c.fecha ?? "");
         if (!fecha || fecha < filterFechaDesde) return false;
@@ -1515,20 +1529,36 @@ export function CotizacionUnificadaWizard({
   }, [steps.length]);
 
   const ensureCliente = useCallback(async () => {
-    if (clienteId) return { ok: true as const, id: clienteId };
-    const res = await createClienteCotizacionRapida({
-      nombre: nombreCliente,
-      documento,
-      telefono,
-      direccion,
+    const datos: ClienteCotizacionDatos = {
+      nombre: nombreCliente.trim(),
+      documento: documento.trim(),
+      telefono: telefono.trim(),
+      direccion: direccion.trim(),
       tipoPersona: tipoCliente,
-    });
+    };
+    if (clienteId) {
+      const creado = clientesCreados.find((cliente) => cliente.id === clienteId);
+      const datosCambiaron = creado && (
+        creado.nombre !== datos.nombre || (creado.documento ?? "") !== datos.documento ||
+        (creado.telefono ?? "") !== datos.telefono || (creado.direccion ?? "") !== datos.direccion ||
+        creado.tipo_persona !== datos.tipoPersona
+      );
+      if (!datosCambiaron) return { ok: true as const, id: clienteId };
+      const actualizado = await updateClienteCotizacionRapida(clienteId, datos);
+      if (!actualizado.ok) return actualizado;
+      setClientesCreados((actuales) => actuales.map((cliente) =>
+        cliente.id === clienteId ? { ...cliente, ...clienteCreadoRow(clienteId, datos), created_at: cliente.created_at } : cliente,
+      ));
+      return actualizado;
+    }
+    const res = await createClienteCotizacionRapida(datos);
     if (!res.ok) {
       return { ok: false as const, error: res.error };
     }
+    setClientesCreados((actuales) => [...actuales, clienteCreadoRow(res.id, datos)]);
     setClienteId(res.id);
     return { ok: true as const, id: res.id };
-  }, [clienteId, direccion, documento, nombreCliente, telefono, tipoCliente]);
+  }, [clienteId, clientesCreados, direccion, documento, nombreCliente, telefono, tipoCliente]);
 
   const handleGuardar = useCallback(
     async (estadoFlujo: "pendiente" | "lista_produccion" = "pendiente", imprimir?: boolean) => {
@@ -1920,11 +1950,15 @@ export function CotizacionUnificadaWizard({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="text-xs text-[var(--color-text-secondary)]">¿Cliente nuevo?</p>
             <NuevoClienteRapidoInline
-              onCreated={(nombre, documento, telefono) => {
-                setNombreCliente(nombre);
-                setDocumento(documento);
-                setTelefono(telefono);
-                setClienteId(null); // aún no tiene ID en DB hasta guardar
+              tipoCliente={tipoCliente}
+              onCreated={(cliente) => {
+                setClientesCreados((actuales) => [...actuales, cliente]);
+                setTipoCliente(cliente.tipo_persona === "empresa" ? "empresa" : "natural");
+                setNombreCliente(cliente.nombre);
+                setDocumento(cliente.documento ?? "");
+                setTelefono(cliente.telefono ?? "");
+                setDireccion(cliente.direccion ?? "");
+                setClienteId(cliente.id);
               }}
             />
           </div>
@@ -2916,7 +2950,7 @@ export function CotizacionUnificadaWizard({
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   {detalle.muebles_lineas.map((linea, idx) => {
-                    const eco = economiaLineaMueble(linea, detalle.desperdicioPctMuebles);
+                    const eco = economiaLineaMueble(linea, detalle.desperdicioPctMuebles, resumenCotizacion.margenPctAplicado ?? 0);
                     const margenNegativo = eco.margenSoles != null && eco.margenSoles < 0;
                     return (
                       <div
@@ -2972,7 +3006,7 @@ export function CotizacionUnificadaWizard({
                           <p>
                             Precio de venta: <strong>{formatPen(eco.precioVenta)}</strong>{" "}
                             <span className="text-[var(--color-text-secondary)]">
-                              (PT compra × precio venta por PT)
+                              (PT cotizados × precio por PT, con el margen de la cotización)
                             </span>
                           </p>
                           <p className={margenNegativo ? "font-semibold text-red-600 dark:text-red-400" : ""}>
@@ -3350,7 +3384,7 @@ export function CotizacionUnificadaWizard({
             />
           </div>
 
-          <div className="mx-3 mb-4 rounded-xl border border-dashed border-amber-800/35 bg-amber-50/50 px-4 py-4 text-sm dark:border-amber-500/30 dark:bg-amber-950/30 sm:mx-5">
+          <div className="mx-3 mb-4 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-2)] px-4 py-4 text-sm text-[var(--color-text-primary)] sm:mx-5">
             <p className="mb-3 font-bold text-[var(--color-text-primary)]">
               Uso interno — economía estimada (no va al PDF del cliente)
             </p>
@@ -3549,6 +3583,7 @@ export function CotizacionUnificadaWizard({
         <div className="border-b border-[var(--color-border)] px-5 py-4">
           <CardTitle className="text-base">Cotizaciones guardadas</CardTitle>
           <CardDescription>Cargá una para editarla o usá las acciones según estado.</CardDescription>
+          {historialLoadWarning && <p role="alert" className="mt-2 text-sm text-[var(--color-text-secondary)]">{historialLoadWarning}</p>}
         </div>
         <div className="grid gap-3 border-b border-[var(--color-border)] px-5 py-4 md:grid-cols-4">
           <label className="space-y-1 md:col-span-2">
@@ -3571,7 +3606,7 @@ export function CotizacionUnificadaWizard({
                   | "todos"
                   | "pendiente"
                   | "lista_produccion"
-                  | "produccion"
+                  | "en_produccion"
                   | "terminado"
                   | "entregado"
                   | "cobrada"
@@ -3581,8 +3616,9 @@ export function CotizacionUnificadaWizard({
               }
             >
               <option value="todos">Todos</option>
-              <option value="pendiente">Pendiente</option>
-              <option value="lista_produccion">Cotización aceptada</option>
+              {Object.entries(COTIZACION_ESTADOS).map(([estado, etiqueta]) => (
+                <option key={estado} value={estado}>{etiqueta}</option>
+              ))}
             </select>
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -3627,6 +3663,7 @@ export function CotizacionUnificadaWizard({
                 <td className="px-3 py-2">
                   <select
                     value={c.estado_flujo}
+                    disabled={!canSave || c.estado_flujo === "cobrada"}
                     onChange={async (e) => {
                       const nuevo = e.target.value as Parameters<typeof cambiarEstadoCotizacionUnificada>[1];
                       if (!confirm(`¿Cambiar el estado de la cotización a "${nuevo}"?`)) return;
@@ -3651,8 +3688,9 @@ export function CotizacionUnificadaWizard({
                                     : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
                       }`}
                   >
-                    <option value="pendiente">Pendiente</option>
-                    <option value="lista_produccion">Cotización aceptada</option>
+                    {Object.entries(COTIZACION_ESTADOS).map(([estado, etiqueta]) => (
+                      <option key={estado} value={estado} disabled={estado === "cobrada"}>{etiqueta}</option>
+                    ))}
                   </select>
                 </td>
                 <td className="px-3 py-2">
@@ -3712,8 +3750,10 @@ export function CotizacionUnificadaWizard({
             ))}
           </tbody>
         </table>
-        {cotizacionesFiltradas.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-[var(--color-text-secondary)]">Aún no hay cotizaciones unificadas guardadas.</p>
+        {cotizacionesFiltradas.length === 0 && !historialLoadWarning ? (
+          <p className="px-5 py-6 text-sm text-[var(--color-text-secondary)]">
+            {cotizacionesGuardadas.length === 0 ? "Aún no hay cotizaciones guardadas." : "No hay cotizaciones que coincidan con estos filtros."}
+          </p>
         ) : null}
       </Card>
       </details>

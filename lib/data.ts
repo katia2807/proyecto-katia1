@@ -464,19 +464,52 @@ export async function getCotizacionesUnificadasRows(): Promise<CotizacionUnifica
   }, fallback.cotizacionesUnificadas);
 }
 
-export async function getCotizacionUnificadaById(id: string): Promise<CotizacionUnificadaRow | null> {
+export const COTIZACIONES_HISTORIAL_LIMITE = 100;
+
+export type CotizacionesHistorialResult = {
+  rows: CotizacionUnificadaRow[];
+  totalCount: number | null;
+  loadWarning: string | null;
+};
+
+/** Lectura del apartado Cotizaciones: conserva errores y alcance, sin cambiar los lectores compartidos. */
+export async function getCotizacionesUnificadasHistorial(): Promise<CotizacionesHistorialResult> {
+  try {
+    if (!hasSupabaseEnv()) {
+      const rows = demoCotizacionesUnificadasRows()
+        .filter((row) => row.organization_id === DEFAULT_ORG_ID && !row.deleted_at)
+        .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.created_at.localeCompare(a.created_at)) as CotizacionUnificadaRow[];
+      return { rows: rows.slice(0, COTIZACIONES_HISTORIAL_LIMITE), totalCount: rows.length, loadWarning: null };
+    }
+    const { data, count, error } = await getSupabaseServerClient()
+      .from("cotizaciones_unificadas")
+      .select("*", { count: "exact" })
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .is("deleted_at", null)
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(COTIZACIONES_HISTORIAL_LIMITE);
+    if (error) throw new Error(error.message);
+    return { rows: data ?? [], totalCount: count, loadWarning: null };
+  } catch {
+    return { rows: [], totalCount: null, loadWarning: "No se pudo cargar el historial de cotizaciones. Recarga la página para intentarlo de nuevo." };
+  }
+}
+
+export async function getCotizacionUnificadaById(id: string, options?: { throwOnError?: boolean }): Promise<CotizacionUnificadaRow | null> {
   if (!hasSupabaseEnv()) {
     const row = demoGetCotizacionUnificada(id);
-    return row && !row.deleted_at ? (row as CotizacionUnificadaRow) : null;
+    return row && !row.deleted_at && (!options?.throwOnError || row.organization_id === DEFAULT_ORG_ID) ? (row as CotizacionUnificadaRow) : null;
   }
   const supabase = getSupabaseServerClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("cotizaciones_unificadas")
     .select("*")
     .eq("id", id)
     .eq("organization_id", DEFAULT_ORG_ID)
     .is("deleted_at", null)
     .maybeSingle();
+  if (error && options?.throwOnError) throw new Error(error.message);
   return data ?? null;
 }
 

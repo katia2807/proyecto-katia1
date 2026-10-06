@@ -2219,6 +2219,18 @@ export function demoCreateCliente(input: Omit<ClienteRow, "id" | "created_at">):
   return id;
 }
 
+export function demoUpdateClienteDatos(
+  id: string,
+  organizationId: string,
+  datos: Pick<ClienteRow, "nombre" | "documento" | "telefono" | "direccion" | "tipo_persona" | "ruc">,
+): boolean {
+  const cliente = store.clientes.find((row) => row.id === id && row.organization_id === organizationId);
+  if (!cliente) return false;
+  Object.assign(cliente, datos);
+  persistStore();
+  return true;
+}
+
 export function demoCreateProveedor(
   input: Pick<ProveedorRow, "organization_id" | "nombre"> & Partial<Omit<ProveedorRow, "id" | "created_at" | "organization_id" | "nombre">>,
 ) {

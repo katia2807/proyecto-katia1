@@ -4,6 +4,7 @@ import {
   crearInstantaneaCalculoCotizacion,
   parseMargenGananciaInput,
   resolverCalculoDocumentoCotizacion,
+  economiaLineaMueble,
   totalClienteCoincideConServidor,
 } from '@/lib/cotizacion-calculos';
 import { buildLineasResumen } from '@/lib/cotizacion-unificada-lineas';
@@ -12,6 +13,31 @@ import {
   defaultCotizacionDetalleV1,
   type CotizacionDetalleV1,
 } from '@/lib/cotizacion-unificada-payload';
+
+describe('economía del mueble con la misma base de la cotización', () => {
+  const linea = {
+    id: 'linea', inventario_producto_id: null, especie_label: 'Madera de prueba',
+    piezas: [{ id: 'pieza', cantidad: 1, espesor: 1, ancho: 10, largo: 12, descripcion: 'Pieza' }],
+    precioPorPt: 10, costoPorPt: 4,
+  };
+
+  test('el desperdicio aumenta la compra, no los PT vendidos', () => {
+    const economia = economiaLineaMueble(linea, 50, 30);
+    expect(economia).toEqual({ ptCompra: 15, precioVenta: 130, costoEstimado: 60, margenSoles: 70, margenPct: 53.85 });
+    const detalle = defaultCotizacionDetalleV1();
+    detalle.rubros.muebles = true;
+    detalle.muebles_lineas = [linea];
+    detalle.desperdicioPctMuebles = 50;
+    expect(calcularContratoCotizacion(detalle, 30).totalFinal).toBe(economia.precioVenta);
+    expect(buildLineasResumen(detalle, 30)[0].precioTotal).toBe(economia.precioVenta);
+  });
+
+  test('sin costo de compra no inventa un margen estimado', () => {
+    expect(economiaLineaMueble({ ...linea, costoPorPt: undefined }, 50, 20)).toEqual({
+      ptCompra: 15, precioVenta: 120, costoEstimado: null, margenSoles: null, margenPct: null,
+    });
+  });
+});
 
 function detalleAserradero(precioHora = 120, horas = 2): CotizacionDetalleV1 {
   const detalle = defaultCotizacionDetalleV1();

@@ -1,12 +1,14 @@
 # Estado del proyecto y continuidad
 
-Actualizado: 06/10/2026. Registro de mantenimiento: 1.1.49 (comprobación de descargas de Inventario).
+Actualizado: 06/10/2026. Registro de mantenimiento: 1.1.51 (C1–C6 de Cotizaciones corregidas y comprobadas en local; pendientes de publicación).
 
 ## Punto de partida
 
 La última publicación funcional comprobada es 1.1.47, commit `cfd7ef3`: las correcciones de Inventario 1.1.40–1.1.47 están en `main` y Vercel confirmó el despliegue. Incluyen I1 (consultas y guardados que confundían costo y precio), I2 (significado de los indicadores), I3 (recortes en celular), I4 (fecha inicial de Perú), I5 (selección múltiple sin operación conectada), I6 (filtros que se perdían al recargar o regresar), I7–I9 (alcance de Kardex, exportaciones y alertas sin historial) e I10–I11 (conteo mensual y Excel de stock). La revisión final local pasó con 538 pruebas; en producción se comprobaron las pantallas y filtros mediante lectura. El Excel de stock descargado se abrió y verificó; el usuario confirmó la descarga de Kardex, cuyo contenido no se pudo inspeccionar. Los registros 1.1.48–1.1.49 incorporan esta evidencia, sin nuevos cambios funcionales. La versión del código se consulta en `lib/app-version.ts` y su historial en [Notas de parche](NOTAS_DE_PARCHE.md).
 
 El criterio acordado es corregir errores y detalles de diseño por partes, conservando el uso habitual. Esta página permite retomar el trabajo; leer solo la sección afectada y consultar el detalle cuando haga falta. No se integra en la aplicación ni se usa para bloquear su ejecución o exigir revisiones completas en cada cambio.
+
+Preferencia visual expresada el 06/10/2026: al terminar de pulir los apartados, considerar una renovación de colores y detalles para que la actualización se perciba más fresca. Preparar esa propuesta al cierre, conservando la ubicación de las opciones y los pasos habituales; no se cambió la paleta durante estas correcciones.
 
 ## Apartados trabajados
 
@@ -16,6 +18,7 @@ El criterio acordado es corregir errores y detalles de diseño por partes, conse
 | Ventas | Revisión funcional cerrada dentro del alcance comprobado; corrección compartida publicada | 1.1.38: historial, filtros, acceso a Clientes y regreso desde comprobante interactivo, A4 y ticket. Las operaciones mostradas antes y después de publicar coincidieron. I1 se publicó en 1.1.47: la consulta compartida no escribe y editar el precio del catálogo conserva el costo de inventario. | Los guardados de costo y precio se probaron con datos aislados; no se editaron registros del negocio en producción para verificar I1. |
 | Caja | Revisión funcional cerrada dentro del alcance comprobado | 1.1.37: resumen completo, filtros, movimientos protegidos, adjuntos y formulario en celular. En 1.1.38 se compararon todos los movimientos mostrados y el saldo sin diferencias. | No quedaron incidencias propias de esa revisión. |
 | Inventario | I1–I11 corregidas y publicadas; revisión local, pantallas y Excel de stock en producción comprobados | 06/10/2026, 1.1.47: 538 pruebas, tipos y compilación aprobados; descarga real y navegación local con datos aislados. Vercel confirmado, salud 200 con demo desactivado, 64 productos activos y ocho movimientos; búsqueda persistente y filtros de Kardex comprobados en producción. Excel real de stock abierto: 64 productos, S/ 17,021.00 conocidos y 58 costos faltantes. Descarga de Kardex confirmada por el usuario. Registro 1.1.49. | [Alcance y límites comprobados](REVISION_INVENTARIO_2026-10-05.md). No se inspeccionó el contenido del Kardex descargado en producción. No se validaron todas las escrituras reales ni los triggers contra PostgreSQL. |
+| Cotizaciones | C1–C6 corregidas y comprobadas en local 1.1.51; preparadas para publicar dentro del alcance revisado | 06/10/2026: 563 pruebas, tipos y compilación aprobados; ESLint sin errores. Navegador con datos aislados: cliente natural, empresa y registro directo sin duplicación, guardado repetido, aceptación y un solo cobro, estados, muebles, impresión, columnas a 320/360 px y enlaces fuera de las 100 recientes. | [Correcciones y límites comprobados](REVISION_COTIZACIONES_2026-10-06.md). Publicación y lectura en producción pendientes; no se verificaron escrituras ni triggers reales. No se cambiaron registros del negocio ni se fusionaron clientes existentes. |
 
 Los otros apartados no tienen una revisión completa registrada en este proceso. No trasladarles el estado de los anteriores. El uso de componentes de Clientes, Cotizaciones o Configuración durante una comprobación de Ventas no significa que esos módulos estén terminados.
 
@@ -56,10 +59,21 @@ Producción está publicada en Vercel desde la rama `main` de `katia2807/proyect
 | Comprobantes de Ventas | `app/(dashboard)/ventas/comprobante/[tipo]/[id]/page.tsx`, `components/sales/print-a4-voucher.tsx`, `components/sales/print-ticket-voucher.tsx`, `app/print/` |
 | Caja | `app/(dashboard)/caja/page.tsx`, `components/caja/`, los archivos `lib/caja-*` y acciones correspondientes en `app/actions.ts` |
 | Inventario | `app/(dashboard)/inventario/page.tsx`, `app/(dashboard)/inventario/export/route.ts`, `components/inventario-interactivo.tsx`, `components/inventario/`, los archivos `lib/inventario-resumen.ts`, `lib/inventario-filtros.ts`, `lib/inventario-historial.ts`, `lib/inventario-alertas.ts`, `lib/utils.ts` (`fechaHoyPeru`), `lib/data.ts` y acciones correspondientes en `app/actions.ts` |
+| Cotizaciones | `app/(dashboard)/cotizacion/page.tsx`, `app/(dashboard)/cotizacion/unificada/[id]/pdf/page.tsx`, `components/cotizacion-unificada-wizard.tsx`, `components/cotizacion-master-detail.tsx`, `components/sales/cotizacion-resumen-formal.tsx`, `lib/cotizacion-estados.ts`, `lib/cotizacion-calculos.ts`, `lib/cotizacion-unificada-lineas.ts`, `lib/cotizacion-unificada-payload.ts`, `lib/data.ts` y acciones correspondientes en `app/actions.ts` |
 | Datos y entornos | `lib/runtime.ts`, `lib/demo-mode.ts`, `lib/demo-store.ts`, `lib/server-data-dir.ts`, `lib/supabase/` |
 | Aviso de actualización | `lib/app-version.ts`, `docs/NOTAS_DE_PARCHE.md` |
 
 La vista local usada en estas revisiones está en `http://127.0.0.1:3001/`, con `KATIA_USE_DEMO_DB=1` y un almacén separado mediante `KATIA_SERVER_DATA_DIR`. Es una copia de pruebas, no una réplica sincronizada de producción. Se inició sesión con la cuenta demo anunciada en el acceso; no se habilitó acceso sin autenticación para esta revisión.
+
+### Correcciones locales de Cotizaciones — 06/10/2026, 1.1.51
+
+C1 conserva el ID y tipo del cliente creado y completa sus datos en ese mismo registro; C2 comparte las etiquetas reales de estados y filtra por coincidencia exacta; C3 distingue PT cotizados, compra con desperdicio y margen sin recalcular importes históricos; C4 permite desplazar las tablas en celular y usa los colores del tema para la economía interna; C5 usa `fechaHoyPeru` al iniciar o crear una nueva propuesta; C6 informa errores y alcance del historial, y consulta por ID los enlaces fuera de las 100 cotizaciones recientes.
+
+Se aprobaron las 563 pruebas en 41 archivos (25 casos nuevos), los tipos de aplicación y pruebas y la compilación optimizada. ESLint no encontró errores; quedaron nueve advertencias anteriores de variables sin uso. En una copia adicional `temp/cotizacion-1.1.51-preview`, el navegador comprobó tres registros de cliente y cotización sin duplicación al guardar dos veces, aceptación y un solo ingreso ficticio de S/ 312, estados coherentes, muebles con 10 PT netos y 15 PT de compra con total S/ 195, vista de impresión, desplazamiento a 320/360 px y contraste claro/oscuro. También abrió N°ANTIGUA, fuera de las 100 recientes, y bloqueó el formulario ante un enlace inexistente. La copia habitual y `data/store.json` conservaron sus huellas. El apartado queda listo para la publicación solicitada en un paso posterior; no se publicó ni se abrió en producción en esta corrección. El [informe](REVISION_COTIZACIONES_2026-10-06.md) conserva el diagnóstico anterior y los límites de estas comprobaciones.
+
+### Diagnóstico local de Cotizaciones — 06/10/2026, registro 1.1.50
+
+La base ejecutada fue 1.1.49 (`5dcdf8a`), sin cambios funcionales durante el diagnóstico. Para las escrituras se usó una segunda copia en `temp/cotizaciones-revision-2026-10-06` y un servidor temporal en el puerto 3002, con Supabase ignorado para datos y autenticación local habilitada. El original y la copia habitual del puerto 3001 conservaron sus huellas. Se aprobaron 96 pruebas de acciones, cálculos, pagos, cobro y descripción. El diagnóstico detallado distingue lo reproducido en navegador de los límites observados solo en el código; no equivale a una revisión completa ni a una comprobación en producción. La documentación y el aviso 1.1.50 quedan preparados localmente; no se recompiló ni publicó esta versión en este diagnóstico.
 
 ### Comprobación local de I1 — 06/10/2026, 1.1.40
 

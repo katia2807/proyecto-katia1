@@ -38,7 +38,7 @@ export function CotizacionResumenFormal({
   const wrapClass = cn(
     "doc-formal",
     embedded
-      ? "rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-[var(--color-text-primary)] shadow-sm sm:p-6"
+      ? "min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-[var(--color-text-primary)] shadow-sm sm:p-6"
       : "text-[#111]",
   );
 
@@ -124,7 +124,8 @@ export function CotizacionResumenFormal({
         Descripción
       </p>
 
-      <table className="mb-1 w-full">
+      <div className={embedded ? "overflow-x-auto" : undefined} tabIndex={embedded ? 0 : undefined} role={embedded ? "region" : undefined} aria-label={embedded ? "Importes de la cotización" : undefined}>
+      <table className={cn("mb-1 w-full", embedded && "min-w-[520px]")}>
         <thead>
           <tr>
             <th className="w-10 text-center">Item</th>
@@ -171,6 +172,7 @@ export function CotizacionResumenFormal({
           </tr>
         </tfoot>
       </table>
+      </div>
 
       {/* ── Notas ── */}
       <section className={cn("mt-5 pt-4 text-sm", embedded ? "border-t border-[var(--color-border)]" : "border-t border-[#ddd]")}>
@@ -195,7 +197,7 @@ export function CotizacionResumenFormal({
       {/* ── Firma ── */}
       <footer className="mt-12 flex justify-end text-xs text-center">
         <div className="flex flex-col items-center">
-          <div className={cn("w-56 border-b mb-1.5", embedded ? "border-[var(--color-border)]" : "border-[#333]")}></div>
+          <div className={cn("w-56 max-w-full border-b mb-1.5", embedded ? "border-[var(--color-border)]" : "border-[#333]")}></div>
           <p className={cn("font-bold", embedded ? "text-[var(--color-text-primary)]" : "text-neutral-800")}>{empresa.firmante}</p>
           <p className={embedded ? "text-[var(--color-text-secondary)]" : "text-neutral-500"}>{empresa.firmante_cargo}</p>
         </div>

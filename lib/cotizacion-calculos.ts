@@ -257,9 +257,10 @@ export type EconomiaLineaMueble = {
 export function economiaLineaMueble(
   linea: MuebleLineaMadera,
   desperdicioPctMuebles: number,
+  margenGananciaPct = 0,
 ): EconomiaLineaMueble {
   const ptCompra = ptCompraLinea(linea, desperdicioPctMuebles);
-  const precioVenta = round2(ptCompra * Math.max(0, linea.precioPorPt));
+  const precioVenta = calcularPrecioConMargen(totalPtLinea(linea.piezas) * Math.max(0, linea.precioPorPt), margenGananciaPct);
   const tieneCosto =
     linea.costoPorPt != null && Number.isFinite(linea.costoPorPt) && linea.costoPorPt >= 0;
   const costoEstimado = tieneCosto ? round2(ptCompra * (linea.costoPorPt as number)) : null;

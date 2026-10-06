@@ -10,6 +10,8 @@ import { formatDate, formatPen } from "@/lib/utils";
 import { parseCotizacionDetalle } from "@/lib/cotizacion-unificada-payload";
 import { cambiarEstadoCotizacion } from "@/app/actions";
 import { lineasCondicionesPagoCotizacion } from "@/lib/cotizacion-pago";
+import { COTIZACION_ESTADOS, etiquetaEstadoCotizacion } from "@/lib/cotizacion-estados";
+import { resolverCalculoDocumentoCotizacion, round2, totalPtLinea } from "@/lib/cotizacion-calculos";
 
 type Cotizacion = {
   id: string;
@@ -34,25 +36,16 @@ function EstadoBadge({ estado }: { estado: string }) {
     inactivo: "bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-300",
     deudor: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
   };
-  const labels: Record<string, string> = {
-    pendiente: "Pendiente",
-    lista_produccion: "Lista para producción",
-    en_produccion: "En producción",
-    cobrada: "Cobrada",
-    terminado: "Terminado",
-    entregado: "Entregado",
-    inactivo: "Inactivo",
-    deudor: "Deudor (Mora)",
-  };
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${colores[estado] ?? "bg-gray-100 text-gray-700"}`}>
-      {labels[estado] ?? estado}
+      {etiquetaEstadoCotizacion(estado)}
     </span>
   );
 }
 
 function DetalleVisual({ detalle, total }: { detalle: unknown; total: number }) {
   const d = useMemo(() => parseCotizacionDetalle(detalle), [detalle]);
+  const calculo = useMemo(() => resolverCalculoDocumentoCotizacion(d, total), [d, total]);
 
   // Extraer info de pago de notas_generales si fue guardada ahí
   const notasLineas = (d.notas_generales ?? "")
@@ -69,6 +62,10 @@ function DetalleVisual({ detalle, total }: { detalle: unknown; total: number }) 
 
   return (
     <div className="space-y-4 text-sm">
+
+      <p className="text-xs text-[var(--color-text-secondary)]">
+        Los importes del detalle son la base antes del margen. El documento para el cliente incluye el margen de la cotización.
+      </p>
 
       {/* ── RUBROS ACTIVOS ── */}
       <section>
@@ -102,24 +99,22 @@ function DetalleVisual({ detalle, total }: { detalle: unknown; total: number }) 
           </p>
           <div className="space-y-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
             {d.muebles_lineas.map((linea, li) => {
-              const totalPt = linea.piezas.reduce(
-                (acc, p) => acc + (p.cantidad * p.espesor * p.ancho * p.largo) / 12,
-                0,
-              );
+              const totalPt = totalPtLinea(linea.piezas);
               const ptCompra = totalPt * (1 + d.desperdicioPctMuebles / 100);
-              const montoLinea = ptCompra * linea.precioPorPt;
+              const montoLinea = round2(totalPt * Math.max(0, linea.precioPorPt));
               return (
                 <div key={linea.id} className="space-y-2">
                   <p className="font-semibold text-[var(--color-text-primary)]">
                     Línea {li + 1}{linea.especie_label ? ` · ${linea.especie_label}` : ""}
                   </p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-[var(--color-text-secondary)]">
-                    <span>Volumen de Madera (PT): <strong className="text-[var(--color-text-primary)]">{ptCompra.toFixed(2)} PT</strong></span>
-                    <span>Precio por Pie: <strong className="text-[var(--color-text-primary)]">{formatPen(linea.precioPorPt)}</strong></span>
-                    <span className="col-span-2">Subtotal línea: <strong className="text-[var(--color-text-primary)]">{formatPen(montoLinea)}</strong></span>
+                    <span>PT cotizados: <strong className="text-[var(--color-text-primary)]">{totalPt.toFixed(2)} PT</strong></span>
+                    <span>Precio base por PT: <strong className="text-[var(--color-text-primary)]">{formatPen(linea.precioPorPt)}</strong></span>
+                    <span className="col-span-2">Importe base línea: <strong className="text-[var(--color-text-primary)]">{formatPen(montoLinea)}</strong></span>
+                    <span className="col-span-2">Compra estimada con desperdicio: <strong>{ptCompra.toFixed(2)} PT</strong></span>
                   </div>
                   {linea.piezas.length > 0 && (
-                    <div className="rounded-lg border border-[var(--color-border)] overflow-hidden">
+                    <div className="rounded-lg border border-[var(--color-border)] overflow-x-auto" tabIndex={0} role="region" aria-label={`Piezas de la línea ${li + 1}`}>
                       <table className="w-full text-xs">
                         <thead className="bg-[var(--color-primary-soft)]/30">
                           <tr>
@@ -178,10 +173,10 @@ function DetalleVisual({ detalle, total }: { detalle: unknown; total: number }) 
               <>
                 <p>S/ por hora: <strong>{formatPen(d.aserradero.precioHora)}</strong></p>
                 <p>Horas: <strong>{d.aserradero.horas}</strong></p>
-                <p>Total: <strong>{formatPen(d.aserradero.precioHora * d.aserradero.horas)}</strong></p>
+                <p>Importe base: <strong>{formatPen(d.aserradero.precioHora * d.aserradero.horas)}</strong></p>
               </>
             ) : (
-              <p>Monto acordado: <strong>{formatPen(d.aserradero.montoTotalFijo)}</strong></p>
+              <p>Importe base: <strong>{formatPen(d.aserradero.montoTotalFijo)}</strong></p>
             )}
             {d.aserradero.descripcion && (
               <p className="pt-1 text-[var(--color-text-secondary)]">{d.aserradero.descripcion}</p>
@@ -200,7 +195,7 @@ function DetalleVisual({ detalle, total }: { detalle: unknown; total: number }) 
             <p>Equipo: <strong>{d.alquiler.nombre_maquinaria || "—"}</strong></p>
             <p>Tarifa: <strong>{formatPen(d.alquiler.tarifa)} / {d.alquiler.tarifaUnidad === "hora" ? "hora" : "día"}</strong></p>
             <p>Tiempo: <strong>{d.alquiler.unidades_tiempo} {d.alquiler.tarifaUnidad === "hora" ? "h" : "día(s)"}</strong></p>
-            <p>Subtotal: <strong>{formatPen(d.alquiler.tarifa * d.alquiler.unidades_tiempo)}</strong></p>
+            <p>Importe base: <strong>{formatPen(d.alquiler.tarifa * d.alquiler.unidades_tiempo)}</strong></p>
             {d.alquiler.incluye_garantia_danios && d.alquiler.monto_garantia > 0 && (
               <p>Garantía: <strong>{formatPen(d.alquiler.monto_garantia)}</strong></p>
             )}
@@ -210,6 +205,16 @@ function DetalleVisual({ detalle, total }: { detalle: unknown; total: number }) 
           </div>
         </section>
       )}
+
+      <section className="rounded-xl border border-[var(--color-border)] p-3 text-xs">
+        {calculo.margenPctAplicado !== null ? (
+          <>
+            <p>Base antes del margen: <strong>{formatPen(calculo.subtotalBase)}</strong></p>
+            <p>Margen ({calculo.margenPctAplicado}%): <strong>{formatPen(calculo.margenMonto ?? 0)}</strong></p>
+          </>
+        ) : <p>El total histórico se conserva; no hay un margen verificable para desglosarlo.</p>}
+        <p>Total de la cotización: <strong>{formatPen(total)}</strong></p>
+      </section>
 
       {/* ── CONDICIONES DE PAGO (desde notas) ── */}
       {notasPago.length > 0 && (
@@ -318,7 +323,7 @@ export function CotizacionMasterDetail({
 
   return (
     <>
-      <div className="overflow-hidden rounded-xl border border-[var(--color-border)]">
+      <div className="overflow-x-auto rounded-xl border border-[var(--color-border)]" tabIndex={0} role="region" aria-label="Historial de cotizaciones">
         <Table>
           <THead>
             <TRow>
@@ -352,12 +357,12 @@ export function CotizacionMasterDetail({
         onClose={() => {
           setSelectedId(null);
         }}
-        onEdit={() => {
+        onEdit={canMutate && selected?.estado_flujo !== "cobrada" ? () => {
           if (selected) {
             setSelectedId(null);
             router.push(`/cotizacion?editar=${selected.id}`);
           }
-        }}
+        } : undefined}
       >
         {selected ? (
           <div className="space-y-4">
@@ -389,13 +394,9 @@ export function CotizacionMasterDetail({
                       className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm"
                       disabled={isPending}
                     >
-                      <option value="pendiente">Pendiente</option>
-                      <option value="lista_produccion">Lista para producción</option>
-                      <option value="en_produccion">En producción</option>
-                      <option value="terminado">Terminado</option>
-                      <option value="entregado">Entregado</option>
-                      <option value="inactivo">Inactivo</option>
-                      <option value="deudor">Deudor (Mora)</option>
+                      {Object.entries(COTIZACION_ESTADOS).filter(([estado]) => estado !== "cobrada").map(([estado, etiqueta]) => (
+                        <option key={estado} value={estado}>{etiqueta}</option>
+                      ))}
                     </select>
                     <button
                       type="submit"
