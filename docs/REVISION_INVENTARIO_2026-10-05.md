@@ -1,6 +1,6 @@
 # Revisión de Inventario — 05/10/2026
 
-Base del diagnóstico: 1.1.38, commit `bcdc338`. Actualizado el 06/10/2026: I1–I11 tienen correcciones locales en 1.1.40–1.1.47; la revisión final local de ese alcance pasó y siguen pendientes publicación y comprobación en producción. Se conserva el diagnóstico original debajo de cada corrección para distinguir la base del resultado comprobado.
+Base del diagnóstico: 1.1.38, commit `bcdc338`. Actualizado el 06/10/2026: I1–I11 se publicaron en 1.1.47, commit `cfd7ef3`, y se comprobaron sus pantallas y filtros en producción mediante lectura. Registro 1.1.48; la descarga real de Excel en producción sigue pendiente de confirmación manual. Se conserva el diagnóstico original debajo de cada corrección para distinguir la base del resultado comprobado.
 
 ## Alcance y límites
 
@@ -146,4 +146,4 @@ La búsqueda sí filtra los productos y las alertas locales coinciden con los m�
 
 ## Próximo paso
 
-La revisión final local de I1–I11 está aprobada en 1.1.47 dentro del alcance comprobado. Publicar cuando corresponda a la autorización del usuario y confirmar después la versión y las consultas de Inventario en producción mediante operaciones de lectura previamente inspeccionadas. Conservar los límites documentados: no se probaron todas las escrituras reales ni los triggers contra PostgreSQL, el historial continúa acotado y otros apartados no se consideran terminados por estas comprobaciones.
+La publicación funcional 1.1.47 está confirmada en Vercel y visible en producción. Se comprobaron Resumen, Productos, búsqueda conservada al recargar, filtros y enlace de Kardex, Alertas y Reportes, sin ejecutar operaciones del negocio. El detalle y los límites están en [Estado del proyecto](ESTADO_DEL_PROYECTO.md). Falta confirmar manualmente que la descarga Excel publicada termina en el navegador: la herramienta no logró observarla. Conservar los demás límites: no se probaron todas las escrituras reales ni los triggers contra PostgreSQL, el historial continúa acotado y otros apartados no se consideran terminados por estas comprobaciones.

@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.48 — 06/10/2026
+
+Inventario ya incluye las correcciones de indicadores, filtros, alertas y archivos Excel, manteniendo el registro habitual. La documentación reúne lo revisado y sus límites para continuar el mantenimiento sin repetir trabajo.
+
 ## 1.1.47 — 06/10/2026
 
 Inventario cuenta los movimientos del mes según la fecha de Perú. El Excel aclara los costos desconocidos, evita sumar unidades distintas y permite descargar categorías personalizadas sin errores, incluso con el catálogo vacío.
