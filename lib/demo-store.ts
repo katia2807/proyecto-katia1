@@ -2459,18 +2459,52 @@ export function demoCreateSueldo(input: Omit<SueldoRow, "id" | "created_at">) {
   persistStore();
 }
 
+/** Equivalente local de la sincronización al guardar; nunca se llama desde una consulta. */
+function syncInventarioProductoToCatalogo(producto: InventarioProductoRow, syncFoto = false) {
+  if (producto.categoria !== "Muebles") return;
+  const match = store.mueblesCatalogo.find((m) =>
+    m.organization_id === producto.organization_id && (
+      m.id === producto.id ||
+      (producto.codigo && m.codigo.toLowerCase() === producto.codigo.toLowerCase()) ||
+      m.nombre.toLowerCase() === producto.nombre.toLowerCase()
+    ),
+  );
+  if (!match) {
+    store.mueblesCatalogo.push({
+      id: producto.id,
+      organization_id: producto.organization_id,
+      codigo: producto.codigo,
+      nombre: producto.nombre,
+      descripcion: "Producto importado del inventario",
+      precio_lista: 0,
+      foto_url: producto.foto_url ?? null,
+      stock_disponible: producto.stock_actual,
+      activo: producto.activo,
+      created_at: producto.created_at,
+    });
+    return;
+  }
+  match.codigo = producto.codigo;
+  match.nombre = producto.nombre;
+  match.stock_disponible = producto.stock_actual;
+  match.activo = producto.activo;
+  if (producto.foto_url || syncFoto) match.foto_url = producto.foto_url ?? null;
+}
+
 export function demoCreateInventarioProducto(
   input: Omit<InventarioProductoRow, "id" | "created_at" | "stock_actual" | "activo"> & { id?: string },
 ) {
   const newId = input.id || randomUUID();
-  store.inventarioProductos.unshift({
+  const producto: InventarioProductoRow = {
     created_at: nowIso(),
     stock_actual: 0,
     activo: true,
     ...input,
     foto_url: input.foto_url ?? null,
     id: newId,
-  });
+  };
+  store.inventarioProductos.unshift(producto);
+  syncInventarioProductoToCatalogo(producto);
   persistStore();
   return newId;
 }
@@ -2486,24 +2520,7 @@ export function demoUpdateInventarioProducto(
 
   Object.assign(row, patch);
 
-  // Sincronizar hacia Catálogo si es categoría Muebles
-  if (row.categoria === "Muebles") {
-    const match = store.mueblesCatalogo.find(
-      (m) =>
-        m.id === row.id ||
-        (row.codigo && m.codigo === row.codigo) ||
-        m.nombre.toLowerCase() === row.nombre.toLowerCase()
-    );
-    if (match) {
-      match.codigo = row.codigo;
-      match.nombre = row.nombre;
-      match.stock_disponible = row.stock_actual;
-      match.activo = row.activo;
-      if (patch.foto_url !== undefined) {
-        match.foto_url = patch.foto_url;
-      }
-    }
-  }
+  syncInventarioProductoToCatalogo(row, patch.foto_url !== undefined);
 
   persistStore();
   return row;
@@ -2552,6 +2569,7 @@ export function demoCreateInventarioMovimiento(
   if (row.tipo === "entrada_compra") producto.stock_actual += Number(row.cantidad);
   if (row.tipo === "salida_venta") producto.stock_actual -= Number(row.cantidad);
   if (row.tipo === "ajuste") producto.stock_actual += Number(row.cantidad);
+  syncInventarioProductoToCatalogo(producto);
   persistStore();
 }
 
@@ -2569,6 +2587,7 @@ export function demoDeleteInventarioMovimiento(id: string) {
   if (producto) {
     reverseMovimientoStock(producto, row);
     if (producto.stock_actual < 0) producto.stock_actual = 0;
+    syncInventarioProductoToCatalogo(producto);
   }
   store.inventarioMovimientos.splice(idx, 1);
   persistStore();
@@ -2676,44 +2695,6 @@ export function demoUpdateChofer(
 }
 
 export function demoMueblesCatalogoRows() {
-  // Sync stock and auto-provision missing catalog rows from inventarioProductos!
-  for (const p of store.inventarioProductos) {
-    if (p.categoria === "Muebles") {
-      const match = store.mueblesCatalogo.find(
-        (m) =>
-          m.id === p.id ||
-          m.codigo.toLowerCase() === p.codigo.toLowerCase() ||
-          m.nombre.toLowerCase() === p.nombre.toLowerCase()
-      );
-      if (!match) {
-        store.mueblesCatalogo.push({
-          id: p.id,
-          organization_id: p.organization_id || orgId || "default-org-id",
-          codigo: p.codigo,
-          nombre: p.nombre,
-          descripcion: "Producto importado del inventario",
-          precio_lista: p.costo_unitario ? Number(p.costo_unitario) : 0,
-          foto_url: p.foto_url || null,
-          stock_disponible: p.stock_actual,
-          activo: p.activo,
-          created_at: p.created_at,
-        });
-      } else {
-        match.stock_disponible = p.stock_actual;
-        // Coalescencia mutua de imágenes para proteger foto_url
-        if (p.foto_url && !match.foto_url) {
-          match.foto_url = p.foto_url;
-        } else if (match.foto_url && !p.foto_url) {
-          p.foto_url = match.foto_url;
-        }
-        // Sincronizar precio
-        if (p.costo_unitario !== null) {
-          match.precio_lista = p.costo_unitario;
-        }
-      }
-    }
-  }
-  persistStore();
   return [...store.mueblesCatalogo].sort((a, b) => a.nombre.localeCompare(b.nombre));
 }
 
@@ -2749,7 +2730,7 @@ export function demoCreateMuebleCatalogo(
     activo: input.activo ?? true,
     created_at: nowIso(),
     foto_url: input.foto_url ?? null,
-    costo_unitario: input.precio_lista ?? 0,
+    costo_unitario: null,
   });
 
   persistStore();
@@ -2782,7 +2763,6 @@ export function demoUpdateMuebleCatalogo(
       invRow.foto_url = patch.foto_url;
     }
     invRow.activo = row.activo;
-    invRow.costo_unitario = patch.precio_lista;
   }
 
   persistStore();
@@ -2831,6 +2811,10 @@ export function demoCreateVentaMuebleTerminado(
   const mueble = store.mueblesCatalogo.find((m) => m.id === newRow.mueble_catalogo_id);
   if (mueble) {
     mueble.stock_disponible = Math.max(0, mueble.stock_disponible - newRow.cantidad);
+    const producto = store.inventarioProductos.find((p) =>
+      p.id === mueble.id && p.organization_id === mueble.organization_id,
+    );
+    if (producto) producto.stock_actual = Math.max(0, producto.stock_actual - newRow.cantidad);
   }
 
   if (confirmaIngreso) {

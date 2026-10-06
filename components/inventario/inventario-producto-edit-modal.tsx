@@ -5,6 +5,7 @@ import { ContextActionPanel } from "@/components/context-action-panel";
 import { FotoUpload } from "@/components/sales/foto-upload";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
+import { formatPen } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useId, useRef } from "react";
 
@@ -17,6 +18,7 @@ type ProductoEnriched = {
   activo: boolean;
   stock_actual: number;
   stock_minimo: number;
+  costo_unitario_promedio: number;
   valor_stock: number;
   ultimo_movimiento: string | null;
   foto_url: string | null;
@@ -61,7 +63,11 @@ export function InventarioProductoEditModal({
 
   const desc =
     product != null
-      ? `Stock ${product.stock_actual} · Valorización S/ ${Number(product.valor_stock ?? 0).toFixed(2)} · Último mov. ${
+      ? `Stock ${product.stock_actual} · Valorización ${
+          Number(product.stock_actual) !== 0 && Number(product.costo_unitario_promedio ?? 0) <= 0
+            ? "Sin costo en compras"
+            : formatPen(product.valor_stock ?? 0)
+        } · Último mov. ${
           product.ultimo_movimiento ? formatDate(product.ultimo_movimiento) : "—"
         } · ${product.activo ? "Activo" : "Inactivo"}.`
       : "Seleccioná un producto en la lista.";

@@ -1,5 +1,37 @@
 # Notas de parche
 
+## 1.1.47 — 06/10/2026
+
+Inventario cuenta los movimientos del mes según la fecha de Perú. El Excel aclara los costos desconocidos, evita sumar unidades distintas y permite descargar categorías personalizadas sin errores, incluso con el catálogo vacío.
+
+## 1.1.46 — 06/10/2026
+
+Kardex indica cuántos movimientos muestra y su descarga Excel respeta los filtros. Las alertas distinguen los productos sin historial de los inactivos, evitando interpretar datos incompletos o antigüedades no comprobadas.
+
+## 1.1.45 — 06/10/2026
+
+Inventario conserva la búsqueda, los filtros de Productos y Kardex y la perspectiva elegida al recargar o volver con el navegador. Así puedes retomar la consulta sin repetir pasos, manteniendo los controles habituales.
+
+## 1.1.44 — 06/10/2026
+
+Productos deja de mostrar casillas y acciones para varios artículos que no estaban conectadas. Se conservan la edición y las confirmaciones al desactivar o eliminar, para evitar controles que confunden y no responden.
+
+## 1.1.43 — 06/10/2026
+
+Compra y movimiento de Inventario usan la fecha inicial del día de Perú para evitar adelantos por la noche. Se conservan las fechas elegidas dentro del formulario y los registros existentes, manteniendo la forma de trabajar.
+
+## 1.1.42 — 06/10/2026
+
+Productos se adapta mejor a pantallas pequeñas y Kardex permite desplazar la tabla para consultar todas sus columnas. Se conservan los filtros y las acciones habituales, evitando recortes sin cambiar la forma de trabajar.
+
+## 1.1.41 — 06/10/2026
+
+Inventario muestra el stock por unidad de medida y distingue los costos de salida de las ganancias. También señala valores parciales o sin costo registrado, para interpretar el resumen sin confundir importes ni cantidades.
+
+## 1.1.40 — 06/10/2026
+
+Inventario y Ventas ya no cambian precios ni registros al consultar el catálogo. El costo y el precio de venta se guardan por separado, manteniendo la actualización de stock y fotos para evitar cambios involuntarios.
+
 ## 1.1.39 — 05/10/2026
 
 Se registra el estado de Inicio, Ventas y Caja y los pendientes de Inventario, con pautas para continuar por partes. Se retira documentación desactualizada para evitar repetir errores y cambios innecesarios.

@@ -10,6 +10,9 @@ import {
 import { InventarioProductoEditModal } from "@/components/inventario/inventario-producto-edit-modal";
 import { InventarioTomaDecisionesCharts } from "@/components/inventario/inventario-toma-decisiones-charts";
 import { MueblesCatalogoSection } from "@/components/inventario/muebles-catalogo-section";
+import { InventarioResumenValores } from "@/components/inventario/inventario-resumen-valores";
+import { getInventarioFiltros, setInventarioFiltro, type InventarioFiltroParam } from "@/lib/inventario-filtros";
+import { filtrarInventarioKardex, getInventarioKardexExportHref, INVENTARIO_KARDEX_VISIBLE_LIMIT } from "@/lib/inventario-historial";
 import {
   buildParetoInventarioRows,
   type ParetoInventarioMode,
@@ -91,6 +94,8 @@ type InventarioData = {
   categorias: string[];
   stockBajo: ProductoEnriched[];
   sinMovimiento: ProductoEnriched[];
+  sinMovimientosRegistrados: ProductoEnriched[];
+  historialMovimientos: { cargados: number; total: number | null };
   reposicionSugerida: RankingRow[];
   rankingMasVendidos: ProductoEnriched[];
   rankingMenosVendidos: ProductoEnriched[];
@@ -192,6 +197,8 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
     categorias,
     stockBajo,
     sinMovimiento,
+    sinMovimientosRegistrados,
+    historialMovimientos,
     reposicionSugerida,
     rankingMasVendidos,
     rankingMenosVendidos,
@@ -208,17 +215,17 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
   );
   const { showToast } = useToast();
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
-  const [filterText, setFilterText] = useState("");
-  const [viewPerspective, setViewPerspective] = useState<"texto" | "galeria">("texto");
-  const [filterCategoria, setFilterCategoria] = useState("todas");
-  const [filterEstado, setFilterEstado] = useState<"todos" | "activos" | "inactivos" | "stock_bajo">("todos");
-  const [filterStockMin, setFilterStockMin] = useState("");
-  const [filterStockMax, setFilterStockMax] = useState("");
+  const filtros = getInventarioFiltros(searchParams);
+  const filterText = filtros.buscar;
+  const viewPerspective = filtros.perspectiva;
+  const filterCategoria = categorias.includes(filtros.categoria) ? filtros.categoria : "todas";
+  const filterEstado = filtros.estado;
+  const filterStockMin = filtros.stockMin;
+  const filterStockMax = filtros.stockMax;
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set());
   const [productosListLimit, setProductosListLimit] = useState(PRODUCTOS_LIST_PAGE);
-  const [kardexTipo, setKardexTipo] = useState<"todos" | "entrada_compra" | "salida_venta" | "ajuste">("todos");
-  const [kardexProducto, setKardexProducto] = useState("todos");
+  const kardexTipo = filtros.kardexTipo;
+  const kardexProducto = productos.some((p) => p.id === filtros.kardexProducto) ? filtros.kardexProducto : "todos";
   const [paretoMode, setParetoMode] = useState<ParetoInventarioMode>("unidades");
   const [editModalProductId, setEditModalProductId] = useState<string | null>(null);
   const [editSession, setEditSession] = useState(0);
@@ -234,6 +241,13 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
   /** Seteado al detectar #producto-uuid (el hash se limpia después; la ref conserva el id para ampliar la lista). */
   const deepLinkProductoIdRef = useRef<string | null>(null);
   const deepLinkScrollHechoRef = useRef(false);
+
+  function updateFilter(key: InventarioFiltroParam, value: string) {
+    const url = new URL(window.location.href);
+    url.search = setInventarioFiltro(url.searchParams, key, value).toString();
+    // Next actualiza useSearchParams sin volver a consultar los datos al escribir.
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }
 
   const getFotoUrlEfectiva = useCallback((row: ProductoEnriched) => {
     if (row.foto_url) return row.foto_url;
@@ -273,7 +287,10 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
   );
 
   const openCompraReponer = useCallback((productoId: string) => {
-    router.push(`/inventario?quick=compra&producto_id=${encodeURIComponent(productoId)}`);
+    const url = new URL(window.location.href);
+    url.searchParams.set("quick", "compra");
+    url.searchParams.set("producto_id", productoId);
+    router.push(`${url.pathname}${url.search}${url.hash}`, { scroll: false });
   }, [router]);
 
   const openProductoModal = useCallback(
@@ -383,11 +400,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
   }, [productosFiltrados]);
 
   const kardexFiltrado = useMemo(() => {
-    return kardex.filter((k) => {
-      if (kardexTipo !== "todos" && k.tipo !== kardexTipo) return false;
-      if (kardexProducto !== "todos" && k.producto_id !== kardexProducto) return false;
-      return true;
-    });
+    return filtrarInventarioKardex(kardex, kardexTipo, kardexProducto);
   }, [kardex, kardexProducto, kardexTipo]);
 
   const paretoInventario = useMemo(
@@ -434,33 +447,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
 
       {activeTab === "resumen" ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card>
-            <CardTitle>Stock total</CardTitle>
-            <p className="mt-3 text-3xl font-black">{indicadores.totalStock}</p>
-            <p className="text-xs text-[var(--color-text-secondary)]">Unidades acumuladas en productos activos.</p>
-          </Card>
-          <Card>
-            <CardTitle>Valor del inventario</CardTitle>
-            <p className="mt-3 text-3xl font-black">S/ {(() => {
-              const totalInventario = productos
-                .filter(p => p.activo !== false)
-                .reduce((sum, p) => sum + Number(p.valor_stock ?? 0), 0);
-              return totalInventario.toFixed(2);
-            })()}</p>
-            <p className="text-xs text-[var(--color-text-secondary)]">Suma de stock × costo unitario de cada producto activo.</p>
-          </Card>
-          <Card>
-            <CardTitle>Ganancias del mes (ventas)</CardTitle>
-            <p className="mt-3 text-3xl font-black">S/ {(() => {
-              const hoy = new Date();
-              const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
-              const gananciasMes = movimientos
-                .filter(m => m.tipo === 'salida_venta' && m.fecha.startsWith(mesActual))
-                .reduce((sum, m) => sum + (Number(m.cantidad) * Number(m.costo_unitario ?? 0)), 0);
-              return gananciasMes.toFixed(2);
-            })()}</p>
-            <p className="text-xs text-[var(--color-text-secondary)]">Total vendido este mes: cantidad × costo unitario por cada venta.</p>
-          </Card>
+          <InventarioResumenValores productos={productos} movimientos={movimientos} />
           <Card>
             <CardTitle>Rotación promedio</CardTitle>
             <p className="mt-3 text-3xl font-black">{indicadores.rotacionPromedio}</p>
@@ -594,9 +581,9 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
           exige escribir ELIMINAR.
         </CardDescription>
         <div className="mt-4 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--color-border)] pb-4">
-          <div className="grid gap-3 md:grid-cols-5 flex-1 min-w-[280px]">
-            <Field label="Buscar" value={filterText} onChange={(e) => setFilterText(e.target.value)} placeholder="Código, nombre..." />
-            <SelectField label="Categoría" value={filterCategoria} onChange={(e) => setFilterCategoria(e.target.value)}>
+          <div className="grid min-w-0 w-full gap-3 md:min-w-[min(100%,560px)] md:w-auto md:flex-1 md:grid-cols-5 [&>label]:min-w-0 [&_input]:min-w-0 [&_input]:w-full [&_select]:min-w-0 [&_select]:w-full">
+            <Field label="Buscar" value={filterText} onChange={(e) => updateFilter("buscar", e.target.value)} placeholder="Código, nombre..." />
+            <SelectField label="Categoría" value={filterCategoria} onChange={(e) => updateFilter("categoria", e.target.value)}>
               <option value="todas">Todas</option>
               {categorias.map((cat) => (
                 <option key={cat} value={cat}>{cat}</option>
@@ -605,18 +592,18 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
             <SelectField
               label="Estado"
               value={filterEstado}
-              onChange={(e) => setFilterEstado(e.target.value as typeof filterEstado)}
+              onChange={(e) => updateFilter("estado", e.target.value)}
             >
               <option value="todos">Todos</option>
               <option value="activos">Activos</option>
               <option value="inactivos">Inactivos</option>
               <option value="stock_bajo">Stock bajo</option>
             </SelectField>
-            <Field label="Stock min." type="number" value={filterStockMin} onChange={(e) => setFilterStockMin(e.target.value)} placeholder="0" />
-            <Field label="Stock max." type="number" value={filterStockMax} onChange={(e) => setFilterStockMax(e.target.value)} placeholder="999" />
+            <Field label="Stock min." type="number" value={filterStockMin} onChange={(e) => updateFilter("stock_min", e.target.value)} placeholder="0" />
+            <Field label="Stock max." type="number" value={filterStockMax} onChange={(e) => updateFilter("stock_max", e.target.value)} placeholder="999" />
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="flex max-w-full flex-wrap items-center gap-3">
             <div className="rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-secondary)]">
               {productosFiltrados.length === 0
                 ? "0 productos"
@@ -630,7 +617,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
               <div className="inline-flex rounded-xl bg-[var(--color-primary-soft)] p-0.5 border border-[var(--color-border)]">
                 <button
                   type="button"
-                  onClick={() => setViewPerspective("texto")}
+                  onClick={() => updateFilter("perspectiva", "texto")}
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-xs font-semibold transition",
                     viewPerspective === "texto"
@@ -642,7 +629,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                 </button>
                 <button
                   type="button"
-                  onClick={() => setViewPerspective("galeria")}
+                  onClick={() => updateFilter("perspectiva", "galeria")}
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-xs font-semibold transition",
                     viewPerspective === "galeria"
@@ -656,14 +643,6 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
             </div>
           </div>
         </div>
-        {selectedBatchIds.size > 0 ? (
-          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--bg-surface)] p-3">
-            <span className="text-sm font-semibold">{selectedBatchIds.size} seleccionados</span>
-            <Button type="button" variant="secondary" disabled={!canMutate}>Desactivar</Button>
-            <Button type="button" variant="secondary">Exportar</Button>
-            <Button type="button" variant="secondary" disabled={!canMutate}>Ajustar stock</Button>
-          </div>
-        ) : null}
         {viewPerspective === "galeria" ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {productosFiltradosVisibles.map((row) => {
@@ -679,26 +658,6 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                   )}
                   onClick={() => setSelectedProductId(row.id)}
                 >
-                  {/* Checkbox multi-select floating */}
-                  <div className="absolute left-2 top-2 z-10">
-                    <input
-                      type="checkbox"
-                      aria-label={`Seleccionar ${row.nombre}`}
-                      checked={selectedBatchIds.has(row.id)}
-                      onChange={(event) => {
-                        event.stopPropagation();
-                        setSelectedBatchIds((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(row.id)) next.delete(row.id);
-                          else next.add(row.id);
-                          return next;
-                        });
-                      }}
-                      onClick={(event) => event.stopPropagation()}
-                      className="size-4 rounded cursor-pointer opacity-0 group-hover:opacity-100 checked:opacity-100 transition-opacity"
-                    />
-                  </div>
-
                   {/* Imagen del producto */}
                   <div className="relative aspect-[4/3] w-full bg-[var(--color-primary-soft)] overflow-hidden flex items-center justify-center border-b border-[var(--color-border)]">
                     {esImagen ? (
@@ -732,7 +691,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                     </p>
 
                     {/* Botones de acción minimalistas */}
-                    <div className="flex justify-end gap-1.5 pt-2 border-t border-[rgba(255,255,255,0.05)]">
+                    <div className="flex flex-wrap justify-end gap-1.5 pt-2 border-t border-[rgba(255,255,255,0.05)]">
                       <Button
                         type="button"
                         variant="secondary"
@@ -796,29 +755,10 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                 onClick={() => setSelectedProductId(row.id)}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <input
-                    type="checkbox"
-                    aria-label={`Seleccionar ${row.nombre}`}
-                    checked={selectedBatchIds.has(row.id)}
-                    onChange={(event) => {
-                      event.stopPropagation();
-                      setSelectedBatchIds((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(row.id)) next.delete(row.id);
-                        else next.add(row.id);
-                        return next;
-                      });
-                    }}
-                    onClick={(event) => event.stopPropagation()}
-                    className="mt-1 size-4"
-                  />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-[var(--color-text-primary)]">{row.nombre}</p>
                     <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
-                      {row.codigo} · {row.categoria} · {row.unidad} · Mín. {formatStockQty(row.stock_minimo, row.unidad)} · Costo unit. promedio: S/ {Number(row.costo_unitario_promedio ?? 0).toFixed(2)} · Stock {formatStockQty(row.stock_actual, row.unidad)} · Valor: S/ {Number(row.valor_stock ?? 0).toFixed(2)}
-                      {Number(row.costo_unitario_promedio ?? 0) === 0 && Number(row.stock_actual) > 0 ? (
-                        <span className="ml-1 text-[var(--color-text-secondary)] opacity-70">(sin costo registrado)</span>
-                      ) : null}
+                      {row.codigo} · {row.categoria} · {row.unidad} · Mín. {formatStockQty(row.stock_minimo, row.unidad)} · Costo unit. promedio: {Number(row.costo_unitario_promedio ?? 0) > 0 ? formatPen(row.costo_unitario_promedio) : "Sin costo en compras"} · Stock {formatStockQty(row.stock_actual, row.unidad)} · Valor: {Number(row.stock_actual) !== 0 && Number(row.costo_unitario_promedio ?? 0) <= 0 ? "Sin costo en compras" : formatPen(row.valor_stock)}
                     </p>
                     {getFotoUrlEfectiva(row) && (
                       <p className="mt-1 text-xs text-[var(--color-accent)] font-semibold flex items-center gap-1">
@@ -1057,23 +997,36 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
         <CardTitle>Kardex y trazabilidad</CardTitle>
         <CardDescription>Filtra y audita entradas, salidas y ajustes por producto.</CardDescription>
         <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <SelectField label="Tipo" value={kardexTipo} onChange={(e) => setKardexTipo(e.target.value as typeof kardexTipo)}>
+          <SelectField label="Tipo" value={kardexTipo} onChange={(e) => updateFilter("kardex_tipo", e.target.value)}>
             <option value="todos">Todos</option>
             <option value="entrada_compra">Entrada compra</option>
             <option value="salida_venta">Salida venta</option>
             <option value="ajuste">Ajuste</option>
           </SelectField>
-          <SelectField label="Producto" value={kardexProducto} onChange={(e) => setKardexProducto(e.target.value)}>
+          <SelectField label="Producto" value={kardexProducto} onChange={(e) => updateFilter("kardex_producto", e.target.value)}>
             <option value="todos">Todos</option>
             {productos.map((p) => (
               <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </SelectField>
-          <a href="/inventario/export?type=kardex" className="md:col-span-2 flex items-end">
-            <Button type="button" variant="secondary">Exportar kardex CSV</Button>
+          <a href={getInventarioKardexExportHref(kardexTipo, kardexProducto)} className="md:col-span-2 flex items-end">
+            <Button type="button" variant="secondary">Exportar kardex Excel</Button>
           </a>
         </div>
-        <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
+        <p role="status" aria-live="polite" className="mt-3 text-xs text-[var(--color-text-secondary)]">
+          {kardexFiltrado.length === 0
+            ? "No hay movimientos que coincidan con estos filtros en el historial cargado."
+            : `Mostrando ${Math.min(kardexFiltrado.length, INVENTARIO_KARDEX_VISIBLE_LIMIT)} de ${kardexFiltrado.length} ${kardexFiltrado.length === 1 ? "movimiento que coincide" : "movimientos que coinciden"} en el historial cargado.`}
+          {kardexFiltrado.length > INVENTARIO_KARDEX_VISIBLE_LIMIT
+            ? " Excel incluye todos los movimientos cargados que coinciden con estos filtros."
+            : " La descarga Excel conserva estos filtros."}
+        </p>
+        <div
+          role="region"
+          aria-label="Tabla de movimientos de inventario"
+          tabIndex={0}
+          className="mt-4 max-w-full overflow-x-auto rounded-xl border border-[var(--color-border)]"
+        >
           <Table>
             <THead>
               <TRow>
@@ -1087,7 +1040,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
               </TRow>
             </THead>
             <tbody>
-              {kardexFiltrado.slice(0, 200).map((row) => (
+              {kardexFiltrado.slice(0, INVENTARIO_KARDEX_VISIBLE_LIMIT).map((row) => (
                 <TRow key={row.id}>
                   <TD>{formatDate(row.fecha)}</TD>
                   <TD>
@@ -1153,9 +1106,10 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
             )}
           </Card>
           <Card>
-            <CardTitle>Sin movimiento (+30 días)</CardTitle>
+            <CardTitle>Productos sin movimiento</CardTitle>
             <CardDescription>Clic en un producto para abrir su ficha en la pestaña Productos.</CardDescription>
             <div className="mt-4 space-y-2">
+              <p className="text-xs font-semibold text-[var(--color-text-secondary)]">Con 30 días o más de inactividad</p>
               {sinMovimiento.slice(0, 20).map((p) => (
                 <button
                   key={p.id}
@@ -1168,6 +1122,23 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                 </button>
               ))}
               {sinMovimiento.length === 0 ? <p className="text-sm text-[var(--color-text-secondary)]">Sin alertas de inactividad.</p> : null}
+              {sinMovimiento.length > 20 ? <p className="text-xs text-[var(--color-text-secondary)]">Mostrando 20 de {sinMovimiento.length} productos.</p> : null}
+              {sinMovimientosRegistrados.length > 0 ? (
+                <>
+                  <p className="pt-3 text-xs font-semibold text-[var(--color-text-secondary)]">
+                    {historialMovimientos.total === historialMovimientos.cargados ? "Sin movimientos registrados" : "Sin movimientos en el historial cargado"}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-secondary)]">No se les asigna una antigüedad de inactividad.</p>
+                  {sinMovimientosRegistrados.slice(0, 20).map((p) => (
+                    <button key={p.id} type="button" onClick={() => goToProductoEditor(p.id)}
+                      className="w-full rounded-xl border border-[var(--color-border)] px-3 py-2 text-left text-sm transition hover:bg-[var(--color-primary-soft)]">
+                      <strong className="text-[var(--color-text-primary)]">{p.nombre}</strong>
+                      <span className="text-[var(--color-text-secondary)]"> · Sin movimientos {historialMovimientos.total === historialMovimientos.cargados ? "registrados" : "en el historial cargado"}</span>
+                    </button>
+                  ))}
+                  {sinMovimientosRegistrados.length > 20 ? <p className="text-xs text-[var(--color-text-secondary)]">Mostrando 20 de {sinMovimientosRegistrados.length} productos.</p> : null}
+                </>
+              ) : null}
             </div>
           </Card>
         </div>
@@ -1222,10 +1193,10 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardTitle>Exportaciones</CardTitle>
-          <CardDescription>Descarga reportes para análisis externo.</CardDescription>
+          <CardDescription>Descarga archivos Excel (.xlsx) con los datos cargados, sin filtros. Para descargar una selección, usa la pestaña Kardex.</CardDescription>
           <div className="mt-4 flex flex-wrap gap-2">
-            <a href="/inventario/export?type=stock"><Button type="button" variant="secondary">Exportar stock valorizado CSV</Button></a>
-            <a href="/inventario/export?type=kardex"><Button type="button" variant="secondary">Exportar kardex CSV</Button></a>
+            <a href="/inventario/export?type=stock"><Button type="button" variant="secondary">Exportar stock valorizado Excel</Button></a>
+            <a href="/inventario/export?type=kardex"><Button type="button" variant="secondary">Exportar kardex Excel</Button></a>
           </div>
           <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
             Útil para auditoría, compras y control gerencial.
@@ -1495,8 +1466,8 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
               <DetailField
                 label="Valorización"
                 value={
-                  Number(selectedProduct.costo_unitario_promedio ?? 0) === 0
-                    ? `S/ 0.00 — sin compras con costo`
+                  Number(selectedProduct.stock_actual) !== 0 && Number(selectedProduct.costo_unitario_promedio ?? 0) <= 0
+                    ? "Sin costo en compras"
                     : formatPen(selectedProduct.valor_stock ?? 0)
                 }
               />

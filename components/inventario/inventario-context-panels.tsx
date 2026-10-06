@@ -14,6 +14,8 @@ import { useToast } from "@/components/ui/toast";
 import { Field, SelectField } from "@/components/ui/field";
 import { MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
+import { fechaHoyPeru } from "@/lib/utils";
+import { getInventarioConsultaHref } from "@/lib/inventario-filtros";
 import { IconArrowsLeftRight, IconCirclePlus, IconShoppingCart } from "@tabler/icons-react";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -50,6 +52,7 @@ export function InventarioContextPanels({
   unidadesExtra = [],
 }: InventarioContextPanelsProps) {
   const searchParams = useSearchParams();
+  const consultaHref = getInventarioConsultaHref(searchParams);
   const router = useRouter();
   const [productoMovId, setProductoMovId] = useState("");
   const [productoCompraId, setProductoCompraId] = useState("");
@@ -310,7 +313,7 @@ export function InventarioContextPanels({
         title="Registrar compra"
         description="Registra mercadería entrante y, si corresponde, egreso de caja por la compra."
         open={openCompra}
-        replacePathOnClose="/inventario"
+        replacePathOnClose={consultaHref}
         onOpenChange={(next) => {
           setOpenCompra(next);
           if (!next) {
@@ -429,7 +432,7 @@ export function InventarioContextPanels({
             </p>
           </div>
 
-          <Field name="fecha" type="date" label="Fecha" required defaultValue={new Date().toISOString().split("T")[0]} />
+          <Field name="fecha" type="date" label="Fecha" required defaultValue={fechaHoyPeru()} />
           <Field className="md:col-span-2" name="nota" label="Nota (opcional)" placeholder="Observación de la compra" />
           
           <SelectField name="tipo_comprobante" label="Tipo de Comprobante" defaultValue="ninguno" required>
@@ -470,7 +473,7 @@ export function InventarioContextPanels({
             setCostoUnitario("");
           }
         }}
-        replacePathOnClose="/inventario"
+        replacePathOnClose={consultaHref}
       >
         <form key={productoFormKey} action={productoFormAction} className="grid gap-3 md:grid-cols-2">
           {/* Nombre + código con sugerencia automática */}
@@ -693,7 +696,7 @@ export function InventarioContextPanels({
             setMovimientoErrors({});
           }
         }}
-        replacePathOnClose="/inventario"
+        replacePathOnClose={consultaHref}
       >
         <form key={movimientoFormKey} action={movimientoFormAction} onSubmit={handleMovimientoSubmit} className="grid gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
@@ -710,7 +713,7 @@ export function InventarioContextPanels({
               <p className="text-xs text-red-500 mt-1">{movimientoErrors.producto_id}</p>
             )}
           </label>
-          <Field name="fecha" type="date" label="Fecha" required defaultValue={new Date().toISOString().split("T")[0]} />
+          <Field name="fecha" type="date" label="Fecha" required defaultValue={fechaHoyPeru()} />
           <SelectField name="tipo" label="Tipo" defaultValue="entrada_compra" required>
             <option value="entrada_compra">Entrada por compra</option>
             <option value="salida_venta">Salida por venta</option>

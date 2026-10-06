@@ -45,6 +45,16 @@ export function formatDate(
   }).format(d);
 }
 
+/** Fecha de calendario de Perú en el formato que requiere un campo date. */
+export function fechaHoyPeru(ahora = new Date()): string {
+  const partes = new Intl.DateTimeFormat("es-PE", {
+    timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(ahora);
+  return ["year", "month", "day"]
+    .map((tipo) => partes.find((parte) => parte.type === tipo)!.value.padStart(tipo === "year" ? 4 : 2, "0"))
+    .join("-");
+}
+
 export function parseDecimal(value: unknown): number {
   if (value === null || value === undefined) return 0;
   if (typeof value === "number") {

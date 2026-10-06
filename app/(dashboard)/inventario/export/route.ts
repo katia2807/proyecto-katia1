@@ -3,6 +3,8 @@ import ExcelJS from "exceljs";
 import { requireAuthContext } from "@/lib/auth";
 import { getInventarioRobustoData } from "@/lib/data";
 import { getEmpresaConfig } from "@/lib/company-config";
+import { getInventarioFiltros } from "@/lib/inventario-filtros";
+import { filtrarInventarioKardex, getInventarioHistorialAviso } from "@/lib/inventario-historial";
 
 const KATIA_VIOLET = "FF8B5CF6";
 const KATIA_VIOLET_LIGHT = "FFE9D5FF";
@@ -12,6 +14,21 @@ const ODD_ROW = "FF14141F";
 const EVEN_ROW = "FF1C1C2A";
 const DANGER_BG = "FFFFE4E4";
 const DANGER_FG = "FFDC2626";
+
+// El nombre guardado se conserva en los datos y el título; solo la pestaña
+// necesita un nombre compatible y único dentro del libro de Excel.
+function nombreHojaCategoria(categoria: string, usados: Set<string>): string {
+  const base = categoria.replace(/[*?:/\\[\]]/g, " ").trim()
+    .replace(/^'+|'+$/g, "").slice(0, 31).replace(/'+$/g, "") || "Categoría";
+  let nombre = base;
+  let indice = 2;
+  while (usados.has(nombre.toLowerCase())) {
+    const sufijo = ` (${indice++})`;
+    nombre = `${base.slice(0, 31 - sufijo.length).replace(/'+$/g, "")}${sufijo}`;
+  }
+  usados.add(nombre.toLowerCase());
+  return nombre;
+}
 
 function applyHeaderStyle(cell: ExcelJS.Cell, light = false) {
   cell.font = { bold: true, color: { argb: light ? "FF18181B" : HEADER_FG }, size: 10 };
@@ -31,6 +48,12 @@ export async function GET(request: Request) {
     getInventarioRobustoData(),
     getEmpresaConfig().catch(() => null),
   ]);
+  const filtros = getInventarioFiltros(url.searchParams);
+  const productoId = data.productos.some(p => p.id === filtros.kardexProducto) ? filtros.kardexProducto : "todos";
+  const tipoKardex = type === "kardex" ? filtros.kardexTipo : "todos";
+  const productoKardex = type === "kardex" ? productoId : "todos";
+  const kardexRows = filtrarInventarioKardex(data.kardex, tipoKardex, productoKardex);
+  const historialAviso = getInventarioHistorialAviso(data.historialMovimientos.cargados, data.historialMovimientos.total);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = empresa?.nombre ?? "Katia Suite";
@@ -59,14 +82,25 @@ export async function GET(request: Request) {
     // Subtítulo métricas
     sheet.mergeCells("A2:K2");
     const subCell = sheet.getCell("A2");
-    const valorTotal = data.productos.reduce((a, p) => a + p.valor_stock, 0);
-    subCell.value = `${data.productos.length} productos · Valorización total: S/ ${valorTotal.toFixed(2)} · Generado por Katia Suite v1.0`;
+    const productosSinCosto = data.productos.filter(p => Number(p.stock_actual) !== 0 && Number(p.costo_unitario_promedio) <= 0).length;
+    const productosConValor = data.productos.filter(p => Number(p.stock_actual) !== 0 && Number(p.costo_unitario_promedio) > 0);
+    const sinValorConocido = productosSinCosto > 0 && productosConValor.length === 0;
+    const valorTotal = productosConValor.reduce((a, p) => a + p.valor_stock, 0);
+    const valorLabel = sinValorConocido ? "Sin costo en compras" : `S/ ${valorTotal.toFixed(2)}`;
+    const valorAlcance = productosSinCosto > 0 ? ` (${sinValorConocido ? "" : "parcial: "}${productosSinCosto} ${productosSinCosto === 1 ? "producto" : "productos"} con stock sin costo en compras)` : "";
+    subCell.value = `${data.productos.length} productos · Valor registrado: ${valorLabel}${valorAlcance}`;
     subCell.font = { italic: true, size: 9, color: { argb: "FF71717A" } };
-    subCell.alignment = { horizontal: "center" };
-    sheet.getRow(2).height = 16;
+    subCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    sheet.getRow(2).height = productosSinCosto > 0 ? 30 : 16;
 
     // Fila vacía
-    sheet.addRow([]);
+    const noticeRow = sheet.addRow([historialAviso ?? ""]);
+    if (historialAviso) {
+      sheet.mergeCells("A3:K3");
+      noticeRow.height = 30;
+      noticeRow.getCell(1).font = { size: 9, color: { argb: DANGER_FG } };
+      noticeRow.getCell(1).alignment = { wrapText: true, vertical: "middle" };
+    }
 
     // Headers
     const headers = [
@@ -103,19 +137,19 @@ export async function GET(request: Request) {
         p.activo ? "Sí" : "No",
         p.stock_actual,
         p.stock_minimo,
-        p.costo_unitario_promedio,
-        p.valor_stock,
+        Number(p.costo_unitario_promedio) > 0 ? p.costo_unitario_promedio : "Sin costo en compras",
+        Number(p.stock_actual) !== 0 && Number(p.costo_unitario_promedio) <= 0 ? "Sin costo en compras" : p.valor_stock,
         p.vendido,
         stockBajo ? "⚠ Stock bajo" : "OK",
       ]);
-      row.height = 18;
+      row.height = Number(p.stock_actual) !== 0 && Number(p.costo_unitario_promedio) <= 0 ? 30 : 18;
 
       const bgColor = dataRowNum % 2 === 0 ? EVEN_ROW : ODD_ROW;
 
       row.eachCell((cell, colNum) => {
         cell.font = { size: 10, color: { argb: HEADER_FG } };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: stockBajo ? DANGER_BG : bgColor } };
-        cell.alignment = { vertical: "middle" };
+        cell.alignment = { vertical: "middle", wrapText: [8, 9].includes(colNum) };
 
         // Formato numérico
         if ([6, 7, 10].includes(colNum)) {
@@ -137,20 +171,24 @@ export async function GET(request: Request) {
 
     // Fila de totales
     const lastDataRow = sheet.lastRow!.number;
+    const unidades = new Set(data.productos.map(p => p.unidad.trim().toLowerCase()));
+    const sumCantidad = (col: string) => data.productos.length === 0 ? 0 :
+      unidades.size > 1 ? "Unidades distintas" : { formula: `SUM(${col}5:${col}${lastDataRow})` };
     const totalRow = sheet.addRow([
       "", "TOTAL", "", "", "",
-      { formula: `SUM(F5:F${lastDataRow})` },
+      sumCantidad("F"),
       "",
       "",
-      { formula: `SUM(I5:I${lastDataRow})` },
-      { formula: `SUM(J5:J${lastDataRow})` },
+      data.productos.length === 0 ? 0 : sinValorConocido ? "Sin costo en compras" : { formula: `SUM(I5:I${lastDataRow})` },
+      sumCantidad("J"),
       "",
     ]);
-    totalRow.height = 22;
+    totalRow.height = unidades.size > 1 || sinValorConocido ? 30 : 22;
     totalRow.eachCell((cell) => {
       cell.font = { bold: true, size: 10, color: { argb: HEADER_FG } };
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2D1B69" } };
       cell.border = { top: { style: "medium", color: { argb: KATIA_VIOLET } } };
+      cell.alignment = { vertical: "middle", wrapText: true };
     });
     totalRow.getCell(6).numFmt = "#,##0.00";
     totalRow.getCell(9).numFmt = '"S/"#,##0.00';
@@ -164,8 +202,9 @@ export async function GET(request: Request) {
       byCategoria.get(cat)!.push(p);
     }
 
+    const nombresUsados = new Set(["stock actual", "kardex", "history"]);
     for (const [cat, productos] of byCategoria) {
-      const sheetCat = workbook.addWorksheet(cat.slice(0, 30));
+      const sheetCat = workbook.addWorksheet(nombreHojaCategoria(cat, nombresUsados));
       sheetCat.mergeCells("A1:I1");
       const catTitle = sheetCat.getCell("A1");
       catTitle.value = `${cat} — ${fechaStr}`;
@@ -185,16 +224,18 @@ export async function GET(request: Request) {
         const low = p.stock_actual <= p.stock_minimo;
         const r = sheetCat.addRow([
           p.codigo, p.nombre, p.stock_actual, p.stock_minimo,
-          p.costo_unitario_promedio, p.valor_stock, p.vendido,
+          Number(p.costo_unitario_promedio) > 0 ? p.costo_unitario_promedio : "Sin costo en compras",
+          Number(p.stock_actual) !== 0 && Number(p.costo_unitario_promedio) <= 0 ? "Sin costo en compras" : p.valor_stock, p.vendido,
           p.activo ? "Sí" : "No", low ? "⚠ Bajo" : "OK",
         ]);
-        r.height = 17;
+        r.height = Number(p.stock_actual) !== 0 && Number(p.costo_unitario_promedio) <= 0 ? 30 : 17;
         r.eachCell((cell, colNum) => {
           cell.font = { size: 10, color: { argb: HEADER_FG } };
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: low ? DANGER_BG : catRow % 2 === 0 ? EVEN_ROW : ODD_ROW } };
           if (low) cell.font = { size: 10, color: { argb: DANGER_FG } };
           if ([3, 4, 7].includes(colNum)) cell.numFmt = "#,##0.00";
           if ([5, 6].includes(colNum)) cell.numFmt = '"S/"#,##0.00';
+          cell.alignment = { vertical: "middle", wrapText: [5, 6].includes(colNum) };
         });
         catRow++;
       }
@@ -214,7 +255,13 @@ export async function GET(request: Request) {
     t.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_BG } };
     t.alignment = { horizontal: "center", vertical: "middle" };
     sheet.getRow(1).height = 28;
-    sheet.addRow([]);
+    const tipoLabel = { todos: "Todos", entrada_compra: "Entrada compra", salida_venta: "Salida venta", ajuste: "Ajuste" }[tipoKardex];
+    const productoLabel = data.productos.find(p => p.id === productoKardex)?.nombre ?? "Todos";
+    const scopeRow = sheet.addRow([`${kardexRows.length} ${kardexRows.length === 1 ? "movimiento" : "movimientos"} · Tipo: ${tipoLabel} · Producto: ${productoLabel}${historialAviso ? `\n${historialAviso}` : ""}`]);
+    sheet.mergeCells("A2:I2");
+    scopeRow.height = historialAviso ? 34 : 20;
+    scopeRow.getCell(1).font = { size: 9, color: { argb: historialAviso ? DANGER_FG : "FF71717A" } };
+    scopeRow.getCell(1).alignment = { wrapText: true, vertical: "middle" };
 
     const kHeaders = sheet.addRow(["Fecha", "Código", "Producto", "Categoría", "Tipo", "Cantidad", "Impacto", "Costo unit.", "Referencia"]);
     kHeaders.height = 22;
@@ -222,7 +269,7 @@ export async function GET(request: Request) {
     [14, 18, 36, 18, 18, 14, 12, 14, 22].forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
 
     let rowIdx = 4;
-    for (const row of data.kardex) {
+    for (const row of kardexRows) {
       const r = sheet.addRow([
         row.fecha, row.producto_codigo, row.producto_nombre,
         row.categoria, row.tipo, row.cantidad, row.impacto,

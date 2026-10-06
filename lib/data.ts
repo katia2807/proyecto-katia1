@@ -33,6 +33,9 @@ import {
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
+import { getInventarioHistorialAviso } from "@/lib/inventario-historial";
+import { getInventarioAlertasMovimiento, getInventarioDiasSinMovimiento } from "@/lib/inventario-alertas";
+import { fechaHoyPeru } from "@/lib/utils";
 
 type CajaRow = Database["public"]["Tables"]["movimientos_caja"]["Row"];
 type VentaRow = Database["public"]["Tables"]["ventas_madera"]["Row"];
@@ -767,10 +770,13 @@ export async function getInventarioRobustoData() {
   const loadFailedParts: string[] = [];
   if (productosBundle.usedFallback) loadFailedParts.push("productos");
   if (movimientosBundle.usedFallback) loadFailedParts.push("movimientos (kardex)");
+  const historialMovimientos = { cargados: totalMovimientosCargados, total: movimientosBundle.totalRowCount };
+  const historialWarning = movimientosBundle.usedFallback ? null :
+    getInventarioHistorialAviso(historialMovimientos.cargados, historialMovimientos.total);
   const loadWarning =
     loadFailedParts.length > 0
       ? `No se pudieron cargar los datos de inventario desde la base de datos (${loadFailedParts.join(" y ")}). Revisá los logs del servidor (prefijos [loadInventarioProductosRows] / [loadInventarioMovimientosRows]).`
-      : null;
+      : historialWarning;
 
   const productos = productosAll.filter((p) => p.activo !== false);
 
@@ -797,16 +803,14 @@ export async function getInventarioRobustoData() {
     }
   }
 
-  const hoyMs = Date.now();
+  const ahora = new Date();
   const enriched = productosAll.map((p) => {
     const costo = costoPromedio.get(p.id);
     const costoUnitarioPromedio =
       costo && costo.totalCantidad > 0 ? Number((costo.totalCosto / costo.totalCantidad).toFixed(4)) : 0;
     const valorStock = Number((Number(p.stock_actual) * costoUnitarioPromedio).toFixed(2));
     const ultimoMov = ultimosMovimientosPorProducto.get(p.id) ?? null;
-    const diasSinMovimiento = ultimoMov
-      ? Math.floor((hoyMs - new Date(ultimoMov).getTime()) / (1000 * 60 * 60 * 24))
-      : null;
+    const diasSinMovimiento = getInventarioDiasSinMovimiento(ultimoMov, ahora);
     return {
       ...p,
       vendido: vendidos.get(p.id) ?? 0,
@@ -820,7 +824,7 @@ export async function getInventarioRobustoData() {
   });
 
   const stockBajo = enriched.filter((p) => p.activo !== false && Number(p.stock_actual) <= Number(p.stock_minimo));
-  const sinMovimiento = enriched.filter((p) => p.activo !== false && (p.dias_sin_movimiento ?? 9999) >= 30);
+  const { sinMovimiento, sinMovimientosRegistrados } = getInventarioAlertasMovimiento(enriched);
   const totalStock = enriched
     .filter((p) => p.activo !== false)
     .reduce((acc, p) => acc + Number(p.stock_actual), 0);
@@ -837,10 +841,8 @@ export async function getInventarioRobustoData() {
         ).toFixed(2),
       )
       : 0;
-  const inicioMes = new Date();
-  inicioMes.setDate(1);
-  inicioMes.setHours(0, 0, 0, 0);
-  const movimientosDelMes = movimientos.filter((m) => new Date(m.fecha).getTime() >= inicioMes.getTime()).length;
+  const mesPeru = fechaHoyPeru(ahora).slice(0, 7);
+  const movimientosDelMes = movimientos.filter((m) => m.fecha.startsWith(`${mesPeru}-`)).length;
 
   const categorias = Array.from(new Set(enriched.map((p) => p.categoria))).sort((a, b) => a.localeCompare(b));
   const rankingMasVendidos = [...enriched]
@@ -884,6 +886,8 @@ export async function getInventarioRobustoData() {
     categorias,
     stockBajo,
     sinMovimiento,
+    sinMovimientosRegistrados,
+    historialMovimientos,
     reposicionSugerida,
     rankingMasVendidos,
     rankingMenosVendidos,
@@ -966,92 +970,8 @@ export async function getMueblesCatalogoRows(includeInactive = false) {
   }
   const supabase = getSupabaseServerClient();
 
-  // 1. Fetch inventory products of category "Muebles"
-  const { rows: inventoryProducts } = await loadInventarioProductosRows(true);
-  const furnitureProducts = inventoryProducts.filter((p) => p.categoria === "Muebles");
-
-  // 2. Fetch current catalog to find missing ones
-  const fetched = await safeQuery(async () => {
-    const { data } = await supabase
-      .from("muebles_catalogo")
-      .select("*")
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .order("nombre", { ascending: true })
-      .limit(500);
-    return data ?? [];
-  }, []);
-
-  // 3. Sincronizar en segundo plano/paralelo si hay diferencias (Asegura consistencia de fotos y stock)
-  for (const p of furnitureProducts) {
-    const match = fetched.find(
-      (m) =>
-        m.id === p.id ||
-        (p.codigo && m.codigo?.toLowerCase() === p.codigo.toLowerCase()) ||
-        m.nombre.toLowerCase() === p.nombre.toLowerCase()
-    );
-
-    if (!match) {
-      // Auto-aprovisionar en el catálogo
-      await safeQuery(async () => {
-        await supabase.from("muebles_catalogo").insert({
-          id: p.id,
-          organization_id: DEFAULT_ORG_ID,
-          codigo: p.codigo || `MUEB-${p.id.slice(0, 4)}`,
-          nombre: p.nombre,
-          descripcion: "Producto importado del inventario",
-          precio_lista: p.costo_unitario ? Number(p.costo_unitario) : 0,
-          foto_url: p.foto_url || null,
-          stock_disponible: p.stock_actual,
-          activo: p.activo,
-        });
-      }, null);
-    } else {
-      // Actualizar stock y coalescencia de fotos
-      const updates: Partial<MuebleCatalogoRow> = {};
-      let needsCatalogUpdate = false;
-      let needsInventoryUpdate = false;
-
-      if (match.stock_disponible !== p.stock_actual) {
-        updates.stock_disponible = p.stock_actual;
-        needsCatalogUpdate = true;
-      }
-
-      if (p.foto_url && !match.foto_url) {
-        updates.foto_url = p.foto_url;
-        needsCatalogUpdate = true;
-      } else if (match.foto_url && !p.foto_url) {
-        needsInventoryUpdate = true;
-      }
-
-      // Sincronizar precio
-      if (p.costo_unitario !== null && match.precio_lista !== Number(p.costo_unitario)) {
-        updates.precio_lista = Number(p.costo_unitario);
-        needsCatalogUpdate = true;
-      }
-
-      if (needsCatalogUpdate) {
-        await safeQuery(async () => {
-          await supabase
-            .from("muebles_catalogo")
-            .update(updates)
-            .eq("id", match.id)
-            .eq("organization_id", DEFAULT_ORG_ID);
-        }, null);
-      }
-
-      if (needsInventoryUpdate && match.foto_url) {
-        await safeQuery(async () => {
-          await supabase
-            .from("inventario_productos")
-            .update({ foto_url: match.foto_url })
-            .eq("id", p.id)
-            .eq("organization_id", DEFAULT_ORG_ID);
-        }, null);
-      }
-    }
-  }
-
-  // 4. Return final, fully synced catalog items
+  // Consultar nunca sincroniza ni repara registros. Los guardados y sus
+  // triggers mantienen stock y fotos sin convertir el costo en precio de venta.
   return safeQuery(async () => {
     let query = supabase
       .from("muebles_catalogo")
