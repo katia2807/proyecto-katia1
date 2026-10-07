@@ -69,12 +69,17 @@ export function ClientesMasivoTable({ clientes, isOwner }: Props) {
           <p className="mt-1 text-2xl font-bold text-[var(--katia-success)]">{totalActivos}</p>
         </div>
         <div className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-3">
-          <p className="text-xs text-[var(--katia-text-tertiary)]">Con cobro vencido</p>
+          <p className="text-xs text-[var(--katia-text-tertiary)]">Clientes con aviso de vencimiento</p>
           <p className={`mt-1 text-2xl font-bold ${totalConDeuda > 0 ? "text-[var(--katia-danger)]" : "text-[var(--katia-text-primary)]"}`}>
             {totalConDeuda}
           </p>
         </div>
       </div>
+
+      <p className="text-xs text-[var(--katia-text-secondary)]">
+        Estos avisos consideran créditos vencidos en muebles pendientes de entrega y alquileres abiertos.
+        Consulta Hoy o Futuro para revisar los créditos de todos los tipos de operación y los pagos vinculados.
+      </p>
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3">
@@ -125,7 +130,7 @@ export function ClientesMasivoTable({ clientes, isOwner }: Props) {
                 <TH>Estado</TH>
                 <TH className="text-right">Total registrado</TH>
                 <TH className="text-right">Ops.</TH>
-                <TH className="text-right">Deuda</TH>
+                <TH className="text-right">Avisos</TH>
                 <TH className="text-right">Acciones</TH>
               </TRow>
             </THead>

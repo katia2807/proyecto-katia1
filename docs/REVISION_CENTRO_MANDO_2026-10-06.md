@@ -1,6 +1,18 @@
 # Revisión e implementación de Centro de Mando
 
-Fecha: 06/10/2026. Implementación local: 1.1.55. Diagnóstico previo: 1.1.54 sobre la base funcional 1.1.53. La renovación se implementó y comprobó en local; publicación y comprobación en producción pendientes.
+Fecha: 06/10/2026. Implementación: 1.1.55, publicada. Ajuste local de claridad: 1.1.56, pendiente de publicación y comprobación final. Diagnóstico previo: 1.1.54 sobre la base funcional 1.1.53.
+
+## Publicación y revisión de lectura — 1.1.55 / ajuste 1.1.56
+
+El usuario autorizó publicar y comprobar sin modificar registros del negocio. Commit funcional `f043f97d45199ab812ed1f2efcbee8f6e6861d05` enviado a `main`; GitHub confirmó éxito de Vercel, despliegue `E7VKFm2GTxFg7XReFrxEi2GYRXRw`, equipo `grupo-ark-ccatun-rumi-sac`, proyecto `project-ukk6w`. Se reutilizó la sesión de Edge del usuario, después de comprobar lecturas de la ruta, layout, autenticación, lectores y enlaces abiertos. No se ejecutaron migraciones, acciones de guardado, cambios de estado ni eliminaciones.
+
+Producción mostró 1.1.55 y sus fuentes sin aviso de carga incompleta. Hoy: S/ 74,677.29 de saldo, igual a Caja; 32 productos en alerta, igual a Inventario; dos créditos de madera por revisar y 34 prioridades en total. Se desplegaron los 26 pendientes adicionales y se abrió el detalle del crédito de S/ 578 mediante lectura. Pasado: 01–06 de octubre contra 01–06 de septiembre; sin movimientos u operaciones en octubre, comparación de ingresos -100% y gastos sin movimiento. Stock conocido S/ 17,021 y 58 productos sin costo, igual a Inventario. Futuro: dos créditos vencidos, cero próximos compromisos/operaciones sin fecha/cotizaciones activas. Los casos con fechas futuras y datos desconocidos se comprobaron con muestras locales aisladas, no creando registros reales.
+
+Hoy/Pasado/Futuro a 320/360 px en Edge: anchura de documento igual a la disponible. Viewport restablecido. Clientes 360° mostró 11 clientes activos y Herramientas sus accesos habituales. Evidencias locales `temp/mando-1.1.55-produccion-{hoy,pasado,futuro}.txt` y `temp/mando-1.1.55-produccion-mobile.{json,png}`. Se guardó referencia de las 53 filas visibles de Caja y sus totales para compararla al cierre. Salud previa HTTP 200, demo desactivado, Supabase configurado y listo para datos reales.
+
+**COMP-M2, alcance del seguimiento de Clientes 360°:** su indicador previo usa solo créditos vencidos en muebles pendientes de entrega y alquileres abiertos; mostró cero, mientras Hoy detectó dos créditos de madera. Para evitar interpretar ese contador como deuda total, 1.1.56 lo denomina «Clientes con aviso de vencimiento», explica sus criterios y dirige a Hoy/Futuro para revisar todos los tipos de operación. La columna se llama «Avisos» y la ficha explicita muebles/alquileres. No cambian cifras, filtros, estados ni acciones de clientes, ni el módulo Clientes. Compilación con comprobación de tipos y ESLint de los tres archivos TypeScript cambiados aprobados; nota de 211 caracteres coincidente con el historial. La suite funcional de 609 pruebas corresponde a 1.1.55; no se añadió ni repitió una suite por este ajuste de textos. Publicación y comprobación final del texto 1.1.56 pendientes.
+
+Nota de parche 1.1.56: Clientes 360° aclara qué vencimientos incluye su seguimiento y dónde revisar los créditos de todas las operaciones. Las etiquetas permiten interpretar los avisos sin confundirlos con una deuda total del cliente.
 
 ## Implementación y estado actual — 1.1.55
 

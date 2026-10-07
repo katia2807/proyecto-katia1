@@ -88,7 +88,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
     { label: "Ventas de madera", count: clienteVentasMadera.length, href: "/ventas?categoria=madera#historial-ventas" },
     { label: "Contratos de alquiler", count: clienteContratos.length, href: "/ventas/alquiler-mixer" },
     { label: "Servicios de aserradero", count: clienteServicios.length, href: "/ventas/aserradero-servicios" },
-    { label: "Cobros vencidos", count: clienteCobrosVencidos.length, href: "/reportes#cobros-vencidos" },
+    { label: "Avisos de vencimiento (muebles y alquileres)", count: clienteCobrosVencidos.length, href: "/reportes#cobros-vencidos" },
     { label: "Órdenes de producción", count: porCliente(historialClientes?.ordenes ?? []).length, href: "/ventas/muebles-personalizados" },
   ];
   const hasRelatedDependencies = relatedDependencies.some((dependency) => dependency.count > 0);
@@ -183,7 +183,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                   <p className="mt-1 text-sm text-[var(--katia-text-primary)]">{etiquetaEstadoCliente(selectedCliente.estado)}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-[var(--katia-text-tertiary)]">Cobros vencidos</p>
+                  <p className="text-xs uppercase tracking-wide text-[var(--katia-text-tertiary)]">Avisos de vencimiento (muebles y alquileres)</p>
                   <p className={`mt-1 text-sm font-semibold ${pagosPendientesCliente > 0 ? "text-[var(--katia-danger)]" : "text-[var(--katia-text-primary)]"}`}>
                     {pagosPendientesCliente}
                   </p>

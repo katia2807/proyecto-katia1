@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.56 — 06/10/2026
+
+Clientes 360° aclara qué vencimientos incluye su seguimiento y dónde revisar los créditos de todas las operaciones. Las etiquetas permiten interpretar los avisos sin confundirlos con una deuda total del cliente.
+
 ## 1.1.55 — 06/10/2026
 
 Centro de Mando ordena las prioridades con motivos y accesos directos, compara períodos con fechas de Perú y muestra próximos compromisos. Distingue Caja, operaciones y propuestas, y avisa cuando faltan datos.
