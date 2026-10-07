@@ -4,6 +4,8 @@ Registro inicial **1.1.59**, publicado en `main` mediante `c4d1a48`; Vercel conf
 
 ## Ampliación nativa — 1.1.60
 
+Documentación y nota publicadas en `main`, commit `ad6c5e8`, con despliegue correcto en Vercel. Navegador con sesión real: versión y nota **1.1.60** coincidentes, sin errores de consola detectados en la carga de Inicio. Salud HTTP 200, demo desactivado y Supabase listo. Evidencia privada `temp/respaldos-seguros/publicacion-1.1.60.png`. No se modificaron rutas, formularios o cálculos del programa; la compilación publicada pasó y se realizaron comprobaciones proporcionales de nota, documentos e integridad de la copia.
+
 Una de las claves proporcionadas por el usuario permitió la conexión de base. La validación usó TLS con certificado y nombre del servidor verificados, usuario del proyecto y una consulta de lectura. Las claves no aparecen en esta documentación ni en el repositorio. La entrada temporal cifrada con Windows se vació al terminar; la propuesta de acceso nuevo se descartó.
 
 Entrega privada: **`Descargas/Katia-respaldo-manual-2026-10-07.zip`**, con otra copia en `temp/respaldos-seguros/`. Tamaño **786,923 bytes**, 30 entradas, SHA-256 `35852328f29ffe05420af195386b33ca3191afb89c17c78b2201ff26e03f256e`. Se comprobaron los contenidos del ZIP contra sus tamaños y huellas, y la copia en Descargas conserva el mismo SHA-256. Los respaldos y evidencias anteriores se mantienen por separado.
