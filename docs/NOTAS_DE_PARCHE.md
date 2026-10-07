@@ -1,5 +1,13 @@
 # Notas de parche
 
+## 1.1.55 — 06/10/2026
+
+Centro de Mando ordena las prioridades con motivos y accesos directos, compara períodos con fechas de Perú y muestra próximos compromisos. Distingue Caja, operaciones y propuestas, y avisa cuando faltan datos.
+
+## 1.1.54 — 06/10/2026
+
+Se documentó la revisión de Centro de Mando y una propuesta centrada en prioridades, resultados y próximos compromisos. Quedan identificadas las cifras confusas y los errores que deben corregirse antes de renovar el panel.
+
 ## 1.1.53 — 06/10/2026
 
 Clientes registra personas y empresas sin perder datos al fallar. Su historial incluye cotizaciones y ventas de madera, permite buscar por RUC y conserva filtros, con tablas legibles en celular y estados coherentes.

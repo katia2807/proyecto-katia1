@@ -4,9 +4,9 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { id: "hoy",          label: "Hoy" },
-  { id: "pasado",       label: "Pasado" },
-  { id: "futuro",       label: "Futuro" },
+  { id: "hoy",          label: "Hoy · Prioridades" },
+  { id: "pasado",       label: "Pasado · Resultados" },
+  { id: "futuro",       label: "Futuro · Compromisos" },
   { id: "clientes360",  label: "Clientes 360°" },
   { id: "herramientas", label: "Herramientas" },
 ] as const;
@@ -25,17 +25,20 @@ export function CentroMandoTabs({ activeTab }: CentroMandoTabsProps) {
   const navigate = (tab: TabId) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", tab);
+    params.delete("alertas");
+    params.delete("mensaje");
     // Limpiar cliente al cambiar de tab
     if (tab !== "clientes360") params.delete("cliente");
     router.push(`${pathname}?${params.toString()}`);
   };
 
   return (
-    <div className="flex gap-1 overflow-x-auto rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-bg-elevated)] p-1">
+    <nav aria-label="Vistas de Centro de Mando" className="flex gap-1 overflow-x-auto rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-bg-elevated)] p-1">
       {TABS.map((tab) => (
         <button
           key={tab.id}
           type="button"
+          aria-current={activeTab === tab.id ? "page" : undefined}
           onClick={() => navigate(tab.id)}
           className={cn(
             "flex-shrink-0 rounded-[calc(var(--katia-radius-md)-2px)] px-4 py-1.5 text-sm font-medium transition-all duration-150",
@@ -47,6 +50,6 @@ export function CentroMandoTabs({ activeTab }: CentroMandoTabsProps) {
           {tab.label}
         </button>
       ))}
-    </div>
+    </nav>
   );
 }
