@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.1.58";
+export const APP_VERSION = "1.1.59";
 export const APP_LAST_UPDATE = "07/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Se corrigieron permisos, respaldos, reportes y formularios de los apartados pendientes. Los errores se muestran con claridad, las cifras distinguen Caja y nómina y los guardados protegen mejor los datos.";
+  "Se documentó la copia local de datos y adjuntos, con recuperación comprobada en una base separada. El registro aclara qué protege el respaldo y qué falta para recuperar Supabase, sin alterar datos del negocio.";
