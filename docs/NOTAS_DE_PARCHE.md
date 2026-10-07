@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.60 — 07/10/2026
+
+Se amplió el respaldo manual con la base, sus permisos y adjuntos. La recuperación local conservó los datos del negocio y los accesos de tablas, sin modificar producción ni contratar un plan de pago.
+
 ## 1.1.59 — 07/10/2026
 
 Se documentó la copia local de datos y adjuntos, con recuperación comprobada en una base separada. El registro aclara qué protege el respaldo y qué falta para recuperar Supabase, sin alterar datos del negocio.

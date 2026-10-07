@@ -1,6 +1,35 @@
 # Copia local y recuperación aislada — 07/10/2026
 
-Registro local **1.1.59**. Producción continúa en **1.1.58**: esta tarea no publicó código ni cambió registros del negocio. El usuario pidió descargar temporalmente a su PC, conservando los datos existentes. Se canceló la propuesta de acceso temporal nuevo; no se creó ningún token, cambió contraseña ni contrató un plan.
+Registro inicial **1.1.59**, publicado en `main` mediante `c4d1a48`; Vercel confirmó el despliegue y la versión/nota coinciden en producción. Salud HTTP 200, demo desactivado y Supabase listo. El respaldo se amplió en **1.1.60**, como se describe a continuación. El usuario eligió plan gratuito y copias manuales a su PC. No se creó ningún token, cambió contraseña ni contrató un plan.
+
+## Ampliación nativa — 1.1.60
+
+Una de las claves proporcionadas por el usuario permitió la conexión de base. La validación usó TLS con certificado y nombre del servidor verificados, usuario del proyecto y una consulta de lectura. Las claves no aparecen en esta documentación ni en el repositorio. La entrada temporal cifrada con Windows se vació al terminar; la propuesta de acceso nuevo se descartó.
+
+Entrega privada: **`Descargas/Katia-respaldo-manual-2026-10-07.zip`**, con otra copia en `temp/respaldos-seguros/`. Tamaño **786,923 bytes**, 30 entradas, SHA-256 `35852328f29ffe05420af195386b33ca3191afb89c17c78b2201ff26e03f256e`. Se comprobaron los contenidos del ZIP contra sus tamaños y huellas, y la copia en Descargas conserva el mismo SHA-256. Los respaldos y evidencias anteriores se mantienen por separado.
+
+| Elemento | Alcance y comprobación reales |
+| --- | --- |
+| Base nativa | PostgreSQL 17.11 `pg_dump`, formato custom, de origen 17.6: **82 tablas y 599 filas**. Una transacción `REPEATABLE READ READ ONLY` exportó la instantánea usada tanto por el dump como por sus huellas. `default_transaction_read_only=on` en la conexión. Sin advertencias de exportación. |
+| Negocio | Las **42 tablas públicas y sus 257 registros**; huellas iguales a la copia lógica anterior y a la consulta final de producción. |
+| Usuarios y servicios | Todas las tablas del dump de Auth, Storage, Realtime e historial; incluye sesiones/refresh tokens y cuentas del programa. No equivale a exportar toda la configuración o las claves externas del proveedor. |
+| Roles y permisos | **16 roles y 22 membresías**, estructura, propietarios, ACL y RLS. Los roles se exportan deliberadamente **sin sus contraseñas de conexión**; las cuentas del programa permanecen en los datos de Auth. |
+| Adjuntos | Los **12 archivos originales, 659,686 bytes**, y sus manifiestos. Huellas/tamaños comprobados; los metadatos de Storage coinciden entre la copia nativa y la lógica anterior. |
+| Configuración observada | Referencia privada parcial de URLs y proveedor Email, consultados sin guardar. No se exportaron todas las claves JWT, variables de Vercel ni configuración externa. |
+
+Recuperación final en un directorio nuevo con PostgreSQL 17.11 portátil, limitado a `127.0.0.1:55440`, contraseña local aleatoria y parada al terminar. **81 tablas y 599 filas** recuperadas con huellas coincidentes; **81 propietarios y ACL efectivos**, **16 roles, 22 membresías, 329 restricciones, 18 triggers y 50 políticas** coinciden con el origen. `pg_restore` terminó sin errores. La única normalización del comparador es una ACL explícita equivalente a la ACL por defecto de su propietario en `realtime.schema_migrations`; no se concedieron permisos adicionales.
+
+La tabla 82 es `vault.secrets`, vacía en el origen. Su extensión administrada `supabase_vault` no existe en el PostgreSQL portátil de Windows: se omitieron ocho entradas de Vault **solo en la prueba**, sin modificar el dump original, que las conserva. Esto no comprueba recuperación de Vault ni inicio de los servicios Auth/Storage/Realtime. Tampoco se probó un inicio de sesión con las cuentas recuperadas o una subida de los binarios a Storage. Una recuperación del programa completo requiere un destino Supabase compatible, preparar sus conexiones/configuración y verificar sus servicios antes de cambiar producción.
+
+Consulta final mediante lectura: **42 tablas públicas, 257 registros, cero tablas con diferencias, 12 adjuntos y dos usuarios**. Ninguna restauración o escritura del negocio en producción. La configuración automática del proveedor no se activó: el usuario eligió mantener Free y respaldo manual. La copia no se actualiza sola; debe renovarse tras cambios relevantes y antes de operaciones delicadas. El `LEEME.txt` del ZIP explica su uso en un destino separado y que no corresponde a la importación Excel o JSON local del programa.
+
+Evidencias privadas: `temp/respaldos-seguros/base-nativa-verificada-2026-10-07/` (dump, huellas, catálogo de permisos, comprobación final, integridad y recuperación); prueba final en `recuperacion-dump-nativo-2026-10-07-5/`. Se conservaron los intentos intermedios para diagnosticar arranque y comparación de ACL; no forman parte de la entrega ZIP ni son dependencias del programa.
+
+Nota **1.1.60 — 07/10/2026**: Se amplió el respaldo manual con la base, sus permisos y adjuntos. La recuperación local conservó los datos del negocio y los accesos de tablas, sin modificar producción ni contratar un plan de pago.
+
+## Registro de la copia lógica inicial — 1.1.59
+
+Los apartados siguientes describen la primera copia y sus límites en ese momento. La ampliación nativa anterior sustituye los pendientes de contraseña, dump, sesiones y recuperación de roles/ACL; sus límites de servicios y configuración externa siguen vigentes.
 
 ## Ubicación y alcance
 
@@ -31,7 +60,7 @@ Evidencias privadas: `recuperacion-verificada.json`, `produccion-final.json`, `s
 
 Esta copia protege los datos y archivos enumerados. **No es un respaldo completo del proveedor**: no contiene sesiones/refresh tokens, todas las tablas administradas, configuración y claves externas, Vault ni sus claves de cifrado. Los roles/grants originales se conservaron en los metadatos; la prueba creó roles locales para reconstruir políticas, pero no reprodujo sus propietarios, concesiones ni servicios de Supabase. No certifica inicio de sesión, acceso entre roles ni recuperación de Auth/Storage.
 
-El plan observado sigue siendo Free, sin respaldo automático configurado. No se hizo un `pg_dump` del origen porque no hay contraseña de base disponible ni se aprobó crear acceso nuevo. Tampoco se subió esta copia sobre la base sana: una recuperación posterior debe prepararse en un destino separado y completar permisos, servicios y elementos faltantes antes de considerar reemplazar producción.
+Al terminar la primera copia, el plan observado seguía siendo Free, sin respaldo automático configurado. En esa etapa no se hizo un `pg_dump` porque no había contraseña disponible ni se aprobó crear acceso nuevo; esta limitación quedó resuelta en la ampliación 1.1.60. No se subió ninguna copia sobre la base sana: una recuperación posterior debe prepararse en un destino separado y completar servicios y configuración faltantes antes de considerar reemplazar producción.
 
 La revisión automática bloqueó una repetición de la prueba por un límite de uso; esa acción no se ejecutó. Tras el mensaje posterior del usuario para continuar, la solicitud se revisó y la comprobación final autorizada pasó. No se eludió la revisión ni cambió el destino.
 
