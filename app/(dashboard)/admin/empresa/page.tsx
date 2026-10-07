@@ -5,8 +5,8 @@ import { requireAuthContext } from "@/lib/auth";
 import { getEmpresaConfig } from "@/lib/company-config";
 
 export default async function EmpresaPage() {
-  await requireAuthContext({ allowedRoles: ["owner_admin"] });
-  const empresa = await getEmpresaConfig();
+  const context = await requireAuthContext({ allowedRoles: ["owner_admin"] });
+  const empresa = await getEmpresaConfig(context.organizationId);
 
   return (
     <div className="space-y-6">

@@ -1,0 +1,18 @@
+import {beforeEach,expect,test,vi} from "vitest";
+const mocks=vi.hoisted(()=>({write:vi.fn(),auth:vi.fn()}));
+vi.mock("server-only",()=>({}));
+vi.mock("next/cache",()=>({revalidatePath:vi.fn()}));vi.mock("next/navigation",()=>({redirect:vi.fn()}));
+vi.mock("@/lib/auth",()=>({requireAuthContext:mocks.auth}));vi.mock("@/lib/runtime",()=>({hasSupabaseEnv:()=>false}));
+vi.mock("@/lib/store-persistence",()=>({readStoreFromDisk:()=>null,writeStoreToDisk:mocks.write}));vi.mock("@/lib/demo-mode",()=>({isDemoDatabaseMode:()=>true}));
+import {demoExportStore,demoImportStore} from "@/lib/demo-store";
+import {createEmpleado,createAdelanto,createSueldo,createRegistroGeneral} from "@/app/actions";
+const baseline=demoExportStore(),org=baseline.empleados[0].organization_id;
+const form=(values:Record<string,string>)=>{const fd=new FormData();Object.entries(values).forEach(([k,v])=>fd.set(k,v));return fd;};
+beforeEach(()=>{mocks.auth.mockResolvedValue({userId:'dueña',organizationId:org,role:'owner_admin',uiRole:null});mocks.write.mockReset();demoImportStore(JSON.stringify(baseline));mocks.write.mockClear();});
+test.each(['','   '])('nombre vacío %s no crea empleado',async nombre=>{await expect(createEmpleado(form({nombre,rol:'Chofer',fecha_ingreso:'2026-10-06'}))).rejects.toThrow();expect(mocks.write).not.toHaveBeenCalled();});
+test('fecha imposible no crea empleado',async()=>{await expect(createEmpleado(form({nombre:'Empleado',rol:'Chofer',fecha_ingreso:'2026-02-30'}))).rejects.toThrow();expect(mocks.write).not.toHaveBeenCalled();});
+test('empleado ajeno o inexistente no recibe adelanto',async()=>{await expect(createAdelanto(form({empleado_id:'10000000-0000-4000-8000-000000000058',fecha:'2026-10-06',monto:'50'}))).rejects.toThrow();expect(mocks.write).not.toHaveBeenCalled();});
+test.each([{periodo:'2026-13',descuentos:'0'},{periodo:'2026-10',descuentos:'101'}])('sueldo inválido %j no escribe',async data=>{await expect(createSueldo(form({empleado_id:baseline.empleados[0].id,submission_id:'10000000-0000-4000-8000-000000000058',monto_bruto:'100',...data}))).rejects.toThrow();expect(mocks.write).not.toHaveBeenCalled();});
+test('registro exige título y fecha válidos',async()=>{await expect(createRegistroGeneral(form({categoria_id:baseline.registroCategorias[0].id,fecha:'2026-02-30',titulo:'   ',detalle:'Prueba',monto:'1'}))).rejects.toThrow();expect(mocks.write).not.toHaveBeenCalled();});
+test('registro exige categoría perteneciente a la empresa',async()=>{await expect(createRegistroGeneral(form({categoria_id:'10000000-0000-4000-8000-000000000058',fecha:'2026-10-06',titulo:'Prueba',detalle:'Prueba',monto:'1'}))).rejects.toThrow();expect(mocks.write).not.toHaveBeenCalled();});
+test('registro usa la misma lista de roles que su botón',async()=>{await createRegistroGeneral(form({categoria_id:baseline.registroCategorias[0].id,fecha:'2026-10-06',titulo:'  Prueba aislada  ',detalle:'Prueba',monto:'1'}));expect(mocks.auth).toHaveBeenCalledWith(expect.objectContaining({allowedRoles:['owner_admin','gerencia','almacen']}));expect(demoExportStore().registrosGenerales[0].titulo).toBe('Prueba aislada');});

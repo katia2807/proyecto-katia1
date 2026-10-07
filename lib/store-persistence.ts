@@ -28,7 +28,7 @@ export function readStoreFromDisk<T>(): T | null {
   }
 }
 
-export function writeStoreToDisk<T>(store: T): void {
+export function writeStoreToDisk<T>(store: T, options: { strict?: boolean } = {}): void {
   try {
     ensureDataDirectory();
     const json = JSON.stringify(store, null, 2);
@@ -36,7 +36,8 @@ export function writeStoreToDisk<T>(store: T): void {
     const finalPath = storeJsonPath();
     writeFileSync(tmp, json, "utf8");
     renameSync(tmp, finalPath);
-  } catch {
+  } catch (error) {
+    if (options.strict) throw new Error("No se pudo guardar el respaldo. Los datos anteriores se conservan.", { cause: error });
     // Fail silently in read-only environments (e.g. Vercel build, edge)
   }
 }

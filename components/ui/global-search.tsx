@@ -49,7 +49,7 @@ export function GlobalSearch({ items }: { items: SearchItem[] }) {
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => setFocused(true)}
         onBlur={() => setTimeout(() => setFocused(false), 150)}
-        placeholder="Buscar…"
+        placeholder="Buscar en registros recientes…"
         aria-label="Búsqueda global"
         className={cn(
           "h-10 w-full rounded-[var(--katia-radius-md)] border pl-9 pr-8 text-sm transition-all duration-150",
@@ -80,9 +80,10 @@ export function GlobalSearch({ items }: { items: SearchItem[] }) {
             "shadow-[var(--katia-shadow-modal)]",
           )}
         >
+          <p className="border-b border-[var(--katia-border-subtle)] px-4 py-2 text-xs text-[var(--katia-text-tertiary)]">Hasta 200 registros recientes por categoría permitida.</p>
           {!hasResults ? (
             <p className="px-4 py-3 text-sm text-[var(--katia-text-tertiary)]">
-              Sin resultados para &ldquo;{query}&rdquo;
+              Sin coincidencias recientes para &ldquo;{query}&rdquo;. Busca en el apartado correspondiente para consultar todo el historial.
             </p>
           ) : (
             (["Cliente", "Producto", "Cotizacion"] as const).map((type) => {

@@ -26,29 +26,28 @@ export const DEFAULT_EMPRESA_CONFIG: EmpresaConfig = {
   logo_url: null,
 };
 
-export async function getEmpresaConfig(): Promise<EmpresaConfig> {
+export async function getEmpresaConfig(organizationId = DEFAULT_ORG_ID): Promise<EmpresaConfig> {
   if (!hasSupabaseEnv()) {
     return DEFAULT_EMPRESA_CONFIG;
   }
 
   const supabase = getSupabaseServerClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("configuracion_empresa")
     .select("nombre,ruc,telefono,direccion,firmante,firmante_cargo,logo_url,margen_ganancia_default_pct")
-    .eq("organization_id", DEFAULT_ORG_ID)
+    .eq("organization_id", organizationId)
     .maybeSingle();
 
-  if (!data) {
-    return DEFAULT_EMPRESA_CONFIG;
-  }
+  if (error) throw new Error("No se pudieron consultar los datos de la empresa. No se usarán datos de muestra. Intenta nuevamente.");
+  if (!data) return { ...DEFAULT_EMPRESA_CONFIG, nombre: "", ruc: "", telefono: "", direccion: "", firmante: "", firmante_cargo: "" };
 
   return {
-    nombre: String(data.nombre ?? DEFAULT_EMPRESA_CONFIG.nombre),
-    ruc: String(data.ruc ?? DEFAULT_EMPRESA_CONFIG.ruc),
-    telefono: String(data.telefono ?? DEFAULT_EMPRESA_CONFIG.telefono),
-    direccion: String(data.direccion ?? DEFAULT_EMPRESA_CONFIG.direccion),
-    firmante: String(data.firmante ?? DEFAULT_EMPRESA_CONFIG.firmante),
-    firmante_cargo: String(data.firmante_cargo ?? DEFAULT_EMPRESA_CONFIG.firmante_cargo),
+    nombre: String(data.nombre ?? ""),
+    ruc: String(data.ruc ?? ""),
+    telefono: String(data.telefono ?? ""),
+    direccion: String(data.direccion ?? ""),
+    firmante: String(data.firmante ?? ""),
+    firmante_cargo: String(data.firmante_cargo ?? ""),
     margen_ganancia_default_pct: parseMargenGananciaInput(
       data.margen_ganancia_default_pct,
       DEFAULT_EMPRESA_CONFIG.margen_ganancia_default_pct,

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { eliminarDatosSistema, restaurarRespaldoJSON } from "@/app/actions";
+import { eliminarDatosSistema, submitRestaurarRespaldo } from "@/app/actions";
+import { FeedbackForm } from "@/components/ui/feedback-form";
 import { ImportExcelPanel } from "@/components/admin/import-excel-panel";
 import { RespaldoPeligroCategoriaForms } from "@/components/admin/respaldo-peligro-categoria-forms";
 import { RespaldoProduccionResumen } from "@/components/admin/respaldo-produccion-resumen";
@@ -8,21 +9,22 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { fetchRespaldoSupabaseResumen } from "@/lib/respaldo-supabase-resumen";
 import { hasSupabaseEnv } from "@/lib/runtime";
-import { getAuthContext } from "@/lib/auth";
+import { requirePageAccess } from "@/lib/auth";
+import { resolveRole } from "@/lib/permissions";
 import { ResetDatabasePanel } from "@/components/admin/reset-database-panel";
 
 export const dynamic = "force-dynamic";
 
 export default async function RespaldoPage() {
+  const context = await requirePageAccess("/admin/respaldo");
   const prodDb = hasSupabaseEnv();
   const mockData =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
 
-  const context = await getAuthContext();
-  const isOwnerAdmin = context?.role === "owner_admin" || context?.uiRole === "owner_admin";
+  const isOwnerAdmin = resolveRole(context.role, context.uiRole) === "owner_admin";
 
   if (prodDb) {
-    const resumen = await fetchRespaldoSupabaseResumen();
+    const resumen = await fetchRespaldoSupabaseResumen(context.organizationId);
 
     return (
       <div className="space-y-6">
@@ -48,9 +50,9 @@ export default async function RespaldoPage() {
         <Card>
           <CardTitle>Exportar datos a Excel</CardTitle>
           <CardDescription className="leading-relaxed">
-            Descarga un archivo <strong>.xlsx</strong> con todas las tablas principales en hojas separadas y bien
+            Descarga un archivo <strong>.xlsx</strong> con las tablas indicadas en hojas separadas y bien
             ordenadas: Compradores, Choferes, Proveedores, Inventario, Ventas de madera, Ventas de muebles y Personal.
-            Cada hoja tiene encabezados claros, filas alternas y totales donde aplica.
+            Este archivo es una exportación para consulta; no restaura el sistema completo. La importación solo reconoce compradores, choferes, proveedores e inventario. Para recuperar producción necesitas un respaldo de Supabase comprobado.
           </CardDescription>
           <div className="mt-4 flex flex-wrap gap-3">
             <a
@@ -58,7 +60,7 @@ export default async function RespaldoPage() {
               className="inline-flex items-center gap-2 rounded-[var(--katia-radius-md)] bg-[var(--katia-primary)] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
               download
             >
-              ↓ Descargar respaldo completo (.xlsx)
+              ↓ Descargar exportación de datos (.xlsx)
             </a>
             <a
               href="/inventario/export?type=full"
@@ -149,7 +151,7 @@ export default async function RespaldoPage() {
             ⚠ Reemplaza <strong>todas las tablas actuales</strong> con el contenido del archivo. Solo owner_admin y
             gerencia. Escribe <code>RESTAURAR</code> para confirmar.
           </CardDescription>
-          <form action={restaurarRespaldoJSON} className="mt-3 space-y-3">
+          <FeedbackForm action={submitRestaurarRespaldo} className="mt-3 space-y-3">
             <label className="space-y-1">
               <span className="text-xs font-medium text-[var(--color-text-secondary)]">Archivo JSON</span>
               <input
@@ -167,7 +169,7 @@ export default async function RespaldoPage() {
               required
             />
             <Button>Restaurar respaldo</Button>
-          </form>
+          </FeedbackForm>
         </Card>
       </div>
 

@@ -159,7 +159,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <p className="mt-1 font-mono text-lg font-bold text-[var(--katia-text-primary)]">{mes ? formatPen(mes.egresos) : "No disponible"}</p>
           </div>
           <div className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] px-4 py-3">
-            <p className="text-xs text-[var(--katia-text-tertiary)]">Utilidad estimada</p>
+            <p className="text-xs text-[var(--katia-text-tertiary)]">Resultado de Caja de empresa</p>
             <p className={`mt-1 font-mono text-lg font-bold ${utilidad === null ? "text-[var(--katia-text-secondary)]" : utilidad >= 0 ? "text-[var(--katia-success)]" : "text-[var(--katia-danger)]"}`}>
               {utilidad === null ? "No disponible" : formatPen(utilidad)}
             </p>

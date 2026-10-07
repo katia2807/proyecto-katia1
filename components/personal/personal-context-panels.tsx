@@ -1,11 +1,11 @@
 "use client";
 
-import { createAdelanto, createEmpleado, createSueldo } from "@/app/actions";
+import { submitPersonalForm } from "@/app/actions";
+import { FeedbackForm } from "@/components/ui/feedback-form";
 import { ContextActionPanel } from "@/components/context-action-panel";
 import { Combobox } from "@/components/ui/Combobox";
 import { Field } from "@/components/ui/field";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
-import { MOCK_EMPLEADOS } from "@/lib/combobox-mocks";
 import { useMemo, useState } from "react";
 
 type EmpleadoOpt = { id: string; nombre: string };
@@ -15,17 +15,16 @@ type PersonalContextPanelsProps = {
   mockData?: boolean;
 };
 
-export function PersonalContextPanels({ empleados, mockData = false }: PersonalContextPanelsProps) {
+export function PersonalContextPanels({ empleados }: PersonalContextPanelsProps) {
   const [empleadoAdelantoId, setEmpleadoAdelantoId] = useState("");
   const [empleadoSueldoId, setEmpleadoSueldoId] = useState("");
 
   const empleadoOptions = useMemo(() => {
-    const src = mockData ? MOCK_EMPLEADOS : empleados;
-    return src.map((e) => ({
+    return empleados.map((e) => ({
       value: e.id,
       label: e.nombre,
     }));
-  }, [mockData, empleados]);
+  }, [empleados]);
 
   return (
     <>
@@ -34,12 +33,12 @@ export function PersonalContextPanels({ empleados, mockData = false }: PersonalC
         title="Nuevo empleado"
         description="Datos del personal activo en nómina."
       >
-        <form action={createEmpleado} className="space-y-3">
+        <FeedbackForm action={formData => submitPersonalForm("empleado", formData)} className="space-y-3">
           <Field name="nombre" label="Nombre completo" required />
           <Field name="rol" label="Rol" placeholder="Chofer / Operario" required />
           <Field name="fecha_ingreso" type="date" label="Fecha de ingreso" required />
           <PendingSubmitButton idleText="Guardar empleado" />
-        </form>
+        </FeedbackForm>
       </ContextActionPanel>
 
       <ContextActionPanel
@@ -47,7 +46,7 @@ export function PersonalContextPanels({ empleados, mockData = false }: PersonalC
         title="Nuevo adelanto"
         description="Registra monto y fecha para el empleado seleccionado."
       >
-        <form action={createAdelanto} className="space-y-3">
+        <FeedbackForm action={formData => submitPersonalForm("adelanto", formData)} className="space-y-3">
           <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
             <span>Empleado</span>
             <Combobox
@@ -62,15 +61,15 @@ export function PersonalContextPanels({ empleados, mockData = false }: PersonalC
           <Field name="fecha" label="Fecha" type="date" required />
           <Field name="monto" label="Monto (S/)" type="number" step="0.01" min="0" required />
           <PendingSubmitButton idleText="Registrar adelanto" />
-        </form>
+        </FeedbackForm>
       </ContextActionPanel>
 
       <ContextActionPanel
         triggerLabel="Registrar sueldo"
         title="Nuevo sueldo"
-        description="Neto = bruto - descuentos, sin doble conteo en reportes."
+        description="Neto = bruto menos descuentos. Los pagos se registran en Caja; la nómina se muestra por separado."
       >
-        <form action={createSueldo} className="space-y-3">
+        <FeedbackForm action={formData => submitPersonalForm("sueldo", formData)} idempotent className="space-y-3">
           <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
             <span>Empleado</span>
             <Combobox
@@ -82,11 +81,11 @@ export function PersonalContextPanels({ empleados, mockData = false }: PersonalC
               inputAriaLabel="Empleado para sueldo"
             />
           </label>
-          <Field name="periodo" label="Periodo (YYYY-MM)" placeholder="2026-04" required />
+          <Field name="periodo" label="Período" type="month" required />
           <Field name="monto_bruto" label="Bruto (S/)" type="number" step="0.01" min="0" required />
           <Field name="descuentos" label="Descuentos (S/)" type="number" step="0.01" min="0" defaultValue="0" />
           <PendingSubmitButton idleText="Guardar sueldo" />
-        </form>
+        </FeedbackForm>
       </ContextActionPanel>
     </>
   );

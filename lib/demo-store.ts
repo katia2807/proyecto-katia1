@@ -1,6 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readStoreFromDisk, writeStoreToDisk } from "@/lib/store-persistence";
 import { isDemoDatabaseMode } from "@/lib/demo-mode";
+import { monthlyCashRows } from "@/lib/reportes-model";
+import { DEFAULT_ORG_ID } from "@/lib/constants";
+import { validateBackupRow, validateBackupReferences } from "@/lib/backup-validation";
 import type { MaderaCortadaVoucherLine, TipoComprobanteVenta } from "@/lib/madera-cortada-print-model";
 
 export type MetodoPago =
@@ -1793,22 +1796,38 @@ export function demoExportStore(): DemoStore {
  * respaldo desde la UI.
  */
 export function demoImportStore(rawJson: string): { creados: number } {
-  const parsed = JSON.parse(rawJson) as Record<string, unknown>;
-  const migrated = migrateDemoStore(parsed);
-  const counts =
-    migrated.caja.length +
-    migrated.clientes.length +
-    migrated.proveedores.length +
-    migrated.ventas.length +
-    migrated.alquileres.length +
-    migrated.cotizaciones.length +
-    migrated.empleados.length +
-    migrated.cierres.length +
-    migrated.choferes.length +
-    migrated.mueblesCatalogo.length +
-    migrated.serviciosAserradero.length;
+  const parsed: unknown = JSON.parse(rawJson);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("El archivo no es un respaldo completo del sistema local.");
+  }
+  const snapshot = parsed as Record<string, unknown>;
+  const defaults = createDefaultDemoStore();
+  const tableKeys = Object.keys(defaults).filter(key => Array.isArray(defaults[key as keyof DemoStore]));
+  if (Object.keys(snapshot).some(key => !(Object.prototype.hasOwnProperty.call(defaults,key)))) throw new Error("El archivo contiene campos ajenos al respaldo del sistema.");
+  // Nunca sembrar datos de muestra al restaurar, ni interpretar un archivo parcial como completo.
+  if (tableKeys.some(key => !Array.isArray(snapshot[key])) || !snapshot.correlativosCounter || typeof snapshot.correlativosCounter !== "object" || Array.isArray(snapshot.correlativosCounter)) {
+    throw new Error("El respaldo está incompleto. Usa el JSON descargado desde este sistema.");
+  }
+  let counts = 0;
+  for (const key of tableKeys) {
+    const ids = new Set<string>();
+    for (const row of snapshot[key] as unknown[]) {
+      if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error(`La tabla ${key} contiene una fila inválida.`);
+      const record = row as Record<string, unknown>;
+      if (typeof record.id !== "string" || !record.id.trim() || ids.has(record.id)) throw new Error(`La tabla ${key} contiene identificadores inválidos o repetidos.`);
+      if (key !== "cortes" && key !== "securityControls" && record.organization_id !== DEFAULT_ORG_ID) throw new Error("El respaldo pertenece a otra organización o no identifica su origen.");
+      validateBackupRow(key, record);
+      ids.add(record.id);
+      counts++;
+    }
+  }
+  if (counts === 0 || Object.values(snapshot.correlativosCounter).some(v => typeof v !== "number" || !Number.isSafeInteger(v) || v < 0)) throw new Error("El archivo no contiene un respaldo válido con datos.");
+  validateBackupReferences(snapshot);
+  const migrated = migrateDemoStore(snapshot);
+  if (!isValidDemoStore(migrated)) throw new Error("No se pudo validar el respaldo.");
+  // Confirmar la persistencia antes de reemplazar el estado en memoria.
+  writeStoreToDisk(migrated, { strict: true });
   Object.assign(store, migrated);
-  persistStore();
   return { creados: counts };
 }
 
@@ -2117,41 +2136,7 @@ export function demoInventarioResumen() {
 }
 
 function demoUtilidad(): UtilidadRow[] {
-  const grouped = new Map<string, UtilidadRow>();
-  for (const row of store.caja.filter((x) => x.voided_at === null)) {
-    const [anio, mes] = row.fecha.split("-").map(Number);
-    const key = `${anio}-${mes}`;
-    const current = grouped.get(key) ?? {
-      organization_id: orgId,
-      anio,
-      mes,
-      ingresos: 0,
-      egresos: 0,
-      sueldos: 0,
-      utilidad_neta: 0,
-    };
-    if (row.tipo === "ingreso") current.ingresos += Number(row.monto);
-    if (row.tipo === "egreso") current.egresos += Number(row.monto);
-    grouped.set(key, current);
-  }
-  for (const row of store.sueldos) {
-    const [anio, mes] = row.periodo.split("-").map(Number);
-    const key = `${anio}-${mes}`;
-    const current = grouped.get(key) ?? {
-      organization_id: orgId,
-      anio,
-      mes,
-      ingresos: 0,
-      egresos: 0,
-      sueldos: 0,
-      utilidad_neta: 0,
-    };
-    current.sueldos += Number(row.monto_neto);
-    grouped.set(key, current);
-  }
-  return [...grouped.values()]
-    .map((row) => ({ ...row, utilidad_neta: row.ingresos - row.egresos - row.sueldos }))
-    .sort((a, b) => `${b.anio}${b.mes}`.localeCompare(`${a.anio}${a.mes}`));
+  return monthlyCashRows(store.caja, store.sueldos);
 }
 
 type DemoCreateCajaInput = Omit<
@@ -2470,8 +2455,13 @@ export function demoCreateAdelanto(input: Omit<AdelantoRow, "id" | "created_at" 
   persistStore();
 }
 
-export function demoCreateSueldo(input: Omit<SueldoRow, "id" | "created_at">) {
-  store.sueldos.unshift({ id: randomUUID(), created_at: nowIso(), ...input });
+export function demoCreateSueldo(input: Omit<SueldoRow, "id" | "created_at">, submissionId: string = randomUUID()) {
+  const existing = store.sueldos.find(s => s.id === submissionId);
+  if (existing) {
+    if (Object.entries(input).some(([key, value]) => existing[key as keyof SueldoRow] !== value)) throw new Error("Este envío ya se registró con otros valores. Vuelve a abrir el formulario.");
+    return;
+  }
+  store.sueldos.unshift({ id: submissionId, created_at: nowIso(), ...input });
   persistStore();
 }
 

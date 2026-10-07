@@ -9,6 +9,7 @@ import { isDemoDatabaseMode } from "@/lib/demo-mode";
 import { getServerSupabaseCredentials } from "@/lib/supabase/temp-credentials";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole, Database } from "@/lib/supabase/types";
+import { canAccessPath, resolveRole } from "@/lib/permissions";
 
 type PerfilAuthRow = Pick<
   Database["public"]["Tables"]["perfiles"]["Row"],
@@ -148,7 +149,7 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
 });
 
 export async function requireAuthContext(options: AccessOptions = {}) {
-  const redirectTo = options.redirectTo ?? "/login";
+  const redirectTo = options.redirectTo === undefined ? "/login" : options.redirectTo;
   let context: AuthContext | null;
   try {
     context = await getAuthContext();
@@ -172,9 +173,16 @@ export async function requireAuthContext(options: AccessOptions = {}) {
   }
 
   const { allowedRoles } = options;
-  if (allowedRoles && !allowedRoles.includes(context.role)) {
+  if (allowedRoles && !allowedRoles.some(role => resolveRole(role) === resolveRole(context.role, context.uiRole))) {
     throw new Error("Acceso denegado: no tienes permisos para esta acción.");
   }
 
+  return context;
+}
+
+/** Autoriza la página antes de cargar o enviar datos al navegador. */
+export async function requirePageAccess(path: string) {
+  const context = await requireAuthContext();
+  if (!canAccessPath(context.role, context.uiRole, path)) redirect("/");
   return context;
 }

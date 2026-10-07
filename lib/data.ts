@@ -1,4 +1,5 @@
 import { DEFAULT_ORG_ID } from "@/lib/constants";
+import { readCompleteTable } from "@/lib/complete-data";
 import {
   demoAlquilerRows,
   demoCajaRows,
@@ -15,13 +16,10 @@ import {
   demoInventarioResumen,
   demoMueblesCatalogoRows,
   demoOrdenesProduccionRows,
-  demoPersonalRows,
   demoProveedoresRows,
   demoRegistroCategoriasRows,
-  demoRegistrosGeneralesRows,
   demoSecurityControlRows,
   demoServiciosAserraderoRows,
-  demoServiciosEspecialesTarifaRows,
   demoSnapshot,
   type ServicioEspecialTarifaRow,
   demoUtilidadRows,
@@ -376,25 +374,9 @@ export async function getRegistroCategoriasRows() {
   }, fallback.registroCategorias);
 }
 
-export async function getRegistrosGeneralesRows(categoriaId?: string) {
-  if (!hasSupabaseEnv()) {
-    const rows = demoRegistrosGeneralesRows();
-    if (!categoriaId) return rows;
-    return rows.filter((row) => row.categoria_id === categoriaId);
-  }
-  const supabase = getSupabaseServerClient();
-  return safeQuery(async () => {
-    let query = supabase
-      .from("registros_generales")
-      .select("*")
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .order("fecha", { ascending: false });
-    if (categoriaId) {
-      query = query.eq("categoria_id", categoriaId);
-    }
-    const { data } = await query.limit(100);
-    return data ?? fallback.registrosGenerales;
-  }, fallback.registrosGenerales);
+export async function getRegistrosGeneralesRows(categoriaId?: string, organizationId = DEFAULT_ORG_ID) {
+  const rows = await readCompleteTable("registros_generales", organizationId);
+  return rows.filter(row => !categoriaId || row.categoria_id === categoriaId).sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id.localeCompare(a.id));
 }
 
 export async function getComprasMaderaRows() {
@@ -559,35 +541,17 @@ export async function getAlquilerById(id: string, organizationId = DEFAULT_ORG_I
 }
 
 
-export async function getPersonalRows() {
-  if (!hasSupabaseEnv()) {
-    return demoPersonalRows();
-  }
-  const supabase = getSupabaseServerClient();
+export async function getPersonalRows(organizationId = DEFAULT_ORG_ID) {
   const [empleados, adelantos, sueldos] = await Promise.all([
-    supabase
-      .from("empleados")
-      .select("*")
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .order("nombre"),
-    supabase
-      .from("adelantos")
-      .select("*, empleados(nombre)")
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .order("fecha", { ascending: false })
-      .limit(30),
-    supabase
-      .from("sueldos")
-      .select("*, empleados(nombre)")
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .order("periodo", { ascending: false })
-      .limit(30),
+    readCompleteTable("empleados", organizationId),
+    readCompleteTable("adelantos", organizationId),
+    readCompleteTable("sueldos", organizationId),
   ]);
 
   return {
-    empleados: empleados.data ?? fallback.empleados,
-    adelantos: adelantos.data ?? fallback.adelantos,
-    sueldos: sueldos.data ?? fallback.sueldos,
+    empleados: empleados.sort((a, b) => a.nombre.localeCompare(b.nombre)),
+    adelantos: adelantos.sort((a, b) => b.fecha.localeCompare(a.fecha)),
+    sueldos: sueldos.sort((a, b) => b.periodo.localeCompare(a.periodo)),
   };
 }
 
@@ -785,10 +749,10 @@ export async function getInventarioResumen() {
   return { productos, movimientos, masVendidos, menosVendidos, stockBajo };
 }
 
-export async function getInventarioRobustoData() {
+export async function getInventarioRobustoData(options?: { organizationId: string; complete: boolean }) {
   const [productosBundle, movimientosBundle] = await Promise.all([
-    loadInventarioProductosRows(true),
-    loadInventarioMovimientosRows(),
+    options?.complete ? readCompleteTable("inventario_productos", options.organizationId).then(rows => ({ rows, usedFallback: false })) : loadInventarioProductosRows(true),
+    options?.complete ? readCompleteTable("inventario_movimientos", options.organizationId).then(rows => ({ rows: rows.sort((a,b) => b.fecha.localeCompare(a.fecha) || b.id.localeCompare(a.id)), usedFallback: false, totalRowCount: rows.length })) : loadInventarioMovimientosRows(),
   ]);
   const productosAll = productosBundle.rows;
   const movimientos = movimientosBundle.rows;
@@ -1157,20 +1121,8 @@ export async function getMaderaCortadaCorrectionContext(
   };
 }
 
-export async function getServiciosEspecialesTarifaRows(): Promise<ServicioEspecialTarifaRow[]> {
-  if (!hasSupabaseEnv()) {
-    return demoServiciosEspecialesTarifaRows();
-  }
-  const supabase = getSupabaseServerClient();
-  return safeQuery(async () => {
-    const { data } = await supabase
-      .from("servicios_especiales_tarifa")
-      .select("*")
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .eq("activo", true)
-      .order("nombre", { ascending: true });
-    return (data ?? []) as ServicioEspecialTarifaRow[];
-  }, []);
+export async function getServiciosEspecialesTarifaRows(organizationId = DEFAULT_ORG_ID): Promise<ServicioEspecialTarifaRow[]> {
+  return (await readCompleteTable("servicios_especiales_tarifa",organizationId)).filter(row=>row.activo).sort((a,b)=>a.nombre.localeCompare(b.nombre));
 }
 
 export async function getZonasEntregaRows() {

@@ -1,3 +1,4 @@
+import { requirePageAccess } from "@/lib/auth";
 import Link from "next/link";
 import { createZonaEntrega } from "@/app/actions";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { canMutateVentas } from "@/lib/permissions";
 import { formatPen } from "@/lib/utils";
 
 export default async function ZonasEntregaPage() {
+  await requirePageAccess("/ventas/zonas-entrega");
   const zonas = await getZonasEntregaRows();
   const role = await getCurrentUserRole();
   const canMutate = canMutateVentas(role);

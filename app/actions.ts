@@ -6,6 +6,7 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { requireAuthContext } from "@/lib/auth";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
+import { FEATURES } from "@/lib/features";
 import {
   demoCambiarEstadoOrden,
   demoCerrarContratoAlquiler,
@@ -152,23 +153,23 @@ const corteSchema = z.object({
 });
 
 const empleadoSchema = z.object({
-  nombre: z.string().min(3),
-  rol: z.string().min(2),
-  fechaIngreso: z.string().min(1),
+  nombre: z.string().trim().min(3),
+  rol: z.string().trim().min(2),
+  fechaIngreso: z.iso.date(),
 });
 
 const adelantoSchema = z.object({
   empleadoId: z.string().uuid(),
-  fecha: z.string().min(1),
+  fecha: z.iso.date(),
   monto: moneySchema(z.number().positive()),
 });
 
 const sueldoSchema = z.object({
   empleadoId: z.string().uuid(),
-  periodo: z.string().min(7),
+  periodo: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Usa un período válido con formato AAAA-MM."),
   montoBruto: moneySchema(z.number().positive()),
   descuentos: moneySchema(z.number().nonnegative()).default(0),
-});
+}).refine(data => data.descuentos <= data.montoBruto, { message: "Los descuentos no pueden superar el sueldo bruto.", path: ["descuentos"] });
 
 const clienteSchema = z.object({
   nombre: z.string().trim().min(3),
@@ -439,9 +440,9 @@ const inventarioConteoSchema = z.object({
 
 const registroGeneralSchema = z.object({
   categoriaId: z.string().uuid(),
-  fecha: z.string().min(1),
-  titulo: z.string().min(3),
-  detalle: z.string().optional(),
+  fecha: z.iso.date(),
+  titulo: z.string().trim().min(3),
+  detalle: z.string().trim().optional(),
   monto: z.preprocess(
     (value) => (value === "" || value === null ? undefined : preprocessDecimal(value)),
     z.number().nonnegative().optional(),
@@ -854,6 +855,7 @@ export async function restaurarRespaldoJSON(formData: FormData) {
   if (hasSupabaseEnv()) {
     throw new Error("El respaldo JSON solo aplica al store local.");
   }
+  if (file.size > 25 * 1024 * 1024 || !file.name.toLowerCase().endsWith(".json")) throw new Error("Usa un respaldo .json de hasta 25 MB.");
   const text = await file.text();
   const { demoImportStore } = await import("@/lib/demo-store");
   const { creados } = demoImportStore(text);
@@ -861,6 +863,11 @@ export async function restaurarRespaldoJSON(formData: FormData) {
     throw new Error("El archivo no contiene datos válidos.");
   }
   revalidatePath("/", "layout");
+}
+
+export async function submitRestaurarRespaldo(formData: FormData): Promise<{error?: string; success?: string}> {
+  try { await restaurarRespaldoJSON(formData); return {success:"Respaldo restaurado correctamente."}; }
+  catch(error) { return {error:error instanceof SyntaxError ? "El archivo no contiene un JSON válido. No se restauraron datos." : error instanceof Error ? error.message : "No se pudo restaurar el archivo."}; }
 }
 
 /**
@@ -2015,6 +2022,7 @@ export async function updateChofer(id: string, formData: FormData) {
 }
 
 export async function createZonaEntrega(formData: FormData) {
+  if (!FEATURES.zonasEntrega) throw new Error("Este apartado no está habilitado.");
   await requireMutationAccess(writerRoles);
   const parsed = zonaEntregaSchema.safeParse({
     nombre: formData.get("nombre"),
@@ -2451,8 +2459,22 @@ export async function createAlquiler(formData: FormData) {
   revalidatePath("/");
 }
 
+async function requireOwnedReference(table: "empleados" | "registro_categorias", id: string, organizationId: string) {
+  if (!hasSupabaseEnv()) {
+    const { demoExportStore } = await import("@/lib/demo-store");
+    const snapshot = demoExportStore();
+    const rows = table === "empleados" ? snapshot.empleados : snapshot.registroCategorias;
+    if (!rows.some(row => row.id === id && row.organization_id === organizationId && (table !== "registro_categorias" || row.activo))) throw new Error("El registro seleccionado no está disponible en esta empresa.");
+    return;
+  }
+  let query = getSupabaseServerClient().from(table).select("id").eq("id", id).eq("organization_id", organizationId);
+  if (table === "registro_categorias") query = query.eq("activo", true);
+  const { data, error } = await query.maybeSingle();
+  if (error || !data) throw new Error("No se pudo comprobar el registro seleccionado. No se guardaron cambios.");
+}
+
 export async function createEmpleado(formData: FormData) {
-  await requireMutationAccess(rrhhRoles);
+  const actor = await requireMutationAccess(rrhhRoles);
   const parsed = empleadoSchema.safeParse({
     nombre: formData.get("nombre"),
     rol: formData.get("rol"),
@@ -2463,7 +2485,7 @@ export async function createEmpleado(formData: FormData) {
   }
   if (!hasSupabaseEnv()) {
     demoCreateEmpleado({
-      organization_id: DEFAULT_ORG_ID,
+      organization_id: actor.organizationId,
       nombre: parsed.data.nombre,
       rol: parsed.data.rol,
       fecha_ingreso: parsed.data.fechaIngreso,
@@ -2471,7 +2493,7 @@ export async function createEmpleado(formData: FormData) {
   } else {
     const supabase = getSupabaseServerClient();
     const { error } = await supabase.from("empleados").insert({
-      organization_id: DEFAULT_ORG_ID,
+      organization_id: actor.organizationId,
       nombre: parsed.data.nombre,
       rol: parsed.data.rol,
       fecha_ingreso: parsed.data.fechaIngreso,
@@ -2484,7 +2506,7 @@ export async function createEmpleado(formData: FormData) {
 }
 
 export async function createAdelanto(formData: FormData) {
-  await requireMutationAccess(rrhhRoles);
+  const actor = await requireMutationAccess(rrhhRoles);
   const parsed = adelantoSchema.safeParse({
     empleadoId: formData.get("empleado_id"),
     fecha: formData.get("fecha"),
@@ -2493,9 +2515,10 @@ export async function createAdelanto(formData: FormData) {
   if (!parsed.success) {
     throw new Error("Datos de adelanto inválidos.");
   }
+  await requireOwnedReference("empleados", parsed.data.empleadoId, actor.organizationId);
   if (!hasSupabaseEnv()) {
     demoCreateAdelanto({
-      organization_id: DEFAULT_ORG_ID,
+      organization_id: actor.organizationId,
       empleado_id: parsed.data.empleadoId,
       fecha: parsed.data.fecha,
       monto: parsed.data.monto,
@@ -2503,7 +2526,7 @@ export async function createAdelanto(formData: FormData) {
   } else {
     const supabase = getSupabaseServerClient();
     const { error } = await supabase.from("adelantos").insert({
-      organization_id: DEFAULT_ORG_ID,
+      organization_id: actor.organizationId,
       empleado_id: parsed.data.empleadoId,
       fecha: parsed.data.fecha,
       monto: parsed.data.monto,
@@ -2517,7 +2540,9 @@ export async function createAdelanto(formData: FormData) {
 }
 
 export async function createSueldo(formData: FormData) {
-  await requireMutationAccess(rrhhRoles);
+  const actor = await requireMutationAccess(rrhhRoles);
+  const submission = z.uuid().safeParse(formData.get("submission_id"));
+  if (!submission.success) throw new Error("Vuelve a abrir el formulario para registrar el sueldo.");
   const parsed = sueldoSchema.safeParse({
     empleadoId: formData.get("empleado_id"),
     periodo: formData.get("periodo"),
@@ -2525,33 +2550,48 @@ export async function createSueldo(formData: FormData) {
     descuentos: formData.get("descuentos"),
   });
   if (!parsed.success) {
-    throw new Error("Datos de sueldo inválidos.");
+    throw new Error(parsed.error.issues[0]?.message ?? "Datos de sueldo inválidos.");
   }
   const montoNeto = roundMoney(parsed.data.montoBruto - parsed.data.descuentos);
+  await requireOwnedReference("empleados", parsed.data.empleadoId, actor.organizationId);
   if (!hasSupabaseEnv()) {
     demoCreateSueldo({
-      organization_id: DEFAULT_ORG_ID,
+      organization_id: actor.organizationId,
       empleado_id: parsed.data.empleadoId,
       periodo: parsed.data.periodo,
       monto_bruto: parsed.data.montoBruto,
       descuentos: parsed.data.descuentos,
       monto_neto: montoNeto,
-    });
+    }, submission.data);
   } else {
     const supabase = getSupabaseServerClient();
     const { error } = await supabase.from("sueldos").insert({
-      organization_id: DEFAULT_ORG_ID,
+      id: submission.data,
+      organization_id: actor.organizationId,
       empleado_id: parsed.data.empleadoId,
       periodo: parsed.data.periodo,
       monto_bruto: parsed.data.montoBruto,
       descuentos: parsed.data.descuentos,
       monto_neto: montoNeto,
     });
-    if (error) {
+    if (error?.code === "23505") {
+      const { data: existing, error: readError } = await supabase.from("sueldos").select("*").eq("id", submission.data).eq("organization_id", actor.organizationId).maybeSingle();
+      if (readError || !existing || existing.empleado_id !== parsed.data.empleadoId || existing.periodo !== parsed.data.periodo || Number(existing.monto_bruto) !== parsed.data.montoBruto || Number(existing.descuentos) !== parsed.data.descuentos) throw new Error("No se pudo confirmar este envío. Revisa el historial antes de intentarlo nuevamente.");
+    } else if (error) {
       throw new Error(error.message);
     }
   }
   revalidatePath("/personal");
+}
+
+export async function submitPersonalForm(kind: "empleado" | "adelanto" | "sueldo", formData: FormData): Promise<{ error?: string; success?: string }> {
+  try {
+    if (kind === "empleado") await createEmpleado(formData);
+    else if (kind === "adelanto") await createAdelanto(formData);
+    else if (kind === "sueldo") await createSueldo(formData);
+    else return { error: "Operación inválida." };
+    return { success: "Registro guardado correctamente." };
+  } catch (error) { return { error: error instanceof Error ? error.message : "No se pudo guardar el registro." }; }
 }
 
 export async function cerrarMes(formData: FormData) {
@@ -2584,6 +2624,7 @@ export async function cerrarMes(formData: FormData) {
 }
 
 export async function toggleSecurityControl(formData: FormData) {
+  if (!FEATURES.seguridad) throw new Error("Este apartado no está habilitado.");
   await requireMutationAccess(liderazgoRoles);
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Control inválido.");
@@ -3177,7 +3218,7 @@ export async function registrarConteoInventario(formData: FormData) {
 }
 
 export async function createRegistroGeneral(formData: FormData) {
-  await requireMutationAccess(writerRoles);
+  const actor = await requireMutationAccess(["owner_admin", "gerencia", "almacen"]);
   const parsed = registroGeneralSchema.safeParse({
     categoriaId: formData.get("categoria_id"),
     fecha: formData.get("fecha"),
@@ -3189,10 +3230,11 @@ export async function createRegistroGeneral(formData: FormData) {
   if (!parsed.success) {
     throw new Error("Datos de registro general inválidos.");
   }
+  await requireOwnedReference("registro_categorias", parsed.data.categoriaId, actor.organizationId);
 
   if (!hasSupabaseEnv()) {
     demoCreateRegistroGeneral({
-      organization_id: DEFAULT_ORG_ID,
+      organization_id: actor.organizationId,
       categoria_id: parsed.data.categoriaId,
       fecha: parsed.data.fecha,
       titulo: parsed.data.titulo,
@@ -3202,7 +3244,7 @@ export async function createRegistroGeneral(formData: FormData) {
   } else {
     const supabase = getSupabaseServerClient();
     const { error } = await supabase.from("registros_generales").insert({
-      organization_id: DEFAULT_ORG_ID,
+      organization_id: actor.organizationId,
       categoria_id: parsed.data.categoriaId,
       fecha: parsed.data.fecha,
       titulo: parsed.data.titulo,
@@ -5340,7 +5382,7 @@ const servicioEspecialTarifaUpdateSchema = z.object({
 });
 
 export async function updateServicioEspecialTarifa(id: string, nombre: string, tarifaPorPieza: number) {
-  await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
+  const actor = await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
   
   const parsed = servicioEspecialTarifaUpdateSchema.safeParse({
     id,
@@ -5353,6 +5395,8 @@ export async function updateServicioEspecialTarifa(id: string, nombre: string, t
   }
 
   if (!hasSupabaseEnv()) {
+    const { demoServiciosEspecialesTarifaRows } = await import("@/lib/demo-store");
+    if (!demoServiciosEspecialesTarifaRows().some(row=>row.id === parsed.data.id && row.organization_id === actor.organizationId)) throw new Error("Tarifa no disponible en esta empresa.");
     const updated = demoUpdateServicioEspecialTarifa(parsed.data.id, {
       nombre: parsed.data.nombre,
       tarifa_por_pieza: parsed.data.tarifaPorPieza,
@@ -5360,17 +5404,17 @@ export async function updateServicioEspecialTarifa(id: string, nombre: string, t
     if (!updated) throw new Error("Tarifa no encontrada en el almacén local.");
   } else {
     const supabase = getSupabaseServerClient();
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("servicios_especiales_tarifa")
       .update({
         nombre: parsed.data.nombre,
         tarifa_por_pieza: parsed.data.tarifaPorPieza,
       })
       .eq("id", parsed.data.id)
-      .eq("organization_id", DEFAULT_ORG_ID);
+      .eq("organization_id", actor.organizationId).select("id").maybeSingle();
       
-    if (error) {
-      throw new Error(error.message);
+    if (error || !updated) {
+      throw new Error("No se pudo confirmar el cambio de tarifa.");
     }
   }
 
@@ -5379,53 +5423,32 @@ export async function updateServicioEspecialTarifa(id: string, nombre: string, t
 }
 
 export async function updateMargenGananciaPredeterminado(margenGananciaDefaultPct: string | number) {
-  await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
-
-  const parsed = margenGananciaConfigSchema.safeParse({ margenGananciaDefaultPct });
-  if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message || "El margen debe ser un numero positivo.");
-  }
-
+  const context = await requireAuthContext({allowedRoles:["owner_admin"],redirectTo:null});
+  const parsed = margenGananciaConfigSchema.safeParse({margenGananciaDefaultPct});
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message || "El margen debe ser un número válido.");
+  if (!hasSupabaseEnv()) throw new Error("El margen requiere la conexión publicada. No se guardaron cambios desde la copia local.");
   const margen = roundMoney(parsed.data.margenGananciaDefaultPct);
+  const {data,error} = await getSupabaseServerClient().from("configuracion_empresa").update({margen_ganancia_default_pct:margen,updated_at:new Date().toISOString()}).eq("organization_id",context.organizationId).select("organization_id").maybeSingle();
+  if(error || !data) throw new Error("No se pudo guardar el margen. Comprueba que los datos de empresa estén configurados; no se cambiaron el nombre ni el logo.");
+  revalidatePath("/configuracion");revalidatePath("/cotizacion");
+  return {ok:true as const,margenGananciaDefaultPct:margen};
+}
 
-  if (!hasSupabaseEnv()) {
-    revalidatePath("/configuracion");
-    revalidatePath("/cotizacion");
-    return { ok: true as const, margenGananciaDefaultPct: margen };
+export async function submitMargenGananciaPredeterminado(value: string | number) {
+  try {
+    return await updateMargenGananciaPredeterminado(value);
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "No se pudo confirmar el cambio de margen." };
   }
+}
 
-  const supabase = getSupabaseServerClient();
-  const { data: existing } = await supabase
-    .from("configuracion_empresa")
-    .select("nombre,ruc,telefono,direccion,firmante,firmante_cargo,logo_url")
-    .eq("organization_id", DEFAULT_ORG_ID)
-    .maybeSingle();
-
-  const payload = {
-    organization_id: DEFAULT_ORG_ID,
-    nombre: String(existing?.nombre ?? "KATIA LIZZET MENESES TAYPE"),
-    ruc: String(existing?.ruc ?? "10739957520"),
-    telefono: String(existing?.telefono ?? "987 654 321"),
-    direccion: String(existing?.direccion ?? "Lima, Peru"),
-    firmante: String(existing?.firmante ?? "Katia Lizzet Meneses Taype"),
-    firmante_cargo: String(existing?.firmante_cargo ?? "Gerente"),
-    logo_url: typeof existing?.logo_url === "string" && existing.logo_url.trim() !== "" ? existing.logo_url.trim() : null,
-    margen_ganancia_default_pct: margen,
-    updated_at: new Date().toISOString(),
-  };
-
-  const { error } = await supabase
-    .from("configuracion_empresa")
-    .upsert(payload, { onConflict: "organization_id" });
-
-  if (error) {
-    throw new Error("No se pudo guardar el margen de ganancia.");
+export async function submitServicioEspecialTarifa(id: string, nombre: string, tarifa: number) {
+  try {
+    await updateServicioEspecialTarifa(id, nombre, tarifa);
+    return { ok: true as const };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "No se pudo confirmar el cambio de tarifa." };
   }
-
-  revalidatePath("/configuracion");
-  revalidatePath("/cotizacion");
-
-  return { ok: true as const, margenGananciaDefaultPct: margen };
 }
 
 export async function deleteCajaMovimiento(

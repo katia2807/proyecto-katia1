@@ -42,7 +42,7 @@ function supabaseProjectHost(url: string | undefined): string {
  * Lecturas ligeras (conteos exactos vía PostgREST) para la pantalla de respaldo en producción.
  * No exporta datos sensibles: solo host del proyecto y totales por tabla.
  */
-export async function fetchRespaldoSupabaseResumen(): Promise<RespaldoSupabaseResumen> {
+export async function fetchRespaldoSupabaseResumen(organizationId: string): Promise<RespaldoSupabaseResumen> {
   const { url } = getServerSupabaseCredentials();
   const projectHost = supabaseProjectHost(url);
   const fetchedAtIso = new Date().toISOString();
@@ -53,14 +53,14 @@ export async function fetchRespaldoSupabaseResumen(): Promise<RespaldoSupabaseRe
     const [tableResults, orgPick] = await Promise.all([
       Promise.all(
         TABLES.map(async ({ table, label }) => {
-          const { count, error } = await supabase.from(table).select("*", { count: "exact", head: true });
+          const { count, error } = await supabase.from(table).select("*", { count: "exact", head: true }).eq(table === "organizations" ? "id" : "organization_id", organizationId);
           if (error) {
             return { table, label, count: null as number | null, error: error.message };
           }
           return { table, label, count: count ?? 0 };
         }),
       ),
-      supabase.from("organizations").select("name").order("created_at", { ascending: true }).limit(5),
+      supabase.from("organizations").select("name").eq("id", organizationId),
     ]);
 
     const organizationNamesSample =

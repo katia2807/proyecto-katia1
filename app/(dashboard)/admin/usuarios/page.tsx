@@ -74,7 +74,7 @@ export default async function AdminUsuariosPage() {
           <Card>
             <CardTitle>Usuarios ({users.length})</CardTitle>
             <CardDescription>
-              El rol se guarda directamente en <code className="text-xs">perfiles.role</code>.
+              Guardar el nombre conserva los permisos actuales; selecciona otro rol solo si quieres cambiarlos.
             </CardDescription>
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[640px] border-collapse text-left text-sm">

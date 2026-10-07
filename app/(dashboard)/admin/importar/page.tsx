@@ -1,8 +1,10 @@
+import { requirePageAccess } from "@/lib/auth";
 import Link from "next/link";
 import { ImportReviewer } from "@/components/admin/import-reviewer";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 
-export default function ImportarPage() {
+export default async function ImportarPage() {
+  await requirePageAccess("/admin/importar");
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">

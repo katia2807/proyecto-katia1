@@ -1,7 +1,11 @@
 import Link from "next/link";
+import { requirePageAccess } from "@/lib/auth";
+import { getReportesData } from "@/lib/reportes-data";
+import { fechaHoyPeru } from "@/lib/utils";
 import { cookies } from "next/headers";
 import { AlertTriangle, ShieldCheck } from "lucide-react";
-import { requestAntifraudeAccess, revokeAntifraudeAccess } from "@/app/(dashboard)/reportes/antifraude/actions";
+import { submitAntifraudeAccess, revokeAntifraudeAccess } from "@/app/(dashboard)/reportes/antifraude/actions";
+import { FeedbackForm } from "@/components/ui/feedback-form";
 import { ReportesCerrarMesPanel } from "@/components/reportes/reportes-cerrar-mes-panel";
 import { ReportesExcelExport } from "@/components/reportes/reportes-excel-export";
 import { ReporteFila } from "@/components/reportes/reporte-fila";
@@ -11,15 +15,6 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { ReportesTabs } from "@/components/reportes/reportes-tabs";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
-import { getCurrentUserRole } from "@/lib/current-user-role";
-import {
-  getCajaRows,
-  getCierresRows,
-  getClientesRows,
-  getCobrosVencidos,
-  getDashboardSnapshot,
-  getUtilidadRows,
-} from "@/lib/data";
 import { canCloseMonth, canExportReportesExcel } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 
@@ -37,37 +32,23 @@ function firstParam(value: string | string[] | undefined): string {
 }
 
 export default async function ReportesPage({ searchParams }: ReportesPageProps) {
+  const context = await requirePageAccess("/reportes");
   const params = await searchParams;
-  const activeTab = firstParam(params?.tab) || "operaciones";
+  const tab = firstParam(params?.tab);
+  const activeTab = ["operaciones","antifraude"].includes(tab) ? tab : "operaciones";
 
   const cookieStore = await cookies();
-  const [utilidad, cierres, caja, cobrosVencidos, clientes] = await Promise.all([
-    getUtilidadRows(),
-    getCierresRows(),
-    getCajaRows(),
-    getCobrosVencidos(),
-    getClientesRows(),
-  ]);
-  const clientesById = new Map(clientes.map((c) => [c.id, c]));
-  const role = await getCurrentUserRole();
-  const canDoCloseMonth = canCloseMonth(role);
-  const canExcel = canExportReportesExcel(role);
-  const canAccessAntifraude = canCloseMonth(role);
+  const { utilidad, cierres, caja, cobros: cobrosVencidos, clientes, model } = await getReportesData(context.organizationId);
+  const clientesById = new Map(clientes.map(c => [c.id, c]));
+  const canDoCloseMonth = canCloseMonth(context.role, context.uiRole);
+  const canExcel = canExportReportesExcel(context.role, context.uiRole);
+  const canAccessAntifraude = canDoCloseMonth;
   const hasAntifraudePermission = cookieStore.get(COOKIE_KEY)?.value === "granted";
-  const today = new Date();
-  const anio = today.getFullYear();
-  const mes = today.getMonth() + 1;
+  const today = fechaHoyPeru();
+  const anio = Number(today.slice(0, 4));
+  const mes = Number(today.slice(5, 7));
   const token = `CERRAR MES ${anio}-${String(mes).padStart(2, "0")}`;
-
-  // Datos antifraude
-  let snapshot = null;
-  if (canAccessAntifraude && hasAntifraudePermission) {
-    try {
-      snapshot = await getDashboardSnapshot();
-    } catch {
-      snapshot = null;
-    }
-  }
+  const snapshot = canAccessAntifraude && hasAntifraudePermission ? model.cash : null;
 
   return (
     <div className="space-y-6">
@@ -99,7 +80,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
           <Card>
             <CardTitle>Movimientos de caja auditables</CardTitle>
             <CardDescription>Cada fila muestra módulo origen, fecha, usuario y referencia.</CardDescription>
-            <div className="mt-4 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
+            <div role="region" aria-label="Historial desplazable" tabIndex={0} className="mt-4 overflow-x-auto rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
               <Table>
                 <THead>
                   <TRow>
@@ -145,11 +126,11 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
             <CardTitle>Cobros a crédito vencidos</CardTitle>
             <CardDescription>
               {cobrosVencidos.length === 0
-                ? "Sin cobros vencidos. Todo al día."
-                : `${cobrosVencidos.length} comprobante(s) por ${formatPen(cobrosVencidos.reduce((acc, c) => acc + c.monto, 0))}`}
+                ? "No se encontraron créditos vencidos con fecha registrada. Comprueba créditos sin fecha y pagos no vinculados en Centro de Mando."
+                : `${cobrosVencidos.length} crédito(s), saldo conocido ${formatPen(cobrosVencidos.reduce((acc, c) => acc + (c.monto ?? 0), 0))}`}
             </CardDescription>
             {cobrosVencidos.length > 0 ? (
-              <div className="mt-3 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
+              <div role="region" aria-label="Historial desplazable" tabIndex={0} className="mt-3 overflow-x-auto rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
                 <Table>
                   <THead>
                     <TRow>
@@ -163,7 +144,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
                   <tbody>
                     {cobrosVencidos.map((c) => {
                       const cliente = clientesById.get(c.cliente_id);
-                      const href = c.origen === "venta_mueble_terminado" ? "/ventas/muebles-terminados" : "/ventas/alquiler-mixer";
+                      const href = c.href;
                       return (
                         <ReporteFila
                           key={c.id}
@@ -180,7 +161,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
                           <TD className="font-mono text-xs">{c.referencia}</TD>
                           <TD>{cliente?.nombre ?? "Sin cliente"}</TD>
                           <TD>{formatDate(c.fecha_vencimiento)}</TD>
-                          <TD className="text-right font-semibold text-[var(--katia-danger)]">{formatPen(c.monto)}</TD>
+                          <TD className="text-right font-semibold text-[var(--katia-danger)]">{c.monto === null ? "Por comprobar" : formatPen(c.monto)}</TD>
                         </ReporteFila>
                       );
                     })}
@@ -191,24 +172,24 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
           </Card>
 
           <Card>
-            <CardTitle>Utilidad neta mensual</CardTitle>
-            <CardDescription>Vista auditable por periodo.</CardDescription>
-            <div className="mt-4 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
+            <CardTitle>Resultado de Caja de empresa por mes</CardTitle>
+            <CardDescription>Ingresos menos egresos de empresa. La nómina registrada es informativa y no se vuelve a descontar de Caja. No representa utilidad contable.</CardDescription>
+            <div role="region" aria-label="Historial desplazable" tabIndex={0} className="mt-4 overflow-x-auto rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
               <Table>
                 <THead>
                   <TRow>
                     <TH>Periodo</TH>
                     <TH className="text-right">Ingresos</TH>
                     <TH className="text-right">Egresos</TH>
-                    <TH className="text-right">Sueldos</TH>
-                    <TH className="text-right">Utilidad</TH>
+                    <TH className="text-right">Nómina registrada</TH>
+                    <TH className="text-right">Resultado de Caja</TH>
                   </TRow>
                 </THead>
                 <tbody>
                   {utilidad.length === 0 ? (
                     <TRow>
                       <TD colSpan={5} className="text-center text-[var(--katia-text-secondary)]">
-                        Sin cierres mensuales registrados.
+                        Sin movimientos de empresa o nómina registrados.
                       </TD>
                     </TRow>
                   ) : null}
@@ -250,7 +231,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
 
           <Card>
             <CardTitle>Cierres firmados</CardTitle>
-            <div className="mt-4 overflow-hidden rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
+            <div role="region" aria-label="Historial desplazable" tabIndex={0} className="mt-4 overflow-x-auto rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
               <Table>
                 <THead>
                   <TRow>
@@ -309,7 +290,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
                   </CardDescription>
                 </div>
               </div>
-              <form action={requestAntifraudeAccess} className="grid gap-3 md:grid-cols-3">
+              <FeedbackForm action={submitAntifraudeAccess} className="grid gap-3 md:grid-cols-3">
                 <Field
                   label="Código de acceso"
                   name="access_code"
@@ -320,7 +301,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
                 <div className="md:col-span-2 flex items-end">
                   <Button type="submit">Solicitar acceso</Button>
                 </div>
-              </form>
+              </FeedbackForm>
             </Card>
           ) : (
             <>
@@ -331,7 +312,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
                     <div>
                       <CardTitle>Reporte de auditoría antifraude</CardTitle>
                       <CardDescription>
-                        Detección de inconsistencias en cierres, caja y movimientos. Acceso registrado.
+                        Consulta de registros de empresa y cierres. Acceso temporal validado.
                       </CardDescription>
                     </div>
                   </div>
@@ -347,13 +328,13 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
                     <Card>
                       <p className="text-xs font-medium uppercase tracking-wide text-[var(--katia-text-tertiary)]">Ingresos declarados</p>
                       <p className="mt-2 font-mono text-2xl font-bold text-[var(--katia-text-primary)]">
-                        {formatPen(Number((snapshot as Record<string, unknown>).ingresos ?? 0))}
+                        {formatPen(snapshot.income ?? 0)}
                       </p>
                     </Card>
                     <Card>
                       <p className="text-xs font-medium uppercase tracking-wide text-[var(--katia-text-tertiary)]">Egresos declarados</p>
                       <p className="mt-2 font-mono text-2xl font-bold text-[var(--katia-text-primary)]">
-                        {formatPen(Number((snapshot as Record<string, unknown>).egresos ?? 0))}
+                        {formatPen(snapshot.expense ?? 0)}
                       </p>
                     </Card>
                     <Card>
@@ -365,9 +346,9 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
                   </div>
                   <Card>
                     <CardTitle>Análisis de consistencia</CardTitle>
-                    <CardDescription>Validación cruzada de registros de caja vs movimientos vs cierres.</CardDescription>
+                    <CardDescription>Estos importes resumen Caja; por sí solos no acreditan una auditoría completa.</CardDescription>
                     <div className="mt-4 rounded-[var(--katia-radius-md)] border border-[var(--katia-success)]/30 bg-[var(--katia-success)]/5 px-4 py-3 text-sm text-[var(--katia-success)]">
-                      ✓ Sin inconsistencias detectadas en el periodo actual. El reporte detallado se genera al cerrar el mes.
+                      Compara los movimientos y los cierres registrados. La consulta no certifica ausencia de inconsistencias ni sustituye la revisión de comprobantes.
                     </div>
                   </Card>
                 </>

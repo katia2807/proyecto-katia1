@@ -7,6 +7,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 type SheetResult = {
   sheet: string;
   inserted: number;
+  updated?: number;
   skipped: number;
   errors: string[];
 };
@@ -16,6 +17,7 @@ type ImportResponse =
   | { ok: false; error: string };
 
 export function ImportExcelPanel() {
+  const busyRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResponse | null>(null);
@@ -24,7 +26,8 @@ export function ImportExcelPanel() {
   async function handleUpload(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const file = inputRef.current?.files?.[0];
-    if (!file) return;
+    if (!file || busyRef.current) return;
+    busyRef.current = true;
 
     setLoading(true);
     setResult(null);
@@ -39,11 +42,13 @@ export function ImportExcelPanel() {
     } catch {
       setResult({ ok: false, error: "Error de conexión. Inténtalo de nuevo." });
     } finally {
+      busyRef.current = false;
       setLoading(false);
     }
   }
 
   const totalInserted = result && result.ok ? result.results.reduce((s, r) => s + r.inserted, 0) : 0;
+  const totalUpdated = result && result.ok ? result.results.reduce((s,r)=>s+(r.updated ?? 0),0) : 0;
   const totalErrors   = result && result.ok ? result.results.reduce((s, r) => s + r.errors.length, 0) : 0;
 
   return (
@@ -51,7 +56,7 @@ export function ImportExcelPanel() {
       <CardTitle>Importar datos desde Excel</CardTitle>
       <CardDescription className="leading-relaxed">
         Sube el archivo <strong>.xlsx</strong> exportado desde Katia o un Excel externo de inventario. El sistema detecta
-        hojas y columnas comunes como producto, descripción, cantidad, stock, costo o precio; si no hay categoría, la
+        hojas y columnas comunes como producto, descripción, cantidad, stock y costo; si no hay categoría, la
         clasifica automáticamente como muebles, materiales, servicios o sin clasificar.
       </CardDescription>
 
@@ -65,7 +70,7 @@ export function ImportExcelPanel() {
           ))}
         </span>
         <p className="mt-2">
-          Para Excel externo, usa encabezados como Producto, Descripción, Cantidad, Stock, Costo, Precio, Categoría o
+          Para Excel externo, usa encabezados como Producto, Descripción, Cantidad, Stock, Costo, Categoría o
           Unidad. Si falta Código, Katia usa el nombre del producto.
         </p>
       </div>
@@ -77,7 +82,7 @@ export function ImportExcelPanel() {
             ref={inputRef}
             type="file"
             name="archivo"
-            accept=".xlsx,.xls"
+            accept=".xlsx"
             required
             onChange={(e) => {
               setFileName(e.target.files?.[0]?.name ?? null);
@@ -110,8 +115,8 @@ export function ImportExcelPanel() {
                 }`}
               >
                 {totalErrors > 0
-                  ? `✓ Importación completada con ${totalErrors} error${totalErrors > 1 ? "es" : ""}. ${totalInserted} registros nuevos.`
-                  : `✓ Importación exitosa. ${totalInserted} registros nuevos importados.`}
+                  ? `✓ Importación completada con ${totalErrors} error${totalErrors > 1 ? "es" : ""}. ${totalInserted} nuevos y ${totalUpdated} actualizados.`
+                  : `✓ Importación exitosa. ${totalInserted} nuevos y ${totalUpdated} actualizados.`}
               </div>
 
               <div className="space-y-2">
@@ -126,6 +131,7 @@ export function ImportExcelPanel() {
                         <span className="rounded bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-700">
                           +{r.inserted} nuevos
                         </span>
+                        {r.updated ? <span className="text-xs text-[var(--katia-text-secondary)]">{r.updated} actualizados</span> : null}
                         {r.skipped > 0 ? (
                           <span className="rounded bg-slate-500/15 px-2 py-0.5 font-semibold text-[var(--katia-text-secondary)]">
                             {r.skipped} omitidos

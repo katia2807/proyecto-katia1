@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
-import { getComprasMaderaRows, getProveedoresRows } from "@/lib/data";
+import { requirePageAccess } from "@/lib/auth";
+import { readCompleteTable } from "@/lib/complete-data";
 import { formatDate, formatPen } from "@/lib/utils";
 
 type CeldaPrecio = {
@@ -11,18 +12,21 @@ type CeldaPrecio = {
 };
 
 export default async function ComparadorProveedoresPage() {
+  const context = await requirePageAccess("/ventas/proveedores-comparador");
   const [compras, proveedores] = await Promise.all([
-    getComprasMaderaRows(),
-    getProveedoresRows(),
+    readCompleteTable("compras_madera",context.organizationId),
+    readCompleteTable("proveedores",context.organizationId),
   ]);
 
   // Construye matriz: especie → proveedorId → último precio.
-  const especies = Array.from(new Set(compras.map((c) => c.especie_madera))).sort();
+  const priceKey = (c: {especie_madera:string;unidad:string}) => `${c.especie_madera} · ${c.unidad?.trim().toLowerCase() || "unidad no registrada"}`;
+  const especies = Array.from(new Set(compras.filter(c=>c.estado !== "borrador" && c.unidad?.trim()).map(priceKey))).sort();
   const proveedoresOrden = [...proveedores].sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   const matriz = new Map<string, Map<string, CeldaPrecio>>();
-  for (const compra of compras) {
-    const especieMap = matriz.get(compra.especie_madera) ?? new Map<string, CeldaPrecio>();
+  for (const compra of [...compras].sort((a,b)=>b.created_at.localeCompare(a.created_at)||b.id.localeCompare(a.id))) {
+    if (compra.estado === "borrador" || !compra.unidad?.trim()) continue;
+    const especieMap = matriz.get(priceKey(compra)) ?? new Map<string, CeldaPrecio>();
     const previo = especieMap.get(compra.proveedor_id);
     if (!previo || compra.fecha > previo.fecha) {
       especieMap.set(compra.proveedor_id, {
@@ -31,7 +35,7 @@ export default async function ComparadorProveedoresPage() {
         proveedorId: compra.proveedor_id,
       });
     }
-    matriz.set(compra.especie_madera, especieMap);
+    matriz.set(priceKey(compra), especieMap);
   }
 
   return (
@@ -39,7 +43,7 @@ export default async function ComparadorProveedoresPage() {
       <div>
         <h2 className="text-xl font-bold">Comparador de proveedores de madera</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
-          Último precio por especie y proveedor. Las celdas más baratas de cada fila aparecen resaltadas en verde.
+          Último precio confirmado por especie, unidad y proveedor. Se excluyen borradores y compras sin unidad; las celdas más baratas de cada fila aparecen resaltadas en verde.
         </p>
       </div>
 
@@ -52,7 +56,7 @@ export default async function ComparadorProveedoresPage() {
           <Table>
             <THead>
               <TRow>
-                <TH>Especie</TH>
+                <TH>Especie / unidad</TH>
                 {proveedoresOrden.map((p) => (
                   <TH key={p.id} className="text-right">
                     {p.nombre}

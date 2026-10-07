@@ -3,74 +3,43 @@ import { MetricCard } from "@/components/metric-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
-import {
-  getAlquilerRows,
-  getClientesRows,
-  getCobrosVencidos,
-  getCotizacionesRows,
-  getCotizacionesUnificadasRows,
-  getMueblesCatalogoRows,
-  getOrdenesProduccionRows,
-  getServiciosAserraderoRows,
-  getVentasMuebleTerminadoRows,
-  getVentasRows,
-} from "@/lib/data";
-import { formatPen } from "@/lib/utils";
+import { requirePageAccess } from "@/lib/auth";
+import { readCompleteTable, readCompleteVentas } from "@/lib/complete-data";
+import { getGerencialSources } from "@/lib/gerencial-data";
+import { buildGerencialModel } from "@/lib/gerencial-model";
+import { formatPen, fechaHoyPeru } from "@/lib/utils";
 import { computeEconomiaInterna } from "@/lib/cotizacion-calculos";
 import { parseCotizacionDetalle } from "@/lib/cotizacion-unificada-payload";
 
 
 function inMes(fecha: string, anio: number, mes: number) {
-  const d = new Date(fecha);
-  return d.getFullYear() === anio && d.getMonth() + 1 === mes;
+  return fecha.slice(0,7) === anio+"-"+String(mes).padStart(2,"0");
 }
-
 export default async function VentasDashboardPage() {
-  const today = new Date();
-  const anio = today.getFullYear();
-  const mes = today.getMonth() + 1;
-  const periodoLabel = `${String(mes).padStart(2, "0")}/${anio}`;
-
-  const [
-    ventasMuebles,
-    ordenes,
-    ventasMadera,
-    alquilerBundle,
-    aserradero,
-    cotizaciones,
-    cotizacionesUnificadas,
-    catalogo,
-    clientes,
-    cobrosVencidos,
-  ] = await Promise.all([
-    getVentasMuebleTerminadoRows(),
-    getOrdenesProduccionRows(),
-    getVentasRows(),
-    getAlquilerRows(),
-    getServiciosAserraderoRows(),
-    getCotizacionesRows(),
-    getCotizacionesUnificadasRows(),
-    getMueblesCatalogoRows(),
-    getClientesRows(),
-    getCobrosVencidos(),
+  const context = await requirePageAccess("/ventas/dashboard");
+  const [anio,mes] = fechaHoyPeru().split("-").map(Number);
+  const periodoLabel = String(mes).padStart(2,"0")+"/"+anio;
+  const org = context.organizationId;
+  const [ventasMuebles,ordenes,ventasMadera,contratos,aserradero,cotizaciones,cotizacionesUnificadas,catalogo,clientes,sources] = await Promise.all([
+    readCompleteTable("ventas_mueble_terminado",org),readCompleteTable("ordenes_produccion",org),readCompleteVentas(org),readCompleteTable("alquileres",org),readCompleteTable("servicios_aserradero",org),readCompleteTable("cotizaciones_mueble",org),readCompleteTable("cotizaciones_unificadas",org),readCompleteTable("muebles_catalogo",org),readCompleteTable("clientes",org),getGerencialSources("hoy",org),
   ]);
-
-  const contratos = alquilerBundle.rows;
-
+  if([sources.movimientos_caja,sources.ventas_madera,sources.ventas_madera_cortada,sources.ventas_mueble_terminado,sources.alquileres].some(rows=>rows===null))throw new Error("No se pudieron comprobar todos los créditos. Actualiza la página.");
+  const mando = buildGerencialModel(sources);
+  const cobrosVencidos = mando.actions.filter(item=>item.id.startsWith("credito:") && item.date && item.date < mando.periods.today);
   const muebleById = new Map(catalogo.map((m) => [m.id, m]));
   const clienteById = new Map(clientes.map((c) => [c.id, c]));
 
   const ventasMueblesMes = ventasMuebles.filter((v) => inMes(v.fecha, anio, mes));
-  const ventasMaderaMes = ventasMadera.filter((v) => inMes(v.fecha, anio, mes));
+  const ventasMaderaMes = ventasMadera.filter((v) => v.estado === "confirmada" && inMes(v.fecha, anio, mes));
   const contratosMes = contratos.filter((c) => inMes(c.fecha_inicio, anio, mes));
   const aserraderoMes = aserradero.filter((s) => inMes(s.fecha, anio, mes));
-  const cotizacionesMes = cotizaciones.filter((c) => inMes(c.fecha, anio, mes));
+  const cotizacionesMes = cotizaciones.filter((c) => c.estado === "confirmada" && inMes(c.fecha, anio, mes));
   const ordenesActivas = ordenes.filter((o) => o.estado !== "entregado");
 
   const ingresoMuebles = ventasMueblesMes.reduce((acc, v) => acc + Number(v.total), 0);
   const ingresoMadera = ventasMaderaMes.reduce((acc, v) => acc + Number(v.total), 0);
   const ingresoAlquiler = contratosMes.reduce(
-    (acc, c) => acc + Number(c.monto_total ?? c.tarifa),
+    (acc, c) => acc + Number(c.monto_total ?? 0),
     0,
   );
   const ingresoAserradero = aserraderoMes.reduce(
@@ -91,8 +60,8 @@ export default async function VentasDashboardPage() {
   const margenesClasicos = cotizacionesMes
     .map((c) => {
       const total = Number(c.precio_acordado);
-      const costo = Number(c.costo_estimado ?? 0);
-      if (total <= 0) return null;
+      const costo = "costo_estimado" in c && c.costo_estimado !== null ? Number(c.costo_estimado) : NaN;
+      if (total <= 0 || !Number.isFinite(costo)) return null;
       return ((total - costo) / total) * 100;
     })
     .filter((x): x is number => x != null);
@@ -123,13 +92,16 @@ export default async function VentasDashboardPage() {
     .slice(0, 3);
 
   const clienteVentas = new Map<string, number>();
+  for (const v of ventasMaderaMes) {
+    clienteVentas.set(v.cliente_id, (clienteVentas.get(v.cliente_id) ?? 0) + Number(v.total));
+  }
   for (const v of ventasMueblesMes) {
     clienteVentas.set(v.cliente_id, (clienteVentas.get(v.cliente_id) ?? 0) + Number(v.total));
   }
   for (const c of contratosMes) {
     clienteVentas.set(
       c.cliente_id,
-      (clienteVentas.get(c.cliente_id) ?? 0) + Number(c.monto_total ?? c.tarifa),
+      (clienteVentas.get(c.cliente_id) ?? 0) + Number(c.monto_total ?? 0),
     );
   }
   for (const s of aserraderoMes) {
@@ -147,21 +119,21 @@ export default async function VentasDashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold">Dashboard de ventas — {periodoLabel}</h2>
+          <h2 className="text-xl font-bold">Resumen de ventas — {periodoLabel}</h2>
           <p className="text-sm text-[var(--color-text-secondary)]">
-            KPIs del mes en curso a través de los 5 sub-flujos del taller.
+            Operaciones del mes. Los importes registrados no equivalen a dinero cobrado; consulta Caja para comprobar ingresos.
           </p>
         </div>
         <Link href="/ventas" className="text-sm font-semibold underline">
-          ← Volver al hub
+          ← Volver a ventas
         </Link>
       </div>
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Ingresos del mes"
+          label="Importes registrados del mes"
           value={formatPen(ingresoTotalMes)}
-          hint={`${totalVentasMes} operaciones registradas`}
+          hint={`${totalVentasMes} operaciones; alquileres sin total quedan pendientes de comprobar`}
         />
         <MetricCard
           label="Órdenes activas"
@@ -170,7 +142,7 @@ export default async function VentasDashboardPage() {
         />
         <MetricCard
           label="Margen promedio"
-          value={`${margenPromedio.toFixed(1)}%`}
+          value={margenes.length ? `${margenPromedio.toFixed(1)}%` : "Por comprobar"}
           hint={`Sobre ${margenes.length} cotizaciones del mes`}
         />
         <MetricCard
@@ -178,22 +150,22 @@ export default async function VentasDashboardPage() {
           value={String(cobrosVencidos.length)}
           hint={
             cobrosVencidos.length > 0
-              ? `Total ${formatPen(cobrosVencidos.reduce((a, c) => a + c.monto, 0))}`
-              : "Sin pendientes"
+              ? `Saldos conocidos ${formatPen(cobrosVencidos.reduce((a, c) => a + (c.amount ?? 0), 0))}`
+              : "Sin vencidos con fecha registrada"
           }
         />
       </section>
 
       <Card>
-        <CardTitle>Ingresos por sub-flujo</CardTitle>
-        <CardDescription>Distribución del mes {periodoLabel}.</CardDescription>
-        <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
+        <CardTitle>Importes por actividad</CardTitle>
+        <CardDescription>Distribución del mes {periodoLabel}. Alquileres sin importe total no suman su tarifa como si fuera el total.</CardDescription>
+        <div className="mt-4 overflow-x-auto rounded-xl border border-[var(--color-border)]">
           <Table>
             <THead>
               <TRow>
                 <TH>Sub-flujo</TH>
                 <TH className="text-right">Operaciones</TH>
-                <TH className="text-right">Ingresos</TH>
+                <TH className="text-right">Importe registrado</TH>
                 <TH className="text-right">Participación</TH>
               </TRow>
             </THead>
@@ -258,7 +230,7 @@ export default async function VentasDashboardPage() {
 
         <Card>
           <CardTitle>Top 3 clientes</CardTitle>
-          <CardDescription>Mayor facturación combinada en el mes.</CardDescription>
+          <CardDescription>Mayores importes registrados del mes, combinando madera, muebles, alquileres y servicios.</CardDescription>
           <div className="mt-3 space-y-2">
             {topClientes.length === 0 ? (
               <p className="text-sm text-[var(--color-text-secondary)]">

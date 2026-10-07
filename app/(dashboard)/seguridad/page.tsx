@@ -1,3 +1,4 @@
+import { requirePageAccess } from "@/lib/auth";
 import { toggleSecurityControl } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { getSecurityControlRows } from "@/lib/data";
 import { privacyPolicy } from "@/lib/security";
 
 export default async function SeguridadPage() {
+  await requirePageAccess("/seguridad");
   const controls = await getSecurityControlRows();
   const completed = controls.filter((x) => x.completed).length;
   return (

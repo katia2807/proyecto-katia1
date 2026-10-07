@@ -1,13 +1,10 @@
+import { fechaHoyPeru, formatDate } from "@/lib/utils";
 import { NextResponse } from "next/server";
+import { readCompleteTable, readCompleteVentas } from "@/lib/complete-data";
 import ExcelJS from "exceljs";
-import { requireAuthContext } from "@/lib/auth";
+import { requireApiAuth } from "@/lib/api-auth";
 import {
-  getClientesRows,
-  getChoferesRows,
-  getProveedoresRows,
   getInventarioRobustoData,
-  getVentasRows,
-  getVentasMuebleTerminadoRows,
   getPersonalRows,
 } from "@/lib/data";
 import { getEmpresaConfig } from "@/lib/company-config";
@@ -64,20 +61,23 @@ function addTotalsRow(ws: ExcelJS.Worksheet, numCols: number) {
   });
 }
 
-export async function GET(request: Request) {
-  await requireAuthContext({ redirectTo: null });
+export async function GET() {
+  const auth = await requireApiAuth(["owner_admin", "gerencia"]);
+  if (auth.response) return auth.response;
 
+  try {
+  const organizationId = auth.context.organizationId;
   const [data_, empresa, choferes, proveedores, ventasMadera, ventasMuebles, personal] = await Promise.all([
-    getInventarioRobustoData(),
-    getEmpresaConfig().catch(() => null),
-    getChoferesRows(),
-    getProveedoresRows(),
-    getVentasRows(),
-    getVentasMuebleTerminadoRows(),
-    getPersonalRows(),
+    getInventarioRobustoData({organizationId,complete:true}),
+    getEmpresaConfig(organizationId),
+    readCompleteTable("choferes",organizationId),
+    readCompleteTable("proveedores",organizationId),
+    readCompleteVentas(organizationId),
+    readCompleteTable("ventas_mueble_terminado",organizationId),
+    getPersonalRows(organizationId),
   ]);
 
-  const clientes = await getClientesRows();
+  const clientes = await readCompleteTable("clientes",organizationId);
 
   const wb   = new ExcelJS.Workbook();
   wb.creator = empresa?.nombre ?? "Katia Suite";
@@ -93,7 +93,7 @@ export async function GET(request: Request) {
   });
   wsIdx.mergeCells("A1:D1");
   const idxT = wsIdx.getCell("A1");
-  idxT.value = `${empresa?.nombre ?? "Katia Suite"} — Respaldo de datos al ${fechaStr}`;
+  idxT.value = `${empresa?.nombre ?? "Katia Suite"} — Exportación de datos al ${fechaStr}`;
   idxT.font  = { bold: true, size: 14, color: { argb: FG_HEADER } };
   idxT.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: BG_HEADER } };
   idxT.alignment = { horizontal: "center", vertical: "middle" };
@@ -105,9 +105,9 @@ export async function GET(request: Request) {
     ["🚛 Choferes",     "Transportistas que realizan entregas"],
     ["🏭 Proveedores",  "Empresas y personas que suministran insumos"],
     ["📦 Inventario",   "Stock actual de productos con valorización"],
-    ["💰 Ventas madera","Ventas de madera cortada del período"],
-    ["🛋️ Ventas muebles","Ventas de muebles terminados del período"],
-    ["👷 Personal",     "Colaboradores y sus adelantos"],
+    ["💰 Ventas madera","Historial de ventas de madera"],
+    ["🛋️ Ventas muebles","Historial de ventas de muebles terminados"],
+    ["👷 Personal",     "Colaboradores registrados"],
   ];
 
   const hRow = wsIdx.addRow(["Hoja", "Descripción", "Registros", "Nota"]);
@@ -188,7 +188,7 @@ export async function GET(request: Request) {
   const wsInv = wb.addWorksheet("📦 Inventario", { properties: { tabColor: { argb: "FF3B82F6" } } });
   const invCols = 11;
   title(wsInv, `Inventario — ${empresa?.nombre ?? "Katia Suite"} · ${fechaStr}`, invCols, fechaStr);
-  const hInv = wsInv.addRow(["Código", "Nombre", "Categoría", "Unidad", "Stock actual", "Stock mín.", "Costo unit.", "Valor stock", "Vendido", "Activo", "Estado"]);
+  const hInv = wsInv.addRow(["Código", "Nombre", "Categoría", "Unidad", "Stock actual", "Stock mín.", "Costo registrado", "Valor según compras", "Vendido", "Activo", "Estado"]);
   hInv.height = 22; hInv.eachCell((c) => header(c));
   [18, 34, 18, 12, 14, 12, 16, 16, 12, 10, 14].forEach((w, i) => { wsInv.getColumn(i + 1).width = w; });
 
@@ -197,7 +197,7 @@ export async function GET(request: Request) {
     const r = wsInv.addRow([
       p.codigo, p.nombre, p.categoria, p.unidad,
       p.stock_actual, p.stock_minimo,
-      p.costo_unitario_promedio, p.valor_stock, p.vendido,
+      p.costo_unitario, p.valor_stock, p.vendido,
       p.activo ? "Sí" : "No", bajo ? "⚠ Stock bajo" : "OK",
     ]);
     r.height = 17;
@@ -239,13 +239,13 @@ export async function GET(request: Request) {
   // ─────────────────────────────────────────────────────────────────
   const wsVMu = wb.addWorksheet("🛋️ Ventas muebles", { properties: { tabColor: { argb: "FFEC4899" } } });
   title(wsVMu, `Ventas de muebles — ${empresa?.nombre ?? "Katia Suite"} · ${fechaStr}`, 7, fechaStr);
-  const hVMu = wsVMu.addRow(["Correlativo", "Fecha", "Estado", "Tipo entrega", "Modalidad pago", "Total", "Creado"]);
+  const hVMu = wsVMu.addRow(["Correlativo", "Fecha", "Estado entrega", "Tipo entrega", "Modalidad pago", "Total", "Creado"]);
   hVMu.height = 20; hVMu.eachCell((c) => header(c));
   [16, 14, 14, 18, 18, 16, 14].forEach((w, i) => { wsVMu.getColumn(i + 1).width = w; });
   ventasMuebles.forEach((v, i) => {
     const r = wsVMu.addRow([
       v.correlativo ?? v.id.slice(0, 8),
-      v.fecha, v.estado, v.tipo_entrega, v.modalidad_pago,
+      v.fecha, v.estado_entrega, v.tipo_entrega, v.modalidad_pago,
       Number(v.total),
       new Date(v.created_at).toLocaleDateString("es-PE"),
     ]);
@@ -262,14 +262,14 @@ export async function GET(request: Request) {
   // ─────────────────────────────────────────────────────────────────
   const wsPers = wb.addWorksheet("👷 Personal", { properties: { tabColor: { argb: "FF7C3AED" } } });
   title(wsPers, `Personal — ${empresa?.nombre ?? "Katia Suite"} · ${fechaStr}`, 6, fechaStr);
-  const hPers = wsPers.addRow(["Nombre", "DNI", "Cargo", "Teléfono", "Activo", "Ingreso"]);
+  const hPers = wsPers.addRow(["Nombre", "Documento no registrado", "Rol", "Teléfono no registrado", "Activo", "Ingreso"]);
   hPers.height = 20; hPers.eachCell((c) => header(c));
   [30, 16, 22, 16, 10, 14].forEach((w, i) => { wsPers.getColumn(i + 1).width = w; });
   personal.empleados.forEach((e, i) => {
     const r = wsPers.addRow([
-      e.nombre, e.dni ?? "—", e.cargo ?? "—", e.telefono ?? "—",
+      e.nombre, "—", e.rol ?? "—", "—",
       e.activo ? "Sí" : "No",
-      e.fecha_ingreso ? new Date(e.fecha_ingreso).toLocaleDateString("es-PE") : "—",
+      e.fecha_ingreso ? formatDate(e.fecha_ingreso) : "—",
     ]);
     r.height = 17; r.eachCell((cell) => data(cell, i));
   });
@@ -279,12 +279,16 @@ export async function GET(request: Request) {
   // Respuesta
   // ─────────────────────────────────────────────────────────────────
   const buffer = await wb.xlsx.writeBuffer();
-  const today  = new Date().toISOString().slice(0, 10);
+  const today  = fechaHoyPeru();
 
   return new NextResponse(buffer, {
     headers: {
+      "Cache-Control": "no-store",
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="katia-respaldo-completo-${today}.xlsx"`,
+      "Content-Disposition": `attachment; filename="katia-exportacion-datos-${today}.xlsx"`,
     },
   });
+  } catch {
+    return NextResponse.json({error:"No se pudo generar la exportación completa. Intenta nuevamente; no se entregó un archivo parcial."},{status:503});
+  }
 }

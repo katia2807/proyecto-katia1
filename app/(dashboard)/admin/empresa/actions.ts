@@ -3,9 +3,9 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { requireAuthContext } from "@/lib/auth";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { hasSupabaseEnv } from "@/lib/runtime";
 
 const EMPRESA_LOGOS_BUCKET = "empresa-logos";
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
@@ -52,7 +52,8 @@ export async function updateEmpresaConfig(
   _prevState: EmpresaFormState,
   formData: FormData,
 ): Promise<EmpresaFormState> {
-  await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
+  const context = await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
+  if (!hasSupabaseEnv()) return { error: "La configuración de empresa requiere la conexión publicada. No se guardaron cambios desde la copia local." };
 
   const parsed = empresaSchema.safeParse({
     nombre: formData.get("nombre"),
@@ -68,19 +69,16 @@ export async function updateEmpresaConfig(
   }
 
   const supabase = getSupabaseServerClient();
-  const { data: existing } = await supabase
+  const { error: existingError } = await supabase
     .from("configuracion_empresa")
     .select("logo_url,margen_ganancia_default_pct")
-    .eq("organization_id", DEFAULT_ORG_ID)
+    .eq("organization_id", context.organizationId)
     .maybeSingle();
 
-  const logoUrlPersist =
-    typeof existing?.logo_url === "string" && existing.logo_url.trim() !== ""
-      ? existing.logo_url.trim()
-      : null;
+  if (existingError) return { error: "No se pudo consultar la configuración anterior. No se guardaron cambios." };
 
   const payload = {
-    organization_id: DEFAULT_ORG_ID,
+    organization_id: context.organizationId,
     nombre: parsed.data.nombre,
     ruc: parsed.data.ruc,
     telefono: parsed.data.telefono,
@@ -88,15 +86,14 @@ export async function updateEmpresaConfig(
     firmante: parsed.data.firmante,
     firmante_cargo: parsed.data.firmante_cargo,
     updated_at: new Date().toISOString(),
-    logo_url: logoUrlPersist,
-    margen_ganancia_default_pct: existing?.margen_ganancia_default_pct ?? 30,
   };
 
-  const { error } = await supabase
+  const { data: saved, error } = await supabase
     .from("configuracion_empresa")
-    .upsert(payload, { onConflict: "organization_id" });
+    .upsert(payload, { onConflict: "organization_id" })
+    .select("organization_id").maybeSingle();
 
-  if (error) {
+  if (error || !saved) {
     return { error: "No se pudo guardar la configuracion. Intenta de nuevo." };
   }
 
@@ -115,7 +112,8 @@ export async function uploadEmpresaLogo(
   _prevState: EmpresaLogoFormState,
   formData: FormData,
 ): Promise<EmpresaLogoFormState> {
-  await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
+  const context = await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
+  if (!hasSupabaseEnv()) return { error: "La configuración de empresa requiere la conexión publicada. No se guardaron cambios desde la copia local." };
 
   const raw = formData.get("logo");
   if (!(raw instanceof File)) {
@@ -136,17 +134,18 @@ export async function uploadEmpresaLogo(
   }
 
   const supabase = getSupabaseServerClient();
-  const { data: row } = await supabase
+  const { data: row, error: readError } = await supabase
     .from("configuracion_empresa")
     .select("logo_url")
-    .eq("organization_id", DEFAULT_ORG_ID)
+    .eq("organization_id", context.organizationId)
     .maybeSingle();
 
+  if (readError) return { error: "No se pudo consultar el logo anterior. No se hicieron cambios." };
   const oldPath = objectPathFromPublicLogoUrl(
     typeof row?.logo_url === "string" ? row.logo_url : null,
   );
 
-  const storagePath = `${DEFAULT_ORG_ID}/${randomUUID()}.png`;
+  const storagePath = `${context.organizationId}/${randomUUID()}.png`;
   const { error: upErr } = await supabase.storage
     .from(EMPRESA_LOGOS_BUCKET)
     .upload(storagePath, buffer, {
@@ -158,9 +157,6 @@ export async function uploadEmpresaLogo(
     return { error: "No se pudo subir el logo. Intenta de nuevo." };
   }
 
-  if (oldPath) {
-    await supabase.storage.from(EMPRESA_LOGOS_BUCKET).remove([oldPath]);
-  }
 
   const { data: publicData } = supabase.storage.from(EMPRESA_LOGOS_BUCKET).getPublicUrl(storagePath);
   const publicUrl = publicData.publicUrl;
@@ -168,7 +164,7 @@ export async function uploadEmpresaLogo(
   const { data: updatedRow, error: dbErr } = await supabase
     .from("configuracion_empresa")
     .update({ logo_url: publicUrl, updated_at: new Date().toISOString() })
-    .eq("organization_id", DEFAULT_ORG_ID)
+    .eq("organization_id", context.organizationId)
     .select("id")
     .maybeSingle();
 
@@ -181,6 +177,8 @@ export async function uploadEmpresaLogo(
     };
   }
 
+  if (oldPath?.startsWith(`${context.organizationId}/`)) await supabase.storage.from(EMPRESA_LOGOS_BUCKET).remove([oldPath]);
+
   revalidatePath("/admin/empresa");
   revalidatePath("/cotizacion");
 
@@ -188,26 +186,25 @@ export async function uploadEmpresaLogo(
 }
 
 export async function clearEmpresaLogo(): Promise<EmpresaLogoFormState> {
-  await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
+  const context = await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
+  if (!hasSupabaseEnv()) return { error: "La configuración de empresa requiere la conexión publicada. No se guardaron cambios desde la copia local." };
 
   const supabase = getSupabaseServerClient();
-  const { data: row } = await supabase
+  const { data: row, error: readError } = await supabase
     .from("configuracion_empresa")
     .select("logo_url")
-    .eq("organization_id", DEFAULT_ORG_ID)
+    .eq("organization_id", context.organizationId)
     .maybeSingle();
 
+  if (readError) return { error: "No se pudo consultar el logo anterior. No se hicieron cambios." };
   const path = objectPathFromPublicLogoUrl(
     typeof row?.logo_url === "string" ? row.logo_url : null,
   );
-  if (path) {
-    await supabase.storage.from(EMPRESA_LOGOS_BUCKET).remove([path]);
-  }
 
   const { data: cleared, error } = await supabase
     .from("configuracion_empresa")
     .update({ logo_url: null, updated_at: new Date().toISOString() })
-    .eq("organization_id", DEFAULT_ORG_ID)
+    .eq("organization_id", context.organizationId)
     .select("id")
     .maybeSingle();
 
@@ -218,6 +215,8 @@ export async function clearEmpresaLogo(): Promise<EmpresaLogoFormState> {
   if (!cleared) {
     return { error: "No hay registro de empresa. Guarda primero los datos del emisor." };
   }
+
+  if (path?.startsWith(`${context.organizationId}/`)) await supabase.storage.from(EMPRESA_LOGOS_BUCKET).remove([path]);
 
   revalidatePath("/admin/empresa");
   revalidatePath("/cotizacion");

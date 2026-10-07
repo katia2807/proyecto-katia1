@@ -1,18 +1,11 @@
+import { fechaHoyPeru } from "@/lib/utils";
+import { readCompleteTable, readCompleteVentas } from "@/lib/complete-data";
+import { getReportesData } from "@/lib/reportes-data";
 import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { requireApiAuth } from "@/lib/api-auth";
 import {
-  getAlquilerRows,
-  getCajaRows,
-  getClientesRows,
-  getCobrosVencidos,
-  getComprasMaderaRows,
-  getInventarioMovimientosRows,
-  getInventarioProductosRows,
   getPersonalRows,
-  getServiciosAserraderoRows,
-  getVentasMuebleTerminadoRows,
-  getVentasRows,
 } from "@/lib/data";
 
 export const runtime = "nodejs";
@@ -29,6 +22,9 @@ export async function GET() {
     return auth.response;
   }
 
+  try {
+  const organizationId = auth.context.organizationId;
+  const reportes = await getReportesData(organizationId);
   const [
     caja,
     ventasMuebles,
@@ -42,17 +38,17 @@ export async function GET() {
     inventarioMovimientos,
     inventarioProductos,
   ] = await Promise.all([
-    getCajaRows(),
-    getVentasMuebleTerminadoRows(),
-    getVentasRows(),
-    getComprasMaderaRows(),
-    getAlquilerRows(),
-    getServiciosAserraderoRows(),
-    getPersonalRows(),
-    getCobrosVencidos(),
-    getClientesRows(),
-    getInventarioMovimientosRows(),
-    getInventarioProductosRows(true),
+    Promise.resolve(reportes.caja),
+    readCompleteTable("ventas_mueble_terminado",organizationId),
+    readCompleteVentas(organizationId),
+    readCompleteTable("compras_madera",organizationId),
+    readCompleteTable("alquileres",organizationId).then(rows=>({rows})),
+    readCompleteTable("servicios_aserradero",organizationId),
+    getPersonalRows(organizationId),
+    Promise.resolve(reportes.cobros),
+    readCompleteTable("clientes",organizationId),
+    readCompleteTable("inventario_movimientos",organizationId),
+    readCompleteTable("inventario_productos",organizationId),
   ]);
 
   const alquileres = alquilerResult.rows;
@@ -173,7 +169,7 @@ export async function GET() {
       fecha_fin: a.fecha_fin ?? "",
       estado: a.estado,
       tarifa: Number(a.tarifa),
-      monto_total: Number(a.monto_total ?? a.tarifa),
+      monto_total: a.monto_total === null ? null : Number(a.monto_total),
       penalidad: Number(a.penalidad ?? 0),
     })),
   );
@@ -270,7 +266,7 @@ export async function GET() {
   );
 
   const buffer = await wb.xlsx.writeBuffer();
-  const filename = `katia-reportes-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const filename = `katia-reportes-${fechaHoyPeru()}.xlsx`;
   return new NextResponse(buffer as unknown as BodyInit, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -278,4 +274,7 @@ export async function GET() {
       "Cache-Control": "no-store",
     },
   });
+  } catch {
+    return NextResponse.json({error:"No se pudo generar la exportación completa. Intenta nuevamente; no se entregó un archivo parcial."},{status:503});
+  }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateMargenGananciaPredeterminado, updateServicioEspecialTarifa } from "@/app/actions";
+import { submitMargenGananciaPredeterminado, submitServicioEspecialTarifa } from "@/app/actions";
 import { formatPen, parseDecimal } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -66,7 +66,8 @@ export function TarifasSettingsForm({ inicialTarifas, margenGananciaDefaultPct }
 
     startTransition(async () => {
       try {
-        await updateServicioEspecialTarifa(editingId, cleanNombre, cleanTarifa);
+        const result = await submitServicioEspecialTarifa(editingId, cleanNombre, cleanTarifa);
+        if (!result.ok) { setError(result.error); return; }
         
         // Update local state
         setTarifas((prev) =>
@@ -79,8 +80,8 @@ export function TarifasSettingsForm({ inicialTarifas, margenGananciaDefaultPct }
         
         setSuccess("Tarifa actualizada correctamente.");
         setEditingId(null);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Error al actualizar la tarifa.");
+      } catch {
+        setError("No se pudo confirmar el cambio. Conservamos los datos para que puedas reintentar.");
       }
     });
   };
@@ -97,11 +98,12 @@ export function TarifasSettingsForm({ inicialTarifas, margenGananciaDefaultPct }
 
     startTransition(async () => {
       try {
-        const res = await updateMargenGananciaPredeterminado(margenInput);
+        const res = await submitMargenGananciaPredeterminado(margenInput);
+        if (!res.ok) { setError(res.error); return; }
         setMargenInput(String(res.margenGananciaDefaultPct));
         setSuccess("Margen de ganancia actualizado correctamente.");
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Error al actualizar el margen.");
+      } catch {
+        setError("No se pudo confirmar el cambio. Conservamos el margen escrito para que puedas reintentar.");
       }
     });
   };
@@ -110,11 +112,12 @@ export function TarifasSettingsForm({ inicialTarifas, margenGananciaDefaultPct }
     <div className="space-y-4">
       {/* Alert Notification Success/Error */}
       {success && (
-        <div className="rounded-xl border border-[var(--color-success,#10b981)] bg-[color-mix(in_srgb,var(--color-success,#10b981)_10%,var(--color-surface,#ffffff))] px-4 py-2.5 text-sm text-[var(--color-success,#10b981)] flex items-center justify-between transition-all duration-200">
+        <div role="status" className="rounded-xl border border-[var(--color-success,#10b981)] bg-[color-mix(in_srgb,var(--color-success,#10b981)_10%,var(--color-surface,#ffffff))] px-4 py-2.5 text-sm text-[var(--color-success,#10b981)] flex items-center justify-between transition-all duration-200">
           <span>{success}</span>
           <button 
             type="button"
             onClick={() => setSuccess(null)} 
+            aria-label="Cerrar confirmación"
             className="text-xs font-bold opacity-60 hover:opacity-100 transition-opacity px-2"
           >
             ✕
@@ -122,11 +125,12 @@ export function TarifasSettingsForm({ inicialTarifas, margenGananciaDefaultPct }
         </div>
       )}
       {error && (
-        <div className="rounded-xl border border-[var(--color-danger,#ef4444)] bg-[color-mix(in_srgb,var(--color-danger,#ef4444)_10%,var(--color-surface,#ffffff))] px-4 py-2.5 text-sm text-[var(--color-danger,#ef4444)] flex items-center justify-between transition-all duration-200">
+        <div role="alert" className="rounded-xl border border-[var(--color-danger,#ef4444)] bg-[color-mix(in_srgb,var(--color-danger,#ef4444)_10%,var(--color-surface,#ffffff))] px-4 py-2.5 text-sm text-[var(--color-danger,#ef4444)] flex items-center justify-between transition-all duration-200">
           <span>{error}</span>
           <button 
             type="button"
             onClick={() => setError(null)} 
+            aria-label="Cerrar aviso"
             className="text-xs font-bold opacity-60 hover:opacity-100 transition-opacity px-2"
           >
             ✕
@@ -251,6 +255,7 @@ export function TarifasSettingsForm({ inicialTarifas, margenGananciaDefaultPct }
                     size="sm"
                     className="h-7 px-2.5 text-xs font-medium text-[var(--katia-primary,#3b82f6)] hover:underline flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity"
                     onClick={() => handleStartEdit(t)}
+                    disabled={isPending}
                   >
                     ✏️ <span className="hidden sm:inline">Editar</span>
                   </Button>

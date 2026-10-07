@@ -2,30 +2,28 @@ import { PersonalContextPanels } from "@/components/personal/personal-context-pa
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
-import { getCurrentUserRole } from "@/lib/current-user-role";
+import { requirePageAccess } from "@/lib/auth";
 import { getPersonalRows } from "@/lib/data";
 import { canMutateRRHH } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
 import { FiltroActivo } from "@/components/inicio/filtro-activo";
-import { getAdelantosPendientesRows } from "@/lib/inicio-pendientes";
 
 export default async function PersonalPage({ searchParams }: {
   searchParams?: Promise<{ adelantos?: string | string[] }>;
 }) {
+  const context = await requirePageAccess("/personal");
   const adelantosParam = (await searchParams)?.adelantos;
   const soloPendientes = (Array.isArray(adelantosParam) ? adelantosParam[0] : adelantosParam) === "pendiente";
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
-  const [personal, pendientes] = await Promise.all([
-    getPersonalRows(), soloPendientes ? getAdelantosPendientesRows() : Promise.resolve(null),
-  ]);
+  const personal = await getPersonalRows(context.organizationId);
+  const pendientes = soloPendientes ? personal.adelantos.filter(row => row.estado === "pendiente") : null;
   const { empleados, sueldos } = personal;
   const adelantos = pendientes ?? personal.adelantos;
-  const role = await getCurrentUserRole();
-  const canMutate = canMutateRRHH(role);
+  const canMutate = canMutateRRHH(context.role, context.uiRole);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <div>
         <h2 className="text-xl font-bold">Gestión de personal</h2>
         <p className="text-sm text-[var(--color-text-secondary)]">
@@ -53,11 +51,11 @@ export default async function PersonalPage({ searchParams }: {
         </div>
       </Card>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-2 [&>*]:min-w-0">
         <Card id="adelantos-pendientes" className="scroll-mt-24">
-          <CardTitle>{soloPendientes ? "Adelantos pendientes" : "Adelantos recientes"}</CardTitle>
+          <CardTitle>{soloPendientes ? "Adelantos pendientes" : "Historial de adelantos"}</CardTitle>
           {pendientes ? <div className="mt-4"><FiltroActivo label="Adelantos por regularizar" total={pendientes.length} clearHref="/personal#adelantos-pendientes" clearLabel="Ver todos los adelantos" /></div> : null}
-          <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
+          <div role="region" aria-label="Historial desplazable" tabIndex={0} className="mt-3 overflow-x-auto rounded-xl border border-[var(--color-border)]">
             <Table>
               <THead>
                 <TRow>
@@ -75,7 +73,7 @@ export default async function PersonalPage({ searchParams }: {
                       <TD className="font-medium">{empName}</TD>
                       <TD>{formatDate(row.fecha)}</TD>
                       <TD>
-                        <Badge variant={row.estado === "pendiente" ? "warning" : "success"}>{row.estado}</Badge>
+                        <Badge variant={row.estado === "pendiente" ? "warning" : "success"}>{row.estado === "pendiente" ? "Pendiente" : "Descontado en nómina"}</Badge>
                       </TD>
                       <TD className="text-right font-semibold">{formatPen(Number(row.monto))}</TD>
                     </TRow>
@@ -89,7 +87,7 @@ export default async function PersonalPage({ searchParams }: {
 
         <Card>
           <CardTitle>Sueldos registrados</CardTitle>
-          <div className="mt-3 overflow-hidden rounded-xl border border-[var(--color-border)]">
+          <div role="region" aria-label="Historial desplazable" tabIndex={0} className="mt-3 overflow-x-auto rounded-xl border border-[var(--color-border)]">
             <Table>
               <THead>
                 <TRow>
@@ -113,6 +111,7 @@ export default async function PersonalPage({ searchParams }: {
                     </TRow>
                   );
                 })}
+                {sueldos.length === 0 ? <TRow><TD colSpan={5} className="py-6 text-center">Aún no hay sueldos registrados.</TD></TRow> : null}
               </tbody>
             </Table>
           </div>

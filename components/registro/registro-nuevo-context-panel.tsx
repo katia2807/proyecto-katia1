@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/Combobox";
 import { Field } from "@/components/ui/field";
 import { MOCK_CATEGORIAS_REGISTRO } from "@/lib/combobox-mocks";
-import { mutationFormInitialState, type MutationFormState } from "@/lib/mutation-form-state";
-import { useActionState, useCallback, useEffect, useMemo, useState } from "react";
+import { mutationFormInitialState } from "@/lib/mutation-form-state";
+import { FeedbackForm } from "@/components/ui/feedback-form";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type CategoriaOpt = { id: string; nombre: string };
 
@@ -34,20 +35,6 @@ function RegistroFormBody({
   const [categoriaError, setCategoriaError] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  const [state, formAction] = useActionState(
-    async (_p: MutationFormState, formData: FormData) => submitRegistroGeneralForm(_p, formData),
-    mutationFormInitialState,
-  );
-
-  useEffect(() => {
-    if (state.success && state.message) {
-      showToast({ variant: "success", message: state.message });
-      onCloseAndReset();
-    } else if (state.error) {
-      showToast({ variant: "error", message: state.error });
-    }
-  }, [state, showToast, onCloseAndReset]);
-
   const categoriaOptions = useMemo(() => {
     const src = (mockData && categorias.length === 0) ? MOCK_CATEGORIAS_REGISTRO : categorias;
     return src.map((c) => ({
@@ -57,17 +44,22 @@ function RegistroFormBody({
   }, [mockData, categorias]);
 
   return (
-    <form
-      action={formAction}
-      className="grid gap-3 md:grid-cols-2"
-      onSubmit={(e) => {
+    <FeedbackForm
+      action={async formData => {
         if (!categoriaId.trim()) {
-          e.preventDefault();
           setCategoriaError("Debes seleccionar una categoría");
-          return;
+          return { error: "Selecciona una categoría antes de guardar." };
         }
         setCategoriaError(null);
+        const state = await submitRegistroGeneralForm(mutationFormInitialState, formData);
+        if (state.success && state.message) {
+          showToast({ variant: "success", message: state.message });
+          onCloseAndReset();
+          return { success: state.message };
+        }
+        return { error: state.error ?? "No se pudo guardar el registro." };
       }}
+      className="grid gap-3 md:grid-cols-2"
     >
       <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
         <span>Categoría</span>
@@ -100,7 +92,7 @@ function RegistroFormBody({
       <div className="md:col-span-2">
         <Button type="submit">Guardar registro</Button>
       </div>
-    </form>
+    </FeedbackForm>
   );
 }
 

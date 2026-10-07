@@ -107,7 +107,8 @@ export function NotificationBell({ notifications, onMarkRead, onMarkAllRead }: N
               {notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
                   <IconBell className="size-8 text-[var(--katia-text-disabled)]" />
-                  <p className="text-sm text-[var(--katia-text-tertiary)]">Sin notificaciones</p>
+                  <p className="text-sm text-[var(--katia-text-tertiary)]">Sin avisos recibidos</p>
+                  <p className="px-3 text-xs text-[var(--katia-text-secondary)]">Consulta los pendientes en Centro de Mando e Inventario.</p>
                 </div>
               ) : (
                 notifications.map((n) => (

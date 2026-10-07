@@ -22,12 +22,13 @@ function firstParam(value: string | string[] | undefined): string {
 
 export default async function ConfiguracionPage({ searchParams }: ConfiguracionPageProps) {
   const params = await searchParams;
-  const activeTab = firstParam(params?.tab) || "cuenta";
+  const tab = firstParam(params?.tab);
+  const activeTab = ["cuenta","empresa","preferencias","tarifas"].includes(tab) ? tab : "cuenta";
 
   const context = await requireAuthContext({ allowedRoles: ["owner_admin"] });
   const [empresa, tarifas] = await Promise.all([
-    getEmpresaConfig(),
-    getServiciosEspecialesTarifaRows(),
+    activeTab === "empresa" || activeTab === "tarifas" ? getEmpresaConfig(context.organizationId) : Promise.resolve(null),
+    activeTab === "tarifas" ? getServiciosEspecialesTarifaRows(context.organizationId) : Promise.resolve([]),
   ]);
 
   return (
@@ -75,7 +76,7 @@ export default async function ConfiguracionPage({ searchParams }: ConfiguracionP
       ) : null}
 
       {/* ── EMPRESA ── */}
-      {activeTab === "empresa" ? (
+      {activeTab === "empresa" && empresa ? (
         <div className="space-y-6">
           <Card>
             <CardTitle>Logo en documentos</CardTitle>
@@ -118,8 +119,7 @@ export default async function ConfiguracionPage({ searchParams }: ConfiguracionP
           <Card>
             <CardTitle>Notificaciones</CardTitle>
             <CardDescription>
-              Las notificaciones del sistema aparecen en el ícono de campana en la barra superior.
-              Se generan automáticamente por eventos críticos: stock bajo, cobros vencidos, etc.
+              Revisa stock y créditos en Centro de Mando e Inventario. La campana todavía no recibe avisos automáticos; su contador no indica que no existan pendientes.
             </CardDescription>
           </Card>
 
@@ -133,7 +133,7 @@ export default async function ConfiguracionPage({ searchParams }: ConfiguracionP
       ) : null}
 
       {/* ── TARIFAS ── */}
-      {activeTab === "tarifas" ? (
+      {activeTab === "tarifas" && empresa ? (
         <div className="space-y-6">
           <Card>
             <CardTitle>Tarifas de servicios especiales</CardTitle>

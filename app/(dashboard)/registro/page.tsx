@@ -3,8 +3,11 @@ import { RegistroNuevoContextPanel } from "@/components/registro/registro-nuevo-
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
-import { getRegistroCategoriasRows, getRegistrosGeneralesRows } from "@/lib/data";
+import { getRegistrosGeneralesRows } from "@/lib/data";
 import { formatDate, formatPen } from "@/lib/utils";
+import { requirePageAccess } from "@/lib/auth";
+import { canMutateRegistro } from "@/lib/permissions";
+import { readCompleteTable } from "@/lib/complete-data";
 
 type RegistroPageProps = {
   searchParams?: Promise<{ quick?: string | string[]; categoria?: string | string[] }>;
@@ -16,15 +19,16 @@ function firstParam(value: string | string[] | undefined) {
 }
 
 export default async function RegistroPage({ searchParams }: RegistroPageProps) {
+  const context = await requirePageAccess("/registro");
   const comboMock =
     process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "1" || process.env.NEXT_PUBLIC_COMBOBOX_MOCK === "true";
   const params = await searchParams;
   const quick = firstParam(params?.quick);
   const categoriaId = firstParam(params?.categoria);
 
-  const categorias = await getRegistroCategoriasRows();
+  const categorias = (await readCompleteTable("registro_categorias", context.organizationId)).filter(c => c.activo);
   const categoriasById = new Map(categorias.map((categoria) => [categoria.id, categoria]));
-  const registros = await getRegistrosGeneralesRows(categoriaId || undefined);
+  const registros = await getRegistrosGeneralesRows(categoriaId || undefined, context.organizationId);
 
   return (
     <div className="space-y-6">
@@ -40,13 +44,13 @@ export default async function RegistroPage({ searchParams }: RegistroPageProps) 
           <CardTitle>Agregar registro</CardTitle>
           <CardDescription>Se guarda en el historial de esta misma pantalla.</CardDescription>
         </div>
-        <RegistroNuevoContextPanel
+        {canMutateRegistro(context.role, context.uiRole) ? <RegistroNuevoContextPanel
           key={categoriaId || "all"}
           categorias={categorias.map((c) => ({ id: c.id, nombre: c.nombre }))}
           defaultCategoriaId={categoriaId || ""}
           openByDefault={quick === "nuevo-registro"}
           mockData={comboMock}
-        />
+        /> : <p className="text-sm text-[var(--color-text-secondary)]">Tu acceso a este apartado es de lectura.</p>}
       </Card>
 
       <Card>
@@ -75,7 +79,7 @@ export default async function RegistroPage({ searchParams }: RegistroPageProps) 
             ? `Mostrando categoría: ${categoriasById.get(categoriaId)?.nombre ?? "Seleccionada"}`
             : "Mostrando todas las categorías"}
         </CardDescription>
-        <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-border)]">
+        <div role="region" aria-label="Historial desplazable" tabIndex={0} className="mt-4 overflow-x-auto rounded-xl border border-[var(--color-border)]">
           <Table>
             <THead>
               <TRow>
@@ -87,6 +91,7 @@ export default async function RegistroPage({ searchParams }: RegistroPageProps) 
               </TRow>
             </THead>
             <tbody>
+              {registros.length === 0 ? <TRow><TD colSpan={5} className="py-6 text-center">No hay registros para esta categoría.</TD></TRow> : null}
               {registros.map((registro) => (
                 <TRow key={registro.id}>
                   <TD>{formatDate(registro.fecha)}</TD>

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
-import { requireAuthContext } from "@/lib/auth";
+import { readCompleteTable } from "@/lib/complete-data";
+import { requireApiAuth } from "@/lib/api-auth";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { hasSupabaseEnv } from "@/lib/runtime";
+import { fechaHoyPeru } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -112,37 +113,7 @@ function findHeaderIndex(headers: Map<string, number>, candidates: string[]): nu
     const exact = headers.get(candidate);
     if (exact !== undefined) return exact;
   }
-  for (const [header, index] of headers) {
-    if (
-      normalizedCandidates.some((candidate) => header.includes(candidate) || candidate.includes(header)) ||
-      (normalizedCandidates.includes("codigo") && header.includes("digo"))
-    ) {
-      return index;
-    }
-  }
   return null;
-}
-
-function previewWorksheet(ws: ExcelJS.Worksheet, maxRows = 8, maxCols = 12): string {
-  const lines: string[] = [];
-  ws.eachRow({ includeEmpty: false }, (row) => {
-    if (lines.length >= maxRows) return;
-    const vals = rowValues(row)
-      .slice(0, maxCols)
-      .map((value) => str(value).replace(/\s+/g, " ").slice(0, 40));
-    if (vals.some(Boolean)) lines.push(`F${row.number}: ${vals.join(" | ")}`);
-  });
-  return lines.join(" / ");
-}
-
-function workbookDiagnostic(wb: ExcelJS.Workbook, sheets: ExcelJS.Worksheet[]): string {
-  const sheetList = wb.worksheets
-    .map((ws) => `${ws.name}(${ws.rowCount} filas x ${ws.columnCount} cols)`)
-    .join(", ");
-  const previews = sheets
-    .map((ws) => `${ws.name}: ${previewWorksheet(ws) || "sin filas visibles"}`)
-    .join(" || ");
-  return `Hojas del archivo: ${sheetList}. Vista previa: ${previews}`;
 }
 
 // ── Sheet parsers ─────────────────────────────────────────────────────────────
@@ -150,6 +121,7 @@ function workbookDiagnostic(wb: ExcelJS.Workbook, sheets: ExcelJS.Worksheet[]): 
 type ImportResult = {
   sheet: string;
   inserted: number;
+  updated?: number;
   skipped: number;
   errors: string[];
 };
@@ -256,7 +228,7 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
 }> {
   const rows: ReturnType<typeof parseInventarioSheet> = [];
   type InventoryColumns = {
-    codigo: number;
+    codigo: number | null;
     nombre: number | null;
     categoria: number | null;
     unidad: number | null;
@@ -264,16 +236,6 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
     stockActual: number | null;
     stockMinimo: number | null;
     costoUnitario: number | null;
-  };
-  const defaultColumns: InventoryColumns = {
-    codigo: 0,
-    nombre: 1,
-    categoria: 2,
-    unidad: 3,
-    stockActual: 4,
-    stockMinimo: 5,
-    costoUnitario: 6,
-    activo: 9,
   };
   let columns: InventoryColumns | null = null;
 
@@ -294,7 +256,7 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
       ]);
       if (nombre !== null) {
         columns = {
-          codigo: codigo ?? nombre,
+          codigo,
           nombre,
           categoria: findHeaderIndex(headers, ["categoria", "familia", "linea", "tipo", "grupo", "rubro"]),
           unidad: findHeaderIndex(headers, ["unidad", "und", "um", "medida", "u m"]),
@@ -310,6 +272,7 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
           ]),
           stockMinimo: findHeaderIndex(headers, ["stock minimo", "minimo", "stock min", "alerta", "punto reposicion"]),
           costoUnitario: findHeaderIndex(headers, [
+            "costo registrado",
             "costo unit prom",
             "costo unitario promedio",
             "costo unitario",
@@ -317,24 +280,15 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
             "costo",
             "precio costo",
             "precio compra",
-            "precio unitario",
-            "precio",
           ]),
         };
         return;
       }
 
-      const first = normalizeText(str(vals[0]));
-      const second = normalizeText(str(vals[1]));
-      if (row.number >= 4 && (first.includes("digo") || second.includes("nombre") || (first && second))) {
-        columns = defaultColumns;
-        if (first.includes("digo") || second.includes("nombre")) return;
-      } else {
-        return;
-      }
+      return;
     }
 
-    const codigoOriginal = str(vals[columns.codigo]);
+    const codigoOriginal = columns.codigo === null ? "" : str(vals[columns.codigo]);
     const nombre = columns.nombre === null ? codigoOriginal : str(vals[columns.nombre]);
     const codigoKey = normalizeText(codigoOriginal);
     const nombreKey = normalizeText(nombre);
@@ -360,42 +314,6 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
     });
   });
 
-  if (rows.length === 0) {
-    ws.eachRow((row) => {
-      const vals = rowValues(row);
-      const first = str(vals[0]);
-      const second = str(vals[1]);
-      const secondIsNumber = num(vals[1]) !== null;
-      const codigoOriginal = secondIsNumber ? "" : first;
-      const nombre = secondIsNumber ? first : second;
-      const codigoKey = normalizeText(codigoOriginal);
-      const nombreKey = normalizeText(nombre);
-
-      if (!codigoOriginal && !nombre) return;
-      if (
-        codigoKey === "codigo" ||
-        codigoKey === "total" ||
-        codigoKey.startsWith("generado") ||
-        codigoKey.includes("inventario") ||
-        nombreKey === "nombre" ||
-        nombreKey.includes("katia suite")
-      ) {
-        return;
-      }
-
-      rows.push({
-        codigo: codigoOriginal || codeFromName(nombre),
-        codigo_generado: !codigoOriginal,
-        nombre,
-        categoria: inferCategoria(nombre, secondIsNumber ? null : str(vals[2]) || null),
-        unidad: secondIsNumber ? null : str(vals[3]) !== "—" ? str(vals[3]) || null : null,
-        stock_actual: secondIsNumber ? num(vals[1]) : num(vals[4]),
-        stock_minimo: secondIsNumber ? null : num(vals[5]),
-        costo_unitario: secondIsNumber ? num(vals[2]) : num(vals[6]),
-        activo: !["no", "false", "0", "inactivo"].includes(normalizeText(str(vals[9]))),
-      });
-    });
-  }
 
   return rows;
 }
@@ -403,7 +321,9 @@ function parseInventarioSheet(ws: ExcelJS.Worksheet): Array<{
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
-  await requireAuthContext({ redirectTo: null });
+  const auth = await requireApiAuth(["owner_admin", "gerencia"]);
+  if (auth.response) return auth.response;
+  const organizationId = auth.context.organizationId;
 
   if (!hasSupabaseEnv()) {
     return NextResponse.json(
@@ -425,9 +345,10 @@ export async function POST(request: Request) {
   }
 
   const ext = file.name.toLowerCase();
-  if (!ext.endsWith(".xlsx") && !ext.endsWith(".xls")) {
-    return NextResponse.json({ ok: false, error: "Solo se aceptan archivos .xlsx o .xls." }, { status: 400 });
+  if (!ext.endsWith(".xlsx")) {
+    return NextResponse.json({ ok: false, error: "Solo se aceptan archivos .xlsx. Guarda el Excel antiguo en ese formato antes de subirlo." }, { status: 400 });
   }
+  if (file.size > 10 * 1024 * 1024) return NextResponse.json({ ok: false, error: "El archivo supera 10 MB." }, { status: 400 });
 
   const arrayBuf = await file.arrayBuffer();
   const wb = new ExcelJS.Workbook();
@@ -438,6 +359,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "El archivo no es un Excel válido." }, { status: 400 });
   }
 
+  let existingClientes, existingChoferes, existingProveedores;
+  try {
+    [existingClientes,existingChoferes,existingProveedores] = await Promise.all([readCompleteTable("clientes",organizationId),readCompleteTable("choferes",organizationId),readCompleteTable("proveedores",organizationId)]);
+  } catch { return NextResponse.json({ok:false,error:"No se pudieron comprobar los registros existentes. No se importaron filas."},{status:503}); }
   const supabase = getSupabaseServerClient();
   const results: ImportResult[] = [];
 
@@ -448,11 +373,7 @@ export async function POST(request: Request) {
     const result: ImportResult = { sheet: "Compradores", inserted: 0, skipped: 0, errors: [] };
 
     // Load existing names to skip duplicates
-    const { data: existing } = await supabase
-      .from("clientes")
-      .select("nombre")
-      .eq("organization_id", DEFAULT_ORG_ID);
-    const existingNames = new Set((existing ?? []).map((r) => r.nombre.toLowerCase().trim()));
+    const existingNames = new Set(existingClientes.map(r=>r.nombre.toLowerCase().trim()));
 
     for (const row of parsed) {
       if (existingNames.has(row.nombre.toLowerCase().trim())) {
@@ -460,7 +381,7 @@ export async function POST(request: Request) {
         continue;
       }
       const { error } = await supabase.from("clientes").insert({
-        organization_id: DEFAULT_ORG_ID,
+        organization_id: organizationId,
         nombre: row.nombre,
         tipo_persona: row.tipo_persona,
         documento: row.documento,
@@ -485,11 +406,7 @@ export async function POST(request: Request) {
     const parsed = parseChoferesSheet(wsCh);
     const result: ImportResult = { sheet: "Choferes", inserted: 0, skipped: 0, errors: [] };
 
-    const { data: existing } = await supabase
-      .from("choferes")
-      .select("nombre")
-      .eq("organization_id", DEFAULT_ORG_ID);
-    const existingNames = new Set((existing ?? []).map((r) => r.nombre.toLowerCase().trim()));
+    const existingNames = new Set(existingChoferes.map(r=>r.nombre.toLowerCase().trim()));
 
     for (const row of parsed) {
       if (existingNames.has(row.nombre.toLowerCase().trim())) {
@@ -497,7 +414,7 @@ export async function POST(request: Request) {
         continue;
       }
       const { error } = await supabase.from("choferes").insert({
-        organization_id: DEFAULT_ORG_ID,
+        organization_id: organizationId,
         nombre: row.nombre,
         telefono: row.telefono,
         placa: row.placa,
@@ -519,11 +436,7 @@ export async function POST(request: Request) {
     const parsed = parseProveedoresSheet(wsPr);
     const result: ImportResult = { sheet: "Proveedores", inserted: 0, skipped: 0, errors: [] };
 
-    const { data: existing } = await supabase
-      .from("proveedores")
-      .select("nombre")
-      .eq("organization_id", DEFAULT_ORG_ID);
-    const existingNames = new Set((existing ?? []).map((r) => r.nombre.toLowerCase().trim()));
+    const existingNames = new Set(existingProveedores.map(r=>r.nombre.toLowerCase().trim()));
 
     for (const row of parsed) {
       if (existingNames.has(row.nombre.toLowerCase().trim())) {
@@ -531,7 +444,7 @@ export async function POST(request: Request) {
         continue;
       }
       const { error } = await supabase.from("proveedores").insert({
-        organization_id: DEFAULT_ORG_ID,
+        organization_id: organizationId,
         nombre: row.nombre,
         documento: row.documento,
         telefono: row.telefono,
@@ -562,47 +475,16 @@ export async function POST(request: Request) {
       importedInventory = true;
       const result: ImportResult = { sheet: `Inventario (${wsInv.name})`, inserted: 0, skipped: 0, errors: [] };
 
+      result.updated = 0;
       for (const row of parsed) {
-        const patch: Record<string, unknown> = {};
-        if (row.nombre) patch.nombre = row.nombre;
-        if (row.categoria) patch.categoria = row.categoria;
-        if (row.unidad) patch.unidad = row.unidad;
-        if (row.stock_actual !== null) patch.stock_actual = row.stock_actual;
-        if (row.stock_minimo !== null) patch.stock_minimo = row.stock_minimo;
-        if (row.costo_unitario !== null) patch.costo_unitario = row.costo_unitario;
-        if (row.activo !== null) patch.activo = row.activo;
-
-        const updateQuery = supabase
-          .from("inventario_productos")
-          .update(patch)
-          .eq("organization_id", DEFAULT_ORG_ID);
-        const { error: updateError, data: updated } = await (row.codigo_generado
-          ? updateQuery.eq("nombre", row.nombre)
-          : updateQuery.eq("codigo", row.codigo)
-        ).select("id");
-
-        if (updateError) {
-          result.errors.push(`${row.codigo}: ${updateError.message}`);
-        } else if ((updated ?? []).length > 0) {
-          result.inserted++;
-        } else {
-          const { error: insertError } = await supabase.from("inventario_productos").insert({
-            organization_id: DEFAULT_ORG_ID,
-            codigo: row.codigo,
-            nombre: row.nombre || row.codigo,
-            categoria: row.categoria || "General",
-            unidad: row.unidad || "und",
-            stock_actual: row.stock_actual ?? 0,
-            stock_minimo: row.stock_minimo ?? 0,
-            costo_unitario: row.costo_unitario,
-            activo: row.activo ?? true,
-          });
-          if (insertError) {
-            result.errors.push(`${row.codigo}: ${insertError.message}`);
-          } else {
-            result.inserted++;
-          }
-        }
+        if ([row.stock_actual,row.stock_minimo,row.costo_unitario].some(value=>value !== null && (!Number.isFinite(value) || value < 0))) { result.errors.push(`${row.codigo}: stock o costo inválido.`); continue; }
+        const {data:operation,error} = await supabase.rpc("importar_producto_inventario",{
+          p_organization_id:organizationId,p_user_id:auth.context.userId,p_producto:{codigo:row.codigo,nombre:row.nombre,categoria:row.categoria,unidad:row.unidad,stock_actual:row.stock_actual,stock_minimo:row.stock_minimo,costo_unitario:row.costo_unitario,activo:row.activo},p_por_nombre:row.codigo_generado,p_fecha:fechaHoyPeru(),
+        });
+        if (error) result.errors.push(`${row.codigo}: no se pudo guardar producto y Kardex juntos. Comprueba la actualización de base de datos o revisa esta fila.`);
+        else if(operation === "updated") result.updated++;
+        else if(operation === "inserted") result.inserted++;
+        else result.errors.push(`${row.codigo}: resultado no confirmado; revisa antes de reintentar.`);
       }
       results.push(result);
     }
@@ -613,7 +495,7 @@ export async function POST(request: Request) {
         inserted: 0,
         skipped: 0,
         errors: [
-          `No se detectaron filas de productos en las hojas revisadas: ${emptySheetNames.join(", ")}. Version importador: diagnostic-preview. ${workbookDiagnostic(wb, inventorySheets)}`,
+          `No se detectaron filas con encabezados claros en: ${emptySheetNames.join(", ")}. Usa columnas Producto o Nombre, Código y Stock; identifica el costo expresamente como Costo.`,
         ],
       });
     }

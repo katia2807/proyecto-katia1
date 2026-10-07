@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
 import type { AppRole } from "@/lib/supabase/types";
+import { resolveRole } from "@/lib/permissions";
 
 /**
  * Autenticación para Route Handlers: misma sesión que el layout (`getAuthContext`).
@@ -17,7 +18,7 @@ export async function requireApiAuth(allowedRoles?: readonly AppRole[]) {
     };
   }
 
-  if (allowedRoles && !allowedRoles.includes(context.role)) {
+  if (allowedRoles && !allowedRoles.some(role => resolveRole(role) === resolveRole(context.role, context.uiRole))) {
     return {
       context: null,
       response: NextResponse.json({ error: "No tienes permisos para esta operación." }, { status: 403 }),

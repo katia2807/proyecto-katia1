@@ -1,9 +1,9 @@
 "use server";
 
 import { z } from "zod";
-import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { getSupabaseAuthServerClient, requireAuthContext } from "@/lib/auth";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { hasSupabaseEnv } from "@/lib/runtime";
 
 export type AccountFormState = {
   error?: string;
@@ -31,7 +31,8 @@ export async function updateAccountSettings(
   _prevState: AccountFormState,
   formData: FormData,
 ): Promise<AccountFormState> {
-  await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
+  const context = await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
+  if (!hasSupabaseEnv()) return {error:"Los cambios de cuenta requieren la conexión publicada. No se modificó el acceso desde la copia local."};
 
   const parsed = accountSchema.safeParse({
     email: formData.get("email"),
@@ -66,36 +67,16 @@ export async function updateAccountSettings(
     return { error: "La contraseña anterior no es correcta." };
   }
 
-  const admin = getSupabaseServerClient();
-  const { error: profileError } = await admin
-    .from("perfiles")
-    .update({ full_name: parsed.data.fullName })
-    .eq("user_id", user.id)
-    .eq("organization_id", DEFAULT_ORG_ID);
-  if (profileError) {
-    return { error: profileError.message };
-  }
-
-  if (parsed.data.newPassword) {
-    const { error: pwError } = await authClient.auth.updateUser({
-      password: parsed.data.newPassword,
-    });
-    if (pwError) {
-      return { error: pwError.message };
-    }
-  }
-
   const nextEmail = parsed.data.email.trim().toLowerCase();
-  if (nextEmail !== user.email?.toLowerCase()) {
-    const { error: emailError } = await authClient.auth.updateUser({ email: nextEmail });
-    if (emailError) {
-      return { error: emailError.message };
-    }
-    return {
-      success:
-        "Datos actualizados. Si cambiaste el correo, revisa tu bandeja para confirmarlo según la configuración de Supabase.",
-    };
-  }
-
-  return { success: "Cuenta actualizada correctamente." };
+  const emailChanged = nextEmail !== user.email.toLowerCase();
+  const { error: authError } = await authClient.auth.updateUser({
+    ...(parsed.data.newPassword ? { password:parsed.data.newPassword } : {}),
+    ...(emailChanged ? { email:nextEmail } : {}),
+    data: { full_name:parsed.data.fullName },
+  });
+  if (authError) return { error:"No se pudo actualizar la cuenta de acceso. El nombre del perfil no se modificó." };
+  const admin = getSupabaseServerClient();
+  const { data: updated, error: profileError } = await admin.from("perfiles").update({full_name:parsed.data.fullName}).eq("user_id",context.userId).eq("organization_id",context.organizationId).select("id").maybeSingle();
+  if (profileError || !updated) return { error:"La cuenta de acceso se actualizó, pero no se pudo guardar el nombre del perfil. Si cambiaste contraseña, usa la nueva; si cambiaste correo, revisa su confirmación. Reintenta solo el nombre." };
+  return { success:emailChanged ? "Cuenta actualizada. Revisa tu correo para confirmar el cambio de dirección." : "Cuenta actualizada correctamente." };
 }

@@ -314,6 +314,7 @@ export type Database = {
       };
       compras_madera: {
         Row: {
+          url_comprobante?: string | null;
           id: string;
           organization_id: string;
           proveedor_id: string;
@@ -1134,6 +1135,8 @@ export type Database = {
       };
     };
     Functions: {
+      limpiar_datos_operativos_atomico: { Args: { p_organization_id: string; p_user_id: string; p_user_name: string | null }; Returns: undefined };
+      importar_producto_inventario: { Args: { p_organization_id: string; p_user_id: string; p_producto: Json; p_por_nombre: boolean; p_fecha: string }; Returns: string };
       corregir_venta_madera_cortada_historica: {
         Args: {
           p_venta_id: string;

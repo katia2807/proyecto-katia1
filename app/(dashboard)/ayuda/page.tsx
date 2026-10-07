@@ -9,17 +9,17 @@ const SECCIONES = [
       { titulo: "Centro de Mando", descripcion: "Tu pantalla principal. Ve ingresos del día, pendientes urgentes y atajos directos.", href: "/gerencial" },
       { titulo: "Reportes y auditoría", descripcion: "Exporta datos a Excel, revisa el historial de caja y genera cierres mensuales firmados.", href: "/reportes" },
       { titulo: "Configuración", descripcion: "Actualiza los datos de tu empresa, cuenta y preferencias de visualización.", href: "/configuracion" },
-      { titulo: "Respaldo", descripcion: "Consulta el estado de tus datos y accede al panel de Supabase para backups automáticos.", href: "/admin/respaldo" },
+      { titulo: "Respaldo", descripcion: "Consulta el estado de tus datos. Verifica en Supabase la configuración de respaldos y su recuperación.", href: "/admin/respaldo" },
     ],
   },
   {
     rol: "Vendedor",
     color: "var(--katia-accent-cyan)",
     pasos: [
-      { titulo: "Registrar una venta", descripcion: "Ve a Ventas, selecciona el tipo de venta (mueble, madera, aserradero, etc.) y completa el formulario.", href: "/ventas" },
-      { titulo: "Crear una cotización", descripcion: "En Cotizaciones, crea una nueva cotización con líneas de productos y el cliente correspondiente.", href: "/cotizacion" },
-      { titulo: "Agregar un cliente", descripcion: "Desde Clientes puedes registrar un cliente nuevo en segundos.", href: "/ventas/clientes" },
-      { titulo: "Registrar un movimiento de caja", descripcion: "En Caja, registra ingresos o egresos con categoría y notas opcionales.", href: "/caja" },
+      { titulo: "Consultar ventas", descripcion: "En Ventas revisa el historial y los detalles. El rol Vendedor tiene acceso comercial de lectura.", href: "/ventas" },
+      { titulo: "Consultar cotizaciones", descripcion: "Consulta las propuestas y sus estados. Los registros nuevos requieren permiso de escritura.", href: "/cotizacion" },
+      { titulo: "Consultar clientes", descripcion: "Busca clientes y revisa sus operaciones; el rol Vendedor no modifica sus datos.", href: "/ventas/clientes" },
+      { titulo: "Consultar Caja", descripcion: "Consulta movimientos y saldos; registrar cambios requiere un rol autorizado para Caja.", href: "/caja" },
     ],
   },
   {
@@ -44,7 +44,7 @@ const FAQS = [
   },
   {
     pregunta: "¿Cómo exporto mis datos?",
-    respuesta: "En Reportes puedes exportar todo a Excel con un solo clic. El archivo incluye todas las hojas operativas (caja, ventas, inventario, etc.).",
+    respuesta: "Reportes exporta las hojas operativas indicadas con su historial completo. El Excel es para consulta y no permite restaurar todo el sistema.",
   },
   {
     pregunta: "¿Puedo usar el sistema en el celular?",

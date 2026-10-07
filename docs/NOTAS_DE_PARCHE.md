@@ -1,5 +1,13 @@
 # Notas de parche
 
+## 1.1.58 — 07/10/2026
+
+Se corrigieron permisos, respaldos, reportes y formularios de los apartados pendientes. Los errores se muestran con claridad, las cifras distinguen Caja y nómina y los guardados protegen mejor los datos.
+
+## 1.1.57 — 06/10/2026
+
+Se documentaron los apartados pendientes y los errores de permisos, respaldos, reportes y formularios. La revisión ordena las correcciones para avanzar por partes y conservar la forma habitual de trabajar.
+
 ## 1.1.56 — 06/10/2026
 
 Clientes 360° aclara qué vencimientos incluye su seguimiento y dónde revisar los créditos de todas las operaciones. Las etiquetas permiten interpretar los avisos sin confundirlos con una deuda total del cliente.
