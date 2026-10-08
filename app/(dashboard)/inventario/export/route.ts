@@ -5,6 +5,7 @@ import { getInventarioRobustoData } from "@/lib/data";
 import { getEmpresaConfig } from "@/lib/company-config";
 import { getInventarioFiltros } from "@/lib/inventario-filtros";
 import { filtrarInventarioKardex, getInventarioHistorialAviso } from "@/lib/inventario-historial";
+import { fechaHoyPeru } from "@/lib/utils";
 
 const KATIA_VIOLET = "FF8B5CF6";
 const KATIA_VIOLET_LIGHT = "FFE9D5FF";
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
   workbook.modified = new Date();
 
   const fechaStr = new Date().toLocaleDateString("es-PE", {
-    day: "2-digit", month: "long", year: "numeric",
+    day: "2-digit", month: "long", year: "numeric", timeZone: "America/Lima",
   });
 
   if (type === "stock" || type === "full") {
@@ -295,7 +296,7 @@ export async function GET(request: Request) {
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = fechaHoyPeru();
   const filename = `katia-inventario-${type}-${today}.xlsx`;
 
   return new NextResponse(buffer, {

@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.63 — 07/10/2026
+
+Se corrigió la fecha de los archivos de inventario para que coincida con el día de Perú, incluso por la noche. Se completó la revisión del programa publicado, conservando los datos y la forma habitual de trabajar.
+
 ## 1.1.62 — 07/10/2026
 
 Se corrigieron los permisos de acceso y las descargas de inventario. Las cuentas mantienen su forma de trabajo y las invitaciones ya no fallan. Se verificaron exportaciones y el respaldo sin alterar los datos del negocio.

@@ -34,6 +34,19 @@ async function descargar(query: string) {
 }
 
 describe("Descarga de Inventario: formato y alcance", () => {
+  test("el título y el archivo conservan el día de Perú aunque UTC sea el siguiente", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-08T01:00:00.000Z"));
+    try {
+      const { response, workbook } = await descargar("/inventario/export?type=full");
+      expect(response.headers.get("content-disposition")).toContain("katia-inventario-full-2026-10-07.xlsx");
+      expect(workbook.getWorksheet("Stock Actual")!.getCell("A1").value).toContain("07 de octubre de 2026");
+      expect(workbook.getWorksheet("Kardex")!.getCell("A1").value).toContain("07 de octubre de 2026");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("el enlace filtrado genera Excel con solo las filas seleccionadas", async () => {
     const { response, workbook } = await descargar(getInventarioKardexExportHref("salida_venta", "p1"));
     expect(mocks.auth).toHaveBeenCalledWith(["owner_admin", "gerencia", "almacen", "ventas"]);
