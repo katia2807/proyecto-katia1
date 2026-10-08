@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import ExcelJS from "exceljs";
 
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), data: vi.fn(), empresa: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ requireAuthContext: mocks.auth }));
+vi.mock("@/lib/api-auth", () => ({ requireApiAuth: mocks.auth }));
 vi.mock("@/lib/data", () => ({ getInventarioRobustoData: mocks.data }));
 vi.mock("@/lib/company-config", () => ({ getEmpresaConfig: mocks.empresa }));
 
@@ -19,7 +19,7 @@ const producto = (id: string, nombre: string) => ({ id, nombre, codigo: id, cate
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.auth.mockResolvedValue({ user: { id: "sesion-local" } });
+  mocks.auth.mockResolvedValue({ context: { organizationId: "empresa-aislada" }, response: null });
   mocks.empresa.mockResolvedValue({ nombre: "Empresa de prueba" });
   mocks.data.mockResolvedValue({ productos: [producto("p1", "Tabla Tornillo"), producto("p2", "Barniz")],
     kardex: [movimiento("m1"), movimiento("m2", "p1", "entrada_compra"), movimiento("m3", "p2")],
@@ -36,7 +36,8 @@ async function descargar(query: string) {
 describe("Descarga de Inventario: formato y alcance", () => {
   test("el enlace filtrado genera Excel con solo las filas seleccionadas", async () => {
     const { response, workbook } = await descargar(getInventarioKardexExportHref("salida_venta", "p1"));
-    expect(mocks.auth).toHaveBeenCalledWith({ redirectTo: null });
+    expect(mocks.auth).toHaveBeenCalledWith(["owner_admin", "gerencia", "almacen", "ventas"]);
+    expect(mocks.data).toHaveBeenCalledWith({ organizationId: "empresa-aislada", complete: true });
     expect(response.headers.get("content-type")).toContain("spreadsheetml.sheet");
     expect(response.headers.get("content-disposition")).toMatch(/\.xlsx"$/);
     const sheet = workbook.getWorksheet("Kardex")!;
@@ -77,9 +78,22 @@ describe("Descarga de Inventario: formato y alcance", () => {
   });
 
   test("la consulta del reporte requiere sesión antes de cargar datos", async () => {
-    mocks.auth.mockRejectedValue(new Error("Sin sesión"));
-    await expect(GET(new Request("https://katia.local/inventario/export?type=kardex"))).rejects.toThrow("Sin sesión");
+    mocks.auth.mockResolvedValue({ context: null, response: new Response("Sin sesión", { status: 401 }) });
+    expect((await GET(new Request("https://katia.local/inventario/export?type=kardex"))).status).toBe(401);
     expect(mocks.data).not.toHaveBeenCalled();
+  });
+
+  test("un rol sin acceso al inventario no puede descargar sus datos", async () => {
+    mocks.auth.mockResolvedValue({ context: null, response: new Response("Sin permiso", { status: 403 }) });
+    expect((await GET(new Request("https://katia.local/inventario/export?type=stock"))).status).toBe(403);
+    expect(mocks.data).not.toHaveBeenCalled();
+  });
+
+  test("un fallo de consulta no descarga un Excel incompleto", async () => {
+    mocks.data.mockRejectedValue(new Error("Base no disponible"));
+    const response = await GET(new Request("https://katia.local/inventario/export?type=kardex"));
+    expect(response.status).toBe(503);
+    expect(response.headers.get("content-disposition")).toBeNull();
   });
 
   test("stock distingue valores desconocidos y no suma cajas con unidades", async () => {

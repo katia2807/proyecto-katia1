@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
-import { requireAuthContext } from "@/lib/auth";
+import { requireApiAuth } from "@/lib/api-auth";
 import { getInventarioRobustoData } from "@/lib/data";
 import { getEmpresaConfig } from "@/lib/company-config";
 import { getInventarioFiltros } from "@/lib/inventario-filtros";
@@ -40,14 +40,21 @@ function applyHeaderStyle(cell: ExcelJS.Cell, light = false) {
 }
 
 export async function GET(request: Request) {
-  await requireAuthContext({ redirectTo: null });
+  const auth = await requireApiAuth(["owner_admin", "gerencia", "almacen", "ventas"]);
+  if (auth.response) return auth.response;
   const url = new URL(request.url);
   const type = url.searchParams.get("type") ?? "stock";
 
-  const [data, empresa] = await Promise.all([
-    getInventarioRobustoData(),
-    getEmpresaConfig().catch(() => null),
-  ]);
+  let data: Awaited<ReturnType<typeof getInventarioRobustoData>>;
+  let empresa: Awaited<ReturnType<typeof getEmpresaConfig>> | null;
+  try {
+    [data, empresa] = await Promise.all([
+      getInventarioRobustoData({ organizationId: auth.context.organizationId, complete: true }),
+      getEmpresaConfig(auth.context.organizationId).catch(() => null),
+    ]);
+  } catch {
+    return NextResponse.json({ error: "No se pudo consultar todo el inventario. Intenta descargarlo nuevamente." }, { status: 503 });
+  }
   const filtros = getInventarioFiltros(url.searchParams);
   const productoId = data.productos.some(p => p.id === filtros.kardexProducto) ? filtros.kardexProducto : "todos";
   const tipoKardex = type === "kardex" ? filtros.kardexTipo : "todos";

@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.1.61";
+export const APP_VERSION = "1.1.62";
 export const APP_LAST_UPDATE = "07/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Se verificó el acceso al respaldo en una prueba local y se retiraron las bases temporales. El programa conserva su única base habitual y los datos del cliente, sin cambios en su forma de trabajar.";
+  "Se corrigieron los permisos de acceso y las descargas de inventario. Las cuentas mantienen su forma de trabajo y las invitaciones ya no fallan. Se verificaron exportaciones y el respaldo sin alterar los datos del negocio.";

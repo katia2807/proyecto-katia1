@@ -65,3 +65,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
     </>
   );
 }
+// Las pantallas privadas se autorizan con la sesión de cada petición, incluso
+// cuando no hay credenciales disponibles durante la compilación local.
+export const dynamic = "force-dynamic";

@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.62 — 07/10/2026
+
+Se corrigieron los permisos de acceso y las descargas de inventario. Las cuentas mantienen su forma de trabajo y las invitaciones ya no fallan. Se verificaron exportaciones y el respaldo sin alterar los datos del negocio.
+
 ## 1.1.61 — 07/10/2026
 
 Se verificó el acceso al respaldo en una prueba local y se retiraron las bases temporales. El programa conserva su única base habitual y los datos del cliente, sin cambios en su forma de trabajar.
