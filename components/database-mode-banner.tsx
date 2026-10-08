@@ -8,6 +8,10 @@ import { cn } from "@/lib/utils";
  * En producción con Supabase bien configurado no renderiza nada.
  */
 export function DatabaseModeBanner() {
+  // La propuesta aislada ya identifica sus datos de prueba en la franja de comparación.
+  if (process.env.NODE_ENV === "development"
+    && process.env.KATIA_VISUAL_PREVIEW === "1"
+    && isDemoDatabaseMode()) return null;
   if (hasSupabaseEnv()) {
     return null;
   }

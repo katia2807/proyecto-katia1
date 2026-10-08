@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import {
   IconBuildingWarehouse,
   IconChartBar,
@@ -28,11 +28,12 @@ import {
 import { navItems } from "@/lib/constants";
 import { logout } from "@/app/(auth)/actions";
 import { AppVersionNotice } from "@/components/app-version-notice";
+import { BrandMark } from "@/components/brand-mark";
 import type { AppRole } from "@/lib/supabase/types";
+import { resolveRole } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { AppShellAccessGuard } from "@/components/app-shell-access-guard";
 import { AppFooter } from "@/components/app-footer";
-import { FloatingHelp } from "@/components/ui/floating-help";
 import { GlobalSearch } from "@/components/ui/global-search";
 import { NotificationBell, type Notification } from "@/components/ui/notification-bell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -72,6 +73,7 @@ type AppShellProps = {
   navBadges?: Record<string, number>;
   companyName?: string | null;
   notifications?: Notification[];
+  showUpdatePresentation?: boolean;
 };
 
 const navSections = [
@@ -94,13 +96,18 @@ const navSections = [
 ] as const;
 
 function roleLabel(role: AppRole, uiRole: AppShellProps["uiRole"]) {
-  if (uiRole === "owner_admin") return "Dueña / owner_admin";
-  if (uiRole === "operaciones") return "Gerencia";
-  if (uiRole === "readonly") return "Vendedor";
-  if (role === "vendedor") return "Vendedor";
-  if (role === "almacen") return "Almacén";
-  if (role === "caja") return "Caja";
-  return role;
+  const labels: Record<AppRole, string> = {
+    owner_admin: "Dueña",
+    gerencia: "Gerencia",
+    vendedor: "Vendedor",
+    almacen: "Almacén",
+    caja: "Caja",
+    ventas: "Ventas",
+    operaciones_caja: "Caja",
+    rrhh: "Equipo",
+    partner_readonly: "Solo lectura",
+  };
+  return labels[resolveRole(role, uiRole)];
 }
 
 function pageTitleFromPath(pathname: string) {
@@ -146,15 +153,38 @@ export function AppShell({
   navBadges = {},
   companyName,
   notifications = [],
+  showUpdatePresentation = false,
 }: AppShellProps) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const dialog = mobileMenuRef.current;
+    if (!dialog) return;
+    dialog.showModal();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      dialog.close();
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobileMenuOpen]);
+
+  useEffect(() => {
+    const wideScreen = window.matchMedia("(min-width: 1280px)");
+    const closeCompactMenu = () => {
+      if (wideScreen.matches) setIsMobileMenuOpen(false);
+    };
+    wideScreen.addEventListener("change", closeCompactMenu);
+    return () => wideScreen.removeEventListener("change", closeCompactMenu);
+  }, []);
   // Tracks which badge routes the user has "seen" today (localStorage)
   const [seenRoutes, setSeenRoutes] = useState<Record<string, string>>({});
 
   // Load seen routes on mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setSeenRoutes(loadSeenRoutes());
   }, []);
@@ -191,6 +221,43 @@ export function AppShell({
 
   const pageTitle = pageTitleFromPath(pathname);
   const userInitial = userName.trim().charAt(0).toUpperCase() || "U";
+  const userRoleLabel = roleLabel(userRole, uiRole);
+  const canOpenAccount = resolveRole(userRole, uiRole) === "owner_admin";
+
+  function profileMarkup(inHeader = false) {
+    const className = cn(
+      "profile-chip flex min-w-0 items-center gap-2 rounded-[var(--katia-radius-md)]",
+      inHeader ? "p-1" : "p-1.5",
+      canOpenAccount && "transition-colors hover:bg-[var(--katia-primary-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--katia-primary)]",
+    );
+    const identity = (
+      <>
+        <span aria-hidden="true" className="profile-avatar flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold">{userInitial}</span>
+        <span className={cn("min-w-0", inHeader && "hidden max-w-40 sm:block")}>
+          <span className={cn("block text-sm font-medium text-[var(--katia-text-primary)]", inHeader ? "truncate" : "break-words")}>{userName}</span>
+          <span className="block text-xs text-[var(--katia-text-secondary)]">{userRoleLabel}</span>
+        </span>
+      </>
+    );
+    return canOpenAccount ? (
+      <Link href="/cuenta" data-update-tour={inHeader ? "profile" : undefined} className={className} title={`Mi cuenta · ${userName}`} aria-label={`Mi cuenta de ${userName}, ${userRoleLabel}`} onClick={() => setIsMobileMenuOpen(false)}>
+        {identity}
+      </Link>
+    ) : (
+      <div data-update-tour={inHeader ? "profile" : undefined} className={className} title={`${userName} · ${userRoleLabel}`} aria-label={`${userName}, ${userRoleLabel}`}>{identity}</div>
+    );
+  }
+
+  const sessionMarkup = (
+    <div className="mt-4 space-y-2 border-t border-[var(--katia-border-subtle)] pt-3">
+      {profileMarkup()}
+      <form action={logout}>
+        <button type="submit" className="w-full rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] px-3 py-2 text-xs font-semibold text-[var(--katia-text-secondary)] transition-all duration-150 hover:bg-[var(--katia-bg-overlay)] hover:text-[var(--katia-text-primary)]">
+          Cerrar sesión
+        </button>
+      </form>
+    </div>
+  );
 
   const navMarkup = (
     <nav className="space-y-4">
@@ -202,34 +269,29 @@ export function AppShell({
         if (items.length === 0) return null;
         return (
           <div key={section.label} className="space-y-1.5">
-            <p
-              className={cn(
-                "px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--katia-text-tertiary)]",
-                !isMenuOpen && "hidden",
-              )}
-            >
+            <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--katia-text-tertiary)]">
               {section.label}
             </p>
             {items.map((item) => {
-                  const Icon = icons[item.href] ?? IconLayoutDashboard;
+              const Icon = icons[item.href] ?? IconLayoutDashboard;
               const active = activeHref === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   title={item.label}
+                  aria-current={active ? "page" : undefined}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={cn(
-                    "flex min-h-10 items-center rounded-[var(--katia-radius-md)] border-l-[3px] transition-all duration-150",
-                    isMenuOpen ? "gap-2 px-3" : "justify-center px-2",
+                    "flex min-h-10 items-center gap-2 rounded-[var(--katia-radius-md)] border-l-[3px] px-3 py-2 transition-all duration-150",
                     active
                       ? "border-l-[var(--katia-primary)] bg-[var(--katia-primary-soft)] text-[var(--katia-text-primary)] font-medium"
                       : "border-l-transparent text-[var(--katia-text-secondary)] hover:bg-[var(--katia-primary-soft)]/60 hover:text-[var(--katia-text-primary)]",
                   )}
                 >
                   <Icon className="size-4 shrink-0" />
-                  <span className={cn("truncate text-sm", !isMenuOpen && "hidden")}>{item.label}</span>
-                  {isMenuOpen && (() => {
+                  <span className="min-w-0 flex-1 text-sm leading-5">{item.label}</span>
+                  {(() => {
                     const { count, seen } = effectiveBadge(item.href);
                     return count > 0 ? (
                       <span
@@ -257,60 +319,35 @@ export function AppShell({
       <Suspense fallback={null}>
         <AppShellAccessGuard pathname={pathname} uiRole={uiRole} userRole={userRole} />
       </Suspense>
-      <aside
-        className={cn(
-          "hidden shrink-0 border-r border-[var(--katia-border-subtle)] bg-[var(--bg-sidebar)] p-3 lg:flex lg:flex-col",
-          "transition-[width] duration-200 ease-out",
-          isMenuOpen ? "w-[220px]" : "w-16",
-        )}
+      {isMenuOpen ? <aside
+        id="desktop-menu"
+        aria-label="Menú principal"
+        className="sticky top-[var(--app-shell-top,0px)] hidden h-[calc(100dvh-var(--app-shell-top,0px))] w-[220px] shrink-0 flex-col self-start border-r border-[var(--katia-border-subtle)] bg-[var(--bg-sidebar)] p-3 xl:flex"
       >
-        <div className={cn("mb-4 flex items-center", isMenuOpen ? "justify-between" : "justify-center")}>
-          <div className={cn("flex items-center gap-2", !isMenuOpen && "hidden")}>
-            <div className="menu-orb flex size-8 items-center justify-center rounded-full text-xs font-semibold">K</div>
+        <div className="mb-4 flex min-h-9 items-center">
+          <div className="flex items-center gap-2">
+            <BrandMark />
             <p className="text-sm font-semibold tracking-wide text-[var(--katia-text-primary)]">Katia Suite</p>
           </div>
-          <button
-            type="button"
-            className="flex size-9 items-center justify-center rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] text-[var(--katia-text-secondary)] transition-all duration-150 hover:bg-[var(--katia-primary-soft)] hover:text-[var(--katia-text-primary)]"
-            onClick={() => setIsMenuOpen((prev) => !prev)}
-            aria-label={isMenuOpen ? "Contraer menú" : "Expandir menú"}
-          >
-            <IconMenu2 className="size-4" />
-          </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">{navMarkup}</div>
-        <div className="mt-4 space-y-2 border-t border-[var(--katia-border-subtle)] pt-3">
-          <div className={cn("flex items-center gap-2", !isMenuOpen && "justify-center")}>
-            <div className="profile-avatar flex size-9 items-center justify-center rounded-full text-sm font-semibold">{userInitial}</div>
-            <div className={cn(!isMenuOpen && "hidden")}>
-              <p className="text-sm font-medium text-[var(--katia-text-primary)]">{userName}</p>
-              <p className="text-xs text-[var(--katia-text-secondary)]">{roleLabel(userRole, uiRole)}</p>
-            </div>
-          </div>
-          <form action={logout}>
-            <button
-              type="submit"
-              className={cn(
-                "w-full rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] px-3 py-2 text-xs font-semibold text-[var(--katia-text-secondary)] transition-all duration-150 hover:bg-[var(--katia-bg-overlay)] hover:text-[var(--katia-text-primary)]",
-                !isMenuOpen && "px-0",
-              )}
-            >
-              {isMenuOpen ? "Cerrar sesión" : "↪"}
-            </button>
-          </form>
-        </div>
-      </aside>
-      {isMobileMenuOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/35 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />
-      ) : null}
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[220px] border-r border-[var(--katia-border-subtle)] bg-[var(--bg-sidebar)] p-3 transition-transform lg:hidden",
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
-        )}
+        {sessionMarkup}
+      </aside> : null}
+      <dialog
+        ref={mobileMenuRef}
+        id="compact-menu"
+        aria-label="Menú principal"
+        onClose={() => setIsMobileMenuOpen(false)}
+        onCancel={() => setIsMobileMenuOpen(false)}
+        onClick={(event) => {
+          if (event.target !== event.currentTarget) return;
+          const bounds = event.currentTarget.getBoundingClientRect();
+          if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) setIsMobileMenuOpen(false);
+        }}
+        className="fixed inset-y-0 left-0 m-0 h-dvh max-h-dvh w-[220px] max-w-[85vw] border-0 border-r border-[var(--katia-border-subtle)] bg-[var(--bg-sidebar)] p-3 text-[var(--katia-text-primary)] backdrop:bg-black/40 open:flex open:flex-col"
       >
         <div className="mb-4 flex items-center justify-between">
-          <p className="text-sm font-semibold tracking-wide text-[var(--katia-text-primary)]">Katia Suite</p>
+          <div className="flex items-center gap-2"><BrandMark /><p className="text-sm font-semibold tracking-wide text-[var(--katia-text-primary)]">Katia Suite</p></div>
           <button
             type="button"
             className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] px-3 py-1 text-xs text-[var(--katia-text-secondary)]"
@@ -319,35 +356,47 @@ export function AppShell({
             Cerrar
           </button>
         </div>
-        {navMarkup}
-      </aside>
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">{navMarkup}</div>
+        {sessionMarkup}
+      </dialog>
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="header-chrome flex h-14 items-center justify-between border-b border-[var(--katia-border-subtle)] bg-[var(--katia-bg-base)] px-4 md:px-6">
+        <header className="header-chrome flex h-14 items-center justify-between gap-3 border-b border-[var(--katia-border-subtle)] bg-[var(--katia-bg-base)] px-4 md:px-6">
           <div className="flex min-w-0 items-center gap-2">
             <button
               type="button"
-              className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] p-2 text-[var(--katia-text-secondary)] transition-colors hover:bg-[var(--katia-primary-soft)] lg:hidden"
+              className="shrink-0 rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] p-2 text-[var(--katia-text-secondary)] transition-colors hover:bg-[var(--katia-primary-soft)] xl:hidden"
               onClick={() => setIsMobileMenuOpen(true)}
               aria-label="Abrir menú"
+              data-update-tour="menu"
+              aria-controls="compact-menu"
+              aria-expanded={isMobileMenuOpen}
+            >
+              <IconMenu2 className="size-4" />
+            </button>
+            <button
+              type="button"
+              className="hidden shrink-0 rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] p-2 text-[var(--katia-text-secondary)] transition-colors hover:bg-[var(--katia-primary-soft)] xl:block"
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+              aria-label={isMenuOpen ? "Ocultar menú" : "Mostrar menú"}
+              data-update-tour="menu"
+              aria-controls="desktop-menu"
+              aria-expanded={isMenuOpen}
             >
               <IconMenu2 className="size-4" />
             </button>
             <h1 className="truncate text-base font-semibold text-[var(--katia-text-primary)]">{pageTitle}</h1>
           </div>
           <GlobalSearch items={globalSearchItems} />
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <NotificationBell notifications={notifications} />
-            <ThemeToggle />
-            <div className="profile-avatar flex size-9 items-center justify-center rounded-full text-sm font-semibold">
-              {userInitial}
-            </div>
+            <span data-update-tour="appearance" className="inline-flex"><ThemeToggle /></span>
+            {profileMarkup(true)}
           </div>
         </header>
         <div className="dashboard-content p-4 md:p-6 lg:p-8">{children}</div>
         <AppFooter companyName={companyName} />
       </main>
-      <AppVersionNotice />
-      <FloatingHelp />
+      <AppVersionNotice presentationEnabled={showUpdatePresentation} canOpenHelp={navAllowlist.has("/ayuda")} />
     </div>
   );
 }

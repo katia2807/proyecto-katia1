@@ -1,0 +1,133 @@
+/* Apariencia aprobada. La comparación anterior se limita al servidor local de propuesta. */
+html[data-appearance="propuesta"] {
+  --katia-bg-base: #111214;
+  --katia-bg-elevated: #191a1d;
+  --katia-bg-overlay: #232428;
+  --katia-surface-raised: #232428;
+  --bg-sidebar: #191a1d;
+  --katia-glass-bg: rgba(25, 26, 29, 0.96);
+  --katia-glass-border: #33353b;
+  --katia-primary: #f4f4f5;
+  --katia-primary-hover: #dedee3;
+  --katia-primary-soft: rgba(255, 255, 255, 0.08);
+  --katia-secondary: #b1a1d4;
+  --katia-accent-cyan: #91b5c1;
+  --katia-gradient-hero: linear-gradient(120deg, #202125, #393a40);
+  --katia-gradient-soft: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  --katia-text-primary: #f0f0f2;
+  --katia-text-secondary: #bcbec5;
+  --katia-text-tertiary: #a4a7b0;
+  --katia-text-disabled: #7b8da2;
+  --katia-border-subtle: #2c2e34;
+  --katia-border-default: #3e414a;
+  --katia-border-emphasis: #7b7c83;
+  --katia-radius-sm: 8px;
+  --katia-radius-md: 10px;
+  --katia-radius-lg: 14px;
+  --katia-radius-xl: 18px;
+  --katia-shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.14);
+  --katia-shadow-card: 0 3px 14px rgba(0, 0, 0, 0.16);
+  --katia-shadow-modal: 0 18px 56px rgba(0, 0, 0, 0.45);
+  --katia-shadow-focus: 0 0 0 3px rgba(255, 255, 255, 0.18);
+  --katia-glow-primary: 0 0 20px rgba(255, 255, 255, 0.04);
+  --katia-glow-secondary: 0 0 20px rgba(177, 161, 212, 0.04);
+  --color-highlight-ring: #dedee3;
+  --color-on-accent: #191a1d;
+  --color-accent-soft: rgba(145, 181, 193, 0.1);
+  --color-op-primary-bg: rgba(255, 255, 255, 0.06);
+  --color-op-primary-border: #7b7c83;
+  --color-op-primary-text: #e7e7ea;
+  --color-op-primary-hover: rgba(255, 255, 255, 0.12);
+  --scrollbar-thumb: #555861;
+}
+
+html[data-appearance="propuesta"][data-theme="light"] {
+  --katia-bg-base: #f7f7f8;
+  --katia-bg-elevated: #ffffff;
+  --katia-bg-overlay: #ffffff;
+  --katia-surface-raised: #f2f2f4;
+  --bg-sidebar: #ffffff;
+  --katia-glass-bg: rgba(255, 255, 255, 0.94);
+  --katia-glass-border: #e2e3e8;
+  --katia-primary: #202125;
+  --katia-primary-hover: #0c0d0f;
+  --katia-primary-soft: #eeeeef;
+  --katia-secondary: #746598;
+  --katia-accent-cyan: #427587;
+  --katia-gradient-soft: linear-gradient(135deg, #f0f0f1, #f7f7f8);
+  --katia-text-primary: #25262b;
+  --katia-text-secondary: #595c67;
+  --katia-text-tertiary: #656976;
+  --katia-text-disabled: #7d8d9c;
+  --katia-border-subtle: #e5e5ea;
+  --katia-border-default: #d1d3dc;
+  --katia-border-emphasis: #9c9da5;
+  --katia-shadow-soft: 0 2px 10px rgba(27, 48, 66, 0.04);
+  --katia-shadow-card: 0 3px 14px rgba(27, 48, 66, 0.06);
+  --katia-shadow-modal: 0 18px 56px rgba(27, 48, 66, 0.2);
+  --katia-shadow-focus: 0 0 0 3px rgba(32, 33, 37, 0.15);
+  --katia-inner-light: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --color-highlight-ring: #7b7c83;
+  --color-on-accent: #ffffff;
+  --color-accent-soft: #edf3f5;
+  --color-op-primary-bg: #f2f2f4;
+  --color-op-primary-border: #a4a5ac;
+  --color-op-primary-text: #202125;
+  --color-op-primary-hover: #e9e9ed;
+  --scrollbar-thumb: #b0b2bc;
+}
+
+html[data-appearance="propuesta"] .dashboard-content :where(input, select, textarea) {
+  border-color: var(--katia-border-default);
+  background-color: var(--katia-bg-elevated);
+}
+
+html[data-appearance="propuesta"] select {
+  color-scheme: inherit;
+}
+
+/* Las acciones principales usan el mismo contraste de la marca en ambos modos. */
+html[data-appearance="propuesta"] :is(button, a)[class~="[background:var(--katia-gradient-hero)]"] {
+  background: var(--katia-primary);
+  color: var(--color-on-accent);
+}
+
+/* Los acentos claros del modo oscuro necesitan texto oscuro para seguir legibles. */
+html[data-appearance="propuesta"][data-theme="dark"] [class~="bg-[var(--katia-primary)]"][class~="text-white"],
+html[data-appearance="propuesta"][data-theme="dark"] input[class~="file:bg-[var(--katia-primary)]"]::file-selector-button {
+  color: var(--color-on-accent);
+}
+
+html[data-appearance="propuesta"] select option:checked {
+  background-color: var(--katia-primary-soft);
+}
+
+html[data-appearance="propuesta"] .dashboard-content thead {
+  background: var(--katia-surface-raised);
+}
+
+html[data-appearance="propuesta"] .dashboard-content tbody tr:hover {
+  background: var(--katia-primary-soft);
+}
+
+html[data-appearance="propuesta"] .header-chrome {
+  background: var(--katia-bg-elevated);
+  box-shadow: 0 1px 4px rgba(27, 48, 66, 0.03);
+}
+
+html[data-appearance="propuesta"] :is(.profile-avatar, .menu-orb) {
+  background: var(--katia-primary);
+  color: var(--color-on-accent);
+}
+
+html[data-appearance="propuesta"] .profile-chip:hover {
+  box-shadow: inset 0 0 0 1px var(--katia-border-emphasis);
+}
+
+/* Variedad en detalles pequeños; las superficies y el texto siguen neutrales. */
+html[data-appearance="propuesta"] :is(aside, dialog) nav a:is([href="/"], [href="/ventas"], [href="/reportes"], [href="/configuracion"], [href="/cuenta"], [href="/admin/empresa"]) svg { color: var(--katia-primary); }
+html[data-appearance="propuesta"] :is(aside, dialog) nav a[href="/caja"] svg { color: var(--katia-success); }
+html[data-appearance="propuesta"] :is(aside, dialog) nav a:is([href="/cotizacion"], [href="/registro"], [href="/admin/usuarios"], [href="/admin/importar"]) svg { color: var(--katia-secondary); }
+html[data-appearance="propuesta"] :is(aside, dialog) nav a:is([href="/inventario"], [href="/seguridad"]) svg { color: var(--katia-warning); }
+html[data-appearance="propuesta"] :is(aside, dialog) nav a:is([href="/gerencial"], [href="/ventas/clientes"], [href="/admin/respaldo"], [href="/personal"], [href="/ayuda"]) svg { color: var(--katia-accent-cyan); }
+html[data-appearance="propuesta"] :is(aside, dialog) nav a[href="/reportes/antifraude"] svg { color: var(--katia-danger); }

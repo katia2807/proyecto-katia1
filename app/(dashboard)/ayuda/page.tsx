@@ -1,108 +1,57 @@
 import Link from "next/link";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { requireAuthContext } from "@/lib/auth";
+import { canAccessPath } from "@/lib/permissions";
 
-const SECCIONES = [
-  {
-    rol: "Dueña / Administrador",
-    color: "var(--katia-primary)",
-    pasos: [
-      { titulo: "Centro de Mando", descripcion: "Tu pantalla principal. Ve ingresos del día, pendientes urgentes y atajos directos.", href: "/gerencial" },
-      { titulo: "Reportes y auditoría", descripcion: "Exporta datos a Excel, revisa el historial de caja y genera cierres mensuales firmados.", href: "/reportes" },
-      { titulo: "Configuración", descripcion: "Actualiza los datos de tu empresa, cuenta y preferencias de visualización.", href: "/configuracion" },
-      { titulo: "Respaldo", descripcion: "Consulta el estado de tus datos. Verifica en Supabase la configuración de respaldos y su recuperación.", href: "/admin/respaldo" },
-    ],
-  },
-  {
-    rol: "Vendedor",
-    color: "var(--katia-accent-cyan)",
-    pasos: [
-      { titulo: "Consultar ventas", descripcion: "En Ventas revisa el historial y los detalles. El rol Vendedor tiene acceso comercial de lectura.", href: "/ventas" },
-      { titulo: "Consultar cotizaciones", descripcion: "Consulta las propuestas y sus estados. Los registros nuevos requieren permiso de escritura.", href: "/cotizacion" },
-      { titulo: "Consultar clientes", descripcion: "Busca clientes y revisa sus operaciones; el rol Vendedor no modifica sus datos.", href: "/ventas/clientes" },
-      { titulo: "Consultar Caja", descripcion: "Consulta movimientos y saldos; registrar cambios requiere un rol autorizado para Caja.", href: "/caja" },
-    ],
-  },
-  {
-    rol: "Almacén",
-    color: "var(--katia-success)",
-    pasos: [
-      { titulo: "Ver el inventario", descripcion: "En Inventario puedes ver todos los productos, su stock actual y los productos con stock bajo.", href: "/inventario" },
-      { titulo: "Agregar un producto", descripcion: "Usa el formulario de inventario para registrar un nuevo producto con su código automático.", href: "/inventario?tab=productos" },
-      { titulo: "Registrar un movimiento de stock", descripcion: "Desde el Kardex puedes registrar entradas y salidas de stock con trazabilidad completa.", href: "/inventario?tab=kardex" },
-    ],
-  },
+const TASKS = [
+  { title: "Encontrar una venta", description: "Abre el historial, busca por cliente o producto y revisa el detalle antes de cambiar algo.", href: "/ventas#historial-ventas", action: "Ir a Ventas" },
+  { title: "Revisar el dinero", description: "Elige Empresa o Personal. Filtra por fecha y medio de pago para ver los movimientos que necesitas.", href: "/caja", action: "Ir a Caja" },
+  { title: "Consultar el stock", description: "Alertas muestra qué reponer. Productos reúne el catálogo y Kardex explica las entradas y salidas.", href: "/inventario?tab=alertas", action: "Ir a Inventario" },
+  { title: "Revisar una cotización", description: "Busca primero en el historial. Para preparar una nueva, revisa cliente, conceptos y total antes de guardar.", href: "/cotizacion", action: "Ir a Cotizaciones" },
+  { title: "Ver qué atender primero", description: "Centro de Mando reúne las prioridades y explica el motivo. Abre la operación indicada para revisarla.", href: "/gerencial", action: "Ir a Centro de Mando" },
+  { title: "Descargar información", description: "En Reportes elige el período y exporta los datos para consultarlos fuera del programa.", href: "/reportes", action: "Ir a Reportes" },
 ];
 
-const FAQS = [
-  {
-    pregunta: "¿Cómo cambio el tema de la interfaz?",
-    respuesta: "Usa el ícono ☀️/🌙 en la barra superior derecha. El sistema también cambia automáticamente según la hora del día.",
-  },
-  {
-    pregunta: "¿Los documentos generados tienen validez fiscal?",
-    respuesta: "No. Todos los documentos (cotizaciones, contratos, reportes) son internos y privados. No tienen referencias fiscales oficiales.",
-  },
-  {
-    pregunta: "¿Cómo exporto mis datos?",
-    respuesta: "Reportes exporta las hojas operativas indicadas con su historial completo. El Excel es para consulta y no permite restaurar todo el sistema.",
-  },
-  {
-    pregunta: "¿Puedo usar el sistema en el celular?",
-    respuesta: "Sí. El sistema está optimizado para tablets y celulares. En pantallas pequeñas, el menú lateral se oculta y se accede desde el ícono de menú.",
-  },
-  {
-    pregunta: "¿Qué pasa si un producto llega a stock cero?",
-    respuesta: "El sistema muestra alertas en el Centro de Mando y en el ícono de Inventario en el menú lateral. No bloquea operaciones pero avisa claramente.",
-  },
+const QUESTIONS = [
+  { title: "¿Dónde está el menú?", answer: "Usa el botón de menú de la cabecera. En una pantalla pequeña se oculta para liberar espacio; puedes cerrarlo con «Cerrar», tocando fuera o con Escape." },
+  { title: "¿Cómo cambio entre claro y oscuro?", answer: "Pulsa el botón de sol o luna de la cabecera. La elección se recuerda en ese navegador." },
+  { title: "¿Por qué no veo una opción?", answer: "Cada cuenta ve las opciones que permite su rol. Si necesitas otra, consulta con quien administra el programa." },
+  { title: "¿El Excel sirve para recuperar todo?", answer: "El Excel sirve para consultar información. La recuperación completa también necesita la base de datos y los adjuntos; se prepara desde el procedimiento de Respaldo." },
 ];
 
-export default function AyudaPage() {
+export default async function AyudaPage() {
+  const context = await requireAuthContext();
+  const tasks = TASKS.filter((task) => canAccessPath(context.role, context.uiRole, task.href.split(/[?#]/)[0]));
+  const canOpenBackup = canAccessPath(context.role, context.uiRole, "/admin/respaldo");
+
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Manual de usuario</h2>
-        <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">
-          Guía rápida por rol. Si tienes dudas, contacta al administrador del sistema.
-        </p>
+        <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">Ayuda rápida</h2>
+        <p className="mt-1 text-sm text-[var(--katia-text-secondary)]">Elige lo que necesitas. Cada resumen te lleva a su apartado.</p>
       </div>
-
-      {SECCIONES.map((seccion) => (
-        <section key={seccion.rol}>
-          <div
-            className="mb-3 inline-flex items-center rounded-[var(--katia-radius-pill)] border px-3 py-1 text-xs font-semibold"
-            style={{ borderColor: seccion.color, color: seccion.color }}
-          >
-            {seccion.rol}
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {seccion.pasos.map((paso) => (
-              <Link key={paso.href} href={paso.href}>
-                <Card className="h-full cursor-pointer transition-all duration-150 hover:border-[var(--katia-border-emphasis)] hover:bg-[var(--katia-primary-soft)]">
-                  <CardTitle className="text-sm">{paso.titulo}</CardTitle>
-                  <CardDescription className="mt-1 text-xs">{paso.descripcion}</CardDescription>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ))}
-
-      <section>
-        <h3 className="mb-4 text-lg font-semibold text-[var(--katia-text-primary)]">Preguntas frecuentes</h3>
-        <div className="space-y-3">
-          {FAQS.map((faq) => (
-            <details
-              key={faq.pregunta}
-              className="group rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-bg-elevated)] px-4 py-3"
-            >
-              <summary className="cursor-pointer text-sm font-medium text-[var(--katia-text-primary)] list-none flex items-center justify-between">
-                {faq.pregunta}
-                <span className="text-[var(--katia-text-tertiary)] transition-transform group-open:rotate-180">▾</span>
-              </summary>
-              <p className="mt-2 text-sm leading-relaxed text-[var(--katia-text-secondary)]">{faq.respuesta}</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {tasks.map((task) => (
+          <Link key={task.href} href={task.href} className="rounded-[var(--katia-radius-lg)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--katia-primary)]">
+            <Card className="h-full transition-colors hover:border-[var(--katia-border-emphasis)]">
+              <CardTitle>{task.title}</CardTitle>
+              <CardDescription className="mt-2 leading-5">{task.description}</CardDescription>
+              <p className="mt-3 text-xs font-medium text-[var(--katia-primary)]">{task.action} →</p>
+            </Card>
+          </Link>
+        ))}
+      </div>
+      <section aria-labelledby="quick-help-questions">
+        <h3 id="quick-help-questions" className="mb-3 text-base font-semibold">Dudas habituales</h3>
+        <div className="space-y-2">
+          {QUESTIONS.map((question) => (
+            <details key={question.title} className="rounded-[var(--katia-radius-md)] border border-[var(--katia-border-subtle)] bg-[var(--katia-bg-elevated)] px-4 py-3">
+              <summary className="cursor-pointer text-sm font-medium">{question.title}</summary>
+              <p className="mt-2 text-sm leading-6 text-[var(--katia-text-secondary)]">{question.answer}</p>
             </details>
           ))}
         </div>
+        {canOpenBackup ? <Link href="/admin/respaldo" className="mt-3 inline-block text-xs font-medium text-[var(--katia-primary)]">Consultar el procedimiento de Respaldo →</Link> : null}
       </section>
     </div>
   );

@@ -1,5 +1,17 @@
 # Notas de parche
 
+## 1.1.66 — 08/10/2026
+
+Se renovó la imagen en blanco y negro y se ajustó el menú para liberar espacio. Ayuda reúne respuestas breves y la bienvenida recorre los cambios una vez por navegador, conservando los pasos habituales de trabajo.
+
+## 1.1.65 — 07/10/2026 (propuesta local, sin publicar)
+
+El color principal ahora alterna entre negro y blanco. Se retiró la ayuda flotante y se resumió Ayuda para consultar rápido. La bienvenida muestra un recorrido breve por los cambios, avanzando a tu ritmo con cada clic.
+
+## 1.1.64 — 07/10/2026 (propuesta local, sin publicar)
+
+Se preparó una imagen local en blanco o grafito, con iconos y marca coherentes. El menú libera espacio sin botones repetidos y muestra la misma cuenta. Una bienvenida breve resume las mejoras una vez por navegador.
+
 ## 1.1.63 — 07/10/2026
 
 Se corrigió la fecha de los archivos de inventario para que coincida con el día de Perú, incluso por la noche. Se completó la revisión del programa publicado, conservando los datos y la forma habitual de trabajar.

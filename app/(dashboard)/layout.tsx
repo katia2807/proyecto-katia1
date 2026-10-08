@@ -1,6 +1,5 @@
 import { AppShell } from "@/components/app-shell";
 import { DatabaseModeBanner } from "@/components/database-mode-banner";
-import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
 import { requireAuthContext } from "@/lib/auth";
 import { readCompleteTable } from "@/lib/complete-data";
 import { getGerencialSources } from "@/lib/gerencial-data";
@@ -45,8 +44,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <>
       <DatabaseModeBanner />
-      <OnboardingTour />
       <AppShell
+        showUpdatePresentation
         navAllowlist={navAllowlist}
         uiRole={context.uiRole}
         userRole={context.role}

@@ -1,0 +1,50 @@
+/* Controles exclusivos de la comparación local. */
+html[data-visual-preview="true"] { --app-shell-top: 59px; }
+
+.visual-preview-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 9px 20px;
+  border-bottom: 1px solid var(--katia-border-default);
+  background: var(--katia-bg-elevated);
+  color: var(--katia-text-secondary);
+  font-size: 12px;
+}
+
+.visual-preview-toolbar [role="group"] {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--katia-border-default);
+  border-radius: 9px;
+  background: var(--katia-bg-base);
+}
+
+.visual-preview-toolbar button {
+  min-height: 32px;
+  padding: 4px 14px;
+  border-radius: 6px;
+  color: var(--katia-text-secondary);
+  cursor: pointer;
+}
+
+.visual-preview-toolbar button[aria-pressed="true"] {
+  background: var(--katia-primary);
+  color: var(--color-on-accent, #ffffff);
+}
+
+.visual-preview-toolbar button:focus-visible {
+  outline: 2px solid var(--katia-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .visual-preview-toolbar { padding-inline: 12px; }
+  .visual-preview-toolbar p span { display: block; }
+}
