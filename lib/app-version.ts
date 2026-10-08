@@ -1,17 +1,17 @@
-export const APP_VERSION = "1.1.67";
+export const APP_VERSION = "1.1.68";
 export const APP_LAST_UPDATE = "08/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "El menú se recoge en una franja de iconos y vuelve a mostrar los nombres con un clic. Al elegir un apartado o trabajar fuera se contrae, dejando más espacio sin ocultar accesos ni cambiar tus formularios.";
+  "El menú muestra los nombres al pasar el cursor por sus iconos y se recoge suavemente al salir. Se retiró el botón de escritorio para despejar la cabecera, sin mover el contenido ni cambiar tu forma de trabajar.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {
-  version: "1.1.67" as string,
+  version: "1.1.68" as string,
   seenVersion: "1.1.66",
   title: "Estrenamos imagen",
   description: APP_UPDATE_SUMMARY,
   steps: [
     { target: "appearance", title: "Una imagen más neutral", description: "Negro en modo claro y blanco en modo oscuro. Este botón cambia el tema; los colores de las alertas conservan su significado." },
-    { target: "menu", title: "Más espacio para trabajar", description: "Este botón despliega los nombres del menú. Al elegir un apartado o volver al contenido queda una franja de iconos; en celular el menú se cierra por completo." },
+    { target: "menu", title: "Más espacio para trabajar", description: "En escritorio, pasa el cursor por la franja de iconos para ver los nombres; al salir se recoge con una pequeña pausa. También funciona con Tab. En celular, usa el botón para abrir el menú." },
     { target: "profile", title: "Tu cuenta, siempre reconocible", description: "La cuenta coincide con la del menú. Ayuda ahora reúne resúmenes prácticos; ya no hay un botón flotante cubriendo la pantalla." },
   ],
 } as const;

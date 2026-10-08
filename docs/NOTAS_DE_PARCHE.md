@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.68 — 08/10/2026
+
+El menú muestra los nombres al pasar el cursor por sus iconos y se recoge suavemente al salir. Se retiró el botón de escritorio para despejar la cabecera, sin mover el contenido ni cambiar tu forma de trabajar.
+
 ## 1.1.67 — 08/10/2026
 
 El menú se recoge en una franja de iconos y vuelve a mostrar los nombres con un clic. Al elegir un apartado o trabajar fuera se contrae, dejando más espacio sin ocultar accesos ni cambiar tus formularios.

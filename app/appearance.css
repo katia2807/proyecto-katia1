@@ -1,6 +1,20 @@
 /* Apariencia aprobada. La comparación anterior se limita al servidor local de propuesta. */
 .menu-icon-scroll { scrollbar-width: none; }
 .menu-icon-scroll::-webkit-scrollbar { display: none; }
+.menu-auto-panel {
+  width: 64px;
+  transition: width 180ms ease, box-shadow 180ms ease;
+}
+.menu-auto-panel[data-collapsed="false"] {
+  width: 220px;
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.12);
+}
+.menu-auto-panel .menu-auto-label { transition: opacity 120ms ease; }
+.menu-auto-panel[data-collapsed="true"] .menu-auto-label { opacity: 0; }
+.menu-auto-profile { min-height: 56px; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .menu-auto-panel, .menu-auto-panel .menu-auto-label { transition: none; }
+}
 
 html[data-appearance="propuesta"] {
   --katia-bg-base: #111214;
