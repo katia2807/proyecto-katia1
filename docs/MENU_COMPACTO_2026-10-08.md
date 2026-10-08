@@ -1,6 +1,6 @@
 # Menú recogido con iconos — 08/10/2026, 1.1.67
 
-Estado: corrección y compilación locales aprobadas; publicación en curso. El usuario indicó después de 1.1.66 que el panel debía esconder sus nombres dejando los iconos. La comprobación anterior validó ocultarlo por botón, pero no este comportamiento solicitado (VIS-A2).
+Estado: **corregida, publicada y comprobada mediante lectura**. El usuario indicó después de 1.1.66 que el panel debía esconder sus nombres dejando los iconos. La comprobación anterior validó ocultarlo por botón, pero no este comportamiento solicitado (VIS-A2).
 
 ## Cambio y archivos
 
@@ -24,6 +24,12 @@ Evidencia local en `temp/menu-1.1.67/`, excluida de Git. La compilación final s
 
 ## Publicación
 
-Compilación optimizada y sus tipos aprobados, sin servidor de desarrollo concurrente. Pendiente subir a `main`, esperar el despliegue y comprobar por lectura el menú con sesión real. Las rutas de Ayuda, Inicio, Cotizaciones y sus auxiliares ya se verificaron como lectores en la entrega 1.1.66; no se guardarán formularios, editarán cuentas ni cambiarán datos del negocio.
+Compilación optimizada y sus tipos aprobados, sin servidor de desarrollo concurrente. Se publicó `a1bef48d0a9a44ab935041ac8f9ddcae67246111` en `main`; GitHub/Vercel confirmó estado `success`, despliegue `FE6LyVskgHYK7RnuFmTGSPSWZLtB`, del proyecto habitual `project-ukk6w`, equipo `grupo-ark-ccatun-rumi-sac`. El sitio `https://proyecto-katia.vercel.app/` muestra 1.1.67 / 08/10/2026. El registro de lectura completa la misma entrega y nota de parche.
+
+Sesión real de Edge: Inicio comenzó con franja de 64 px; el recorrido 1.1.66 no se repitió y apareció la nota breve de 1.1.67 con sus 204 caracteres exactos. Se cerró el aviso, desplegó el panel a 220 px, eligió Ayuda y quedó recogido. Un clic sobre la pregunta de Ayuda abrió su respuesta, recogió el menú y conservó el foco en el desplegable. Escape desde el menú devolvió el foco al activador. Se comprobaron ambos temas y avisos visibles; a 360 × 800 px el menú móvil se cerró al elegir Ayuda sin desbordamiento. Se restituyeron el tamaño y tema habituales.
+
+Las dos tablas visibles de Inicio coincidieron exactamente con la referencia previa a publicar; no equivale a comparar toda la base. Salud pública HTTP 200, demo desactivado y Supabase configurado. Consola de los recorridos publicados sin errores/advertencias detectados. No se guardaron formularios, editaron cuentas ni cambiaron datos del negocio para estas comprobaciones. Lectores de las rutas ya revisados en 1.1.66. No se repitió la revisión funcional completa ni toda la matriz de roles.
+
+Capturas `iconos-produccion.png` e `iconos-oscuros-produccion.png` bajo `temp/menu-1.1.67/`. El local se volvió a iniciar en desarrollo demo con el mismo almacén: salud 200 y Ayuda 1.1.67 con iconos comprobadas; quedó una pestaña limpia abierta. La primera compilación de Ayuda demoró la navegación del navegador, pero terminó correctamente y se comprobó la página antes de entregar.
 
 Nota: El menú se recoge en una franja de iconos y vuelve a mostrar los nombres con un clic. Al elegir un apartado o trabajar fuera se contrae, dejando más espacio sin ocultar accesos ni cambiar tus formularios.
