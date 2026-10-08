@@ -1,6 +1,6 @@
 # Entrega visual — 08/10/2026, 1.1.66
 
-Estado: preparada para publicación por petición expresa del usuario. La última producción comprobada sigue en 1.1.63 hasta confirmar el nuevo despliegue. No requiere migraciones, cambios de cuenta ni variables nuevas en Vercel.
+Estado: **publicada y comprobada mediante lectura**, por petición expresa del usuario. Producción muestra 1.1.66 y fecha 08/10/2026. No requirió migraciones, cambios de cuenta ni variables nuevas en Vercel.
 
 ## Cambios incluidos
 
@@ -23,7 +23,15 @@ Marca/avatar/acciones principales alternan negro/blanco correctamente; menú y A
 
 ## Publicación y límites
 
-Pendiente: subir el código a `main`, confirmar el estado Vercel y comprobar mediante lectura la versión publicada, recorrido, menú, temas, Ayuda y apartados principales con sesión real. La sesión actual de Edge abre Inicio; se conservaron en memoria las dos tablas visibles como referencia previa. Las rutas y sus lectores auxiliares se revisaron antes de navegar para evitar escrituras del negocio.
+El commit `0340cdead354e14f55da1c598b720ed8547d18d8` se subió a `main` y GitHub/Vercel confirmó estado `success`, despliegue `E2DjZL2PsBfRyYNVfmpbFXEVKYZ6`, en el proyecto existente `project-ukk6w` del equipo `grupo-ark-ccatun-rumi-sac`. El dominio habitual `https://proyecto-katia.vercel.app/` muestra versión/fecha correctas. Las rutas y sus lectores auxiliares se revisaron antes de navegar para evitar escrituras del negocio.
+
+Con la sesión real existente de Edge, la primera bienvenida mostró exactamente la nota de parche, seguida de los tres pasos sobre los controles reales. Se terminó con «Listo»; recarga y navegación no la repitieron. A 360 × 800 px el segundo paso reajustó el resaltado al botón visible; tarjeta de 328 × 318 px situada a 16 px del borde. El menú compacto mide 220 px, presenta nombre/rol coherentes y se cierra al abrir Ayuda. No hay botón flotante, barra de comparación ni hueco de propuesta en producción.
+
+En escritorio se probó ocultar/mostrar el menú con un solo control visible. Cabecera y menú coinciden en «Administrador 1 / Dueña», con inicial A; la marca K se distingue de la identidad personal. Tema claro principal `#202125`, oscuro `#f4f4f5`, con texto inverso; se comprobaron también las acciones principales estándar de Inventario. Ayuda mostró sus seis tareas y cuatro dudas; la respuesta sobre el menú se abrió correctamente. Los acentos secundarios siguen siendo de color.
+
+Se cargaron Inicio, Ventas, Caja, Inventario, Cotizaciones, Centro de Mando, Reportes y Ayuda, con versión 1.1.66, sin avisos de carga fallida ni desbordamiento horizontal en escritorio. No se probaron otra vez todos sus guardados/exportaciones: este recorrido verifica la integración visual compartida. Las dos tablas visibles de Inicio coincidieron exactamente con la referencia previa, tanto al publicar como después de las comprobaciones; no equivale a una comparación completa de las tablas de la base. Consola inspeccionada: cero errores/advertencias detectados. Salud pública HTTP 200, demo desactivado, Supabase/Auth/datos preparados. No se enviaron formularios del negocio.
+
+Capturas locales de evidencia: `bienvenida-produccion.png`, `recorrido-menu-movil-produccion.png`, `inventario-oscuro-produccion.png`, `ayuda-clara-produccion.png` y resumen `navegacion-produccion.json`, bajo `temp/publicacion-visual-1.1.66/`. La documentación de estas comprobaciones completa la misma entrega 1.1.66.
 
 La revisión se limita a apariencia y navegación compartida. No acredita todos los lectores de pantalla, toda la matriz de roles ni ausencia absoluta de errores. No se guardan, importan, restauran, borran o editan registros del negocio para verificar producción; tampoco se modifican conexiones, contraseñas o permisos.
 

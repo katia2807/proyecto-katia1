@@ -1,6 +1,6 @@
 # Propuesta visual local — 07/10/2026
 
-Registro histórico de la propuesta local **1.1.64–1.1.65**, aprobada por el usuario. Su integración y publicación se preparan en **1.1.66**, el 08/10/2026; consultar el [informe de entrega visual](PUBLICACION_VISUAL_2026-10-08.md) para el estado vigente. Los apartados siguientes conservan las comprobaciones de la etapa local del 07/10/2026.
+Registro histórico de la propuesta local **1.1.64–1.1.65**, aprobada por el usuario. Su integración se publicó y comprobó en **1.1.66**, el 08/10/2026; consultar el [informe de entrega visual](PUBLICACION_VISUAL_2026-10-08.md) para el estado vigente. Los apartados siguientes conservan las comprobaciones de la etapa local del 07/10/2026.
 
 ## Ajuste actual — 1.1.65
 
