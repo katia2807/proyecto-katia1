@@ -394,7 +394,12 @@ export function AppShell({
             if (pointerInMenuRef.current) setIsMenuOpen(true);
           }, 140);
         }}
-        onPointerLeave={() => { pointerInMenuRef.current = false; pointerPressedRef.current = false; scheduleMenuClose(); }}
+        onPointerLeave={(event) => {
+          if (event.pointerType === "touch") return;
+          pointerInMenuRef.current = false;
+          pointerPressedRef.current = false;
+          scheduleMenuClose();
+        }}
         onPointerDown={() => { pointerPressedRef.current = true; keyboardMenuFocusRef.current = false; }}
         onPointerUp={() => { pointerPressedRef.current = false; }}
         onFocusCapture={() => {
