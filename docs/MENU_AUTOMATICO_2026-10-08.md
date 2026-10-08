@@ -1,6 +1,6 @@
 # Menú automático — 08/10/2026, 1.1.68
 
-Estado: corrección comprobada en desarrollo y compilación local final; publicación pendiente. Sustituye la interacción por botón de 1.1.67, cuyo registro se conserva como antecedente. El usuario pidió abrir los nombres al pasar el cursor y recogerlos al salir sin incomodar.
+Estado: **corregida, publicada y comprobada mediante lectura**. Sustituye la interacción por botón de 1.1.67, cuyo registro se conserva como antecedente. El usuario pidió abrir los nombres al pasar el cursor y recogerlos al salir sin incomodar.
 
 ## Cambio
 
@@ -21,6 +21,16 @@ Tab despliega los nombres, mantiene el panel mientras el foco de teclado esté d
 - Nota de aviso e historial coincidentes, 210 caracteres. Revisión React: temporizador y escuchas con limpieza, foco y teclado disponibles, sin consultas nuevas ni cambios de autorización. Estilos de movimiento reducido revisados en código; no se cambió la preferencia del sistema.
 - Compilación optimizada y sus tipos aprobados, sin desarrollo concurrente. Servidor compilado con salud/Ayuda 200 y Supabase desactivado; navegador con barra inicial de 64 px, apertura a 220 px, recogida al volver al contenido, contenido sin desplazarse y botón de cabecera ausente en escritorio. Consola de la carga válida sin errores/advertencias detectados. Una pestaña quedó vacía; salud y registros del servidor seguían correctos, se abrió la ruta HTTP conocida y se repitió esta comprobación. El diagnóstico demo se muestra solo en esta instancia aislada, sin cambiar producción.
 
-Evidencias locales en `temp/menu-1.1.68/`, excluidas de Git. Las verificaciones de producción se registrarán después de confirmar su despliegue; las anteriores no se atribuyen automáticamente a esta entrega.
+## Publicación y lectura real
+
+Publicado `b8c59fe40b44ed99ea1a9c714cdca87a57cd4670` en `main`. GitHub/Vercel confirmó `success`, despliegue `FiDuy5CgtGbKMoxK6cgDyndMWcwb`, del proyecto y equipo habituales. `https://proyecto-katia.vercel.app/` muestra 1.1.68 / 08/10/2026. Este registro completa la misma entrega y nota.
+
+Sesión real de Edge, Administrador 1 / Dueña: Inicio comenzó con franja de 64 px y sin botón visible de cabecera en escritorio. Se observó el aviso con la nota exacta de 210 caracteres; no se repitió el recorrido terminado. Entrada por zona vacía de la barra abrió 220 px, con contenido e iconos de las primeras cuatro filas en las mismas coordenadas. Salida del cursor mediante clic secundario en zona vacía del contenido, sin clic principal, recogió a 64 px antes de pulsar Escape. Tab abrió y enfocó Inicio; Escape conservó su enlace visible. Al sacar el foco a la cabecera se recogió automáticamente.
+
+A 360 × 800 px se abrió el diálogo móvil, se eligió Ayuda y cerró; navegación a Ayuda confirmada tras terminar la transición, sin desbordamiento (documento 350 px / viewport 360 px). Se restituyó el tamaño habitual. Ayuda muestra la respuesta breve nueva, comprobada desplegando su pregunta. Panel completo en tema oscuro y franja en claro comprobados; marca K blanca/negra coherente, colores de iconos/avisos conservados. Tema claro restituido.
+
+Las dos tablas visibles de Inicio coinciden exactamente con la referencia tomada antes de publicar; esta comparación no cubre toda la base. Salud HTTP 200, demo desactivado y Supabase/Auth configurados como antes. Consola de Inicio/Ayuda y recorridos inspeccionados sin errores/advertencias detectados. Se visitaron solo lectores revisados previamente, cuyo comportamiento no se modifica en esta entrega; no se guardaron formularios, cambiaron cuentas o ejecutaron operaciones del negocio. No se repitió la revisión funcional ni la matriz completa de roles.
+
+Local restituido en desarrollo demo con el mismo almacén; salud 200 y Ayuda 1.1.68 comprobada en una pestaña HTTP limpia. Original `data/store.json` conserva su huella. Evidencias en `temp/menu-1.1.68/`, excluidas de Git: `menu-automatico-produccion.png` y `menu-oscuro-produccion.png`. La documentación y su nota no contienen datos de respaldo ni claves.
 
 Nota: El menú muestra los nombres al pasar el cursor por sus iconos y se recoge suavemente al salir. Se retiró el botón de escritorio para despejar la cabecera, sin mover el contenido ni cambiar tu forma de trabajar.
