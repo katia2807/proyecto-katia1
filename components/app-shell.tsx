@@ -11,6 +11,7 @@ import {
   IconFileText,
   IconHelp,
   IconLayoutDashboard,
+  IconLogout,
   IconMenu2,
   IconNotes,
   IconPackages,
@@ -156,9 +157,34 @@ export function AppShell({
   showUpdatePresentation = false,
 }: AppShellProps) {
   const pathname = usePathname();
-  const [isMenuOpen, setIsMenuOpen] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const desktopMenuRef = useRef<HTMLElement>(null);
+  const desktopMenuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileMenuRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    function closeWhenWorking(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)
+        || desktopMenuRef.current?.contains(target)
+        || desktopMenuButtonRef.current?.contains(target)) return;
+      setIsMenuOpen(false);
+    }
+    function closeWithEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape" || mobileMenuRef.current?.open) return;
+      if (desktopMenuRef.current?.contains(document.activeElement)) desktopMenuButtonRef.current?.focus();
+      setIsMenuOpen(false);
+    }
+    // Después del clic: el control pulsado conserva su acción y su foco.
+    document.addEventListener("click", closeWhenWorking);
+    document.addEventListener("keydown", closeWithEscape);
+    return () => {
+      document.removeEventListener("click", closeWhenWorking);
+      document.removeEventListener("keydown", closeWithEscape);
+    };
+  }, [isMenuOpen]);
 
   useEffect(() => {
     if (!isMobileMenuOpen) return;
@@ -224,23 +250,23 @@ export function AppShell({
   const userRoleLabel = roleLabel(userRole, uiRole);
   const canOpenAccount = resolveRole(userRole, uiRole) === "owner_admin";
 
-  function profileMarkup(inHeader = false) {
+  function profileMarkup(inHeader = false, iconOnly = false) {
     const className = cn(
       "profile-chip flex min-w-0 items-center gap-2 rounded-[var(--katia-radius-md)]",
-      inHeader ? "p-1" : "p-1.5",
+      inHeader ? "p-1" : iconOnly ? "justify-center p-0.5" : "p-1.5",
       canOpenAccount && "transition-colors hover:bg-[var(--katia-primary-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--katia-primary)]",
     );
     const identity = (
       <>
         <span aria-hidden="true" className="profile-avatar flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold">{userInitial}</span>
-        <span className={cn("min-w-0", inHeader && "hidden max-w-40 sm:block")}>
+        <span className={cn("min-w-0", iconOnly && "sr-only", inHeader && "hidden max-w-40 sm:block")}>
           <span className={cn("block text-sm font-medium text-[var(--katia-text-primary)]", inHeader ? "truncate" : "break-words")}>{userName}</span>
           <span className="block text-xs text-[var(--katia-text-secondary)]">{userRoleLabel}</span>
         </span>
       </>
     );
     return canOpenAccount ? (
-      <Link href="/cuenta" data-update-tour={inHeader ? "profile" : undefined} className={className} title={`Mi cuenta · ${userName}`} aria-label={`Mi cuenta de ${userName}, ${userRoleLabel}`} onClick={() => setIsMobileMenuOpen(false)}>
+      <Link href="/cuenta" data-update-tour={inHeader ? "profile" : undefined} className={className} title={`Mi cuenta · ${userName}`} aria-label={`Mi cuenta de ${userName}, ${userRoleLabel}`} onClick={() => { setIsMobileMenuOpen(false); setIsMenuOpen(false); }}>
         {identity}
       </Link>
     ) : (
@@ -248,18 +274,18 @@ export function AppShell({
     );
   }
 
-  const sessionMarkup = (
+  const sessionMarkup = (iconOnly = false) => (
     <div className="mt-4 space-y-2 border-t border-[var(--katia-border-subtle)] pt-3">
-      {profileMarkup()}
+      {profileMarkup(false, iconOnly)}
       <form action={logout}>
-        <button type="submit" className="w-full rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] px-3 py-2 text-xs font-semibold text-[var(--katia-text-secondary)] transition-all duration-150 hover:bg-[var(--katia-bg-overlay)] hover:text-[var(--katia-text-primary)]">
-          Cerrar sesión
+        <button type="submit" title="Cerrar sesión" aria-label="Cerrar sesión" className={cn("flex min-h-10 w-full items-center justify-center rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] py-2 text-xs font-semibold text-[var(--katia-text-secondary)] transition-colors duration-150 hover:bg-[var(--katia-bg-overlay)] hover:text-[var(--katia-text-primary)]", iconOnly ? "px-2" : "px-3")}>
+          {iconOnly ? <IconLogout aria-hidden="true" className="size-4" /> : "Cerrar sesión"}
         </button>
       </form>
     </div>
   );
 
-  const navMarkup = (
+  const navMarkup = (iconOnly = false) => (
     <nav className="space-y-4">
       {navSections.map((section) => {
         const items = section.items
@@ -269,33 +295,36 @@ export function AppShell({
         if (items.length === 0) return null;
         return (
           <div key={section.label} className="space-y-1.5">
-            <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--katia-text-tertiary)]">
+            <p className={cn("text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--katia-text-tertiary)]", iconOnly ? "sr-only" : "px-2")}>
               {section.label}
             </p>
             {items.map((item) => {
               const Icon = icons[item.href] ?? IconLayoutDashboard;
               const active = activeHref === item.href;
+              const { count, seen } = effectiveBadge(item.href);
+              const label = count > 0 ? `${item.label} · ${count} avisos` : item.label;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  title={item.label}
+                  title={label}
+                  aria-label={label}
                   aria-current={active ? "page" : undefined}
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={() => { setIsMobileMenuOpen(false); setIsMenuOpen(false); }}
                   className={cn(
-                    "flex min-h-10 items-center gap-2 rounded-[var(--katia-radius-md)] border-l-[3px] px-3 py-2 transition-all duration-150",
+                    "relative flex min-h-10 items-center rounded-[var(--katia-radius-md)] border-l-[3px] py-2 transition-colors duration-150",
+                    iconOnly ? "justify-center px-1" : "gap-2 px-3",
                     active
                       ? "border-l-[var(--katia-primary)] bg-[var(--katia-primary-soft)] text-[var(--katia-text-primary)] font-medium"
                       : "border-l-transparent text-[var(--katia-text-secondary)] hover:bg-[var(--katia-primary-soft)]/60 hover:text-[var(--katia-text-primary)]",
                   )}
                 >
-                  <Icon className="size-4 shrink-0" />
-                  <span className="min-w-0 flex-1 text-sm leading-5">{item.label}</span>
-                  {(() => {
-                    const { count, seen } = effectiveBadge(item.href);
-                    return count > 0 ? (
+                  <Icon aria-hidden="true" className={cn("shrink-0", iconOnly ? "size-5" : "size-4")} />
+                  <span className={iconOnly ? "sr-only" : "min-w-0 flex-1 text-sm leading-5"}>{item.label}</span>
+                  {count > 0 ? (
                       <span
-                        className={`ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white ${
+                        aria-hidden="true"
+                        className={`${iconOnly ? "absolute -right-1 -top-1 px-1" : "ml-auto px-1.5"} rounded-full py-0.5 text-[10px] font-bold leading-3 text-white ${
                           seen
                             ? "bg-[var(--katia-warning)]"
                             : "bg-[var(--katia-danger)]"
@@ -303,8 +332,7 @@ export function AppShell({
                       >
                         {count}
                       </span>
-                    ) : null;
-                  })()}
+                    ) : null}
                 </Link>
               );
             })}
@@ -319,20 +347,22 @@ export function AppShell({
       <Suspense fallback={null}>
         <AppShellAccessGuard pathname={pathname} uiRole={uiRole} userRole={userRole} />
       </Suspense>
-      {isMenuOpen ? <aside
+      <aside
+        ref={desktopMenuRef}
         id="desktop-menu"
         aria-label="Menú principal"
-        className="sticky top-[var(--app-shell-top,0px)] hidden h-[calc(100dvh-var(--app-shell-top,0px))] w-[220px] shrink-0 flex-col self-start border-r border-[var(--katia-border-subtle)] bg-[var(--bg-sidebar)] p-3 xl:flex"
+        data-collapsed={!isMenuOpen}
+        className={cn("sticky top-[var(--app-shell-top,0px)] hidden h-[calc(100dvh-var(--app-shell-top,0px))] shrink-0 flex-col self-start border-r border-[var(--katia-border-subtle)] bg-[var(--bg-sidebar)] xl:flex", isMenuOpen ? "w-[220px] p-3" : "w-16 p-2")}
       >
         <div className="mb-4 flex min-h-9 items-center">
-          <div className="flex items-center gap-2">
+          <div className={cn("flex w-full items-center", isMenuOpen ? "gap-2" : "justify-center")}>
             <BrandMark />
-            <p className="text-sm font-semibold tracking-wide text-[var(--katia-text-primary)]">Katia Suite</p>
+            <p className={isMenuOpen ? "text-sm font-semibold tracking-wide text-[var(--katia-text-primary)]" : "sr-only"}>Katia Suite</p>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">{navMarkup}</div>
-        {sessionMarkup}
-      </aside> : null}
+        <div className={cn("min-h-0 flex-1 overflow-y-auto pr-1", !isMenuOpen && "menu-icon-scroll")}>{navMarkup(!isMenuOpen)}</div>
+        {sessionMarkup(!isMenuOpen)}
+      </aside>
       <dialog
         ref={mobileMenuRef}
         id="compact-menu"
@@ -356,8 +386,8 @@ export function AppShell({
             Cerrar
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">{navMarkup}</div>
-        {sessionMarkup}
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">{navMarkup()}</div>
+        {sessionMarkup()}
       </dialog>
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="header-chrome flex h-14 items-center justify-between gap-3 border-b border-[var(--katia-border-subtle)] bg-[var(--katia-bg-base)] px-4 md:px-6">
@@ -374,10 +404,11 @@ export function AppShell({
               <IconMenu2 className="size-4" />
             </button>
             <button
+              ref={desktopMenuButtonRef}
               type="button"
               className="hidden shrink-0 rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] p-2 text-[var(--katia-text-secondary)] transition-colors hover:bg-[var(--katia-primary-soft)] xl:block"
               onClick={() => setIsMenuOpen((prev) => !prev)}
-              aria-label={isMenuOpen ? "Ocultar menú" : "Mostrar menú"}
+              aria-label={isMenuOpen ? "Contraer menú" : "Expandir menú"}
               data-update-tour="menu"
               aria-controls="desktop-menu"
               aria-expanded={isMenuOpen}

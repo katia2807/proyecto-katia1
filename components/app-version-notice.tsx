@@ -7,8 +7,9 @@ import { UpdateTour } from "@/components/update-tour";
 const SEEN_VERSION_KEY = "katia_seen_version";
 
 export function AppVersionNotice({ presentationEnabled = false, canOpenHelp = false }: { presentationEnabled?: boolean; canOpenHelp?: boolean }) {
+  const [showPatch, setShowPatch] = useState(false);
   return presentationEnabled && APP_UPDATE_PRESENTATION.version === APP_VERSION
-    ? <UpdateTour canOpenHelp={canOpenHelp} />
+    ? <><UpdateTour canOpenHelp={canOpenHelp} onPreviouslySeen={setShowPatch} />{showPatch ? <VersionToast /> : null}</>
     : <VersionToast />;
 }
 

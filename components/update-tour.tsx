@@ -12,7 +12,7 @@ type TourPosition = {
 };
 
 /** Recorrido exclusivamente visual: no navega ni guarda operaciones del negocio. */
-export function UpdateTour({ canOpenHelp }: { canOpenHelp: boolean }) {
+export function UpdateTour({ canOpenHelp, onPreviouslySeen }: { canOpenHelp: boolean; onPreviouslySeen?: (seen: boolean) => void }) {
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(-1);
   const [position, setPosition] = useState<TourPosition | null>(null);
@@ -20,20 +20,23 @@ export function UpdateTour({ canOpenHelp }: { canOpenHelp: boolean }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const initialScroll = useRef<{ x: number; y: number } | null>(null);
   const maskId = useId();
-  const seenKey = `katia_seen_presentation_${APP_VERSION}`;
+  const seenVersion = APP_UPDATE_PRESENTATION.seenVersion;
+  const seenKey = `katia_seen_presentation_${seenVersion}`;
   const currentStep = APP_UPDATE_PRESENTATION.steps[step];
   const isLast = step === APP_UPDATE_PRESENTATION.steps.length - 1;
 
   useEffect(() => {
     try {
-      if (window.localStorage.getItem(seenKey) !== APP_VERSION) setVisible(true);
+      const previouslySeen = window.localStorage.getItem(seenKey) === seenVersion;
+      onPreviouslySeen?.(previouslySeen);
+      if (!previouslySeen) setVisible(true);
     } catch {
       // El recorrido manual sigue disponible en la propuesta local.
     }
-    const replayPreview = () => { setStep(-1); setPosition(null); setVisible(true); };
+    const replayPreview = () => { onPreviouslySeen?.(false); setStep(-1); setPosition(null); setVisible(true); };
     window.addEventListener("katia-preview-presentation-open", replayPreview);
     return () => window.removeEventListener("katia-preview-presentation-open", replayPreview);
-  }, [seenKey]);
+  }, [seenKey, seenVersion, onPreviouslySeen]);
 
   useEffect(() => {
     if (!visible) return;
@@ -88,7 +91,10 @@ export function UpdateTour({ canOpenHelp }: { canOpenHelp: boolean }) {
 
   function finish() {
     setVisible(false);
-    try { window.localStorage.setItem(seenKey, APP_VERSION); } catch { /* El cierre siempre funciona. */ }
+    try {
+      window.localStorage.setItem(seenKey, seenVersion);
+      window.localStorage.setItem("katia_seen_version", APP_VERSION);
+    } catch { /* El cierre siempre funciona. */ }
   }
 
   function moveTo(nextStep: number) {

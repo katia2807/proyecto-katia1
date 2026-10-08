@@ -13,7 +13,7 @@ const TASKS = [
 ];
 
 const QUESTIONS = [
-  { title: "¿Dónde está el menú?", answer: "Usa el botón de menú de la cabecera. En una pantalla pequeña se oculta para liberar espacio; puedes cerrarlo con «Cerrar», tocando fuera o con Escape." },
+  { title: "¿Dónde está el menú?", answer: "En una pantalla grande queda una franja de iconos; señala uno para ver su nombre o usa el botón de la cabecera para desplegarlos. Al elegir un apartado o volver al contenido se recoge. En celular se abre con ese botón y se cierra con «Cerrar», tocando fuera o con Escape." },
   { title: "¿Cómo cambio entre claro y oscuro?", answer: "Pulsa el botón de sol o luna de la cabecera. La elección se recuerda en ese navegador." },
   { title: "¿Por qué no veo una opción?", answer: "Cada cuenta ve las opciones que permite su rol. Si necesitas otra, consulta con quien administra el programa." },
   { title: "¿El Excel sirve para recuperar todo?", answer: "El Excel sirve para consultar información. La recuperación completa también necesita la base de datos y los adjuntos; se prepara desde el procedimiento de Respaldo." },

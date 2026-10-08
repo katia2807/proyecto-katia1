@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.67 — 08/10/2026
+
+El menú se recoge en una franja de iconos y vuelve a mostrar los nombres con un clic. Al elegir un apartado o trabajar fuera se contrae, dejando más espacio sin ocultar accesos ni cambiar tus formularios.
+
 ## 1.1.66 — 08/10/2026
 
 Se renovó la imagen en blanco y negro y se ajustó el menú para liberar espacio. Ayuda reúne respuestas breves y la bienvenida recorre los cambios una vez por navegador, conservando los pasos habituales de trabajo.

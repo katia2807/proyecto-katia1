@@ -1,4 +1,7 @@
 /* Apariencia aprobada. La comparación anterior se limita al servidor local de propuesta. */
+.menu-icon-scroll { scrollbar-width: none; }
+.menu-icon-scroll::-webkit-scrollbar { display: none; }
+
 html[data-appearance="propuesta"] {
   --katia-bg-base: #111214;
   --katia-bg-elevated: #191a1d;
