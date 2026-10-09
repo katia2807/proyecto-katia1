@@ -67,8 +67,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       ) : null}
 
       {avisoPanel ? (
-        <div className="mt-4 rounded-[var(--border-radius-input)] border border-amber-500/40 bg-amber-900/20 p-3 text-sm text-[var(--text-primary)]">
-          <p className="font-semibold text-amber-400">Sesión expirada</p>
+        <div className="mt-4 rounded-[var(--border-radius-input)] border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
+          <p className="font-semibold text-amber-800 dark:text-amber-300">Sesión expirada</p>
           <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
             Tu sesión cerró automáticamente por inactividad. Vuelve a ingresar con tus datos.
           </p>

@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.68";
+export const APP_VERSION = "1.1.69";
 export const APP_LAST_UPDATE = "08/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "El menú muestra los nombres al pasar el cursor por sus iconos y se recoge suavemente al salir. Se retiró el botón de escritorio para despejar la cabecera, sin mover el contenido ni cambiar tu forma de trabajar.";
+  "Caja y Cotizaciones facilitan la navegación y validan mejor los datos. Inventario aclara el stock y la hora de registro; Reportes ofrece resúmenes filtrados en Excel, CSV y PDF. El aviso del login gana contraste.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {

@@ -6,6 +6,7 @@ import type { Database } from "@/lib/supabase/types";
 import { roundMoney } from "@/lib/utils";
 import { CAJA_HISTORY_PAGE_SIZE, crearFiltroCaja, normalizeCajaFiltros } from "@/lib/caja-filtros";
 import type { CajaFiltros } from "@/lib/caja-filtros";
+import { listadoTamano } from "@/lib/listado-paginacion";
 
 export type CajaVista = "todos" | "empresa" | "personal";
 type CajaRow = Database["public"]["Tables"]["movimientos_caja"]["Row"] & { deleted_at?: string | null };
@@ -93,9 +94,10 @@ export async function getCajaPanelData(vista: CajaVista = "todos", organizationI
       } while (offset < total);
     }
     const totalVista = vista === "todos" ? empresa.movimientos + personal.movimientos : vista === "personal" ? personal.movimientos : empresa.movimientos;
-    const pagina = Math.min(filtros.pagina, Math.max(1, Math.ceil(coincidencias.length / CAJA_HISTORY_PAGE_SIZE)));
-    const start = (pagina - 1) * CAJA_HISTORY_PAGE_SIZE;
-    const rows = coincidencias.slice(start, start + CAJA_HISTORY_PAGE_SIZE);
+    const pageSize = listadoTamano(filtros.por_pagina, CAJA_HISTORY_PAGE_SIZE);
+    const pagina = Math.min(filtros.pagina, Math.max(1, Math.ceil(coincidencias.length / pageSize)));
+    const start = (pagina - 1) * pageSize;
+    const rows = coincidencias.slice(start, start + pageSize);
     return { ok: true, empresa: finalizar(empresa), personal: finalizar(personal), rows, totalVista, totalResultados: coincidencias.length, pagina };
   } catch {
     // Un fallo en cualquier página invalida los totales; nunca presentar una suma parcial como saldo.

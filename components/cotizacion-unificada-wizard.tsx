@@ -46,6 +46,7 @@ import {
 import type { EmpresaConfig } from "@/lib/company-config";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { fechaHoyPeru, formatPen, parseDecimal } from "@/lib/utils";
+import { documentoClienteError, telefonoClienteError } from "@/lib/cotizacion-cliente-validacion";
 import { COTIZACION_ESTADOS, coincideEstadoCotizacion, type CotizacionEstado } from "@/lib/cotizacion-estados";
 import type { Database } from "@/lib/supabase/types";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -319,19 +320,15 @@ function isEmpresaClienteRow(cliente: ClienteRow) {
   );
 }
 
-function normalizeDoc(value: string) {
-  return value.replace(/\D/g, "");
+function validateDocumentoByTipo(tipo: "natural" | "empresa", rawDocumento: string) {
+  return documentoClienteError(tipo, rawDocumento) ?? "";
 }
 
-function validateDocumentoByTipo(tipo: "natural" | "empresa", rawDocumento: string) {
-  const doc = normalizeDoc(rawDocumento);
-  if (!doc) return "Documento obligatorio.";
-  if (tipo === "natural") {
-    if (doc.length !== 8) return "DNI inválido: debe tener 8 dígitos.";
-    return "";
-  }
-  if (doc.length !== 11) return "RUC inválido: debe tener 11 dígitos.";
-  return "";
+function scrollCotizacionFormulario() {
+  const element = document.getElementById("cotizacion-cliente");
+  if (!element) return;
+  element.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
+  element.focus({ preventScroll: true });
 }
 
 function getDefaultGerenciaTemplate(): MuebleTemplate {
@@ -410,6 +407,8 @@ function NuevoClienteRapidoInline({
 
   async function handleSave() {
     if (!nombre.trim()) { setErr("El nombre es obligatorio."); return; }
+    const validationError = documentoClienteError(tipoCliente, documento, false) || telefonoClienteError(telefono);
+    if (validationError) { setErr(validationError); return; }
     setLoading(true);
     setErr("");
     try {
@@ -459,10 +458,10 @@ function NuevoClienteRapidoInline({
           <input
             className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
             value={documento}
-            onChange={(e) => setDocumento(e.target.value)}
+            onChange={(e) => setDocumento(e.target.value.replace(/\D/g, "").slice(0, tipoCliente === "empresa" ? 11 : 8))}
             placeholder={tipoCliente === "empresa" ? "RUC" : "DNI"}
             inputMode="numeric"
-            maxLength={11}
+            maxLength={tipoCliente === "empresa" ? 11 : 8}
           />
         </label>
         <label className="space-y-1">
@@ -472,6 +471,9 @@ function NuevoClienteRapidoInline({
             value={telefono}
             onChange={(e) => setTelefono(e.target.value)}
             placeholder="999 999 999"
+            type="tel"
+            inputMode="tel"
+            maxLength={30}
           />
         </label>
         <div className="flex items-end">
@@ -1272,6 +1274,7 @@ export function CotizacionUnificadaWizard({
     setMaxStep(0);
     clearDraft();
     setError("");
+    requestAnimationFrame(scrollCotizacionFormulario);
   }, [clearDraft, clearEditingQuery]);
 
   const initialDraftSaver = useRef(saveDraft);
@@ -1473,7 +1476,7 @@ export function CotizacionUnificadaWizard({
         setError("Indica el nombre o razón social.");
         return;
       }
-      const docValidationError = validateDocumentoByTipo(tipoCliente, documento);
+      const docValidationError = validateDocumentoByTipo(tipoCliente, documento) || telefonoClienteError(telefono);
       if (docValidationError) {
         setError(docValidationError);
         return;
@@ -1516,6 +1519,7 @@ export function CotizacionUnificadaWizard({
     nombreCliente,
     stepIndex,
     steps,
+    telefono,
     tipoCliente,
     tipoCotizacionPreset,
   ]);
@@ -1745,10 +1749,7 @@ export function CotizacionUnificadaWizard({
         editarIdCargado.current = editarId;
         loadCotizacion(found);
         setTimeout(() => {
-          const element = document.getElementById("cotizacion-wizard");
-          if (element) {
-            element.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
+          scrollCotizacionFormulario();
         }, 100);
       }
     }
@@ -1946,7 +1947,7 @@ export function CotizacionUnificadaWizard({
       </details>
 
       {currentStepId === "cliente" ? (
-        <Card className={`${panelClass} space-y-5 border-none`}>
+        <Card id="cotizacion-cliente" tabIndex={-1} className={`${panelClass} scroll-mt-28 space-y-5 border-none focus:outline-none`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="text-xs text-[var(--color-text-secondary)]">¿Cliente nuevo?</p>
             <NuevoClienteRapidoInline
@@ -2037,7 +2038,7 @@ export function CotizacionUnificadaWizard({
               <input
                 className={inputClass}
                 value={documento}
-                onChange={(e) => setDocumento(e.target.value)}
+                onChange={(e) => setDocumento(e.target.value.replace(/\D/g, "").slice(0, tipoCliente === "empresa" ? 11 : 8))}
                 placeholder={tipoCliente === "empresa" ? "20xxxxxxxx" : "DNI"}
                 inputMode="numeric"
                 maxLength={tipoCliente === "empresa" ? 11 : 8}
@@ -2051,6 +2052,9 @@ export function CotizacionUnificadaWizard({
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
                 placeholder="999 999 999"
+                type="tel"
+                inputMode="tel"
+                maxLength={30}
               />
             </label>
             <label className="space-y-1 md:col-span-2">
@@ -3703,10 +3707,7 @@ export function CotizacionUnificadaWizard({
                           loadCotizacion(c);
                           router.push(`/cotizacion?editar=${c.id}`);
                           setTimeout(() => {
-                            const element = document.getElementById("cotizacion-wizard");
-                            if (element) {
-                              element.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }
+                            scrollCotizacionFormulario();
                           }, 50);
                         }}
                       >

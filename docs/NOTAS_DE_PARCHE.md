@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.69 — 08/10/2026 (local, pendiente de publicación)
+
+Caja y Cotizaciones facilitan la navegación y validan mejor los datos. Inventario aclara el stock y la hora de registro; Reportes ofrece resúmenes filtrados en Excel, CSV y PDF. El aviso del login gana contraste.
+
 ## 1.1.68 — 08/10/2026
 
 El menú muestra los nombres al pasar el cursor por sus iconos y se recoge suavemente al salir. Se retiró el botón de escritorio para despejar la cabecera, sin mover el contenido ni cambiar tu forma de trabajar.

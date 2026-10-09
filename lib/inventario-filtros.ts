@@ -1,3 +1,5 @@
+import { listadoTamano } from "@/lib/listado-paginacion";
+
 export type InventarioEstadoFiltro = "todos" | "activos" | "inactivos" | "stock_bajo";
 export type InventarioKardexTipoFiltro = "todos" | "entrada_compra" | "salida_venta" | "ajuste";
 
@@ -10,6 +12,9 @@ const FILTROS_DEFAULT = {
   perspectiva: "texto",
   kardex_tipo: "todos",
   kardex_producto: "todos",
+  kardex_filas: "200",
+  kardex_pagina: "1",
+  productos_filas: "20",
 } as const;
 
 export type InventarioFiltroParam = keyof typeof FILTROS_DEFAULT;
@@ -34,6 +39,9 @@ export function getInventarioFiltros(params: Pick<URLSearchParams, "get">) {
     kardexTipo: (["entrada_compra", "salida_venta", "ajuste"].includes(tipo ?? "")
       ? tipo : "todos") as InventarioKardexTipoFiltro,
     kardexProducto: params.get("kardex_producto") || "todos",
+    kardexFilas: listadoTamano(params.get("kardex_filas"), 200),
+    kardexPagina: params.get("kardex_pagina") ?? "1",
+    productosFilas: listadoTamano(params.get("productos_filas"), 20),
   };
 }
 
@@ -44,6 +52,7 @@ export function setInventarioFiltro(
   value: string,
 ): URLSearchParams {
   const next = new URLSearchParams(params.toString());
+  if (["kardex_tipo", "kardex_producto", "kardex_filas"].includes(key)) next.delete("kardex_pagina");
   if (value === "" || value === FILTROS_DEFAULT[key]) next.delete(key);
   else next.set(key, value);
   return next;

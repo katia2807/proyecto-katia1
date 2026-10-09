@@ -9,6 +9,7 @@ import { Field, SelectField } from "@/components/ui/field";
 import { buildCajaHref, cajaFiltrosError, normalizeCajaFiltros } from "@/lib/caja-filtros";
 import type { CajaFiltros } from "@/lib/caja-filtros";
 import type { CajaVista } from "@/lib/caja-resumen-data";
+import { LISTADO_TAMANOS } from "@/lib/listado-paginacion";
 
 export function CajaFiltrosForm({ filtros, vista }: { filtros: CajaFiltros; vista: CajaVista }) {
   const [error, setError] = useState(cajaFiltrosError(filtros));
@@ -66,6 +67,9 @@ export function CajaFiltrosForm({ filtros, vista }: { filtros: CajaFiltros; vist
       </div>
       {error && <p id="caja-filtros-error" role="alert" className="text-sm text-[var(--katia-danger)]">{error}</p>}
       <div className="flex flex-wrap items-center gap-3">
+        <SelectField name="por_pagina" label="Filas por página" defaultValue={filtros.por_pagina ?? 50}>
+          {LISTADO_TAMANOS.map(size => <option key={size} value={size}>{size}</option>)}
+        </SelectField>
         <Button disabled={pending}>{pending ? "Buscando…" : "Aplicar filtros"}</Button>
         <Link href={buildCajaHref(vista, normalizeCajaFiltros())} onClick={() => { formRef.current?.reset(); setError(null); }} className="rounded-lg px-3 py-2 text-sm font-semibold text-[var(--katia-primary)] focus-visible:outline-2 focus-visible:outline-offset-2">Limpiar filtros</Link>
       </div>

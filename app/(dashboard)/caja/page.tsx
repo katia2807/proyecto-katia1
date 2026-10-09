@@ -10,6 +10,7 @@ import { canAccessPath, canMutateCaja } from "@/lib/permissions";
 import { formatPen } from "@/lib/utils";
 import { buildCajaHref, cajaFiltrosError, cajaTieneFiltros, CAJA_HISTORY_PAGE_SIZE, normalizeCajaFiltros } from "@/lib/caja-filtros";
 import type { CajaSearchParams } from "@/lib/caja-filtros";
+import { listadoTamano } from "@/lib/listado-paginacion";
 
 type CajaPageProps = {
   searchParams?: Promise<CajaSearchParams>;
@@ -33,6 +34,7 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
   const data = await getCajaPanelData(vista, context?.organizationId, filtros);
   const resumen = vista === "personal" ? data.personal : data.empresa;
   const rows = data.rows;
+  const pageSize = listadoTamano(filtros.por_pagina, CAJA_HISTORY_PAGE_SIZE);
 
   const tabs: { value: typeof vista; label: string; hint: string }[] = [
     { value: "todos", label: "Todos", hint: data.ok ? `${data.empresa.movimientos + data.personal.movimientos} ${data.empresa.movimientos + data.personal.movimientos === 1 ? "movimiento" : "movimientos"}` : "No disponible" },
@@ -103,14 +105,14 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
           {data.ok ? (
             <>
               <p role="status" className="mb-3 text-sm text-[var(--katia-text-secondary)]">
-                {filtrosError ? "Corrige las fechas para consultar los resultados." : `${data.totalResultados} ${data.totalResultados === 1 ? "movimiento encontrado" : "movimientos encontrados"}${filtrosActivos ? " con estos filtros" : ""}.${data.totalResultados > CAJA_HISTORY_PAGE_SIZE ? ` Mostrando ${(data.pagina - 1) * CAJA_HISTORY_PAGE_SIZE + 1}–${(data.pagina - 1) * CAJA_HISTORY_PAGE_SIZE + rows.length}, del más reciente al más antiguo.` : ""}`}
+                {filtrosError ? "Corrige las fechas para consultar los resultados." : `${data.totalResultados} ${data.totalResultados === 1 ? "movimiento encontrado" : "movimientos encontrados"}${filtrosActivos ? " con estos filtros" : ""}.${data.totalResultados > pageSize ? ` Mostrando ${(data.pagina - 1) * pageSize + 1}–${(data.pagina - 1) * pageSize + rows.length}, del más reciente al más antiguo.` : ""}`}
               </p>
               {!filtrosError && <CajaMasterDetail rows={rows} cajaHref={buildCajaHref(vista, filtros, data.pagina)} canOpenOrigen={Boolean(context && (canAccessPath(context.role, context.uiRole, "/ventas") || canAccessPath(context.role, context.uiRole, "/cotizacion")))} emptyMessage={data.totalVista === 0 ? "Aún no hay movimientos en esta vista de Caja." : undefined} userRole={context?.uiRole === "readonly" ? "vendedor" : role} />}
-              {!filtrosError && data.totalResultados > CAJA_HISTORY_PAGE_SIZE && (
+              {!filtrosError && data.totalResultados > pageSize && (
                 <nav aria-label="Páginas de movimientos de Caja" className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
                   {data.pagina > 1 ? <Link href={buildCajaHref(vista, filtros, data.pagina - 1)} className="rounded-lg border border-[var(--color-border)] px-3 py-2 font-semibold focus-visible:outline-2">Anterior</Link> : <span />}
-                  <span>Página {data.pagina} de {Math.ceil(data.totalResultados / CAJA_HISTORY_PAGE_SIZE)}</span>
-                  {data.pagina * CAJA_HISTORY_PAGE_SIZE < data.totalResultados ? <Link href={buildCajaHref(vista, filtros, data.pagina + 1)} className="rounded-lg border border-[var(--color-border)] px-3 py-2 font-semibold focus-visible:outline-2">Siguiente</Link> : <span />}
+                  <span>Página {data.pagina} de {Math.ceil(data.totalResultados / pageSize)}</span>
+                  {data.pagina * pageSize < data.totalResultados ? <Link href={buildCajaHref(vista, filtros, data.pagina + 1)} className="rounded-lg border border-[var(--color-border)] px-3 py-2 font-semibold focus-visible:outline-2">Siguiente</Link> : <span />}
                 </nav>
               )}
             </>

@@ -101,7 +101,7 @@ export default async function CotizacionPage({ searchParams }: CotizacionPagePro
             </CardDescription>
           </div>
           <a
-            href="#cotizacion-wizard"
+            href="#cotizacion-cliente"
             className="inline-flex h-11 items-center rounded-xl bg-[var(--color-accent)] px-5 text-sm font-bold text-[var(--color-on-accent)] transition hover:brightness-110"
           >
             Empezar cotización

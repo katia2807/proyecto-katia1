@@ -82,6 +82,18 @@ describe("Caja: resumen completo", () => {
     expect(requests.every(url => url.searchParams.get("voided_at") === "is.null" && url.searchParams.get("deleted_at") === "is.null")).toBe(true);
   });
 
+  test("el tamaño elegido pagina 20 filas sin alterar el saldo completo ni repetir registros", async () => {
+    rows = Array.from({length:55},(_,n)=>movimiento(n+1));
+    const first = await getCajaPanelData("empresa",org,normalizeCajaFiltros({por_pagina:"20"}));
+    const second = await getCajaPanelData("empresa",org,normalizeCajaFiltros({por_pagina:"20",pagina:"2"}));
+    if (!first.ok || !second.ok) throw new Error("No cargó el historial ficticio");
+    expect(first.rows).toHaveLength(20);
+    expect(second.rows).toHaveLength(20);
+    expect(first.empresa.saldo).toBe(55);
+    expect(second.empresa.saldo).toBe(55);
+    expect(new Set([...first.rows,...second.rows].map(r=>r.id)).size).toBe(40);
+  });
+
   test("continúa hasta el conteo exacto si el servidor devuelve páginas más pequeñas", async () => {
     backendLimit = 100;
     rows = Array.from({ length: 251 }, (_, i) => movimiento(i + 1));

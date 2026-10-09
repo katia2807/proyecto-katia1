@@ -13,7 +13,7 @@ export function ReportesExcelExport({ canExport }: ReportesExcelExportProps) {
   if (canExport) {
     return (
       <a href="/api/export/reportes-excel">
-        <Button type="button">Descargar Excel multi-hoja</Button>
+        <Button type="button">Excel completo multi-hoja</Button>
       </a>
     );
   }
@@ -28,7 +28,7 @@ export function ReportesExcelExport({ canExport }: ReportesExcelExportProps) {
           )
         }
       >
-        Descargar Excel multi-hoja
+        Excel completo multi-hoja
       </Button>
       {permissionError ? (
         <p role="alert" className="max-w-md text-sm font-medium text-[var(--color-danger)]">

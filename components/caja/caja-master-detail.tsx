@@ -55,7 +55,8 @@ export function CajaMasterDetail({
 
   return (
     <>
-      <div className="overflow-hidden rounded-xl border border-[var(--color-border)]">
+      <p className="mb-2 text-xs text-[var(--color-text-secondary)] lg:hidden">Desliza la tabla para ver todas las columnas y acciones.</p>
+      <div role="region" aria-label="Tabla de movimientos de Caja" tabIndex={0} className="max-w-full overflow-x-auto rounded-xl border border-[var(--color-border)] focus-visible:outline-2 focus-visible:outline-offset-2">
         <Table>
           <THead>
             <TRow>

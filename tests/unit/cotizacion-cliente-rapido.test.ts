@@ -67,6 +67,15 @@ describe("completar el cliente recién registrado en Cotizaciones", () => {
     });
   });
 
+  test("alta rápida rechaza documento o teléfono inválido sin crear clientes", async () => {
+    const antes = demoClientesRows().length;
+    for (const cambio of [{ documento: "123456789" }, { documento: "1234567x" }, { telefono: "teléfono incorrecto" }, { tipoPersona: "empresa" as const, documento: "2012345678" }]) {
+      await expect(createClienteCotizacionRapida({ ...datos, ...cambio })).resolves.toMatchObject({ ok: false });
+    }
+    expect(demoClientesRows()).toHaveLength(antes);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+
   test("una empresa conserva el tipo y su RUC al completar datos", async () => {
     const empresa = { ...datos, nombre: "Empresa ficticia", tipoPersona: "empresa" as const, documento: "20000000000" };
     const creado = await createClienteCotizacionRapida({ ...empresa, direccion: "" });

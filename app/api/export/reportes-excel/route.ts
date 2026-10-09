@@ -1,4 +1,5 @@
 import { fechaHoyPeru } from "@/lib/utils";
+import { inventarioRegistroFechaHora } from "@/lib/inventario-historial";
 import { readCompleteTable, readCompleteVentas } from "@/lib/complete-data";
 import { getReportesData } from "@/lib/reportes-data";
 import ExcelJS from "exceljs";
@@ -250,6 +251,7 @@ export async function GET() {
       { header: "Cantidad", key: "cantidad", width: 12 },
       { header: "Costo unitario", key: "costo_unitario", width: 14 },
       { header: "Referencia", key: "referencia", width: 36 },
+      { header: "Registro (Perú)", key: "registro", width: 28 },
     ],
     inventarioMovimientos.map((m) => {
       const producto = inventarioProductos.find((p) => p.id === m.producto_id);
@@ -261,6 +263,7 @@ export async function GET() {
         cantidad: Number(m.cantidad),
         costo_unitario: Number(m.costo_unitario ?? 0),
         referencia: m.referencia ?? "",
+        registro: inventarioRegistroFechaHora(m.created_at),
       };
     }),
   );

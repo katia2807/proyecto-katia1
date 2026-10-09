@@ -1,4 +1,10 @@
 import type { InventarioKardexTipoFiltro } from "@/lib/inventario-filtros";
+import { formatDate } from "@/lib/utils";
+
+export function inventarioRegistroFechaHora(value: string | null | undefined): string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}T/.test(value) || !Number.isFinite(Date.parse(value))) return "Sin hora registrada";
+  return formatDate(value, {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+}
 
 export const INVENTARIO_KARDEX_VISIBLE_LIMIT = 200;
 

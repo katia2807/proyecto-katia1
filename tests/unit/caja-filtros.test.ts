@@ -11,7 +11,7 @@ const row: CajaMovimientoBuscable = {
 describe("Caja: búsqueda y filtros", () => {
   test("normaliza parámetros duplicados, espacios, valores desconocidos y páginas inválidas", () => {
     const filtros = normalizeCajaFiltros({ buscar: ["  José   Pérez  ", "otro"], tipo: "desconocido", medio: "tarjeta", comprobante: "xxx", pagina: "-5" });
-    expect(filtros).toEqual({ buscar: "José Pérez", desde: "", hasta: "", tipo: "todos", medio: "todos", comprobante: "todos", pagina: 1 });
+    expect(filtros).toEqual({ buscar: "José Pérez", desde: "", hasta: "", tipo: "todos", medio: "todos", comprobante: "todos", pagina: 1, por_pagina: 50 });
     expect(normalizeCajaFiltros({ buscar: "x".repeat(200), pagina: "1e100" }).buscar).toHaveLength(160);
     expect(normalizeCajaFiltros({ pagina: "1e100" }).pagina).toBe(1);
     expect(normalizeCajaFiltros({ pagina: "2" }).pagina).toBe(2);

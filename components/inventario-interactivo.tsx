@@ -12,7 +12,9 @@ import { InventarioTomaDecisionesCharts } from "@/components/inventario/inventar
 import { MueblesCatalogoSection } from "@/components/inventario/muebles-catalogo-section";
 import { InventarioResumenValores } from "@/components/inventario/inventario-resumen-valores";
 import { getInventarioFiltros, setInventarioFiltro, type InventarioFiltroParam } from "@/lib/inventario-filtros";
-import { filtrarInventarioKardex, getInventarioKardexExportHref, INVENTARIO_KARDEX_VISIBLE_LIMIT } from "@/lib/inventario-historial";
+import { filtrarInventarioKardex, getInventarioKardexExportHref, inventarioRegistroFechaHora } from "@/lib/inventario-historial";
+import { getInventarioEstadoStock } from "@/lib/inventario-alertas";
+import { LISTADO_TAMANOS, listadoPagina } from "@/lib/listado-paginacion";
 import {
   buildParetoInventarioRows,
   type ParetoInventarioMode,
@@ -68,6 +70,7 @@ type MovimientoRow = {
   cantidad: number;
   costo_unitario: number | null;
   referencia: string | null;
+  created_at?: string | null;
 };
 
 type KardexRow = MovimientoRow & {
@@ -222,9 +225,12 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
   const filterEstado = filtros.estado;
   const filterStockMin = filtros.stockMin;
   const filterStockMax = filtros.stockMax;
+  const productosPageSize = Number(filtros.productosFilas);
+  const kardexPageParam = String(filtros.kardexPagina);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [productosListLimit, setProductosListLimit] = useState(PRODUCTOS_LIST_PAGE);
   const kardexTipo = filtros.kardexTipo;
+  const kardexPageSize = Number(filtros.kardexFilas);
   const kardexProducto = productos.some((p) => p.id === filtros.kardexProducto) ? filtros.kardexProducto : "todos";
   const [paretoMode, setParetoMode] = useState<ParetoInventarioMode>("unidades");
   const [editModalProductId, setEditModalProductId] = useState<string | null>(null);
@@ -352,8 +358,8 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
   }, [filterCategoria, filterEstado, filterStockMax, filterStockMin, filterText, productos]);
 
   useEffect(() => {
-    setProductosListLimit(PRODUCTOS_LIST_PAGE);
-  }, [filterCategoria, filterEstado, filterStockMax, filterStockMin, filterText]);
+    setProductosListLimit(productosPageSize);
+  }, [filterCategoria, filterEstado, filterStockMax, filterStockMin, filterText, productosPageSize]);
 
   const selectedProduct = useMemo(
     () => (selectedProductId ? productos.find((p) => p.id === selectedProductId) ?? null : null),
@@ -402,6 +408,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
   const kardexFiltrado = useMemo(() => {
     return filtrarInventarioKardex(kardex, kardexTipo, kardexProducto);
   }, [kardex, kardexProducto, kardexTipo]);
+  const kardexPagina = listadoPagina(kardexPageParam, kardexFiltrado.length, kardexPageSize);
 
   const paretoInventario = useMemo(
     () => buildParetoInventarioRows(productos, paretoMode),
@@ -604,6 +611,9 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
           </div>
 
           <div className="flex max-w-full flex-wrap items-center gap-3">
+            <SelectField label="Productos por bloque" value={productosPageSize} onChange={e => updateFilter("productos_filas", e.target.value)}>
+              {LISTADO_TAMANOS.map(size => <option key={size} value={size}>{size}</option>)}
+            </SelectField>
             <div className="rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-secondary)]">
               {productosFiltrados.length === 0
                 ? "0 productos"
@@ -674,8 +684,8 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                     )}
 
                     {/* Stock badge */}
-                    <div className="absolute right-2 bottom-2 rounded-lg bg-black/60 backdrop-blur-sm px-2 py-0.5 text-[10px] font-semibold text-white">
-                      Stock: {formatStockQty(row.stock_actual, row.unidad)}
+                    <div className={cn("absolute right-2 bottom-2 rounded-lg border px-2 py-0.5 text-[10px] font-semibold",getInventarioEstadoStock(Number(row.stock_actual),Number(row.stock_minimo)).className)}>
+                      {getInventarioEstadoStock(Number(row.stock_actual),Number(row.stock_minimo)).label}: {formatStockQty(row.stock_actual, row.unidad)}
                     </div>
 
                     {/* Categoría badge */}
@@ -757,6 +767,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-[var(--color-text-primary)]">{row.nombre}</p>
+                    <span className={cn("mt-1 inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold",getInventarioEstadoStock(Number(row.stock_actual),Number(row.stock_minimo)).className)}>{getInventarioEstadoStock(Number(row.stock_actual),Number(row.stock_minimo)).label}</span>
                     <p className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
                       {row.codigo} · {row.categoria} · {row.unidad} · Mín. {formatStockQty(row.stock_minimo, row.unidad)} · Costo unit. promedio: {Number(row.costo_unitario_promedio ?? 0) > 0 ? formatPen(row.costo_unitario_promedio) : "Sin costo en compras"} · Stock {formatStockQty(row.stock_actual, row.unidad)} · Valor: {Number(row.stock_actual) !== 0 && Number(row.costo_unitario_promedio ?? 0) <= 0 ? "Sin costo en compras" : formatPen(row.valor_stock)}
                     </p>
@@ -812,7 +823,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
             <Button
               type="button"
               variant="secondary"
-              onClick={() => setProductosListLimit((n) => n + PRODUCTOS_LIST_PAGE)}
+              onClick={() => setProductosListLimit((n) => n + productosPageSize)}
             >
               Mostrar más ({productosFiltrados.length - productosListLimit} restantes)
             </Button>
@@ -1009,15 +1020,18 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
               <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </SelectField>
-          <a href={getInventarioKardexExportHref(kardexTipo, kardexProducto)} className="md:col-span-2 flex items-end">
+          <SelectField label="Movimientos por página" value={kardexPageSize} onChange={e => updateFilter("kardex_filas", e.target.value)}>
+            {LISTADO_TAMANOS.map(size => <option key={size} value={size}>{size}</option>)}
+          </SelectField>
+          <a href={getInventarioKardexExportHref(kardexTipo, kardexProducto)} className="flex items-end">
             <Button type="button" variant="secondary">Exportar kardex Excel</Button>
           </a>
         </div>
         <p role="status" aria-live="polite" className="mt-3 text-xs text-[var(--color-text-secondary)]">
           {kardexFiltrado.length === 0
             ? "No hay movimientos que coincidan con estos filtros en el historial cargado."
-            : `Mostrando ${Math.min(kardexFiltrado.length, INVENTARIO_KARDEX_VISIBLE_LIMIT)} de ${kardexFiltrado.length} ${kardexFiltrado.length === 1 ? "movimiento que coincide" : "movimientos que coinciden"} en el historial cargado.`}
-          {kardexFiltrado.length > INVENTARIO_KARDEX_VISIBLE_LIMIT
+            : `Mostrando ${(kardexPagina - 1) * kardexPageSize + 1}–${Math.min(kardexPagina * kardexPageSize, kardexFiltrado.length)} de ${kardexFiltrado.length} movimientos que coinciden en el historial cargado.`}
+          {kardexFiltrado.length > kardexPageSize
             ? " Excel incluye todos los movimientos cargados que coinciden con estos filtros."
             : " La descarga Excel conserva estos filtros."}
         </p>
@@ -1031,6 +1045,7 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
             <THead>
               <TRow>
                 <TH>Fecha</TH>
+                <TH>Registro (fecha y hora de Perú)</TH>
                 <TH>Producto</TH>
                 <TH>Tipo</TH>
                 <TH className="text-right">Cantidad</TH>
@@ -1040,9 +1055,10 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
               </TRow>
             </THead>
             <tbody>
-              {kardexFiltrado.slice(0, INVENTARIO_KARDEX_VISIBLE_LIMIT).map((row) => (
+              {kardexFiltrado.slice((kardexPagina - 1) * kardexPageSize, kardexPagina * kardexPageSize).map((row) => (
                 <TRow key={row.id}>
                   <TD>{formatDate(row.fecha)}</TD>
+                  <TD className="whitespace-nowrap">{inventarioRegistroFechaHora(String(row.created_at ?? ""))}</TD>
                   <TD>
                     <ProductoIrAEdicion
                       nombre={row.producto_nombre}
@@ -1075,6 +1091,11 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
             </tbody>
           </Table>
         </div>
+        {kardexFiltrado.length > kardexPageSize ? <nav aria-label="Páginas del Kardex" className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <Button type="button" variant="secondary" disabled={kardexPagina <= 1} onClick={()=>updateFilter("kardex_pagina",String(kardexPagina-1))}>Anterior</Button>
+          <span className="text-sm">Página {kardexPagina} de {Math.ceil(kardexFiltrado.length/kardexPageSize)}</span>
+          <Button type="button" variant="secondary" disabled={kardexPagina*kardexPageSize >= kardexFiltrado.length} onClick={()=>updateFilter("kardex_pagina",String(kardexPagina+1))}>Siguiente</Button>
+        </nav> : null}
       </Card>
       ) : null}
 
@@ -1093,9 +1114,10 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                     onClick={() => {
                       goToProductoEditor(item.id);
                     }}
-                    className="w-full rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-soft)] px-4 py-3 text-left text-sm text-[var(--color-warning-strong)] transition hover:brightness-95"
+                    className={cn("w-full rounded-xl border px-4 py-3 text-left text-sm transition hover:brightness-95", getInventarioEstadoStock(Number(item.stock_actual),Number(item.stock_minimo)).className)}
                   >
                     <span className="font-semibold">{item.nombre}</span> ({formatStockQty(item.stock_actual, item.unidad)}/{formatStockQty(item.stock_minimo, item.unidad)})
+                    <span className="mt-1 block text-xs font-semibold">{getInventarioEstadoStock(Number(item.stock_actual),Number(item.stock_minimo)).label}</span>
                   </button>
                 ))}
               </div>

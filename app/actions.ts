@@ -1,4 +1,5 @@
 "use server";
+import { documentoClienteError, telefonoClienteError } from "@/lib/cotizacion-cliente-validacion";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -1207,6 +1208,9 @@ export async function createClienteCotizacionRapida(input: {
     if (input.nombre.trim().length < 2) {
       return { ok: false, error: "Ingresa el nombre o razón social." };
     }
+    if (!["natural", "empresa"].includes(input.tipoPersona)) return { ok: false, error: "Selecciona persona natural o empresa." };
+    const errorCliente = documentoClienteError(input.tipoPersona, input.documento, false) || telefonoClienteError(input.telefono);
+    if (errorCliente) return { ok: false, error: errorCliente };
     if (!hasSupabaseEnv()) {
       const id = demoCreateCliente({
         organization_id: DEFAULT_ORG_ID,
@@ -1261,6 +1265,8 @@ export async function updateClienteCotizacionRapida(
       tipoPersona: z.enum(["natural", "empresa"]),
     }).safeParse({ ...input, id: clienteId });
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+    const errorCliente = documentoClienteError(parsed.data.tipoPersona, parsed.data.documento, false) || telefonoClienteError(parsed.data.telefono);
+    if (errorCliente) return { ok: false, error: errorCliente };
     const datos = {
       nombre: parsed.data.nombre,
       documento: parsed.data.documento || null,

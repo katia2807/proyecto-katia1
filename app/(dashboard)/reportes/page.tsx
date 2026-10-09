@@ -17,11 +17,14 @@ import { ReportesTabs } from "@/components/reportes/reportes-tabs";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { canCloseMonth, canExportReportesExcel } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
+import { ReportesResumenPanel } from "@/components/reportes/reportes-resumen-panel";
+import { buildReportesResumen, normalizeReportesResumen, reportesResumenError, reportesResumenQuery, type ReportesResumenParams } from "@/lib/reportes-resumen";
+import { listadoPagina, listadoTamano } from "@/lib/listado-paginacion";
 
 export const dynamic = "force-dynamic";
 
 type ReportesPageProps = {
-  searchParams?: Promise<{ tab?: string | string[] }>;
+  searchParams?: Promise<ReportesResumenParams & { por_pagina?: string | string[]; pagina?: string | string[] }>;
 };
 
 const COOKIE_KEY = "antifraud_access";
@@ -42,6 +45,14 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
   const clientesById = new Map(clientes.map(c => [c.id, c]));
   const canDoCloseMonth = canCloseMonth(context.role, context.uiRole);
   const canExcel = canExportReportesExcel(context.role, context.uiRole);
+  const filtros = normalizeReportesResumen(params);
+  const filtrosError = reportesResumenError(filtros);
+  const resumen = filtrosError ? null : buildReportesResumen(caja, filtros);
+  const pageSize = listadoTamano(firstParam(params?.por_pagina));
+  const pagina = listadoPagina(firstParam(params?.pagina), resumen?.movimientos.length ?? 0, pageSize);
+  const rowsVisibles = resumen?.movimientos.slice((pagina - 1) * pageSize, pagina * pageSize) ?? [];
+  const seleccionQuery = reportesResumenQuery(filtros);
+  const paginaHref = (page: number) => `/reportes?${seleccionQuery ? `${seleccionQuery}&` : ""}por_pagina=${pageSize}&pagina=${page}#movimientos-reportes`;
   const canAccessAntifraude = canDoCloseMonth;
   const hasAntifraudePermission = cookieStore.get(COOKIE_KEY)?.value === "granted";
   const today = fechaHoyPeru();
@@ -64,10 +75,11 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
       {/* ── OPERACIONES ── */}
       {activeTab === "operaciones" ? (
         <div className="space-y-6">
+          <ReportesResumenPanel resumen={resumen} filtros={filtros} categorias={[...new Set(caja.map(row => row.categoria))].sort()} canExport={canExcel} error={filtrosError} pageSize={pageSize} />
           <Card className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle>Exportaciones</CardTitle>
-              <CardDescription>Excel operativo con todas las hojas y kardex de inventario.</CardDescription>
+              <CardTitle>Exportaciones completas</CardTitle>
+              <CardDescription>Archivo operativo de todo el historial, sin los filtros del resumen. Para descargar una selección, usa los botones de arriba.</CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/reportes/export">
@@ -77,9 +89,10 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
             </div>
           </Card>
 
-          <Card>
+          <Card id="movimientos-reportes" className="scroll-mt-20">
             <CardTitle>Movimientos de caja auditables</CardTitle>
-            <CardDescription>Cada fila muestra módulo origen, fecha, usuario y referencia.</CardDescription>
+            <CardDescription>Detalle de la selección anterior. Toca una fila para consultar su origen y referencia.</CardDescription>
+            <p role="status" className="mt-2 text-xs text-[var(--katia-text-secondary)]">{filtrosError ? "Corrige las fechas para ver el detalle." : `${resumen?.movimientos.length ?? 0} movimientos. Mostrando ${rowsVisibles.length ? (pagina - 1) * pageSize + 1 : 0}–${(pagina - 1) * pageSize + rowsVisibles.length}.`}</p>
             <div role="region" aria-label="Historial desplazable" tabIndex={0} className="mt-4 overflow-x-auto rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
               <Table>
                 <THead>
@@ -91,14 +104,14 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
                   </TRow>
                 </THead>
                 <tbody>
-                  {caja.length === 0 ? (
+                  {rowsVisibles.length === 0 ? (
                     <TRow>
                       <TD colSpan={4} className="text-center text-[var(--katia-text-secondary)]">
-                        Sin movimientos registrados.
+                        {filtrosError ? "Fechas no válidas." : "Sin movimientos con esta selección."}
                       </TD>
                     </TRow>
                   ) : null}
-                  {caja.map((row) => (
+                  {rowsVisibles.map((row) => (
                     <ReporteFila
                       key={row.id}
                       detalle={{
@@ -120,6 +133,11 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
                 </tbody>
               </Table>
             </div>
+            {resumen && resumen.movimientos.length > pageSize ? <nav aria-label="Páginas de movimientos de Reportes" className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+              {pagina > 1 ? <Link href={paginaHref(pagina - 1)} className="rounded-lg border px-3 py-2">Anterior</Link> : <span />}
+              <span>Página {pagina} de {Math.ceil(resumen.movimientos.length / pageSize)}</span>
+              {pagina * pageSize < resumen.movimientos.length ? <Link href={paginaHref(pagina + 1)} className="rounded-lg border px-3 py-2">Siguiente</Link> : <span />}
+            </nav> : null}
           </Card>
 
           <Card id="cobros-vencidos">
@@ -173,7 +191,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
 
           <Card>
             <CardTitle>Resultado de Caja de empresa por mes</CardTitle>
-            <CardDescription>Ingresos menos egresos de empresa. La nómina registrada es informativa y no se vuelve a descontar de Caja. No representa utilidad contable.</CardDescription>
+            <CardDescription>Historial completo de empresa, sin los filtros del resumen. Ingresos menos egresos; la nómina es informativa y no se vuelve a descontar. No representa utilidad contable.</CardDescription>
             <div role="region" aria-label="Historial desplazable" tabIndex={0} className="mt-4 overflow-x-auto rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)]">
               <Table>
                 <THead>

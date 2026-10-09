@@ -17,6 +17,7 @@ describe("Contexto de consulta de Inventario", () => {
       buscar: "Tornillo & cedro #2 / 50%", categoria: "Barnices y Químicos", estado: "stock_bajo",
       stockMin: "0", stockMax: "12.5", perspectiva: "galeria",
       kardexTipo: "salida_venta", kardexProducto: "producto-1",
+      kardexFilas: 200, kardexPagina: "1", productosFilas: 20,
     });
   });
 
@@ -48,6 +49,7 @@ describe("Contexto de consulta de Inventario", () => {
     expect(getInventarioFiltros(new URLSearchParams())).toEqual({
       buscar: "", categoria: "todas", estado: "todos", stockMin: "", stockMax: "",
       perspectiva: "texto", kardexTipo: "todos", kardexProducto: "todos",
+      kardexFilas: 200, kardexPagina: "1", productosFilas: 20,
     });
   });
 

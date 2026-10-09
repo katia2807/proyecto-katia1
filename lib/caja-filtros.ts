@@ -1,5 +1,6 @@
 import type { CajaVista } from "@/lib/caja-resumen-data";
 import { cajaCategoriaLabel, cajaOrigenLabel } from "@/lib/caja-presentacion";
+import { listadoTamano } from "@/lib/listado-paginacion";
 
 export const CAJA_HISTORY_PAGE_SIZE = 50;
 export const CAJA_TIPOS = ["todos", "ingreso", "egreso", "transferencia"] as const;
@@ -14,6 +15,7 @@ export type CajaFiltros = {
   medio: (typeof CAJA_MEDIOS)[number];
   comprobante: (typeof CAJA_COMPROBANTES)[number];
   pagina: number;
+  por_pagina?: number;
 };
 export type CajaSearchParams = Partial<Record<keyof CajaFiltros | "vista", string | string[]>>;
 export type CajaMovimientoBuscable = {
@@ -50,6 +52,7 @@ export function normalizeCajaFiltros(params: CajaSearchParams = {}): CajaFiltros
     medio: CAJA_MEDIOS.find(value => value === medio) ?? "todos",
     comprobante: CAJA_COMPROBANTES.find(value => value === comprobante) ?? "todos",
     pagina: Number.isSafeInteger(pagina) && pagina > 0 && pagina <= Math.floor(Number.MAX_SAFE_INTEGER / CAJA_HISTORY_PAGE_SIZE) ? pagina : 1,
+    por_pagina: listadoTamano(primero(params.por_pagina), CAJA_HISTORY_PAGE_SIZE),
   };
 }
 
@@ -69,6 +72,7 @@ export function buildCajaHref(vista: CajaVista, filtros: CajaFiltros, pagina = 1
   for (const field of ["buscar", "desde", "hasta"] as const) if (filtros[field]) params.set(field, filtros[field]);
   for (const field of ["tipo", "medio", "comprobante"] as const) if (filtros[field] !== "todos") params.set(field, filtros[field]);
   if (pagina > 1) params.set("pagina", String(normalizeCajaFiltros({ pagina: String(pagina) }).pagina));
+  if (filtros.por_pagina && filtros.por_pagina !== CAJA_HISTORY_PAGE_SIZE) params.set("por_pagina", String(listadoTamano(filtros.por_pagina)));
   const query = params.toString();
   return `/caja${query ? `?${query}` : ""}${anchor ? "#movimientos-caja" : ""}`;
 }

@@ -316,7 +316,7 @@ export function CotizacionMasterDetail({
         title="Aun no hay cotizaciones"
         description="Las cotizaciones ordenan cliente, items, precios, fechas, cobros y produccion."
         actionLabel="Crear cotizacion"
-        actionHref="/cotizacion#cotizacion-wizard"
+        actionHref="/cotizacion#cotizacion-cliente"
       />
     );
   }

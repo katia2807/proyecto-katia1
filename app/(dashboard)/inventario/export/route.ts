@@ -4,7 +4,7 @@ import { requireApiAuth } from "@/lib/api-auth";
 import { getInventarioRobustoData } from "@/lib/data";
 import { getEmpresaConfig } from "@/lib/company-config";
 import { getInventarioFiltros } from "@/lib/inventario-filtros";
-import { filtrarInventarioKardex, getInventarioHistorialAviso } from "@/lib/inventario-historial";
+import { filtrarInventarioKardex, getInventarioHistorialAviso, inventarioRegistroFechaHora } from "@/lib/inventario-historial";
 import { fechaHoyPeru } from "@/lib/utils";
 
 const KATIA_VIOLET = "FF8B5CF6";
@@ -155,7 +155,7 @@ export async function GET(request: Request) {
       const bgColor = dataRowNum % 2 === 0 ? EVEN_ROW : ODD_ROW;
 
       row.eachCell((cell, colNum) => {
-        cell.font = { size: 10, color: { argb: HEADER_FG } };
+        cell.font = { size: 10, color: { argb: stockBajo ? "FF18181B" : HEADER_FG } };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: stockBajo ? DANGER_BG : bgColor } };
         cell.alignment = { vertical: "middle", wrapText: [8, 9].includes(colNum) };
 
@@ -256,7 +256,7 @@ export async function GET(request: Request) {
       properties: { tabColor: { argb: "FF06B6D4" } },
     });
 
-    sheet.mergeCells("A1:I1");
+    sheet.mergeCells("A1:J1");
     const t = sheet.getCell("A1");
     t.value = `${empresa?.nombre ?? "Katia Suite"} — Kardex al ${fechaStr}`;
     t.font = { bold: true, size: 13, color: { argb: HEADER_FG } };
@@ -266,22 +266,22 @@ export async function GET(request: Request) {
     const tipoLabel = { todos: "Todos", entrada_compra: "Entrada compra", salida_venta: "Salida venta", ajuste: "Ajuste" }[tipoKardex];
     const productoLabel = data.productos.find(p => p.id === productoKardex)?.nombre ?? "Todos";
     const scopeRow = sheet.addRow([`${kardexRows.length} ${kardexRows.length === 1 ? "movimiento" : "movimientos"} · Tipo: ${tipoLabel} · Producto: ${productoLabel}${historialAviso ? `\n${historialAviso}` : ""}`]);
-    sheet.mergeCells("A2:I2");
+    sheet.mergeCells("A2:J2");
     scopeRow.height = historialAviso ? 34 : 20;
     scopeRow.getCell(1).font = { size: 9, color: { argb: historialAviso ? DANGER_FG : "FF71717A" } };
     scopeRow.getCell(1).alignment = { wrapText: true, vertical: "middle" };
 
-    const kHeaders = sheet.addRow(["Fecha", "Código", "Producto", "Categoría", "Tipo", "Cantidad", "Impacto", "Costo unit.", "Referencia"]);
+    const kHeaders = sheet.addRow(["Fecha", "Código", "Producto", "Categoría", "Tipo", "Cantidad", "Impacto", "Costo unit.", "Referencia", "Registro (Perú)"]);
     kHeaders.height = 22;
     kHeaders.eachCell((cell) => applyHeaderStyle(cell));
-    [14, 18, 36, 18, 18, 14, 12, 14, 22].forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
+    [14, 18, 36, 18, 18, 14, 12, 14, 22, 28].forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
 
     let rowIdx = 4;
     for (const row of kardexRows) {
       const r = sheet.addRow([
         row.fecha, row.producto_codigo, row.producto_nombre,
         row.categoria, row.tipo, row.cantidad, row.impacto,
-        row.costo_unitario ?? "", row.referencia ?? "",
+        row.costo_unitario ?? "", row.referencia ?? "", inventarioRegistroFechaHora(row.created_at),
       ]);
       r.height = 17;
       r.eachCell((cell) => {
