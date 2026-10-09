@@ -1,6 +1,6 @@
-# Revisión externa: correcciones locales 1.1.69
+# Revisión externa: correcciones publicadas 1.1.69
 
-Fecha: 08/10/2026. Estado: **implementado en local; pendiente de publicación**. Se atendieron las correcciones y opciones aprobadas tras comparar el borrador externo con el comportamiento del programa. El borrador no acreditó un fallo nuevo concreto en Centro de Mando o Registro; no se cambiaron esos apartados.
+Fecha: 08/10/2026. Estado: **publicado; verificación de lectura y Excel completada, CSV publicado y PDF binario pendientes**. Se atendieron las correcciones y opciones aprobadas tras comparar el borrador externo con el comportamiento del programa. El borrador no acreditó un fallo nuevo concreto en Centro de Mando o Registro; no se cambiaron esos apartados.
 
 ## Cambios entregables
 
@@ -24,13 +24,31 @@ Fecha: 08/10/2026. Estado: **implementado en local; pendiente de publicación**.
 
 Compilación final aprobada (Next.js 16.2.4, webpack y comprobación de tipos). Servidor restituido en desarrollo demo con el mismo almacén y puerto 3001; Login responde HTTP 200 y Reportes muestra 1.1.69 con el resumen correcto tras reiniciar. La nota del programa y el historial coinciden, con 212 caracteres. Las huellas SHA-256 de ambos almacenes locales siguen iguales a la inicial: `19FA05D7758DB65EF8854D7DC143F26A55BBD2F8100EA9105B398CC5B2472CC9`.
 
-Evidencias visuales locales: `temp/mejoras-externas-2026-10-08/reportes-movil.jpg` y `reportes-final.jpg`. Excel y CSV descargados: `katia-caja-seleccion-2026-10-08.xlsx` y `.csv` en Descargas. Son archivos de prueba, fuera de la aplicación y sin incluirse en la publicación.
+Evidencias visuales locales: `temp/mejoras-externas-2026-10-08/reportes-movil.jpg` y `reportes-final.jpg`. Excel y CSV locales quedaron agrupados como `resumen-caja-local.xlsx` y `.csv` en `C:\Users\cuent\Downloads\Pruebas Katia\2026-10-08\`. Son archivos de prueba, fuera de la aplicación y sin incluirse en la publicación.
+
+## Publicación y verificación de lectura
+
+Publicación autorizada por el usuario. Commit funcional `b5078d5877bf2b2c243ef25574ef0e402440abf4`, enviado por avance normal a `main` del repositorio `katia2807/proyecto-katia1`. El estado Vercel de GitHub confirmó éxito en [el despliegue habitual](https://vercel.com/grupo-ark-ccatun-rumi-sac/project-ukk6w/2ojMTLvEhPFccRNuFwfsfa4gZJwG); la URL pública muestra 1.1.69 y el texto de actualización coincide con la nota.
+
+- Sesión real Dueña. Antes de navegar se leyeron las rutas y sus lectores auxiliares: consultas de tablas y previsualización del correlativo sin consumirlo. No se guardaron clientes, cotizaciones o movimientos, ni se cerraron meses, borraron registros o cambiaron existencias.
+- Las cuatro tablas anteriores de Reportes coinciden antes/después por contenido, sin exigir el orden de movimientos con la misma fecha: 53 movimientos, dos créditos, tres meses y ausencia de cierres. Referencias privadas: `temp/mejoras-externas-2026-10-08/produccion-reportes-antes.json` y `produccion-reportes-despues.json`, excluidas de Git.
+- Resumen real de julio de 2026, Compra de inventario, Empresa: cuatro movimientos de S/ 5, gastos S/ 20 y resultado -S/ 20. El Excel descargado contiene dos hojas y esas cuatro filas, importes numéricos y mismos totales; comprobado abriendo el archivo, no solo por el aviso de descarga. Conservado como `resumen-caja-produccion.xlsx` en la carpeta de pruebas.
+- Caja: 20 filas, página 2 de 3 y ámbito/tamaño conservados en la URL; saldo S/ 74,677.29 igual al completo. A 390 px, página de 380 px y región de tabla de 305 px con contenido de 773 px, desplazamiento horizontal y foco de teclado.
+- Inventario: 64 productos, 32 avisos y ocho movimientos históricos. Fecha de operación y registro de Perú visibles. Selección CASA DE MASCOTA (GRANDE): cuatro registros; filtro y tamaño 20 conservados, enlace Excel incluye el producto. Bloque 50 y etiquetas de stock comprobados en los temas claro y oscuro; superficies oscuras verificadas después de terminar su transición.
+- Cotizaciones: el acceso deja Nombre/Razón social visible a 463 px en una ventana de 732 px. DNI máximo 8 y RUC máximo 11, tanto en el formulario como en el alta rápida; se abrió y canceló sin guardar ni introducir datos del negocio. No se reprodujeron las pruebas de guardado real: las validaciones servidor y rechazo de datos se comprobaron con casos aislados.
+- Salud pública HTTP 200, demo desactivado y conexiones habituales Supabase listas. Exportación del resumen anónima devuelve 401; vista imprimible anónima redirige con 307. Consola sin errores/advertencias detectados en los recorridos de lectura de Caja, Inventario, Cotizaciones y Reportes.
+
+**Límites de archivos publicados:** la vista imprimible muestra los cuatro movimientos y S/ 20 correctos; el diálogo nativo se abrió, pero no se generó un PDF para inspeccionar. El usuario aclaró que solo descargó Excel. El intento automático de CSV llegó a `ERR_BLOCKED_BY_CLIENT` de Edge, no a un archivo verificable; su contenido publicado sigue pendiente. No se desactivaron protecciones del navegador. Los 177 casos y los Excel/CSV locales no sustituyen estas dos pruebas reales. Evidencia publicada: `temp/mejoras-externas-2026-10-08/reportes-publicado-verificado.jpg`.
+
+## Organización de archivos de prueba
+
+Por petición del usuario, solo se agruparon cuatro archivos de prueba identificados en `C:\Users\cuent\Downloads\Pruebas Katia\2026-10-08\`: Excel/CSV locales del resumen, Excel real del resumen y el Kardex publicado de la revisión anterior. Este último conserva su contenido como `kardex-produccion-2026-10-07.xlsx` (antes `katia-inventario-kardex-2026-10-07 (1).xlsx`). Se eliminó únicamente `katia-caja-seleccion-2026-10-08 (2).xlsx`, después de comparar todas sus hojas, valores y formatos con la copia conservada; sus fechas internas hacían distintas las huellas binarias. Las rutas absolutas se comprobaron dentro de Descargas y no se sobrescribieron destinos. No se tocaron archivos personales ni respaldos, ni se eliminaron archivos solo por su nombre.
 
 ## Seguridad y límites
 
 Servidor reiniciado con `scripts/preview-visual.mjs`, puerto 3001, desarrollo demo y el almacén anterior `temp/propuesta-visual-1.1.64/store.json`. Supabase y Sentry desactivados en ese proceso. Operaciones de escritura rechazadas se probaron con respuestas aisladas; no se guardaron formularios, eliminaron movimientos ni cerraron períodos del negocio. No hay migraciones, nuevas dependencias ni cambios de conexión.
 
-Producción conserva 1.1.68. Solo se abrió el login anónimo publicado para comparar el diseño, después de leer su ruta; no se probaron escrituras reales ni se publicó esta entrega. Las revisiones históricas siguen teniendo sus propios límites.
+Antes de esta publicación, producción conservaba 1.1.68 y solo se había abierto el login anónimo para comparar el diseño. La verificación nueva está descrita arriba; las revisiones históricas siguen teniendo sus propios límites. No hay una garantía de ausencia de cualquier otro error ni una nueva matriz completa de roles: la sesión real usada fue Dueña.
 
 Archivos principales: `lib/reportes-resumen.ts`, `app/api/export/reportes-resumen/route.ts`, `app/print/reportes/page.tsx`, `components/reportes/reportes-resumen-panel.tsx`, `lib/listado-paginacion.ts`, `lib/cotizacion-cliente-validacion.ts`, `lib/inventario-historial.ts`. Se conserva Next.js/React/TypeScript, ExcelJS y la impresión del navegador usada por los documentos existentes; la documentación no participa en la ejecución.
 
