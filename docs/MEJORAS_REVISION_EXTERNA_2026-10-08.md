@@ -1,6 +1,6 @@
 # Revisión externa: correcciones publicadas 1.1.69
 
-Entrega funcional: 08/10/2026, 1.1.69. Comprobación adicional: 09/10/2026. Estado: **publicado; verificación de lectura y de los archivos Excel, CSV y PDF de la selección completada dentro del alcance descrito**. La publicación del registro 1.1.70 está autorizada; su despliegue queda pendiente de confirmación. Se atendieron las correcciones y opciones aprobadas tras comparar el borrador externo con el comportamiento del programa. El borrador no acreditó un fallo nuevo concreto en Centro de Mando o Registro; no se cambiaron esos apartados.
+Entrega funcional: 08/10/2026, 1.1.69. Comprobación adicional y publicación del registro 1.1.70: 09/10/2026. Estado: **publicado; verificación de lectura y de los archivos Excel, CSV y PDF de la selección completada dentro del alcance descrito**. Vercel confirmó el registro 1.1.70; su verificación pública fue de disponibilidad y Login anónimo. Se atendieron las correcciones y opciones aprobadas tras comparar el borrador externo con el comportamiento del programa. El borrador no acreditó un fallo nuevo concreto en Centro de Mando o Registro; no se cambiaron esos apartados.
 
 ## Cambios entregables
 
@@ -48,7 +48,16 @@ Publicación autorizada por el usuario. Commit funcional `b5078d5877bf2b2c243ef2
 - Ambos archivos quedaron como `resumen-caja-produccion.csv` y `.pdf` en `C:\Users\cuent\Downloads\Pruebas Katia\2026-10-09\`. Se comprobaron sus huellas antes y después del traslado, sin sobrescribir destinos ni tocar archivos personales o respaldos. El Excel anterior permanece en la carpeta del 08/10/2026.
 - Evidencias privadas excluidas de Git: `temp/mejoras-externas-2026-10-08/produccion-exportaciones-2026-10-09.json`, `produccion-pdf-2026-10-09.json`, `reportes-csv-produccion-2026-10-09.jpg` y `pdf-produccion-2026-10-09.png`.
 - Alcance: los tres archivos de esa selección real quedan comprobados. El guardado final del PDF fue manual; el control de Windows no pudo completar esa interacción. No se certifican todas las selecciones, tamaños, roles o datos posibles ni se atribuyen nuevas pruebas funcionales, de compilación o de escrituras a este registro.
-- 1.1.70 modifica únicamente la documentación y el aviso para registrar estas comprobaciones. Su publicación fue autorizada por el usuario; la confirmación de Vercel y la comprobación pública quedan pendientes. No cambia rutas, permisos, formularios, cálculos ni datos.
+- 1.1.70 modifica únicamente la documentación y el aviso para registrar estas comprobaciones. Su publicación fue autorizada por el usuario y confirmada por Vercel. No cambia rutas, permisos, formularios, cálculos ni datos.
+
+## Publicación del registro 1.1.70 — 09/10/2026
+
+El commit `4dd883cf5562176892891264ffd2e129762eb01a` se envió por avance normal a `main` del repositorio habitual. La integración Vercel de GitHub confirmó éxito en [el despliegue del proyecto habitual](https://vercel.com/grupo-ark-ccatun-rumi-sac/project-ukk6w/5CcnakXL9z1ePDEyq1dyHANfyDLE). El archivo de versión de ese commit conserva 1.1.70, fecha 09/10/2026 y la nota exacta del historial.
+
+- Local reiniciado en desarrollo demo, puerto 3001 y mismo almacén aislado. Login y salud responden HTTP 200, sin Supabase. Inicio muestra versión 1.1.70 y aviso correcto con la cuenta de prueba; no se repitió el recorrido visual. Las huellas de ambos almacenes siguen iguales a la inicial indicada arriba.
+- Validaciones proporcionales: archivo de versión sin errores de sintaxis, ESLint sin errores, nota de 200 caracteres idéntica a la primera del historial y revisión de espacios de Git correcta. No se repitieron compilación o pruebas funcionales locales para este cambio de constantes y documentos; la publicación sí obtuvo el estado de éxito de Vercel.
+- Producción después del despliegue: Login y `/api/health` HTTP 200; Login presenta el acceso privado sin credenciales de prueba. Salud conserva demo desactivado, Supabase configurado y conexiones de autenticación/datos listas. Se revisaron esas rutas y sus lectores antes de consultarlas; no se guardaron registros del negocio.
+- Límites: la sesión del navegador publicado había expirado. El aviso se comprobó visualmente en local y su contenido en el commit desplegado; no se verificó de nuevo su aparición con sesión real ni se repitieron las revisiones funcionales. La API directa de Vercel devolvió 403 para ese equipo y no había CLI disponible; se usó el estado de su integración habitual de GitHub, sin consultar registros internos de Vercel ni cambiar de proyecto.
 
 ## Organización de archivos de prueba
 
