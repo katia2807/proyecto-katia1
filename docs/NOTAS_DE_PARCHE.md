@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.70 — 09/10/2026
+
+Se comprobaron Excel, CSV y PDF de la selección de Reportes: sus fechas e importes coinciden. El registro de revisión conserva esta evidencia para retomar el trabajo con un estado claro y actualizado.
+
 ## 1.1.69 — 08/10/2026
 
 Caja y Cotizaciones facilitan la navegación y validan mejor los datos. Inventario aclara el stock y la hora de registro; Reportes ofrece resúmenes filtrados en Excel, CSV y PDF. El aviso del login gana contraste.

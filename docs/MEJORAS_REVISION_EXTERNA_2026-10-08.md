@@ -1,6 +1,6 @@
 # Revisión externa: correcciones publicadas 1.1.69
 
-Fecha: 08/10/2026. Estado: **publicado; verificación de lectura y Excel completada, CSV publicado y PDF binario pendientes**. Se atendieron las correcciones y opciones aprobadas tras comparar el borrador externo con el comportamiento del programa. El borrador no acreditó un fallo nuevo concreto en Centro de Mando o Registro; no se cambiaron esos apartados.
+Entrega funcional: 08/10/2026, 1.1.69. Comprobación adicional: 09/10/2026. Estado: **publicado; verificación de lectura y de los archivos Excel, CSV y PDF de la selección completada dentro del alcance descrito**. La publicación del registro 1.1.70 está autorizada; su despliegue queda pendiente de confirmación. Se atendieron las correcciones y opciones aprobadas tras comparar el borrador externo con el comportamiento del programa. El borrador no acreditó un fallo nuevo concreto en Centro de Mando o Registro; no se cambiaron esos apartados.
 
 ## Cambios entregables
 
@@ -38,7 +38,17 @@ Publicación autorizada por el usuario. Commit funcional `b5078d5877bf2b2c243ef2
 - Cotizaciones: el acceso deja Nombre/Razón social visible a 463 px en una ventana de 732 px. DNI máximo 8 y RUC máximo 11, tanto en el formulario como en el alta rápida; se abrió y canceló sin guardar ni introducir datos del negocio. No se reprodujeron las pruebas de guardado real: las validaciones servidor y rechazo de datos se comprobaron con casos aislados.
 - Salud pública HTTP 200, demo desactivado y conexiones habituales Supabase listas. Exportación del resumen anónima devuelve 401; vista imprimible anónima redirige con 307. Consola sin errores/advertencias detectados en los recorridos de lectura de Caja, Inventario, Cotizaciones y Reportes.
 
-**Límites de archivos publicados:** la vista imprimible muestra los cuatro movimientos y S/ 20 correctos; el diálogo nativo se abrió, pero no se generó un PDF para inspeccionar. El usuario aclaró que solo descargó Excel. El intento automático de CSV llegó a `ERR_BLOCKED_BY_CLIENT` de Edge, no a un archivo verificable; su contenido publicado sigue pendiente. No se desactivaron protecciones del navegador. Los 177 casos y los Excel/CSV locales no sustituyen estas dos pruebas reales. Evidencia publicada: `temp/mejoras-externas-2026-10-08/reportes-publicado-verificado.jpg`.
+**Incidencia de archivos del 08/10/2026, resuelta en la comprobación posterior:** la vista imprimible mostraba los cuatro movimientos y S/ 20 correctos, pero faltaba un PDF guardado para inspeccionar. El intento automático de CSV llegó a `ERR_BLOCKED_BY_CLIENT` de Edge. No se desactivaron protecciones del navegador. La evidencia inicial permanece en `temp/mejoras-externas-2026-10-08/reportes-publicado-verificado.jpg`; los archivos reales y el cierre de esas dos pruebas se describen a continuación.
+
+## Comprobación de los archivos pendientes — 09/10/2026
+
+- Producción conserva la entrega funcional 1.1.69. Antes de consultar se revisaron la exportación, la vista imprimible y sus lectores: generación de archivos a partir de consultas, sin guardar registros del negocio.
+- CSV: el control directo del navegador descargó `katia-caja-seleccion-2026-10-09.csv` desde la selección publicada. Se abrió y se compararon sus ocho columnas con el Excel real conservado del día anterior: cuatro gastos de S/ 5 del 03/07/2026, Compra de inventario, Empresa, total S/ 20. Acentos correctos y ninguna diferencia; no se detectaron errores de consola en ese recorrido.
+- PDF: el usuario confirmó el guardado manual. El archivo apareció posteriormente como `Katia Suite.pdf`, de 43.870 bytes; su metadato indica generación con Edge/Skia. Se abrió con pypdf y se renderizó con Poppler: una página A4, período 01–31/07/2026, Empresa, Compra de inventario, cuatro movimientos, ingresos S/ 0, gastos S/ 20 y resultado -S/ 20. La imagen completa se revisó sin recortes ni solapamientos en el texto o la tabla; no incluye los botones de la vista web.
+- Ambos archivos quedaron como `resumen-caja-produccion.csv` y `.pdf` en `C:\Users\cuent\Downloads\Pruebas Katia\2026-10-09\`. Se comprobaron sus huellas antes y después del traslado, sin sobrescribir destinos ni tocar archivos personales o respaldos. El Excel anterior permanece en la carpeta del 08/10/2026.
+- Evidencias privadas excluidas de Git: `temp/mejoras-externas-2026-10-08/produccion-exportaciones-2026-10-09.json`, `produccion-pdf-2026-10-09.json`, `reportes-csv-produccion-2026-10-09.jpg` y `pdf-produccion-2026-10-09.png`.
+- Alcance: los tres archivos de esa selección real quedan comprobados. El guardado final del PDF fue manual; el control de Windows no pudo completar esa interacción. No se certifican todas las selecciones, tamaños, roles o datos posibles ni se atribuyen nuevas pruebas funcionales, de compilación o de escrituras a este registro.
+- 1.1.70 modifica únicamente la documentación y el aviso para registrar estas comprobaciones. Su publicación fue autorizada por el usuario; la confirmación de Vercel y la comprobación pública quedan pendientes. No cambia rutas, permisos, formularios, cálculos ni datos.
 
 ## Organización de archivos de prueba
 
@@ -53,5 +63,11 @@ Antes de esta publicación, producción conservaba 1.1.68 y solo se había abier
 Archivos principales: `lib/reportes-resumen.ts`, `app/api/export/reportes-resumen/route.ts`, `app/print/reportes/page.tsx`, `components/reportes/reportes-resumen-panel.tsx`, `lib/listado-paginacion.ts`, `lib/cotizacion-cliente-validacion.ts`, `lib/inventario-historial.ts`. Se conserva Next.js/React/TypeScript, ExcelJS y la impresión del navegador usada por los documentos existentes; la documentación no participa en la ejecución.
 
 ## Nota de parche
+
+Registro 1.1.70, 09/10/2026:
+
+Se comprobaron Excel, CSV y PDF de la selección de Reportes: sus fechas e importes coinciden. El registro de revisión conserva esta evidencia para retomar el trabajo con un estado claro y actualizado.
+
+Entrega funcional 1.1.69, 08/10/2026:
 
 Caja y Cotizaciones facilitan la navegación y validan mejor los datos. Inventario aclara el stock y la hora de registro; Reportes ofrece resúmenes filtrados en Excel, CSV y PDF. El aviso del login gana contraste.
