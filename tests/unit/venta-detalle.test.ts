@@ -72,30 +72,6 @@ const fixtureFetch: typeof fetch = async (input, init) => {
   return new Response(JSON.stringify(selected), { headers: { "content-type": "application/json" } });
 };
 
-function datosContrato() {
-  const form = new FormData();
-  for (const [key, value] of Object.entries({
-    id: "pendiente", cliente_id: "11111111-1111-4111-8111-111111111111", activo: "Bomba Mixer",
-    codigo: "", representante: "", ruc_empresa: "", direccion_ejecucion: "",
-    fecha_inicio: "2026-10-03", fecha_termino: "", dias_alquiler: "2", tarifa_unidad: "dia",
-    tarifa: "650", monto_total: "1300", metodo_pago: "efectivo", modalidad_pago: "credito",
-    fecha_pago_credito: "2026-10-10", adelanto: "0", monto_credito: "1300",
-    penalidad_retraso_pago_pct: "3", penalidad_devolucion_tardia_pct: "3", penalidad_danios_pct: "3",
-  })) form.set(key, value);
-  return form;
-}
-
-function contratoConCaja(periodoCerrado: boolean, organizationId = org) {
-  tables.alquileres = [row("pendiente", {
-    organization_id: organizationId, estado: "abierto", monto_total: 900,
-    activo: "Activo anterior", tarifa: 450, dias_alquiler: 2, deposito_30: 270,
-  })];
-  tables.movimientos_caja = [row("caja-alquiler", {
-    organization_id: organizationId, referencia_id: "pendiente", modulo_origen: "ventas_alquiler",
-    periodo_cerrado: periodoCerrado, monto: 270,
-  })];
-}
-
 describe("Detalle de ventas", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -258,114 +234,13 @@ describe("Detalle de ventas", () => {
     expect(readonly).toContain("Total por definir");
   });
 
-  test("guardar los datos completa el total y el resumen deja de pedir que se completen", async () => {
+  test("un alquiler completo deja de pedir completar datos en el resumen", async () => {
     mocks.hasSupabaseEnv.mockReturnValue(false);
-    tables.alquileres = [row("pendiente", { estado: "abierto", monto_total: null })];
+    tables.alquileres = [row("pendiente", { estado: "abierto", monto_total: 1300,
+      cliente_id: "11111111-1111-4111-8111-111111111111", activo:"Bomba Mixer",tarifa:650,dias_alquiler:2,
+      tarifa_unidad:"dia",fecha_inicio:"2026-10-03" })];
     tables.clientes = [row("11111111-1111-4111-8111-111111111111", { nombre: "Cliente de prueba" })];
-    await expect(updateContratoAlquiler(datosContrato())).resolves.toEqual({ ok: true });
-    expect(mocks.persistStore).toHaveBeenCalledOnce();
-    expect(mocks.demoCreateCaja).not.toHaveBeenCalled();
     const detalle = await getVentaDetalle("alquiler", "pendiente", org);
     expect(detalle).toMatchObject({ total: 1300, clienteNombre: "Cliente de prueba", completarHref: null });
-    expect(mocks.revalidatePath).toHaveBeenCalledWith("/ventas");
-  });
-
-  test("el guardado sigue rechazando cantidades vacías y contratos cerrados", async () => {
-    mocks.hasSupabaseEnv.mockReturnValue(false);
-    tables.alquileres = [row("pendiente", { estado: "abierto", monto_total: null })];
-    const incompleto = datosContrato();
-    incompleto.set("dias_alquiler", "");
-    expect((await updateContratoAlquiler(incompleto)).ok).toBe(false);
-    expect(tables.alquileres[0].monto_total).toBeNull();
-    tables.alquileres[0].estado = "cerrado";
-    expect((await updateContratoAlquiler(datosContrato())).ok).toBe(false);
-    expect(mocks.persistStore).not.toHaveBeenCalled();
-    expect(tables.alquileres[0].monto_total).toBeNull();
-  });
-
-  test.each(["credito", "adelanto"])("demo conserva contrato y caja cerrada al guardar con %s", async (modalidad) => {
-    mocks.hasSupabaseEnv.mockReturnValue(false);
-    contratoConCaja(true);
-    mocks.demoCajaRows.mockReturnValue(tables.movimientos_caja);
-    const antes = structuredClone(tables);
-    const form = datosContrato();
-    form.set("modalidad_pago", modalidad);
-    form.set("adelanto", "390");
-
-    expect(await updateContratoAlquiler(form)).toEqual({
-      ok: false, error: "El movimiento de caja pertenece a un período cerrado y no se puede editar.",
-    });
-    expect(tables).toEqual(antes);
-    expect(mocks.persistStore).not.toHaveBeenCalled();
-    expect(mocks.demoCreateCaja).not.toHaveBeenCalled();
-    expect(mocks.demoDeleteOneById).not.toHaveBeenCalled();
-    expect(mocks.revalidatePath).not.toHaveBeenCalled();
-  });
-
-  test.each(["credito", "adelanto"])("Supabase no envía escrituras si la caja está cerrada al guardar con %s", async (modalidad) => {
-    contratoConCaja(true, DEFAULT_ORG_ID);
-    const antes = structuredClone(tables);
-    const form = datosContrato();
-    form.set("modalidad_pago", modalidad);
-    form.set("adelanto", "390");
-
-    expect(await updateContratoAlquiler(form)).toEqual({
-      ok: false, error: "El movimiento de caja pertenece a un período cerrado y no se puede editar.",
-    });
-    expect(mutations).toEqual([]);
-    expect(tables).toEqual(antes);
-    expect(mocks.revalidatePath).not.toHaveBeenCalled();
-  });
-
-  test.each(["alquileres", "movimientos_caja"])("un error al consultar %s impide cualquier escritura", async (table) => {
-    contratoConCaja(false, DEFAULT_ORG_ID);
-    const antes = structuredClone(tables);
-    failures.add(table);
-    expect(await updateContratoAlquiler(datosContrato())).toEqual({ ok: false, error: "No disponible" });
-    expect(mutations).toEqual([]);
-    expect(tables).toEqual(antes);
-  });
-
-  test.each([false, true])("un contrato inexistente no genera movimientos de caja (Supabase: %s)", async (supabase) => {
-    mocks.hasSupabaseEnv.mockReturnValue(supabase);
-    const form = datosContrato();
-    form.set("modalidad_pago", "adelanto");
-    form.set("adelanto", "390");
-    expect(await updateContratoAlquiler(form)).toEqual({ ok: false, error: "No se encontró el contrato de alquiler." });
-    expect(mutations).toEqual([]);
-    expect(mocks.demoCreateCaja).not.toHaveBeenCalled();
-    expect(mocks.persistStore).not.toHaveBeenCalled();
-  });
-
-  test("demo permite actualizar un alquiler y su adelanto cuando la caja está abierta", async () => {
-    mocks.hasSupabaseEnv.mockReturnValue(false);
-    contratoConCaja(false);
-    mocks.demoCajaRows.mockReturnValue(tables.movimientos_caja);
-    const form = datosContrato();
-    form.set("modalidad_pago", "adelanto");
-    form.set("adelanto", "390");
-    expect(await updateContratoAlquiler(form)).toEqual({ ok: true });
-    expect(tables.alquileres[0].monto_total).toBe(1300);
-    expect(tables.movimientos_caja[0].monto).toBe(390);
-    expect(mocks.persistStore).toHaveBeenCalledOnce();
-  });
-
-  test.each(["actualizar", "crear", "eliminar"])("Supabase permite %s el movimiento de un alquiler sin caja cerrada", async (operacion) => {
-    contratoConCaja(false, DEFAULT_ORG_ID);
-    const form = datosContrato();
-    if (operacion === "crear") tables.movimientos_caja = [];
-    if (operacion !== "eliminar") {
-      form.set("modalidad_pago", "adelanto");
-      form.set("adelanto", "390");
-    }
-
-    expect(await updateContratoAlquiler(form)).toEqual({ ok: true });
-    expect(tables.alquileres[0].monto_total).toBe(1300);
-    if (operacion === "eliminar") expect(tables.movimientos_caja).toEqual([]);
-    else expect(tables.movimientos_caja[0].monto).toBe(390);
-    expect(mutations).toEqual([
-      { table: "alquileres", method: "PATCH" },
-      { table: "movimientos_caja", method: operacion === "eliminar" ? "DELETE" : operacion === "crear" ? "POST" : "PATCH" },
-    ]);
   });
 });

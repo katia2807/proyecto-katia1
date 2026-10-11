@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.71";
+export const APP_VERSION = "1.1.73";
 export const APP_LAST_UPDATE = "10/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Los cobros respetan la modalidad y el medio de pago, descuentan adelantos y evitan cierres duplicados o guardados incompletos. Se bloquean adelantos excesivos y se retira la lectura de PDF que simulaba datos.";
+  "Se corrigieron guardados parciales, anulaciones y reintentos que podían descuadrar Caja o stock. Los meses cerrados quedan protegidos y ventas, compras y alquileres conservan sus importes y pasos habituales.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {

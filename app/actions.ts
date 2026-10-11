@@ -51,9 +51,6 @@ import {
   demoResetStore,
   demoCreateServicioAserradero,
   demoCreateSueldo,
-  demoCreateVenta,
-  demoCreateVentaMaderaCortada,
-  demoCreateVentaMuebleTerminado,
   demoCreateZonaEntrega,
   demoMarcarEntregaMueble,
   demoRegistrarConteoInventario,
@@ -80,6 +77,7 @@ import type { MutationFormState } from "@/lib/mutation-form-state";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole, Json } from "@/lib/supabase/types";
 import { roundMoney, safeDivide, parseDecimal } from "@/lib/utils";
+import { claveOperacion, registrarOperacionIntegral, anularOperacionIntegral, nombreClienteOperacion } from '@/lib/operaciones-integrales';
 import { montoCobradoVenta, mensajeOperacionFinanciera } from "@/lib/ventas-pago";
 import { resumenCobroLocal } from "@/lib/cotizacion-cobros";
 import {
@@ -916,178 +914,45 @@ export async function eliminarDatoIndividual(formData: FormData) {
 }
 
 export async function createVentaMadera(formData: FormData) {
-  const actor = await requireMutationAccess(ventasRoles);
-  const parsed = ventaSchema.safeParse({
-    clienteId: formData.get("cliente_id"),
-    fecha: formData.get("fecha"),
-    total: formData.get("total"),
-    estado: formData.get("estado"),
-    metodoPago: formData.get("metodo_pago") ?? undefined,
-    modalidadPago: formData.get("modalidad_pago") ?? undefined,
-    adelanto: formData.get("adelanto") ?? undefined,
-    fechaPagoCredito: formData.get("fecha_pago_credito") ?? undefined,
-    productoInventarioId: formData.get("inventario_producto_id"),
-    cantidadProducto: formData.get("cantidad_producto"),
-    tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
-    urlComprobante: formData.get("url_comprobante"),
-  });
-
-  if (!parsed.success) {
-    throw new Error("Datos de venta inválidos.");
-  }
-
-  const modalidadPago = parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago;
-  const adelanto = modalidadPago === "adelanto" ? parsed.data.adelanto : 0;
-  const montoCaja = montoCobradoVenta(parsed.data.total, modalidadPago, adelanto);
-
-  // Obtener nombre de cliente para la descripción de caja
-  let clienteNombre = "Cliente Desconocido";
-  if (!hasSupabaseEnv()) {
-    const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
-    if (c) clienteNombre = c.nombre;
-  } else {
-    const supabase = getSupabaseServerClient();
-    const { data: cData } = await supabase
-      .from("clientes")
-      .select("nombre")
-      .eq("id", parsed.data.clienteId)
-      .maybeSingle();
-    if (cData) clienteNombre = cData.nombre;
-  }
-
-  if (!hasSupabaseEnv()) {
-    const anioCorrel = Number(parsed.data.fecha.slice(0, 4)) || new Date().getFullYear();
-    const correlativo = await nextCorrelativo("venta_madera", anioCorrel);
-    const venta = demoCreateVenta({
-      organization_id: DEFAULT_ORG_ID,
-      cliente_id: parsed.data.clienteId,
-      fecha: parsed.data.fecha,
-      total: parsed.data.total,
-      estado: parsed.data.estado,
-      correlativo,
-      confirmaIngreso: false,
-      metodo_pago: parsed.data.metodoPago,
-      modalidad_pago: modalidadPago,
-      adelanto,
-      fecha_pago_credito: parsed.data.fechaPagoCredito || null,
+    const actor = await requireMutationAccess(ventasRoles);
+    const parsed = ventaSchema.safeParse({
+        clienteId: formData.get("cliente_id"),
+        fecha: formData.get("fecha"),
+        total: formData.get("total"),
+        estado: formData.get("estado"),
+        metodoPago: formData.get("metodo_pago") ?? undefined,
+        modalidadPago: formData.get("modalidad_pago") ?? undefined,
+        adelanto: formData.get("adelanto") ?? undefined,
+        fechaPagoCredito: formData.get("fecha_pago_credito") ?? undefined,
+        productoInventarioId: formData.get("inventario_producto_id"),
+        cantidadProducto: formData.get("cantidad_producto"),
+        tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
+        urlComprobante: formData.get("url_comprobante"),
     });
-    if (parsed.data.estado === "confirmada" && parsed.data.productoInventarioId && parsed.data.cantidadProducto) {
-      demoCreateInventarioMovimiento({
-        organization_id: DEFAULT_ORG_ID,
-        producto_id: parsed.data.productoInventarioId,
-        fecha: parsed.data.fecha,
-        tipo: "salida_venta",
-        cantidad: parsed.data.cantidadProducto,
-        costo_unitario: safeDivide(parsed.data.total, parsed.data.cantidadProducto),
-        referencia: "Venta confirmada",
-      });
+    if (!parsed.success) {
+        throw new Error("Datos de venta inválidos.");
     }
-    if (parsed.data.estado === "confirmada" && montoCaja > 0) {
-      demoCreateCaja({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fecha,
-        tipo: "ingreso",
-        medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
-        categoria: "venta_madera",
-        monto: montoCaja,
-        descripcion: `Venta de madera - ${clienteNombre}`,
-        modulo_origen: "ventas_madera",
-        referencia_id: venta.id,
-      });
-    }
-  } else {
-    const supabase = getSupabaseServerClient();
-    const anioCorrel = Number(parsed.data.fecha.slice(0, 4)) || new Date().getFullYear();
-    const correlativo = await nextCorrelativo("venta_madera", anioCorrel);
-
-    const { data, error } = await supabase
-      .from("ventas_madera")
-      .insert({
-        organization_id: DEFAULT_ORG_ID,
-        cliente_id: parsed.data.clienteId,
-        fecha: parsed.data.fecha,
-        total: parsed.data.total,
-        estado: parsed.data.estado,
-        correlativo,
-        created_by: actor.userId,
-        metodo_pago: parsed.data.metodoPago,
-        modalidad_pago: modalidadPago,
-        adelanto,
-        fecha_pago_credito: parsed.data.fechaPagoCredito || null,
-      })
-      .select("id")
-      .single();
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (parsed.data.cantidadProducto) {
-      const precioUnitario = safeDivide(parsed.data.total, parsed.data.cantidadProducto);
-      const { error: lineaError } = await supabase.from("ventas_madera_lineas").insert({
-        venta_id: data.id,
-        item_id: null,
-        cantidad: parsed.data.cantidadProducto,
-        precio_unitario: precioUnitario,
-      });
-      if (lineaError) {
-        await supabase.from("ventas_madera").delete().eq("id", data.id);
-        throw new Error(lineaError.message);
-      }
-    }
-
-    let inventarioInsertado = false;
-    if (parsed.data.estado === "confirmada" && parsed.data.productoInventarioId && parsed.data.cantidadProducto) {
-      const { error: inventarioError } = await supabase.from("inventario_movimientos").insert({
-        organization_id: DEFAULT_ORG_ID,
-        producto_id: parsed.data.productoInventarioId,
-        fecha: parsed.data.fecha,
-        tipo: "salida_venta",
-        cantidad: parsed.data.cantidadProducto,
-        referencia: `venta:${data.id}`,
-      });
-      if (inventarioError) {
-        await supabase.from("ventas_madera_lineas").delete().eq("venta_id", data.id);
-        await supabase.from("ventas_madera").delete().eq("id", data.id);
-        throw new Error(inventarioError.message);
-      }
-      inventarioInsertado = true;
-    }
-
-    if (parsed.data.estado === "confirmada" && montoCaja > 0) {
-      const { error: cajaError } = await supabase.from("movimientos_caja").insert({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fecha,
-        tipo: "ingreso",
-        medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
-        categoria: "venta_madera",
-        monto: montoCaja,
-        descripcion: `Venta de madera - ${clienteNombre}`,
-        modulo_origen: "ventas_madera",
-        referencia_id: data.id,
-        tipo_comprobante: parsed.data.tipoComprobante,
-        url_comprobante: parsed.data.urlComprobante ?? null,
-        created_by: actor.userId,
-        updated_by: actor.userId,
-      });
-      if (cajaError) {
-        if (inventarioInsertado) {
-          await supabase
-            .from("inventario_movimientos")
-            .delete()
-            .eq("organization_id", DEFAULT_ORG_ID)
-            .eq("referencia", `venta:${data.id}`);
-        }
-        await supabase.from("ventas_madera_lineas").delete().eq("venta_id", data.id);
-        await supabase.from("ventas_madera").delete().eq("id", data.id);
-        throw new Error(cajaError.message);
-      }
-    }
-  }
-
-  revalidatePath("/ventas");
-  revalidatePath("/caja");
-  revalidatePath("/");
-  maybeRedirectToQuickStep(formData);
+    const modalidadPago = parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago;
+    const adelanto = modalidadPago === "adelanto" ? parsed.data.adelanto : 0;
+    const montoCaja = montoCobradoVenta(parsed.data.total, modalidadPago, adelanto);
+    const clienteNombre = await nombreClienteOperacion(parsed.data.clienteId, actor.organizationId);
+    const descripcionCaja = 'Venta de madera - ' + clienteNombre;
+    const correlativo = await nextCorrelativo('venta_madera', Number(parsed.data.fecha.slice(0, 4)) || new Date().getFullYear());
+    const stock = parsed.data.estado === 'confirmada' && parsed.data.productoInventarioId && parsed.data.cantidadProducto
+        ? [{ producto_id: parsed.data.productoInventarioId, cantidad: parsed.data.cantidadProducto,
+            costo_unitario: safeDivide(parsed.data.total, parsed.data.cantidadProducto) }] : [];
+    const caja = montoCaja > 0 ? { fecha: parsed.data.fecha, tipo: 'ingreso', medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
+        categoria: 'venta_madera', monto: montoCaja, descripcion: descripcionCaja, tipo_comprobante: parsed.data.tipoComprobante,
+        url_comprobante: parsed.data.urlComprobante ?? null } : null;
+    await registrarOperacionIntegral(actor, { tipo: 'venta_madera', clave: claveOperacion(formData),
+        documento: { cliente_id: parsed.data.clienteId, fecha: parsed.data.fecha, total: parsed.data.total, estado: parsed.data.estado, correlativo,
+            metodo_pago: parsed.data.metodoPago, modalidad_pago: modalidadPago, adelanto, fecha_pago_credito: parsed.data.fechaPagoCredito || null },
+        lineas: parsed.data.cantidadProducto ? [{ item_id: null, cantidad: parsed.data.cantidadProducto, precio_unitario: safeDivide(parsed.data.total, parsed.data.cantidadProducto) }] : [],
+        stock, caja: parsed.data.estado === 'confirmada' ? caja : null });
+    revalidatePath('/ventas');
+    revalidatePath('/caja');
+    revalidatePath('/');
+    maybeRedirectToQuickStep(formData);
 }
 
 /** Wrapper con MutationFormState para useActionState (cierre automático del modal). */
@@ -1919,7 +1784,7 @@ export async function createChofer(formData: FormData) {
 
 export async function updateChofer(id: string, formData: FormData) {
   await requireMutationAccess(writerRoles);
-  
+
   const activoVal = formData.get("activo");
   const activo = activoVal === "true" || activoVal === "on" || activoVal === "1";
 
@@ -2736,101 +2601,31 @@ export async function submitCreateInventarioMovimientoForm(
 }
 
 export async function createInventarioCompraRapida(formData: FormData) {
-  const actor = await requireMutationAccess(writerRoles);
-  const parsed = inventarioCompraRapidaSchema.safeParse({
-    productoId: formData.get("producto_id"),
-    cantidad: formData.get("cantidad"),
-    costoUnitario: formData.get("costo_unitario"),
-    proveedor: formData.get("proveedor"),
-    fecha: formData.get("fecha"),
-    nota: formData.get("nota"),
-    tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
-    urlComprobante: formData.get("url_comprobante"),
-  });
-  if (!parsed.success) {
-    throw new Error("Datos de compra inválidos.");
-  }
-
-  const referenciaPartes = [parsed.data.proveedor?.trim(), parsed.data.nota?.trim()].filter(Boolean);
-  const referencia = referenciaPartes.join(" · ") || null;
-  const costoUnitario = parsed.data.costoUnitario ?? null;
-  const montoCompra = costoUnitario && costoUnitario > 0 ? roundMoney(parsed.data.cantidad * costoUnitario) : 0;
-
-  if (!hasSupabaseEnv()) {
-    demoCreateInventarioMovimiento({
-      organization_id: DEFAULT_ORG_ID,
-      producto_id: parsed.data.productoId,
-      fecha: parsed.data.fecha,
-      tipo: "entrada_compra",
-      cantidad: parsed.data.cantidad,
-      costo_unitario: costoUnitario,
-      referencia,
+    const actor = await requireMutationAccess(writerRoles);
+    const parsed = inventarioCompraRapidaSchema.safeParse({
+        productoId: formData.get("producto_id"),
+        cantidad: formData.get("cantidad"),
+        costoUnitario: formData.get("costo_unitario"),
+        proveedor: formData.get("proveedor"),
+        fecha: formData.get("fecha"),
+        nota: formData.get("nota"),
+        tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
+        urlComprobante: formData.get("url_comprobante"),
     });
-    if (montoCompra > 0) {
-      demoCreateCaja({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fecha,
-        tipo: "egreso",
-        medio: "efectivo",
-        categoria: "compra_inventario",
-        monto: montoCompra,
-        descripcion: referencia ? `Compra de inventario: ${referencia}` : "Compra de inventario",
-        modulo_origen: "inventario",
-        tipo_comprobante: parsed.data.tipoComprobante,
-        url_comprobante: parsed.data.urlComprobante ?? null,
-      });
+    if (!parsed.success) {
+        throw new Error("Datos de compra inválidos.");
     }
-  } else {
-    const supabase = getSupabaseServerClient();
-    const { data: producto, error: productoErr } = await supabase
-      .from("inventario_productos")
-      .select("id, nombre")
-      .eq("id", parsed.data.productoId)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .maybeSingle();
-    if (productoErr) throw new Error(productoErr.message);
-    if (!producto) throw new Error("Producto no encontrado.");
-
-    const { data: movimiento, error: movErr } = await supabase
-      .from("inventario_movimientos")
-      .insert({
-        organization_id: DEFAULT_ORG_ID,
-        producto_id: parsed.data.productoId,
-        fecha: parsed.data.fecha,
-        tipo: "entrada_compra",
-        cantidad: parsed.data.cantidad,
-        costo_unitario: costoUnitario,
-        referencia,
-      })
-      .select("id")
-      .single();
-    if (movErr || !movimiento) throw new Error(movErr?.message ?? "No se pudo registrar la entrada.");
-
-    if (montoCompra > 0) {
-      const { error: cajaErr } = await supabase.from("movimientos_caja").insert({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fecha,
-        tipo: "egreso",
-        medio: "efectivo",
-        categoria: "compra_inventario",
-        monto: montoCompra,
-        descripcion: `Compra de inventario: ${producto.nombre}`,
-        modulo_origen: "inventario",
-        referencia_id: movimiento.id,
-        tipo_comprobante: parsed.data.tipoComprobante,
-        url_comprobante: parsed.data.urlComprobante ?? null,
-        created_by: actor.userId,
-        updated_by: actor.userId,
-      });
-      if (cajaErr) {
-        throw new Error(cajaErr.message);
-      }
-    }
-  }
-
-  revalidatePath("/inventario");
-  revalidatePath("/caja");
-  revalidatePath("/");
+    const referencia = [parsed.data.proveedor?.trim(), parsed.data.nota?.trim()].filter(Boolean).join(' · ') || null;
+    const costoUnitario = parsed.data.costoUnitario ?? null;
+    const monto = costoUnitario && costoUnitario > 0 ? roundMoney(parsed.data.cantidad * costoUnitario) : 0;
+    await registrarOperacionIntegral(actor, { tipo: 'compra_inventario', clave: claveOperacion(formData), documento: { fecha: parsed.data.fecha },
+        stock: [{ producto_id: parsed.data.productoId, cantidad: parsed.data.cantidad, costo_unitario: costoUnitario, referencia }],
+        caja: monto > 0 ? { fecha: parsed.data.fecha, tipo: 'egreso', medio: 'efectivo', categoria: 'compra_inventario', monto,
+            descripcion: referencia ? 'Compra de inventario: ' + referencia : 'Compra de inventario',
+            tipo_comprobante: parsed.data.tipoComprobante, url_comprobante: parsed.data.urlComprobante ?? null } : null });
+    revalidatePath('/inventario');
+    revalidatePath('/caja');
+    revalidatePath('/');
 }
 
 export async function updateInventarioProducto(formData: FormData) {
@@ -3336,173 +3131,48 @@ export async function deleteMuebleCatalogo(
 }
 
 export async function createVentaMuebleTerminado(formData: FormData) {
-  const actor = await requireMutationAccess(ventasRoles);
-  const parsed = ventaMuebleTerminadoSchema.safeParse({
-    clienteId: formData.get("cliente_id"),
-    muebleCatalogoId: formData.get("mueble_catalogo_id"),
-    cantidad: formData.get("cantidad"),
-    precioUnitario: formData.get("precio_unitario"),
-    fecha: formData.get("fecha"),
-    choferId: formData.get("chofer_id"),
-    tipoEntrega: formData.get("tipo_entrega"),
-    direccionEntrega: formData.get("direccion_entrega"),
-    estadoEntrega: formData.get("estado_entrega"),
-    metodoPago: formData.get("metodo_pago"),
-    modalidadPago: formData.get("modalidad_pago"),
-    fechaPagoCredito: formData.get("fecha_pago_credito"),
-    adelanto: formData.get("adelanto"),
-    montoCredito: formData.get("monto_credito"),
-    tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
-    urlComprobante: formData.get("url_comprobante"),
-  });
-  if (!parsed.success) {
-    throw new Error("Datos de venta de mueble inválidos.");
-  }
-
-  await assertClientePuedeEmitirFactura(parsed.data.clienteId, parsed.data.tipoComprobante);
-
-  const total = roundMoney(parsed.data.precioUnitario * parsed.data.cantidad);
-
-  const montoCaja = montoCobradoVenta(total, parsed.data.modalidadPago, parsed.data.adelanto);
-
-  // Obtener nombre de cliente para la descripción de caja
-  let clienteNombre = "Cliente Desconocido";
-  if (!hasSupabaseEnv()) {
-    const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
-    if (c) clienteNombre = c.nombre;
-  } else {
-    const supabase = getSupabaseServerClient();
-    const { data: cData } = await supabase
-      .from("clientes")
-      .select("nombre")
-      .eq("id", parsed.data.clienteId)
-      .maybeSingle();
-    if (cData) clienteNombre = cData.nombre;
-  }
-
-  if (!hasSupabaseEnv()) {
-    demoCreateVentaMuebleTerminado({
-      organization_id: DEFAULT_ORG_ID,
-      cliente_id: parsed.data.clienteId,
-      mueble_catalogo_id: parsed.data.muebleCatalogoId,
-      cantidad: parsed.data.cantidad,
-      precio_unitario: parsed.data.precioUnitario,
-      total,
-      chofer_id: parsed.data.choferId || null,
-      tipo_entrega: parsed.data.tipoEntrega,
-      direccion_entrega: parsed.data.direccionEntrega || null,
-      estado_entrega: parsed.data.estadoEntrega,
-      metodo_pago: parsed.data.metodoPago,
-      modalidad_pago: parsed.data.modalidadPago,
-      fecha_pago_credito: parsed.data.fechaPagoCredito || null,
-      adelanto: parsed.data.adelanto,
-      montoCredito: parsed.data.montoCredito,
-      fecha: parsed.data.fecha,
-      correlativo: await nextCorrelativo("venta_mueble"),
-      confirmaIngreso: false, // Desactivar ingreso implícito para controlarlo manualmente
+    const actor = await requireMutationAccess(ventasRoles);
+    const parsed = ventaMuebleTerminadoSchema.safeParse({
+        clienteId: formData.get("cliente_id"),
+        muebleCatalogoId: formData.get("mueble_catalogo_id"),
+        cantidad: formData.get("cantidad"),
+        precioUnitario: formData.get("precio_unitario"),
+        fecha: formData.get("fecha"),
+        choferId: formData.get("chofer_id"),
+        tipoEntrega: formData.get("tipo_entrega"),
+        direccionEntrega: formData.get("direccion_entrega"),
+        estadoEntrega: formData.get("estado_entrega"),
+        metodoPago: formData.get("metodo_pago"),
+        modalidadPago: formData.get("modalidad_pago"),
+        fechaPagoCredito: formData.get("fecha_pago_credito"),
+        adelanto: formData.get("adelanto"),
+        montoCredito: formData.get("monto_credito"),
+        tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
+        urlComprobante: formData.get("url_comprobante"),
     });
-
-    if (montoCaja > 0) {
-      demoCreateCaja({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fecha,
-        tipo: "ingreso",
-        medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
-        categoria: "venta_mueble_terminado",
-        monto: montoCaja,
-        descripcion: `Venta de mueble - ${clienteNombre}`,
-        modulo_origen: "ventas_muebles_terminados",
-      });
+    if (!parsed.success) {
+        throw new Error("Datos de venta de mueble inválidos.");
     }
-  } else {
-    const supabase = getSupabaseServerClient();
-    const muebleId = parsed.data.muebleCatalogoId;
-
-    const { data: mueble, error: muebleErr } = await supabase
-      .from("muebles_catalogo")
-      .select("id, nombre, stock_disponible")
-      .eq("id", muebleId)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .maybeSingle();
-
-    if (muebleErr) {
-      throw new Error(muebleErr.message);
-    }
-    if (!mueble) {
-      throw new Error("El mueble seleccionado no existe en el catálogo.");
-    }
-    if (mueble.stock_disponible < parsed.data.cantidad) {
-      throw new Error("Stock insuficiente para esta venta.");
-    }
-
-    const correlativo = await nextCorrelativo("venta_mueble");
-    const fechaCredito =
-      parsed.data.modalidadPago === "credito" && parsed.data.fechaPagoCredito
-        ? parsed.data.fechaPagoCredito
-        : null;
-
-    const { data: venta, error: ventaErr } = await supabase
-      .from("ventas_mueble_terminado")
-      .insert({
-        organization_id: DEFAULT_ORG_ID,
-        cliente_id: parsed.data.clienteId,
-        mueble_catalogo_id: muebleId,
-        cantidad: parsed.data.cantidad,
-        precio_unitario: parsed.data.precioUnitario,
-        total,
-        chofer_id: parsed.data.choferId || null,
-        tipo_entrega: parsed.data.tipoEntrega,
-        direccion_entrega: parsed.data.direccionEntrega?.trim() || null,
-        estado_entrega: parsed.data.estadoEntrega,
-        metodo_pago: parsed.data.metodoPago,
-        modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
-        fecha_pago_credito: fechaCredito,
-        correlativo,
-        fecha: parsed.data.fecha,
-        created_by: actor.userId,
-        updated_by: actor.userId,
-      })
-      .select("id")
-      .single();
-
-    if (ventaErr || !venta) {
-      throw new Error(ventaErr?.message ?? "No se pudo registrar la venta.");
-    }
-
-    const stockPrevio = mueble.stock_disponible;
-
-    if (montoCaja > 0) {
-      const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
-      const { error: cajaError } = await supabase.from("movimientos_caja").insert({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fecha,
-        tipo: "ingreso",
-        medio: medioCaja,
-        categoria: "venta_mueble_terminado",
-        monto: montoCaja,
-        descripcion: `Venta de mueble - ${clienteNombre}`,
-        modulo_origen: "ventas_muebles_terminados",
-        referencia_id: venta.id,
-        tipo_comprobante: parsed.data.tipoComprobante,
-        url_comprobante: parsed.data.urlComprobante ?? null,
-        created_by: actor.userId,
-        updated_by: actor.userId,
-      });
-      if (cajaError) {
-        await supabase
-          .from("muebles_catalogo")
-          .update({ stock_disponible: stockPrevio })
-          .eq("id", muebleId)
-          .eq("organization_id", DEFAULT_ORG_ID);
-        await supabase.from("ventas_mueble_terminado").delete().eq("id", venta.id);
-        throw new Error(cajaError.message);
-      }
-    }
-  }
-
-  revalidatePath("/ventas");
-  revalidatePath("/ventas/muebles-terminados");
-  revalidatePath("/caja");
+    await assertClientePuedeEmitirFactura(parsed.data.clienteId, parsed.data.tipoComprobante);
+    const total = roundMoney(parsed.data.precioUnitario * parsed.data.cantidad);
+    const montoCaja = montoCobradoVenta(total, parsed.data.modalidadPago, parsed.data.adelanto);
+    const clienteNombre = await nombreClienteOperacion(parsed.data.clienteId, actor.organizationId);
+    const descripcionCaja = 'Venta de mueble - ' + clienteNombre;
+    const correlativo = await nextCorrelativo('venta_mueble');
+    const caja = montoCaja > 0 ? { fecha: parsed.data.fecha, tipo: 'ingreso', medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
+        categoria: 'venta_mueble_terminado', monto: montoCaja, descripcion: descripcionCaja, tipo_comprobante: parsed.data.tipoComprobante,
+        url_comprobante: parsed.data.urlComprobante ?? null } : null;
+    await registrarOperacionIntegral(actor, { tipo: 'venta_mueble', clave: claveOperacion(formData),
+        documento: { cliente_id: parsed.data.clienteId, mueble_catalogo_id: parsed.data.muebleCatalogoId, cantidad: parsed.data.cantidad,
+            precio_unitario: parsed.data.precioUnitario, total, chofer_id: parsed.data.choferId || null, tipo_entrega: parsed.data.tipoEntrega,
+            direccion_entrega: parsed.data.direccionEntrega?.trim() || null, estado_entrega: parsed.data.estadoEntrega, metodo_pago: parsed.data.metodoPago,
+            modalidad_pago: parsed.data.modalidadPago === 'adelanto_saldo' ? 'adelanto' : parsed.data.modalidadPago,
+            fecha_pago_credito: parsed.data.modalidadPago === 'credito' ? parsed.data.fechaPagoCredito || null : null,
+            correlativo, fecha: parsed.data.fecha, updated_by: actor.userId }, caja });
+    revalidatePath('/ventas');
+    revalidatePath('/ventas/muebles-terminados');
+    revalidatePath('/inventario');
+    revalidatePath('/caja');
 }
 
 export async function submitCreateVentaMuebleTerminadoForm(
@@ -3565,18 +3235,13 @@ export async function marcarEntregaMueble(formData: FormData) {
 }
 
 export async function cancelarVentaMueble(formData: FormData) {
-  await requireMutationAccess(["owner_admin", "admin" as AppRole]);
-  const id = String(formData.get("id") ?? "");
-  if (!id) throw new Error("Venta inválida.");
-  if (!hasSupabaseEnv()) {
-    throw new Error("No implementado en demo.");
-  }
-  const supabase = getSupabaseServerClient();
-  const { error } = await supabase.rpc("cancelar_venta_mueble", {
-    p_venta_id: id,
-  });
-  if (error) throw new Error(error.message);
-  revalidatePath("/ventas/muebles-terminados");
+    const actor = await requireMutationAccess(['owner_admin']);
+    await anularOperacionIntegral(actor, 'venta_mueble', String(formData.get('id') ?? ''));
+    revalidatePath('/ventas');
+    revalidatePath('/ventas/muebles-terminados');
+    revalidatePath('/inventario');
+    revalidatePath('/caja');
+    revalidatePath('/');
 }
 
 // ---------------------------------------------------------------------------
@@ -3689,273 +3354,90 @@ export async function cambiarEstadoOrden(formData: FormData) {
 // Sub-flujo 3: Madera cortada
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Sub-flujo 3: Madera cortada
+// ---------------------------------------------------------------------------
 export async function createVentaMaderaCortada(formData: FormData) {
-  const actor = await requireMutationAccess(ventasRoles);
-  const parsed = ventaMaderaCortadaSchema.safeParse({
-    clienteId: formData.get("cliente_id"),
-    fecha: formData.get("fecha"),
-    tipoCorte: formData.get("tipo_corte"),
-    totalPt: formData.get("total_pt"),
-    precioPorPt: formData.get("precio_por_pt"),
-    cantidadPiezas: formData.get("cantidad_piezas"),
-    precioUnitarioComercial: formData.get("precio_unitario_comercial"),
-    total: formData.get("total"),
-    metodoPago: formData.get("metodo_pago"),
-    modalidadPago: formData.get("modalidad_pago"),
-    fechaPagoCredito: formData.get("fecha_pago_credito"),
-    adelanto: formData.get("adelanto"),
-    montoCredito: formData.get("monto_credito"),
-    choferId: formData.get("chofer_id"),
-    tipoEntrega: formData.get("tipo_entrega"),
-    direccionEntrega: formData.get("direccion_entrega"),
-    estadoEntrega: formData.get("estado_entrega"),
-    inventarioProductoId: formData.get("inventario_producto_id"),
-    tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
-    urlComprobante: formData.get("url_comprobante"),
-  });
-  if (!parsed.success) {
-    console.error("[createVentaMaderaCortada] Validation failed:", parsed.error.format());
-    const fieldErrors = Object.entries(parsed.error.flatten().fieldErrors)
-      .map(([field, errs]) => `${field}: ${errs?.join(", ")}`)
-      .join(" | ");
-    throw new Error(`Datos de venta de madera cortada inválidos: ${fieldErrors}`);
-  }
-
-  await assertClientePuedeEmitirFactura(parsed.data.clienteId, parsed.data.tipoComprobante);
-
-  const lineasRaw = formData.get("lineas_cubicaje");
-  const lineas = parseMaderaCortadaCubicajeLines(lineasRaw);
-  const lineasComprobante = buildMaderaCortadaVoucherLines(lineas, parsed.data.precioPorPt);
-  if (lineas.length === 0 || lineasComprobante.length === 0) {
-    throw new Error("No se pudo conservar el detalle de la venta. Revisa las piezas ingresadas antes de registrar.");
-  }
-  const totalPtReal = lineasComprobante.reduce(
-    (sum, linea) => sum + ((linea.espesor * linea.ancho * linea.largo) / 12) * linea.cantidad,
-    0,
-  );
-  const cantidadPiezasReal = lineasComprobante.reduce((sum, linea) => sum + linea.cantidad, 0);
-  const totalCalculadoReal = roundMoney(
-    lineasComprobante.reduce((sum, linea) => sum + linea.subtotal, 0),
-  );
-  const totalManualRaw = formData.get("total_manual_input");
-  const usaTotalManual = typeof totalManualRaw === "string" && totalManualRaw.trim().length > 0;
-  const totalCobrado = usaTotalManual ? parsed.data.total : totalCalculadoReal;
-  const montoCaja = montoCobradoVenta(totalCobrado, parsed.data.modalidadPago, parsed.data.adelanto);
-  const precioUnitarioComercialReal = cantidadPiezasReal > 0
-    ? roundMoney(totalCobrado / cantidadPiezasReal)
-    : 0;
-
-  let createdId = "";
-  if (!hasSupabaseEnv()) {
-    const row = demoCreateVentaMaderaCortada({
-      organization_id: DEFAULT_ORG_ID,
-      cliente_id: parsed.data.clienteId,
-      fecha: parsed.data.fecha,
-      tipo_corte: parsed.data.tipoCorte,
-      total_pt: totalPtReal,
-      precio_por_pt: parsed.data.precioPorPt,
-      cantidad_piezas: cantidadPiezasReal,
-      precio_unitario_comercial: precioUnitarioComercialReal,
-      lineas_comprobante: lineasComprobante,
-      tipo_comprobante: parsed.data.tipoComprobante,
-      total: totalCobrado,
-      metodo_pago: parsed.data.metodoPago,
-      modalidad_pago: parsed.data.modalidadPago,
-      fecha_pago_credito: parsed.data.fechaPagoCredito || null,
-      adelanto: parsed.data.adelanto,
-      chofer_id: parsed.data.choferId || null,
-      tipo_entrega: parsed.data.tipoEntrega,
-      direccion_entrega: parsed.data.direccionEntrega || null,
-      estado_entrega: parsed.data.estadoEntrega,
-      inventario_producto_id: parsed.data.inventarioProductoId || null,
+    const actor = await requireMutationAccess(ventasRoles);
+    const parsed = ventaMaderaCortadaSchema.safeParse({
+        clienteId: formData.get("cliente_id"),
+        fecha: formData.get("fecha"),
+        tipoCorte: formData.get("tipo_corte"),
+        totalPt: formData.get("total_pt"),
+        precioPorPt: formData.get("precio_por_pt"),
+        cantidadPiezas: formData.get("cantidad_piezas"),
+        precioUnitarioComercial: formData.get("precio_unitario_comercial"),
+        total: formData.get("total"),
+        metodoPago: formData.get("metodo_pago"),
+        modalidadPago: formData.get("modalidad_pago"),
+        fechaPagoCredito: formData.get("fecha_pago_credito"),
+        adelanto: formData.get("adelanto"),
+        montoCredito: formData.get("monto_credito"),
+        choferId: formData.get("chofer_id"),
+        tipoEntrega: formData.get("tipo_entrega"),
+        direccionEntrega: formData.get("direccion_entrega"),
+        estadoEntrega: formData.get("estado_entrega"),
+        inventarioProductoId: formData.get("inventario_producto_id"),
+        tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
+        urlComprobante: formData.get("url_comprobante"),
     });
-    createdId = row?.id ?? "";
-  } else {
-    const supabase = getSupabaseServerClient();
-    const productoId =
-      parsed.data.inventarioProductoId && parsed.data.inventarioProductoId.length > 0
-        ? parsed.data.inventarioProductoId
-        : null;
-
+    if (!parsed.success) {
+        console.error("[createVentaMaderaCortada] Validation failed:", parsed.error.format());
+        const fieldErrors = Object.entries(parsed.error.flatten().fieldErrors)
+            .map(([field, errs]) => `${field}: ${errs?.join(", ")}`)
+            .join(" | ");
+        throw new Error(`Datos de venta de madera cortada inválidos: ${fieldErrors}`);
+    }
+    await assertClientePuedeEmitirFactura(parsed.data.clienteId, parsed.data.tipoComprobante);
+    const lineasRaw = formData.get("lineas_cubicaje");
+    const lineas = parseMaderaCortadaCubicajeLines(lineasRaw);
+    const lineasComprobante = buildMaderaCortadaVoucherLines(lineas, parsed.data.precioPorPt);
+    if (lineas.length === 0 || lineasComprobante.length === 0) {
+        throw new Error("No se pudo conservar el detalle de la venta. Revisa las piezas ingresadas antes de registrar.");
+    }
+    const totalPtReal = lineasComprobante.reduce((sum, linea) => sum + ((linea.espesor * linea.ancho * linea.largo) / 12) * linea.cantidad, 0);
+    const cantidadPiezasReal = lineasComprobante.reduce((sum, linea) => sum + linea.cantidad, 0);
+    const totalCalculadoReal = roundMoney(lineasComprobante.reduce((sum, linea) => sum + linea.subtotal, 0));
+    const totalManualRaw = formData.get("total_manual_input");
+    const usaTotalManual = typeof totalManualRaw === "string" && totalManualRaw.trim().length > 0;
+    const totalCobrado = usaTotalManual ? parsed.data.total : totalCalculadoReal;
+    const montoCaja = montoCobradoVenta(totalCobrado, parsed.data.modalidadPago, parsed.data.adelanto);
+    const precioUnitarioComercialReal = cantidadPiezasReal > 0
+        ? roundMoney(totalCobrado / cantidadPiezasReal)
+        : 0;
     const productPtMap = new Map<string, number>();
     for (const linea of lineas) {
-      const pId = linea.inventario_producto_id;
-      if (
-        pId
-        && pId !== "manual"
-        && pId.trim().length > 0
-        && linea.cantidad > 0
-        && linea.espesor > 0
-        && linea.ancho > 0
-        && linea.largo > 0
-      ) {
-        const currentPt = productPtMap.get(pId) ?? 0;
-        const lineaPtReal = ((linea.espesor * linea.ancho * linea.largo) / 12) * linea.cantidad;
-        productPtMap.set(pId, currentPt + lineaPtReal);
-      }
-    }
-
-    if (productPtMap.size > 0) {
-      // Verify stock for each product in the pieces list
-      for (const [pId, ptVal] of productPtMap.entries()) {
-        const { data: prod, error: prodErr } = await supabase
-          .from("inventario_productos")
-          .select("id, nombre, stock_actual")
-          .eq("id", pId)
-          .eq("organization_id", DEFAULT_ORG_ID)
-          .maybeSingle();
-        if (prodErr || !prod) {
-          throw new Error(`Producto de inventario no encontrado: ${pId}`);
+        const id = linea.inventario_producto_id;
+        if (id && id !== 'manual' && id.trim() && linea.cantidad > 0 && linea.espesor > 0 && linea.ancho > 0 && linea.largo > 0) {
+            const pt = ((linea.espesor * linea.ancho * linea.largo) / 12) * linea.cantidad;
+            productPtMap.set(id, (productPtMap.get(id) ?? 0) + pt);
         }
-        const pcRequeridos = ptVal / 12;
-        if (Number(prod.stock_actual) < pcRequeridos) {
-          throw new Error(`Stock insuficiente para "${prod.nombre}". Se requieren ${pcRequeridos.toFixed(2)} ft³ pero solo hay ${Number(prod.stock_actual).toFixed(2)} ft³ disponibles.`);
-        }
-      }
-    } else if (productoId) {
-      // Fallback verification for single global product
-      const { data: prod, error: prodErr } = await supabase
-        .from("inventario_productos")
-        .select("id, stock_actual")
-        .eq("id", productoId)
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .maybeSingle();
-      if (prodErr) {
-        throw new Error(prodErr.message);
-      }
-      if (!prod) {
-        throw new Error("Producto de inventario no encontrado.");
-      }
-      const piesCubicosRequeridos = totalPtReal / 12;
-      if (Number(prod.stock_actual) < piesCubicosRequeridos) {
-        throw new Error(`Stock insuficiente para la cantidad vendida. Se requieren ${piesCubicosRequeridos.toFixed(2)} ft³ pero solo hay ${Number(prod.stock_actual).toFixed(2)} ft³ disponibles.`);
-      }
     }
-
-    const fechaCredito =
-      parsed.data.modalidadPago === "credito" && parsed.data.fechaPagoCredito
-        ? parsed.data.fechaPagoCredito
-        : null;
-
-    const { data: venta, error: ventaErr } = await supabase
-      .from("ventas_madera_cortada")
-      .insert({
-        organization_id: DEFAULT_ORG_ID,
-        cliente_id: parsed.data.clienteId,
-        fecha: parsed.data.fecha,
-        estado: "confirmada",
-        tipo_corte: parsed.data.tipoCorte,
-        total_pt: totalPtReal,
-        precio_por_pt: parsed.data.precioPorPt,
-        cantidad_piezas: cantidadPiezasReal || null,
-        precio_unitario_comercial: precioUnitarioComercialReal || null,
-        lineas_comprobante: lineasComprobante as unknown as Json,
-        tipo_comprobante: parsed.data.tipoComprobante,
-        total: totalCobrado,
-        metodo_pago: parsed.data.metodoPago,
-        modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
-        fecha_pago_credito: fechaCredito,
-        chofer_id: parsed.data.choferId || null,
-        tipo_entrega: parsed.data.tipoEntrega,
-        direccion_entrega: parsed.data.direccionEntrega?.trim() || null,
-        estado_entrega: parsed.data.estadoEntrega,
-        inventario_producto_id: productoId,
-        created_by: actor.userId,
-      })
-      .select("id")
-      .single();
-
-    if (ventaErr || !venta) {
-      throw new Error(ventaErr?.message ?? "No se pudo registrar la venta.");
-    }
-
-    let cajaRegistrado = false;
-    if (montoCaja > 0) {
-      const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
-      const descripcionBase =
-        cantidadPiezasReal > 0 && precioUnitarioComercialReal > 0
-          ? `Venta ${cantidadPiezasReal} pzs x S/ ${precioUnitarioComercialReal.toFixed(2)} (${parsed.data.tipoCorte})`
-          : `Venta ${totalPtReal.toFixed(2)} PT (${parsed.data.tipoCorte})`;
-      const descripcionModalidad = 
-        parsed.data.modalidadPago === "adelanto" ? ` - Adelanto: S/ ${(parsed.data.adelanto || 0).toFixed(2)}`
-        : parsed.data.modalidadPago === "adelanto_saldo" ? ` - Adelanto: S/ ${(parsed.data.adelanto || 0).toFixed(2)}`
-        : "";
-      const { error: cajaError } = await supabase.from("movimientos_caja").insert({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fecha,
-        tipo: "ingreso",
-        medio: medioCaja,
-        categoria: "venta_madera_cortada",
-        monto: montoCaja,
-        descripcion: `${descripcionBase}${descripcionModalidad}`,
-        modulo_origen: "ventas_madera_cortada",
-        referencia_id: venta.id,
-        tipo_comprobante: parsed.data.tipoComprobante,
-        url_comprobante: parsed.data.urlComprobante ?? null,
-        created_by: actor.userId,
-        updated_by: actor.userId,
-      });
-      if (cajaError) {
-        await supabase.from("ventas_madera_cortada").delete().eq("id", venta.id);
-        throw new Error(cajaError.message);
-      }
-      cajaRegistrado = true;
-    }
-
-    let movErrGlobal: string | null = null;
-    if (productPtMap.size > 0) {
-      // Record stock outputs for each product in the pieces list
-      for (const [pId, ptVal] of productPtMap.entries()) {
-        const pcRequeridos = ptVal / 12;
-        const { error: movErr } = await supabase.from("inventario_movimientos").insert({
-          organization_id: DEFAULT_ORG_ID,
-          producto_id: pId,
-          fecha: parsed.data.fecha,
-          tipo: "salida_venta",
-          cantidad: pcRequeridos,
-          costo_unitario: parsed.data.precioPorPt * 12,
-          referencia: `venta_madera_cortada:${venta.id}`,
-        });
-        if (movErr) {
-          movErrGlobal = `Error registrando movimiento para el producto ${pId}: ${movErr.message}`;
-          break;
-        }
-      }
-    } else if (productoId) {
-      // Fallback single global product movement recording
-      const piesCubicosRequeridos = totalPtReal / 12;
-      const { error: movErr } = await supabase.from("inventario_movimientos").insert({
-        organization_id: DEFAULT_ORG_ID,
-        producto_id: productoId,
-        fecha: parsed.data.fecha,
-        tipo: "salida_venta",
-        cantidad: piesCubicosRequeridos,
-        costo_unitario: parsed.data.precioPorPt * 12,
-        referencia: `venta_madera_cortada:${venta.id}`,
-      });
-      if (movErr) {
-        movErrGlobal = movErr.message;
-      }
-    }
-
-    if (movErrGlobal) {
-      if (cajaRegistrado) {
-        await supabase
-          .from("movimientos_caja")
-          .delete()
-          .eq("referencia_id", venta.id)
-          .eq("organization_id", DEFAULT_ORG_ID)
-          .eq("modulo_origen", "ventas_madera_cortada");
-      }
-      await supabase.from("ventas_madera_cortada").delete().eq("id", venta.id);
-      throw new Error(movErrGlobal);
-    }
-    createdId = venta.id;
-  }
-  revalidatePath("/ventas");
-  revalidatePath("/ventas/madera-cortada");
-  revalidatePath("/caja");
-  return createdId;
+    const productoId = parsed.data.inventarioProductoId || null;
+    if (!productPtMap.size && productoId)
+        productPtMap.set(productoId, totalPtReal);
+    const stock = [...productPtMap].map(([producto_id, pt]) => ({ producto_id, cantidad: pt / 12, costo_unitario: parsed.data.precioPorPt * 12 }));
+    const descripcionBase = cantidadPiezasReal > 0 && precioUnitarioComercialReal > 0
+        ? 'Venta ' + cantidadPiezasReal + ' pzs x S/ ' + precioUnitarioComercialReal.toFixed(2) + ' (' + parsed.data.tipoCorte + ')'
+        : 'Venta ' + totalPtReal.toFixed(2) + ' PT (' + parsed.data.tipoCorte + ')';
+    const descripcionCaja = descripcionBase + (['adelanto', 'adelanto_saldo'].includes(parsed.data.modalidadPago)
+        ? ' - Adelanto: S/ ' + parsed.data.adelanto.toFixed(2) : '');
+    const caja = montoCaja > 0 ? { fecha: parsed.data.fecha, tipo: 'ingreso', medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
+        categoria: 'venta_madera_cortada', monto: montoCaja, descripcion: descripcionCaja, tipo_comprobante: parsed.data.tipoComprobante,
+        url_comprobante: parsed.data.urlComprobante ?? null } : null;
+    const id = await registrarOperacionIntegral(actor, { tipo: 'venta_madera_cortada', clave: claveOperacion(formData),
+        documento: { cliente_id: parsed.data.clienteId, fecha: parsed.data.fecha, estado: 'confirmada', tipo_corte: parsed.data.tipoCorte,
+            total_pt: totalPtReal, precio_por_pt: parsed.data.precioPorPt, cantidad_piezas: cantidadPiezasReal || null,
+            precio_unitario_comercial: precioUnitarioComercialReal || null, lineas_comprobante: lineasComprobante, tipo_comprobante: parsed.data.tipoComprobante,
+            total: totalCobrado, metodo_pago: parsed.data.metodoPago, modalidad_pago: parsed.data.modalidadPago === 'adelanto_saldo' ? 'adelanto' : parsed.data.modalidadPago,
+            fecha_pago_credito: parsed.data.modalidadPago === 'credito' ? parsed.data.fechaPagoCredito || null : null,
+            chofer_id: parsed.data.choferId || null, tipo_entrega: parsed.data.tipoEntrega, direccion_entrega: parsed.data.direccionEntrega?.trim() || null,
+            estado_entrega: parsed.data.estadoEntrega, inventario_producto_id: productoId }, stock, caja });
+    revalidatePath('/ventas');
+    revalidatePath('/ventas/madera-cortada');
+    revalidatePath('/inventario');
+    revalidatePath('/caja');
+    return id;
 }
 
 /** Wrapper con MutationFormState para useActionState (cierre automático del modal). */
@@ -3979,167 +3461,171 @@ export async function submitCreateVentaMaderaCortadaForm(
 // Sub-flujo 4: Alquiler Bomba Mixer (contrato extendido)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Sub-flujo 4: Alquiler Bomba Mixer (contrato extendido)
+// ---------------------------------------------------------------------------
 export async function createContratoAlquiler(formData: FormData) {
-  const actor = await requireMutationAccess(writerRoles);
-  const parsed = contratoAlquilerSchema.safeParse({
-    clienteId: formData.get("cliente_id"),
-    activo: formData.get("activo"),
-    codigo: formData.get("codigo"),
-    representante: formData.get("representante"),
-    rucEmpresa: formData.get("ruc_empresa"),
-    direccionEjecucion: formData.get("direccion_ejecucion"),
-    fechaInicio: formData.get("fecha_inicio"),
-    fechaTermino: formData.get("fecha_termino"),
-    diasAlquiler: formData.get("dias_alquiler"),
-    tarifaUnidad: formData.get("tarifa_unidad"),
-    tarifa: formData.get("tarifa"),
-    montoTotal: formData.get("monto_total"),
-    metodoPago: formData.get("metodo_pago"),
-    modalidadPago: formData.get("modalidad_pago"),
-    fechaPagoCredito: formData.get("fecha_pago_credito"),
-    adelanto: formData.get("adelanto"),
-    montoCredito: formData.get("monto_credito"),
-    penalidadRetrasoPagoPct: formData.get("penalidad_retraso_pago_pct"),
-    penalidadDevolucionTardiaPct: formData.get("penalidad_devolucion_tardia_pct"),
-    penalidadDaniosPct: formData.get("penalidad_danios_pct"),
-  });
-  if (!parsed.success) {
-    throw new Error("Datos de contrato inválidos.");
-  }
-
-  // Calculate deposito30 dynamically
-  const total = roundMoney(parsed.data.montoTotal);
-  montoCobradoVenta(total, parsed.data.modalidadPago, parsed.data.adelanto);
-  let deposito30 = roundMoney(total * 0.3);
-  if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
-    if (parsed.data.adelanto !== undefined && parsed.data.adelanto > 0) {
-      deposito30 = roundMoney(parsed.data.adelanto);
-    }
-  } else if (parsed.data.modalidadPago === "credito") {
-    deposito30 = 0;
-  }
-
-  // Obtener nombre de cliente para la descripción de caja
-  let clienteNombre = "Cliente Desconocido";
-  if (!hasSupabaseEnv()) {
-    const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
-    if (c) clienteNombre = c.nombre;
-  } else {
-    const supabase = getSupabaseServerClient();
-    const { data: cData } = await supabase
-      .from("clientes")
-      .select("nombre")
-      .eq("id", parsed.data.clienteId)
-      .maybeSingle();
-    if (cData) clienteNombre = cData.nombre;
-  }
-
-  if (!hasSupabaseEnv()) {
-    const codigo = parsed.data.codigo || (await nextCorrelativo("contrato_alquiler"));
-    const contractRow = demoCreateContratoAlquiler({
-      organization_id: DEFAULT_ORG_ID,
-      cliente_id: parsed.data.clienteId,
-      activo: parsed.data.activo,
-      fecha_inicio: parsed.data.fechaInicio,
-      fecha_termino: parsed.data.fechaTermino || null,
-      dias_alquiler: parsed.data.diasAlquiler ?? null,
-      tarifa_unidad: parsed.data.tarifaUnidad,
-      tarifa: parsed.data.tarifa,
-      monto_total: parsed.data.montoTotal,
-      deposito_30: deposito30,
-      codigo,
-      representante: parsed.data.representante || null,
-      ruc_empresa: parsed.data.rucEmpresa || null,
-      direccion_ejecucion: parsed.data.direccionEjecucion || null,
-      metodo_pago: parsed.data.metodoPago,
-      modalidad_pago: parsed.data.modalidadPago,
-      fecha_pago_credito: parsed.data.fechaPagoCredito || null,
-      penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct,
-      penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct,
-      penalidad_danios_pct: parsed.data.penalidadDaniosPct,
-      confirmaIngreso: false,
+    const actor = await requireMutationAccess(writerRoles);
+    const parsed = contratoAlquilerSchema.safeParse({
+        clienteId: formData.get("cliente_id"),
+        activo: formData.get("activo"),
+        codigo: formData.get("codigo"),
+        representante: formData.get("representante"),
+        rucEmpresa: formData.get("ruc_empresa"),
+        direccionEjecucion: formData.get("direccion_ejecucion"),
+        fechaInicio: formData.get("fecha_inicio"),
+        fechaTermino: formData.get("fecha_termino"),
+        diasAlquiler: formData.get("dias_alquiler"),
+        tarifaUnidad: formData.get("tarifa_unidad"),
+        tarifa: formData.get("tarifa"),
+        montoTotal: formData.get("monto_total"),
+        metodoPago: formData.get("metodo_pago"),
+        modalidadPago: formData.get("modalidad_pago"),
+        fechaPagoCredito: formData.get("fecha_pago_credito"),
+        adelanto: formData.get("adelanto"),
+        montoCredito: formData.get("monto_credito"),
+        penalidadRetrasoPagoPct: formData.get("penalidad_retraso_pago_pct"),
+        penalidadDevolucionTardiaPct: formData.get("penalidad_devolucion_tardia_pct"),
+        penalidadDaniosPct: formData.get("penalidad_danios_pct"),
     });
-    if (deposito30 > 0) {
-      demoCreateCaja({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fechaInicio,
-        tipo: "ingreso",
-        medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
-        categoria: "alquiler_bomba_mixer",
-        monto: deposito30,
-        descripcion: `Alquiler de mixer - ${clienteNombre}`,
-        modulo_origen: "ventas_alquiler",
-        referencia_id: contractRow?.id ?? null,
-      });
+    if (!parsed.success) {
+        throw new Error("Datos de contrato inválidos.");
     }
-  } else {
-    const supabase = getSupabaseServerClient();
-    const codigo = parsed.data.codigo?.trim() || (await nextCorrelativo("contrato_alquiler"));
-    const montoTotal = parsed.data.montoTotal;
-    const fechaCredito =
-      parsed.data.modalidadPago === "credito" && parsed.data.fechaPagoCredito
-        ? parsed.data.fechaPagoCredito
-        : null;
-
-    const { data: contrato, error: insErr } = await supabase
-      .from("alquileres")
-      .insert({
-        organization_id: DEFAULT_ORG_ID,
-        cliente_id: parsed.data.clienteId,
-        activo: parsed.data.activo.trim(),
-        fecha_inicio: parsed.data.fechaInicio,
-        fecha_fin: null,
-        fecha_termino: parsed.data.fechaTermino?.trim() || null,
-        tarifa: parsed.data.tarifa,
-        penalidad: 0,
-        estado: "abierto",
-        codigo,
-        representante: parsed.data.representante?.trim() || null,
-        ruc_empresa: parsed.data.rucEmpresa?.trim() || null,
-        direccion_ejecucion: parsed.data.direccionEjecucion?.trim() || null,
-        dias_alquiler: parsed.data.diasAlquiler ?? null,
-        tarifa_unidad: parsed.data.tarifaUnidad,
-        monto_total: montoTotal,
-        deposito_30: deposito30,
-        penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct,
-        penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct,
-        penalidad_danios_pct: parsed.data.penalidadDaniosPct,
-        metodo_pago: parsed.data.metodoPago,
-        modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
-        fecha_pago_credito: fechaCredito,
-      })
-      .select("id")
-      .single();
-
-    if (insErr || !contrato) {
-      throw new Error(insErr?.message ?? "No se pudo crear el contrato.");
+    // Calculate deposito30 dynamically
+    const total = roundMoney(parsed.data.montoTotal);
+    montoCobradoVenta(total, parsed.data.modalidadPago, parsed.data.adelanto);
+    let deposito30 = roundMoney(total * 0.3);
+    if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
+        if (parsed.data.adelanto !== undefined && parsed.data.adelanto > 0) {
+            deposito30 = roundMoney(parsed.data.adelanto);
+        }
     }
-
-    if (deposito30 > 0) {
-      const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
-      const { error: cajaErr } = await supabase.from("movimientos_caja").insert({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fechaInicio,
-        tipo: "ingreso",
-        medio: medioCaja,
-        categoria: "alquiler_bomba_mixer",
-        monto: deposito30,
-        descripcion: `Alquiler de mixer - ${clienteNombre}`,
-        modulo_origen: "ventas_alquiler",
-        referencia_id: contrato.id,
-        created_by: actor.userId,
-        updated_by: actor.userId,
-      });
-      if (cajaErr) {
-        await supabase.from("alquileres").delete().eq("id", contrato.id);
-        throw new Error(cajaErr.message);
-      }
+    else if (parsed.data.modalidadPago === "credito") {
+        deposito30 = 0;
     }
-  }
-  revalidatePath("/ventas");
-  revalidatePath("/ventas/alquiler-mixer");
-  revalidatePath("/alquiler");
-  revalidatePath("/caja");
+    // Obtener nombre de cliente para la descripción de caja
+    let clienteNombre = "Cliente Desconocido";
+    if (!hasSupabaseEnv()) {
+        const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
+        if (c)
+            clienteNombre = c.nombre;
+    }
+    else {
+        const supabase = getSupabaseServerClient();
+        const { data: cData } = await supabase
+            .from("clientes")
+            .select("nombre")
+            .eq("id", parsed.data.clienteId)
+            .maybeSingle();
+        if (cData)
+            clienteNombre = cData.nombre;
+    }
+    if (!hasSupabaseEnv()) {
+        const { demoOperacionAtomica } = await import("@/lib/demo-store");
+        const codigo = parsed.data.codigo || (await nextCorrelativo("contrato_alquiler"));
+        demoOperacionAtomica(() => {
+            const contractRow = demoCreateContratoAlquiler({
+                organization_id: DEFAULT_ORG_ID,
+                cliente_id: parsed.data.clienteId,
+                activo: parsed.data.activo,
+                fecha_inicio: parsed.data.fechaInicio,
+                fecha_termino: parsed.data.fechaTermino || null,
+                dias_alquiler: parsed.data.diasAlquiler ?? null,
+                tarifa_unidad: parsed.data.tarifaUnidad,
+                tarifa: parsed.data.tarifa,
+                monto_total: parsed.data.montoTotal,
+                deposito_30: deposito30,
+                codigo,
+                representante: parsed.data.representante || null,
+                ruc_empresa: parsed.data.rucEmpresa || null,
+                direccion_ejecucion: parsed.data.direccionEjecucion || null,
+                metodo_pago: parsed.data.metodoPago,
+                modalidad_pago: parsed.data.modalidadPago,
+                fecha_pago_credito: parsed.data.fechaPagoCredito || null,
+                penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct,
+                penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct,
+                penalidad_danios_pct: parsed.data.penalidadDaniosPct,
+                confirmaIngreso: false,
+            });
+            if (deposito30 > 0) {
+                demoCreateCaja({
+                    organization_id: DEFAULT_ORG_ID,
+                    fecha: parsed.data.fechaInicio,
+                    tipo: "ingreso",
+                    medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
+                    categoria: "alquiler_bomba_mixer",
+                    monto: deposito30,
+                    descripcion: `Alquiler de mixer - ${clienteNombre}`,
+                    modulo_origen: "ventas_alquiler",
+                    referencia_id: contractRow?.id ?? null,
+                });
+            }
+        });
+    }
+    else {
+        const supabase = getSupabaseServerClient();
+        const codigo = parsed.data.codigo?.trim() || (await nextCorrelativo("contrato_alquiler"));
+        const montoTotal = parsed.data.montoTotal;
+        const fechaCredito = parsed.data.modalidadPago === "credito" && parsed.data.fechaPagoCredito
+            ? parsed.data.fechaPagoCredito
+            : null;
+        const { data: contrato, error: insErr } = await supabase
+            .from("alquileres")
+            .insert({
+            organization_id: DEFAULT_ORG_ID,
+            cliente_id: parsed.data.clienteId,
+            activo: parsed.data.activo.trim(),
+            fecha_inicio: parsed.data.fechaInicio,
+            fecha_fin: null,
+            fecha_termino: parsed.data.fechaTermino?.trim() || null,
+            tarifa: parsed.data.tarifa,
+            penalidad: 0,
+            estado: "abierto",
+            codigo,
+            representante: parsed.data.representante?.trim() || null,
+            ruc_empresa: parsed.data.rucEmpresa?.trim() || null,
+            direccion_ejecucion: parsed.data.direccionEjecucion?.trim() || null,
+            dias_alquiler: parsed.data.diasAlquiler ?? null,
+            tarifa_unidad: parsed.data.tarifaUnidad,
+            monto_total: montoTotal,
+            deposito_30: deposito30,
+            penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct,
+            penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct,
+            penalidad_danios_pct: parsed.data.penalidadDaniosPct,
+            metodo_pago: parsed.data.metodoPago,
+            modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
+            fecha_pago_credito: fechaCredito,
+        })
+            .select("id")
+            .single();
+        if (insErr || !contrato) {
+            throw new Error(insErr?.message ?? "No se pudo crear el contrato.");
+        }
+        if (deposito30 > 0) {
+            const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
+            const { error: cajaErr } = await supabase.from("movimientos_caja").insert({
+                organization_id: DEFAULT_ORG_ID,
+                fecha: parsed.data.fechaInicio,
+                tipo: "ingreso",
+                medio: medioCaja,
+                categoria: "alquiler_bomba_mixer",
+                monto: deposito30,
+                descripcion: `Alquiler de mixer - ${clienteNombre}`,
+                modulo_origen: "ventas_alquiler",
+                referencia_id: contrato.id,
+                created_by: actor.userId,
+                updated_by: actor.userId,
+            });
+            if (cajaErr) {
+                await supabase.from("alquileres").delete().eq("id", contrato.id);
+                throw new Error(cajaErr.message);
+            }
+        }
+    }
+    revalidatePath("/ventas");
+    revalidatePath("/ventas/alquiler-mixer");
+    revalidatePath("/alquiler");
+    revalidatePath("/caja");
 }
 
 export async function cerrarContratoAlquiler(formData: FormData) {
@@ -4294,175 +3780,172 @@ async function cleanupClienteProvisionalCreado(clienteId: string | null) {
 }
 
 export async function createServicioAserradero(formData: FormData) {
-  const actor = await requireMutationAccess(ventasRoles);
-  const usarClienteProvisional = formData.get("usarClienteProvisional") === "true";
-  const tipoComprobante = String(formData.get("tipo_comprobante") || "ninguno");
-
-  if (usarClienteProvisional && tipoComprobante === "factura") {
-    throw new Error("Completa un cliente con RUC valido antes de emitir factura.");
-  }
-
-  const parsed = servicioAserraderoSchema.safeParse({
-    clienteId: usarClienteProvisional ? randomUUID() : formData.get("cliente_id"),
-    fecha: formData.get("fecha"),
-    piesCubicos: formData.get("pies_cubicos"),
-    costoCubicaje: formData.get("costo_cubicaje"),
-    precioCobrado: formData.get("precio_cobrado"),
-    lineas: formData.get("lineas_json"),
-    metodoPago: formData.get("metodo_pago") || "efectivo",
-    modalidadPago: formData.get("modalidad_pago") || "contado",
-    fechaPagoCredito: formData.get("fecha_pago_credito") || undefined,
-    adelanto: formData.get("adelanto") || 0,
-    tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
-    urlComprobante: formData.get("url_comprobante"),
-  });
-  if (!parsed.success) {
-    throw new Error("Datos de servicio invalidos.");
-  }
-  const modalidadPago = parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago;
-  const adelanto = modalidadPago === "adelanto" ? parsed.data.adelanto : 0;
-  const montoCaja = montoCobradoVenta(parsed.data.precioCobrado, modalidadPago, adelanto);
-
-  let lineasJson: Record<string, unknown>[] = [];
-  if (parsed.data.lineas) {
-    try {
-      const parsedLineas = JSON.parse(parsed.data.lineas);
-      if (Array.isArray(parsedLineas)) {
-        lineasJson = parsedLineas;
-      } else {
-        throw new Error("El detalle de Aserradero no contiene un arreglo JSON válido.");
-      }
-    } catch {
-      throw new Error("El detalle de Aserradero contiene JSON inválido y no puede guardarse.");
+    const actor = await requireMutationAccess(ventasRoles);
+    const usarClienteProvisional = formData.get("usarClienteProvisional") === "true";
+    const tipoComprobante = String(formData.get("tipo_comprobante") || "ninguno");
+    if (usarClienteProvisional && tipoComprobante === "factura") {
+        throw new Error("Completa un cliente con RUC valido antes de emitir factura.");
     }
-  }
-
-  let clienteId = parsed.data.clienteId;
-  let clienteProvisionalCreadoId: string | null = null;
-
-  try {
-    if (usarClienteProvisional) {
-      const provisional = await crearClienteProvisionalServicioAserradero();
-      clienteId = provisional.id;
-      clienteProvisionalCreadoId = provisional.id;
+    const parsed = servicioAserraderoSchema.safeParse({
+        clienteId: usarClienteProvisional ? randomUUID() : formData.get("cliente_id"),
+        fecha: formData.get("fecha"),
+        piesCubicos: formData.get("pies_cubicos"),
+        costoCubicaje: formData.get("costo_cubicaje"),
+        precioCobrado: formData.get("precio_cobrado"),
+        lineas: formData.get("lineas_json"),
+        metodoPago: formData.get("metodo_pago") || "efectivo",
+        modalidadPago: formData.get("modalidad_pago") || "contado",
+        fechaPagoCredito: formData.get("fecha_pago_credito") || undefined,
+        adelanto: formData.get("adelanto") || 0,
+        tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
+        urlComprobante: formData.get("url_comprobante"),
+    });
+    if (!parsed.success) {
+        throw new Error("Datos de servicio invalidos.");
     }
-
-    // Obtener nombre de cliente para la descripcion de caja y validar factura provisional.
-    let clienteNombre = "Cliente Desconocido";
-    let clienteDocumento: string | null = null;
-    if (!hasSupabaseEnv()) {
-      const c = demoClientesRows().find((x) => x.id === clienteId);
-      if (c) {
-        clienteNombre = c.nombre;
-        clienteDocumento = c.documento ?? null;
-      }
-    } else {
-      const supabase = getSupabaseServerClient();
-      const { data: cData } = await supabase
-        .from("clientes")
-        .select("nombre,documento")
-        .eq("id", clienteId)
-        .maybeSingle();
-      if (cData) {
-        clienteNombre = cData.nombre;
-        clienteDocumento = cData.documento ?? null;
-      }
-    }
-
-    if (parsed.data.tipoComprobante === "factura" && isCodigoClienteProvisional(clienteDocumento)) {
-      throw new Error("Completa un cliente con RUC valido antes de emitir factura.");
-    }
-
-    if (!hasSupabaseEnv()) {
-      const serviceRow = demoCreateServicioAserradero({
-        organization_id: DEFAULT_ORG_ID,
-        cliente_id: clienteId,
-        fecha: parsed.data.fecha,
-        pies_cubicos: parsed.data.piesCubicos,
-        costo_cubicaje: parsed.data.costoCubicaje,
-        precio_cobrado: parsed.data.precioCobrado,
-        utilidad: 0,
-        lineas_json: lineasJson,
-        correlativo: await nextCorrelativo("servicio_aserradero"),
-        confirmaIngreso: false,
-        metodo_pago: parsed.data.metodoPago,
-        modalidad_pago: modalidadPago,
-        adelanto,
-        fecha_pago_credito: parsed.data.fechaPagoCredito || null,
-      });
-      if (montoCaja > 0) {
-        demoCreateCaja({
-          organization_id: DEFAULT_ORG_ID,
-          fecha: parsed.data.fecha,
-          tipo: "ingreso",
-          medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
-          categoria: "servicio_aserradero",
-          monto: montoCaja,
-          descripcion: `Servicio de aserradero - ${clienteNombre}`,
-          modulo_origen: "ventas_aserradero",
-          referencia_id: serviceRow?.id ?? null,
-        });
-      }
-    } else {
-      const supabase = getSupabaseServerClient();
-      const correlativo = await nextCorrelativo("servicio_aserradero");
-      const lineasPayload = lineasJson as unknown as Json;
-
-      const { data: servicio, error: servicioErr } = await supabase
-        .from("servicios_aserradero")
-        .insert({
-          organization_id: DEFAULT_ORG_ID,
-          cliente_id: clienteId,
-          fecha: parsed.data.fecha,
-          pies_cubicos: parsed.data.piesCubicos,
-          costo_cubicaje: parsed.data.costoCubicaje,
-          precio_cobrado: parsed.data.precioCobrado,
-          utilidad: 0,
-          lineas_json: lineasPayload,
-          correlativo,
-          metodo_pago: parsed.data.metodoPago ?? "efectivo",
-          modalidad_pago: modalidadPago,
-          fecha_pago_credito: parsed.data.fechaPagoCredito ?? null,
-          adelanto,
-          created_by: actor.userId,
-        })
-        .select("id")
-        .single();
-
-      if (servicioErr || !servicio) {
-        throw new Error(servicioErr?.message ?? "No se pudo registrar el servicio.");
-      }
-
-      if (montoCaja > 0) {
-        const { error: cajaError } = await supabase.from("movimientos_caja").insert({
-          organization_id: DEFAULT_ORG_ID,
-          fecha: parsed.data.fecha,
-          tipo: "ingreso",
-          medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
-          categoria: "servicio_aserradero",
-          monto: montoCaja,
-          descripcion: `Servicio de aserradero - ${clienteNombre}`,
-          modulo_origen: "ventas_aserradero",
-          referencia_id: servicio.id,
-          tipo_comprobante: parsed.data.tipoComprobante,
-          url_comprobante: parsed.data.urlComprobante ?? null,
-          created_by: actor.userId,
-          updated_by: actor.userId,
-        });
-        if (cajaError) {
-          await supabase.from("servicios_aserradero").delete().eq("id", servicio.id);
-          throw new Error(cajaError.message);
+    const modalidadPago = parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago;
+    const adelanto = modalidadPago === "adelanto" ? parsed.data.adelanto : 0;
+    const montoCaja = montoCobradoVenta(parsed.data.precioCobrado, modalidadPago, adelanto);
+    let lineasJson: Record<string, unknown>[] = [];
+    if (parsed.data.lineas) {
+        try {
+            const parsedLineas = JSON.parse(parsed.data.lineas);
+            if (Array.isArray(parsedLineas)) {
+                lineasJson = parsedLineas;
+            }
+            else {
+                throw new Error("El detalle de Aserradero no contiene un arreglo JSON válido.");
+            }
         }
-      }
+        catch {
+            throw new Error("El detalle de Aserradero contiene JSON inválido y no puede guardarse.");
+        }
     }
-  } catch (error) {
-    await cleanupClienteProvisionalCreado(clienteProvisionalCreadoId);
-    throw error;
-  }
-
-  revalidatePath("/ventas");
-  revalidatePath("/ventas/aserradero-servicios");
-  revalidatePath("/caja");
+    let clienteId = parsed.data.clienteId;
+    let clienteProvisionalCreadoId: string | null = null;
+    try {
+        if (usarClienteProvisional) {
+            const provisional = await crearClienteProvisionalServicioAserradero();
+            clienteId = provisional.id;
+            clienteProvisionalCreadoId = provisional.id;
+        }
+        // Obtener nombre de cliente para la descripcion de caja y validar factura provisional.
+        let clienteNombre = "Cliente Desconocido";
+        let clienteDocumento: string | null = null;
+        if (!hasSupabaseEnv()) {
+            const c = demoClientesRows().find((x) => x.id === clienteId);
+            if (c) {
+                clienteNombre = c.nombre;
+                clienteDocumento = c.documento ?? null;
+            }
+        }
+        else {
+            const supabase = getSupabaseServerClient();
+            const { data: cData } = await supabase
+                .from("clientes")
+                .select("nombre,documento")
+                .eq("id", clienteId)
+                .maybeSingle();
+            if (cData) {
+                clienteNombre = cData.nombre;
+                clienteDocumento = cData.documento ?? null;
+            }
+        }
+        if (parsed.data.tipoComprobante === "factura" && isCodigoClienteProvisional(clienteDocumento)) {
+            throw new Error("Completa un cliente con RUC valido antes de emitir factura.");
+        }
+        if (!hasSupabaseEnv()) {
+            const { demoOperacionAtomica } = await import("@/lib/demo-store");
+            const correlativoLocal = await nextCorrelativo("servicio_aserradero");
+            demoOperacionAtomica(() => {
+                const serviceRow = demoCreateServicioAserradero({
+                    organization_id: DEFAULT_ORG_ID,
+                    cliente_id: clienteId,
+                    fecha: parsed.data.fecha,
+                    pies_cubicos: parsed.data.piesCubicos,
+                    costo_cubicaje: parsed.data.costoCubicaje,
+                    precio_cobrado: parsed.data.precioCobrado,
+                    utilidad: 0,
+                    lineas_json: lineasJson,
+                    correlativo: correlativoLocal,
+                    confirmaIngreso: false,
+                    metodo_pago: parsed.data.metodoPago,
+                    modalidad_pago: modalidadPago,
+                    adelanto,
+                    fecha_pago_credito: parsed.data.fechaPagoCredito || null,
+                });
+                if (montoCaja > 0) {
+                    demoCreateCaja({
+                        organization_id: DEFAULT_ORG_ID,
+                        fecha: parsed.data.fecha,
+                        tipo: "ingreso",
+                        medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
+                        categoria: "servicio_aserradero",
+                        monto: montoCaja,
+                        descripcion: `Servicio de aserradero - ${clienteNombre}`,
+                        modulo_origen: "ventas_aserradero",
+                        referencia_id: serviceRow?.id ?? null,
+                    });
+                }
+            });
+        }
+        else {
+            const supabase = getSupabaseServerClient();
+            const correlativo = await nextCorrelativo("servicio_aserradero");
+            const lineasPayload = lineasJson as unknown as Json;
+            const { data: servicio, error: servicioErr } = await supabase
+                .from("servicios_aserradero")
+                .insert({
+                organization_id: DEFAULT_ORG_ID,
+                cliente_id: clienteId,
+                fecha: parsed.data.fecha,
+                pies_cubicos: parsed.data.piesCubicos,
+                costo_cubicaje: parsed.data.costoCubicaje,
+                precio_cobrado: parsed.data.precioCobrado,
+                utilidad: 0,
+                lineas_json: lineasPayload,
+                correlativo,
+                metodo_pago: parsed.data.metodoPago ?? "efectivo",
+                modalidad_pago: modalidadPago,
+                fecha_pago_credito: parsed.data.fechaPagoCredito ?? null,
+                adelanto,
+                created_by: actor.userId,
+            })
+                .select("id")
+                .single();
+            if (servicioErr || !servicio) {
+                throw new Error(servicioErr?.message ?? "No se pudo registrar el servicio.");
+            }
+            if (montoCaja > 0) {
+                const { error: cajaError } = await supabase.from("movimientos_caja").insert({
+                    organization_id: DEFAULT_ORG_ID,
+                    fecha: parsed.data.fecha,
+                    tipo: "ingreso",
+                    medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
+                    categoria: "servicio_aserradero",
+                    monto: montoCaja,
+                    descripcion: `Servicio de aserradero - ${clienteNombre}`,
+                    modulo_origen: "ventas_aserradero",
+                    referencia_id: servicio.id,
+                    tipo_comprobante: parsed.data.tipoComprobante,
+                    url_comprobante: parsed.data.urlComprobante ?? null,
+                    created_by: actor.userId,
+                    updated_by: actor.userId,
+                });
+                if (cajaError) {
+                    await supabase.from("servicios_aserradero").delete().eq("id", servicio.id);
+                    throw new Error(cajaError.message);
+                }
+            }
+        }
+    }
+    catch (error) {
+        await cleanupClienteProvisionalCreado(clienteProvisionalCreadoId);
+        throw error;
+    }
+    revalidatePath("/ventas");
+    revalidatePath("/ventas/aserradero-servicios");
+    revalidatePath("/caja");
 }
 
 export async function submitCreateServicioAserraderoForm(
@@ -4798,63 +4281,37 @@ export async function deleteCliente(formData: FormData) {
  * Elimina un cliente y TODOS sus registros relacionados en cascada.
  * Solo disponible para owner_admin. Requiere confirmación escrita.
  */
+/**
+ * Elimina un cliente y TODOS sus registros relacionados en cascada.
+ * Solo disponible para owner_admin. Requiere confirmación escrita.
+ */
 export async function forzarEliminarClienteCompleto(formData: FormData) {
-  await requireMutationAccess(["owner_admin"]);
-  const id = String(formData.get("id") ?? "").trim();
-  const confirmacion = String(formData.get("confirmacion") ?? "").trim();
-  const clienteIdParam = id ? `?cliente=${encodeURIComponent(id)}` : "";
-  const baseRedirect = `/gerencial${clienteIdParam}`;
-
-  const fail = (msg: string) => redirect(`${baseRedirect}&mensaje=${encodeURIComponent(msg)}`);
-
-  if (!id) fail("Identificador inválido.");
-  if (confirmacion !== "ELIMINAR TODO") fail('Escribe "ELIMINAR TODO" en el campo de confirmación.');
-
-  if (!hasSupabaseEnv()) {
-    fail("Esta acción solo está disponible con base de datos activa.");
-    return;
-  }
-
-  const supabase = getSupabaseServerClient();
-
-  // Eliminar en orden para evitar violaciones de FK
-  const tablas = [
-    "ordenes_produccion",
-    "cotizaciones_unificadas",
-    "cotizaciones_mueble",
-    "ventas_mueble_terminado",
-    "ventas_madera",
-    "servicios_aserradero",
-    "alquileres",
-  ] as const;
-
-  for (const tabla of tablas) {
-    const { error } = await supabase
-      .from(tabla)
-      .delete()
-      .eq("cliente_id", id)
-      .eq("organization_id", DEFAULT_ORG_ID);
-    if (error) {
-      fail(`Error al limpiar ${tabla}: ${error.message}`);
-      return;
+    const actor = await requireMutationAccess(['owner_admin']);
+    const id = String(formData.get('id') ?? '').trim();
+    const base = '/gerencial?cliente=' + encodeURIComponent(id);
+    if (!z.uuid().safeParse(id).success || formData.get('confirmacion') !== 'ELIMINAR TODO')
+        return redirect(base + '&mensaje=' + encodeURIComponent('Escribe ELIMINAR TODO para confirmar un cliente válido.'));
+    try {
+        if (!hasSupabaseEnv()) {
+            const d = await import('@/lib/demo-store');
+            d.demoEliminarClienteIntegral(actor.organizationId, id);
+        }
+        else {
+            const { error } = await getSupabaseServerClient().rpc('eliminar_cliente_integral', { p_org: actor.organizationId, p_actor: actor.userId, p_id: id });
+            if (error)
+                throw new Error(mensajeOperacionFinanciera(error));
+        }
     }
-  }
-
-  // Ahora eliminar el cliente
-  const { error: delError } = await supabase
-    .from("clientes")
-    .delete()
-    .eq("id", id)
-    .eq("organization_id", DEFAULT_ORG_ID);
-
-  if (delError) {
-    fail(delError.message || "No se pudo eliminar el cliente.");
-    return;
-  }
-
-  revalidatePath("/ventas/clientes");
-  revalidatePath("/gerencial");
-  redirect("/gerencial?mensaje=" + encodeURIComponent("Cliente y todos sus registros eliminados correctamente."));
+    catch (error) {
+        return redirect(base + '&mensaje=' + encodeURIComponent(error instanceof Error ? error.message : 'No se pudo eliminar el cliente.'));
+    }
+    revalidatePath('/ventas/clientes');
+    revalidatePath('/gerencial');
+    revalidatePath('/ventas');
+    revalidatePath('/caja');
+    revalidatePath('/inventario');
+    revalidatePath('/');
+    redirect('/gerencial?mensaje=' + encodeURIComponent('Cliente y todos sus registros eliminados correctamente.'));
 }
 
 export async function submitCreateClienteForm(
@@ -4937,7 +4394,7 @@ const servicioEspecialTarifaUpdateSchema = z.object({
 
 export async function updateServicioEspecialTarifa(id: string, nombre: string, tarifaPorPieza: number) {
   const actor = await requireAuthContext({ allowedRoles: ["owner_admin"], redirectTo: null });
-  
+
   const parsed = servicioEspecialTarifaUpdateSchema.safeParse({
     id,
     nombre,
@@ -4966,7 +4423,7 @@ export async function updateServicioEspecialTarifa(id: string, nombre: string, t
       })
       .eq("id", parsed.data.id)
       .eq("organization_id", actor.organizationId).select("id").maybeSingle();
-      
+
     if (error || !updated) {
       throw new Error("No se pudo confirmar el cambio de tarifa.");
     }
@@ -5108,255 +4565,107 @@ export async function createUnidadMedida(formData: FormData) {
   }
 }
 
-export async function updateContratoAlquiler(
-  formData: FormData,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  try {
-    const actor = await requireMutationAccess(writerRoles);
-    const id = formData.get("id") as string;
-    if (!id) return { ok: false, error: "ID de contrato requerido." };
-
-    const parsed = contratoAlquilerSchema.safeParse({
-      clienteId: formData.get("cliente_id"),
-      activo: formData.get("activo"),
-      codigo: formData.get("codigo"),
-      representante: formData.get("representante"),
-      rucEmpresa: formData.get("ruc_empresa"),
-      direccionEjecucion: formData.get("direccion_ejecucion"),
-      fechaInicio: formData.get("fecha_inicio"),
-      fechaTermino: formData.get("fecha_termino"),
-      diasAlquiler: formData.get("dias_alquiler"),
-      tarifaUnidad: formData.get("tarifa_unidad"),
-      tarifa: formData.get("tarifa"),
-      montoTotal: formData.get("monto_total"),
-      metodoPago: formData.get("metodo_pago"),
-      modalidadPago: formData.get("modalidad_pago"),
-      fechaPagoCredito: formData.get("fecha_pago_credito"),
-      adelanto: formData.get("adelanto"),
-      montoCredito: formData.get("monto_credito"),
-      penalidadRetrasoPagoPct: formData.get("penalidad_retraso_pago_pct"),
-      penalidadDevolucionTardiaPct: formData.get("penalidad_devolucion_tardia_pct"),
-      penalidadDaniosPct: formData.get("penalidad_danios_pct"),
-    });
-
-    if (!parsed.success) {
-      return { ok: false, error: "Datos de contrato inválidos." };
-    }
-
-    const total = roundMoney(parsed.data.montoTotal);
-    montoCobradoVenta(total, parsed.data.modalidadPago, parsed.data.adelanto);
-    let deposito30 = roundMoney(total * 0.3);
-    if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
-      if (parsed.data.adelanto !== undefined && parsed.data.adelanto > 0) {
-        deposito30 = roundMoney(parsed.data.adelanto);
-      }
-    } else if (parsed.data.modalidadPago === "credito") {
-      deposito30 = 0;
-    }
-
-    // Obtener nombre de cliente para la descripción de caja
-    let clienteNombre = "Cliente Desconocido";
-    if (!hasSupabaseEnv()) {
-      const { demoClientesRows } = await import("@/lib/demo-store");
-      const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
-      if (c) clienteNombre = c.nombre;
-    } else {
-      const supabase = getSupabaseServerClient();
-      const { data: cData } = await supabase
-        .from("clientes")
-        .select("nombre")
-        .eq("id", parsed.data.clienteId)
-        .maybeSingle();
-      if (cData) clienteNombre = cData.nombre;
-    }
-
-    if (!hasSupabaseEnv()) {
-      const { demoAlquilerRows, demoCajaRows, demoCreateCaja, demoDeleteOneById, persistStore } = await import("@/lib/demo-store");
-      const row = demoAlquilerRows().find((x) => x.id === id);
-      if (!row) {
-        return { ok: false, error: "No se encontró el contrato de alquiler." };
-      }
-      if (row.estado === "cerrado") {
-        return { ok: false, error: "El contrato ya está cerrado y no se puede modificar." };
-      }
-
-      // Comprobar el bloqueo de caja antes de modificar cualquier dato del contrato.
-      const cRow = demoCajaRows().find((c) => c.referencia_id === id && c.modulo_origen === "ventas_alquiler");
-      if (cRow?.periodo_cerrado) {
-        return { ok: false, error: "El movimiento de caja pertenece a un período cerrado y no se puede editar." };
-      }
-
-      row.cliente_id = parsed.data.clienteId;
-      row.activo = parsed.data.activo;
-      row.fecha_inicio = parsed.data.fechaInicio;
-      row.fecha_termino = parsed.data.fechaTermino || null;
-      row.dias_alquiler = parsed.data.diasAlquiler ?? null;
-      row.tarifa_unidad = parsed.data.tarifaUnidad;
-      row.tarifa = parsed.data.tarifa;
-      row.monto_total = parsed.data.montoTotal;
-      row.deposito_30 = deposito30;
-      row.representante = parsed.data.representante || null;
-      row.ruc_empresa = parsed.data.rucEmpresa || null;
-      row.direccion_ejecucion = parsed.data.direccionEjecucion || null;
-      row.metodo_pago = parsed.data.metodoPago;
-      row.modalidad_pago = parsed.data.modalidadPago;
-      row.fecha_pago_credito = parsed.data.fechaPagoCredito || null;
-      row.penalidad_retraso_pago_pct = parsed.data.penalidadRetrasoPagoPct;
-      row.penalidad_devolucion_tardia_pct = parsed.data.penalidadDevolucionTardiaPct;
-      row.penalidad_danios_pct = parsed.data.penalidadDaniosPct;
-
-      if (cRow) {
-        if (deposito30 > 0) {
-          cRow.monto = deposito30;
-          cRow.fecha = parsed.data.fechaInicio;
-          cRow.medio = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
-          cRow.descripcion = `Alquiler de mixer - ${clienteNombre}`;
-        } else {
-          demoDeleteOneById("caja", cRow.id);
-        }
-      } else if (deposito30 > 0) {
-        demoCreateCaja({
-          organization_id: DEFAULT_ORG_ID,
-          fecha: parsed.data.fechaInicio,
-          tipo: "ingreso",
-          medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
-          categoria: "alquiler_bomba_mixer",
-          monto: deposito30,
-          descripcion: `Alquiler de mixer - ${clienteNombre}`,
-          modulo_origen: "ventas_alquiler",
-          referencia_id: id,
+export async function updateContratoAlquiler(formData: FormData): Promise<{
+    ok: true;
+} | {
+    ok: false;
+    error: string;
+}> {
+    try {
+        const actor = await requireMutationAccess(writerRoles);
+        const id = formData.get("id") as string;
+        if (!id)
+            return { ok: false, error: "ID de contrato requerido." };
+        const parsed = contratoAlquilerSchema.safeParse({
+            clienteId: formData.get("cliente_id"),
+            activo: formData.get("activo"),
+            codigo: formData.get("codigo"),
+            representante: formData.get("representante"),
+            rucEmpresa: formData.get("ruc_empresa"),
+            direccionEjecucion: formData.get("direccion_ejecucion"),
+            fechaInicio: formData.get("fecha_inicio"),
+            fechaTermino: formData.get("fecha_termino"),
+            diasAlquiler: formData.get("dias_alquiler"),
+            tarifaUnidad: formData.get("tarifa_unidad"),
+            tarifa: formData.get("tarifa"),
+            montoTotal: formData.get("monto_total"),
+            metodoPago: formData.get("metodo_pago"),
+            modalidadPago: formData.get("modalidad_pago"),
+            fechaPagoCredito: formData.get("fecha_pago_credito"),
+            adelanto: formData.get("adelanto"),
+            montoCredito: formData.get("monto_credito"),
+            penalidadRetrasoPagoPct: formData.get("penalidad_retraso_pago_pct"),
+            penalidadDevolucionTardiaPct: formData.get("penalidad_devolucion_tardia_pct"),
+            penalidadDaniosPct: formData.get("penalidad_danios_pct"),
         });
-      }
-      persistStore();
-    } else {
-      const supabase = getSupabaseServerClient();
-
-      const { data: currentContract, error: contractSelectErr } = await supabase
-        .from("alquileres")
-        .select("estado")
-        .eq("id", id)
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .maybeSingle();
-
-      if (contractSelectErr) {
-        return { ok: false, error: contractSelectErr.message };
-      }
-      if (!currentContract) {
-        return { ok: false, error: "No se encontró el contrato de alquiler." };
-      }
-      if (currentContract.estado === "cerrado") {
-        return { ok: false, error: "El contrato ya está cerrado y no se puede modificar." };
-      }
-
-      // Resolver los errores de lectura y el cierre de caja antes de guardar el contrato.
-      const { data: existingCaja, error: cajaSelectErr } = await supabase
-        .from("movimientos_caja")
-        .select("id, periodo_cerrado")
-        .eq("referencia_id", id)
-        .eq("modulo_origen", "ventas_alquiler")
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .maybeSingle();
-
-      if (cajaSelectErr) {
-        return { ok: false, error: cajaSelectErr.message };
-      }
-      if (existingCaja?.periodo_cerrado) {
-        return { ok: false, error: "El movimiento de caja pertenece a un período cerrado y no se puede editar." };
-      }
-
-      const { error: updErr } = await supabase
-        .from("alquileres")
-        .update({
-          cliente_id: parsed.data.clienteId,
-          activo: parsed.data.activo.trim(),
-          fecha_inicio: parsed.data.fechaInicio,
-          fecha_termino: parsed.data.fechaTermino?.trim() || null,
-          tarifa: parsed.data.tarifa,
-          representante: parsed.data.representante?.trim() || null,
-          ruc_empresa: parsed.data.rucEmpresa?.trim() || null,
-          direccion_ejecucion: parsed.data.direccionEjecucion?.trim() || null,
-          dias_alquiler: parsed.data.diasAlquiler ?? null,
-          tarifa_unidad: parsed.data.tarifaUnidad,
-          monto_total: parsed.data.montoTotal,
-          deposito_30: deposito30,
-          penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct,
-          penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct,
-          penalidad_danios_pct: parsed.data.penalidadDaniosPct,
-          metodo_pago: parsed.data.metodoPago,
-          modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
-          fecha_pago_credito: parsed.data.modalidadPago === "credito" ? parsed.data.fechaPagoCredito || null : null,
-        })
-        .eq("id", id)
-        .eq("organization_id", DEFAULT_ORG_ID);
-
-      if (updErr) {
-        return { ok: false, error: updErr.message };
-      }
-
-      if (existingCaja) {
-        if (deposito30 > 0) {
-          // - Si existe -> UPDATE
-          const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
-          const { error: updCajaErr } = await supabase
-            .from("movimientos_caja")
-            .update({
-              fecha: parsed.data.fechaInicio,
-              monto: deposito30,
-              medio: medioCaja,
-              descripcion: `Alquiler de mixer - ${clienteNombre}`,
-            })
-            .eq("id", existingCaja.id)
-            .eq("organization_id", DEFAULT_ORG_ID);
-
-          if (updCajaErr) {
-            return { ok: false, error: updCajaErr.message };
-          }
-        } else {
-          // - Si existe y monto = 0 -> DELETE
-          const { error: delCajaErr } = await supabase
-            .from("movimientos_caja")
-            .delete()
-            .eq("id", existingCaja.id)
-            .eq("organization_id", DEFAULT_ORG_ID);
-
-          if (delCajaErr) {
-            return { ok: false, error: delCajaErr.message };
-          }
+        if (!parsed.success) {
+            return { ok: false, error: "Datos de contrato inválidos." };
         }
-      } else if (deposito30 > 0) {
-        // - Si no existe y monto > 0 -> INSERT
-        const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
-        const { error: insCajaErr } = await supabase.from("movimientos_caja").insert({
-          organization_id: DEFAULT_ORG_ID,
-          fecha: parsed.data.fechaInicio,
-          tipo: "ingreso",
-          medio: medioCaja,
-          categoria: "alquiler_bomba_mixer",
-          monto: deposito30,
-          descripcion: `Alquiler de mixer - ${clienteNombre}`,
-          modulo_origen: "ventas_alquiler",
-          referencia_id: id,
-          created_by: actor.userId,
-          updated_by: actor.userId,
-        });
-
-        if (insCajaErr) {
-          return { ok: false, error: insCajaErr.message };
+        const total = roundMoney(parsed.data.montoTotal);
+        montoCobradoVenta(total, parsed.data.modalidadPago, parsed.data.adelanto);
+        let deposito30 = roundMoney(total * 0.3);
+        if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
+            if (parsed.data.adelanto !== undefined && parsed.data.adelanto > 0) {
+                deposito30 = roundMoney(parsed.data.adelanto);
+            }
         }
-      }
+        else if (parsed.data.modalidadPago === "credito") {
+            deposito30 = 0;
+        }
+        const clienteNombre = await nombreClienteOperacion(parsed.data.clienteId, actor.organizationId);
+        const documento = { cliente_id: parsed.data.clienteId, activo: parsed.data.activo.trim(), fecha_inicio: parsed.data.fechaInicio,
+            fecha_termino: parsed.data.fechaTermino?.trim() || null, tarifa: parsed.data.tarifa, representante: parsed.data.representante?.trim() || null,
+            ruc_empresa: parsed.data.rucEmpresa?.trim() || null, direccion_ejecucion: parsed.data.direccionEjecucion?.trim() || null,
+            dias_alquiler: parsed.data.diasAlquiler ?? null, tarifa_unidad: parsed.data.tarifaUnidad, monto_total: parsed.data.montoTotal,
+            penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct, penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct,
+            penalidad_danios_pct: parsed.data.penalidadDaniosPct, metodo_pago: parsed.data.metodoPago,
+            modalidad_pago: parsed.data.modalidadPago === 'adelanto_saldo' ? 'adelanto' : parsed.data.modalidadPago,
+            fecha_pago_credito: parsed.data.modalidadPago === 'credito' ? parsed.data.fechaPagoCredito || null : null };
+        const medio = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago), descripcion = 'Alquiler de mixer - ' + clienteNombre;
+        if (!hasSupabaseEnv()) {
+            const d = await import('@/lib/demo-store');
+            d.demoOperacionAtomica(() => {
+                const row = d.demoAlquilerRows().find(r => r.id === id && r.organization_id === actor.organizationId);
+                if (!row)
+                    throw new Error('Contrato no encontrado.');
+                if (row.estado === 'cerrado')
+                    throw new Error('El contrato ya está cerrado y no se puede modificar.');
+                d.demoComprobarPeriodoAbierto(actor.organizationId, row.fecha_inicio);
+                d.demoComprobarPeriodoAbierto(actor.organizationId, documento.fecha_inicio);
+                const movimientos = d.demoCajaRows().filter(c => c.organization_id === actor.organizationId && c.referencia_id === id
+                    && ['ventas_alquiler', 'alquiler'].includes(c.modulo_origen ?? '') && !c.deleted_at);
+                if (movimientos.length > 1)
+                    throw new Error('Revisa los cobros vinculados al contrato antes de editar.');
+                const caja = movimientos[0];
+                if (caja?.periodo_cerrado)
+                    throw new Error('El cobro pertenece a un período cerrado.');
+                if (caja)
+                    d.demoComprobarPeriodoAbierto(actor.organizationId, caja.fecha);
+                Object.assign(row, documento, { deposito_30: deposito30 });
+                if (caja && deposito30 > 0)
+                    Object.assign(caja, { fecha: documento.fecha_inicio, monto: deposito30, medio, descripcion });
+                else if (caja)
+                    d.demoVoidCajaMov(caja.id, 'El contrato cambió a crédito');
+                else if (deposito30 > 0)
+                    d.demoCreateCaja({ organization_id: actor.organizationId, fecha: documento.fecha_inicio, tipo: 'ingreso', medio,
+                        categoria: 'alquiler_bomba_mixer', monto: deposito30, descripcion, modulo_origen: 'ventas_alquiler', referencia_id: id });
+            });
+        }
+        else {
+            const { error } = await getSupabaseServerClient().rpc('editar_alquiler_integral', { p_org: actor.organizationId, p_actor: actor.userId, p_id: id,
+                p_documento: documento, p_monto: deposito30, p_medio: medio, p_descripcion: descripcion });
+            if (error)
+                throw new Error(mensajeOperacionFinanciera(error));
+        }
+        revalidatePath('/ventas');
+        revalidatePath('/ventas/alquiler-mixer');
+        revalidatePath('/alquiler');
+        revalidatePath('/caja');
+        return { ok: true };
     }
-
-    revalidatePath("/ventas");
-    revalidatePath("/ventas/alquiler-mixer");
-    revalidatePath("/alquiler");
-    revalidatePath("/caja");
-    return { ok: true };
-  } catch (err: unknown) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : "Error desconocido al actualizar contrato.",
-    };
-  }
+    catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : 'No se pudo actualizar el contrato.' };
+    }
 }
 
 export async function submitUpdateContratoAlquilerForm(
@@ -5386,130 +4695,36 @@ export async function submitUpdateContratoAlquilerForm(
   }
 }
 
-export async function deleteServicioAserradero(
-  id: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  try {
-    await requireMutationAccess(ventasRoles);
-    const parsedId = z.string().uuid().safeParse(id);
-    if (!parsedId.success) {
-      return { ok: false, error: "Identificador inválido." };
+export async function deleteServicioAserradero(id: string) {
+    try {
+        const actor = await requireMutationAccess(ventasRoles);
+        await anularOperacionIntegral(actor, 'aserradero', id);
+        revalidatePath('/ventas/aserradero-servicios');
+        revalidatePath('/ventas');
+        revalidatePath('/caja');
+        revalidatePath('/inventario');
+        revalidatePath('/');
+        return { ok: true as const };
     }
-
-    if (!hasSupabaseEnv()) {
-      const { demoServiciosAserraderoRows, demoDeleteOneById, demoVoidCajaMov, demoCajaRows, persistStore } = await import("@/lib/demo-store");
-      const service = demoServiciosAserraderoRows().find((x) => x.id === id);
-      if (!service) {
-        return { ok: false, error: "Servicio no encontrado." };
-      }
-
-      // Anular movimientos de caja (NO eliminar — quedan como historial con estado anulado)
-      const cajaMovs = demoCajaRows().filter((c) => c.referencia_id === id && (c.modulo_origen === "ventas_aserradero" || c.modulo_origen === "aserradero"));
-      for (const m of cajaMovs) {
-        demoVoidCajaMov(m.id, "Servicio de aserradero eliminado");
-      }
-
-      demoDeleteOneById("serviciosAserradero", id);
-      persistStore();
-      revalidatePath("/ventas/aserradero-servicios");
-      revalidatePath("/caja");
-      revalidatePath("/");
-      return { ok: true };
+    catch (error) {
+        return { ok: false as const, error: error instanceof Error ? error.message : 'No se pudo anular la operación.' };
     }
-
-    const supabase = getSupabaseServerClient();
-
-    // Anular movimientos de caja asociados (NO eliminar — quedan como historial)
-    await supabase
-      .from("movimientos_caja")
-      .update({
-        voided_at: new Date().toISOString(),
-        void_reason: "Servicio de aserradero eliminado",
-      })
-      .eq("referencia_id", id)
-      .in("modulo_origen", ["ventas_aserradero", "aserradero"]);
-
-    // Eliminar el servicio del registro de ventas
-    const { error } = await supabase
-      .from("servicios_aserradero")
-      .delete()
-      .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID);
-
-    if (error) {
-      return { ok: false, error: error.message };
-    }
-
-    revalidatePath("/ventas/aserradero-servicios");
-    revalidatePath("/caja");
-    revalidatePath("/");
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Error desconocido." };
-  }
 }
 
-export async function deleteAlquilerContrato(
-  id: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  try {
-    await requireMutationAccess(ventasRoles);
-    const parsedId = z.string().uuid().safeParse(id);
-    if (!parsedId.success) {
-      return { ok: false, error: "Identificador inválido." };
+export async function deleteAlquilerContrato(id: string) {
+    try {
+        const actor = await requireMutationAccess(ventasRoles);
+        await anularOperacionIntegral(actor, 'alquiler', id);
+        revalidatePath('/ventas/alquiler-mixer');
+        revalidatePath('/ventas');
+        revalidatePath('/caja');
+        revalidatePath('/inventario');
+        revalidatePath('/');
+        return { ok: true as const };
     }
-
-    if (!hasSupabaseEnv()) {
-      const { demoAlquilerRows, demoDeleteOneById, demoVoidCajaMov, demoCajaRows, persistStore } = await import("@/lib/demo-store");
-      const contrato = demoAlquilerRows().find((x) => x.id === id);
-      if (!contrato) {
-        return { ok: false, error: "Contrato no encontrado." };
-      }
-
-      // Anular movimientos de caja (NO eliminar — quedan como historial con estado anulado)
-      const cajaMovs = demoCajaRows().filter((c) => c.referencia_id === id && (c.modulo_origen === "ventas_alquiler" || c.modulo_origen === "alquiler"));
-      for (const m of cajaMovs) {
-        demoVoidCajaMov(m.id, "Contrato de alquiler eliminado");
-      }
-
-      demoDeleteOneById("alquileres", id);
-      persistStore();
-      revalidatePath("/ventas/alquiler-mixer");
-      revalidatePath("/caja");
-      revalidatePath("/");
-      return { ok: true };
+    catch (error) {
+        return { ok: false as const, error: error instanceof Error ? error.message : 'No se pudo anular la operación.' };
     }
-
-    const supabase = getSupabaseServerClient();
-
-    // Anular movimientos de caja asociados (NO eliminar — quedan como historial)
-    await supabase
-      .from("movimientos_caja")
-      .update({
-        voided_at: new Date().toISOString(),
-        void_reason: "Contrato de alquiler eliminado",
-      })
-      .eq("referencia_id", id)
-      .in("modulo_origen", ["ventas_alquiler", "alquiler"]);
-
-    // Eliminar el contrato del registro
-    const { error } = await supabase
-      .from("alquileres")
-      .delete()
-      .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID);
-
-    if (error) {
-      return { ok: false, error: error.message };
-    }
-
-    revalidatePath("/ventas/alquiler-mixer");
-    revalidatePath("/caja");
-    revalidatePath("/");
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Error desconocido." };
-  }
 }
 
 export async function updateServicioAserradero(formData: FormData) {
@@ -5591,67 +4806,20 @@ export async function submitUpdateServicioAserraderoForm(
   }
 }
 
-export async function deleteVentaMaderaCortada(
-  id: string,
-): Promise<{ ok: boolean; error: string }> {
-  try {
-    const actor = await requireMutationAccess(ventasRoles);
-    if (!hasSupabaseEnv()) {
-      // Modo demo: anular caja y eliminar venta del listado
-      const { demoVentasRows, demoDeleteOneById, demoVoidCajaMov, demoCajaRows, demoInventarioMovimientosRows, persistStore } = await import("@/lib/demo-store");
-      const venta = demoVentasRows().find((v) => v.id === id);
-      if (!venta) {
-        return { ok: false, error: "Venta no encontrada." };
-      }
-      // Anular movimientos de caja (NO eliminar — quedan como historial con estado anulado)
-      const cajaMovs = demoCajaRows().filter(
-        (c) => c.referencia_id === id && c.modulo_origen === "ventas_madera_cortada",
-      );
-      for (const m of cajaMovs) {
-        demoVoidCajaMov(m.id, "Venta de madera cortada eliminada");
-      }
-      // Revertir movimientos de inventario asociados
-      const invMovs = demoInventarioMovimientosRows().filter(
-        (m) => String(m.referencia ?? "").includes(id),
-      );
-      for (const m of invMovs) {
-        demoDeleteOneById("inventarioMovimientos", m.id);
-      }
-      demoDeleteOneById("ventas", id);
-      persistStore();
-    } else {
-      const supabase = getSupabaseServerClient();
-      // Anular movimientos de caja (NO eliminar — quedan como historial)
-      await supabase
-        .from("movimientos_caja")
-        .update({
-          voided_at: new Date().toISOString(),
-          void_reason: "Venta de madera cortada eliminada",
-        })
-        .eq("referencia_id", id)
-        .eq("modulo_origen", "ventas_madera_cortada");
-      // Revertir movimientos de inventario
-      await supabase
-        .from("inventario_movimientos")
-        .delete()
-        .eq("referencia_id", id);
-      // Eliminar la venta
-      const { error } = await supabase
-        .from("ventas_madera_cortada")
-        .delete()
-        .eq("id", id)
-        .eq("organization_id", DEFAULT_ORG_ID);
-      if (error) throw new Error(error.message);
+export async function deleteVentaMaderaCortada(id: string) {
+    try {
+        const actor = await requireMutationAccess(ventasRoles);
+        await anularOperacionIntegral(actor, 'venta_madera_cortada', id);
+        revalidatePath('/ventas/madera-cortada');
+        revalidatePath('/ventas');
+        revalidatePath('/caja');
+        revalidatePath('/inventario');
+        revalidatePath('/');
+        return { ok: true as const, error: '' };
     }
-    revalidatePath("/ventas/madera-cortada");
-    revalidatePath("/ventas");
-    revalidatePath("/caja");
-    revalidatePath("/");
-    return { ok: true, error: "" };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Error al eliminar la venta.";
-    return { ok: false, error: msg };
-  }
+    catch (error) {
+        return { ok: false as const, error: error instanceof Error ? error.message : 'No se pudo anular la operación.' };
+    }
 }
 
 export async function updateVentaMaderaCortada(_formData: FormData) {

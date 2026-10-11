@@ -1,4 +1,5 @@
 "use client";
+import { OperationSubmissionId } from "@/components/ui/operation-submission-id";
 
 import {
   submitCreateInventarioProductoForm,
@@ -327,6 +328,7 @@ export function InventarioContextPanels({
         }}
       >
         <form key={compraFormKey} action={compraFormAction} onSubmit={handleCompraSubmit} className="grid gap-3 md:grid-cols-2">
+          <OperationSubmissionId state={compraState} />
           <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)] md:col-span-2">
             <span>Producto</span>
             <Combobox

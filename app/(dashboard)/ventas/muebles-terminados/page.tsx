@@ -17,7 +17,7 @@ import {
   getZonasEntregaRows,
 } from "@/lib/data";
 import { canMutateVentas } from "@/lib/permissions";
-import { formatDate, formatPen } from "@/lib/utils";
+import { fechaHoyPeru, formatDate, formatPen } from "@/lib/utils";
 
 export default async function MueblesTerminadosPage({
   searchParams,
@@ -40,7 +40,7 @@ export default async function MueblesTerminadosPage({
   const choferesById = new Map(choferes.map((c) => [c.id, c.nombre]));
   const muebleHelpers = new Map(muebles.map((m) => [m.id, m]));
 
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = fechaHoyPeru();
   const mueblesDisponibles = muebles.filter((m) => m.stock_disponible > 0).length;
   const stockBajo = muebles.filter((m) => m.stock_disponible > 0 && m.stock_disponible <= 2).length;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;

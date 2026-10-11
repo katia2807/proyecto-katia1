@@ -15,7 +15,10 @@ vi.mock("@/lib/company-config", () => ({ getEmpresaConfig: vi.fn() }));
 
 import { createVentaMadera, createVentaMaderaCortada, createServicioAserradero, updateServicioAserradero,
   createVentaMuebleTerminado, createCompraMadera, cerrarContratoAlquiler, createVentaDesdePdf,
-  aprobarCotizacionAOrden, registrarCobroCotizacionUnificada, consultarCobroCotizacionUnificada } from "@/app/actions";
+  aprobarCotizacionAOrden, registrarCobroCotizacionUnificada, consultarCobroCotizacionUnificada,
+  cancelarVentaMueble, createInventarioCompraRapida, updateContratoAlquiler, deleteServicioAserradero,
+  deleteAlquilerContrato, deleteVentaMaderaCortada, forzarEliminarClienteCompleto } from "@/app/actions";
+import { redirect } from "next/navigation";
 import { DEFAULT_ORG_ID as org } from "@/lib/constants";
 import { defaultCotizacionDetalleV1 } from "@/lib/cotizacion-unificada-payload";
 
@@ -26,9 +29,9 @@ let db: PGlite;
 type Row = Record<string, unknown>;
 const tables = new Set(["clientes", "proveedores", "inventario_productos", "muebles_catalogo", "ventas_madera", "ventas_madera_lineas",
   "inventario_movimientos", "ventas_mueble_terminado", "ventas_madera_cortada", "servicios_aserradero", "compras_madera",
-  "alquileres", "cotizaciones_unificadas", "cotizaciones_mueble", "ordenes_produccion", "movimientos_caja"]);
+  "alquileres", "cotizaciones_unificadas", "cotizaciones_mueble", "ordenes_produccion", "movimientos_caja", "cierres_mensuales", "operaciones_financieras_seguras"]);
 const functions = new Set(["crear_compra_madera_con_caja", "cerrar_alquiler_con_caja", "consultar_cobro_cotizacion",
-  "registrar_cobro_cotizacion_seguro", "aprobar_cotizacion_con_adelanto", "editar_aserradero_con_caja"]);
+  "registrar_cobro_cotizacion_seguro", "aprobar_cotizacion_con_adelanto", "editar_aserradero_con_caja", "registrar_operacion_integral", "anular_operacion_integral", "editar_alquiler_integral", "eliminar_cliente_integral"]);
 const name = (value: string) => { if (!/^[a-z_][a-z_0-9]*$/.test(value)) throw new Error("Nombre inválido"); return '"' + value + '"'; };
 const parameter = (value: unknown) => typeof value === "object" && value !== null ? JSON.stringify(value) : value;
 
@@ -84,17 +87,172 @@ const count = async (table: string) => Number((await db.query<{ n: number }>("se
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(readFileSync("tests/unit/fixtures/finanzas.sql", "utf8"));
+  await db.exec(readFileSync("tests/unit/fixtures/finanzas-heredado.sql", "utf8"));
   await db.exec(readFileSync("supabase/migrations/20261010010000_cobros_y_cierres_seguros.sql", "utf8"));
+  await db.exec(readFileSync("supabase/migrations/20261011010000_integridad_caja_stock_operaciones.sql", "utf8"));
+  await db.exec(`create function fallo_stock_ficticio() returns trigger language plpgsql as $$begin
+    if new.producto_id::text=current_setting('auditoria.fallo_producto',true) then raise exception 'Fallo ficticio del segundo producto'; end if;return new;end $$;
+    create trigger fallo_stock before insert on inventario_movimientos for each row execute function fallo_stock_ficticio();`);
 }, 30000);
+
+const clave = () => crypto.randomUUID();
+const baseVenta = { cliente_id: cliente, fecha: '2026-10-10', metodo_pago: 'yape', modalidad_pago: 'contado',
+  adelanto: 0, fecha_pago_credito: '', tipo_comprobante: 'ninguno', chofer_id: '', tipo_entrega: 'entrega_local',
+  direccion_entrega: '', estado_entrega: 'pendiente', monto_credito: 0 };
+const venderMueble = (id = clave()) => createVentaMuebleTerminado(data({ ...baseVenta, submission_id: id, mueble_catalogo_id: producto, cantidad: 2, precio_unitario: 500 }));
+const venderMadera = (id = clave()) => createVentaMadera(data({ ...baseVenta, submission_id: id, total: 1000,
+  estado: 'confirmada', inventario_producto_id: producto, cantidad_producto: 10 }));
+const venderCorte = (cantidad = 12, productos = [producto], id = clave()) => createVentaMaderaCortada(data({ ...baseVenta,
+  submission_id: id, tipo_corte: 'tabla', total_pt: cantidad * 12 * productos.length, precio_por_pt: 50,
+  total: cantidad * 600 * productos.length, cantidad_piezas: cantidad * productos.length, precio_unitario_comercial: 600,
+  inventario_producto_id: '', lineas_cubicaje: JSON.stringify(productos.map(inventario_producto_id => ({
+    cantidad, espesor: 1, ancho: 12, largo: 12, descripcion: 'Pieza ficticia', inventario_producto_id }))) }));
+const comprarStock = (id = clave(), cantidad = 10) => createInventarioCompraRapida(data({ submission_id: id, producto_id: producto,
+  cantidad, costo_unitario: 10, proveedor: 'Proveedor ficticio', nota: '', fecha: '2026-10-10', tipo_comprobante: 'ninguno', url_comprobante: '' }));
+const editarAlquiler = (modalidad = 'adelanto') => updateContratoAlquiler(data({ ...baseVenta, id: contrato, activo: 'Mixer ficticio',
+  codigo: 'AUDIT-ALQ', representante: '', ruc_empresa: '', direccion_ejecucion: '', fecha_inicio: '2026-10-10',
+  fecha_termino: '2026-10-12', dias_alquiler: 2, tarifa_unidad: 'dia', tarifa: 1000, monto_total: 2000,
+  modalidad_pago: modalidad, adelanto: 600, fecha_pago_credito: '2026-10-31', penalidad_retraso_pago_pct: 3,
+  penalidad_devolucion_tardia_pct: 3, penalidad_danios_pct: 3 }));
+const num = async (sql: string) => Number((await db.query<{ n: string }>(sql)).rows[0].n);
+const existencias = (id = producto) => num(`select stock_actual n from inventario_productos where id='${id}'`);
+const cajaActiva = () => num('select coalesce(sum(monto),0) n from movimientos_caja where voided_at is null and deleted_at is null');
+const deposito = () => db.query(`insert into movimientos_caja(organization_id,fecha,tipo,medio,categoria,monto,referencia_id,modulo_origen)
+  values($1,'2026-10-10','ingreso','yape','alquiler_bomba_mixer',300,$2,'ventas_alquiler')`, [org, contrato]);
+const aserradero = async () => {
+  await createServicioAserradero(data({ ...baseVenta, precio_cobrado: 1000, costo_cubicaje: 100, pies_cubicos: 10, lineas_json: '[]' }));
+  return String((await db.query<Row>('select id from servicios_aserradero')).rows[0].id);
+};
+const eliminarCliente = () => forzarEliminarClienteCompleto(data({ id: cliente, confirmacion: 'ELIMINAR TODO' }));
+
+describe('Prioridades: Caja, existencias y operaciones completas con triggers heredados', () => {
+  test('P1-01: anular muebles devuelve exactamente dos unidades y anula el ingreso una sola vez', async () => {
+    await venderMueble(); const id = String((await db.query<Row>('select id from ventas_mueble_terminado')).rows[0].id);
+    expect(await existencias()).toBe(98);
+    await cancelarVentaMueble(data({ id })); await cancelarVentaMueble(data({ id }));
+    expect(await existencias()).toBe(100);
+    expect(await num('select stock_disponible n from muebles_catalogo')).toBe(100);
+    expect(await count('inventario_movimientos')).toBe(1);
+    expect(await cajaActiva()).toBe(0); expect(await count('movimientos_caja')).toBe(1);
+  });
+  test.each(['mueble', 'madera'])('P1-02/P1-11: un fallo de Caja revierte venta %s, stock y Kardex; el reintento guarda una vez', async tipo => {
+    const id = clave(), vender = tipo === 'mueble' ? venderMueble : venderMadera;
+    await db.exec("set auditoria.fallo_caja='si'"); await expect(vender(id)).rejects.toThrow(/Caja/);
+    expect(await existencias()).toBe(100); expect(await count('inventario_movimientos')).toBe(0);
+    expect(await count('ventas_mueble_terminado')).toBe(0); expect(await count('ventas_madera')).toBe(0);
+    expect(await count('ventas_madera_lineas')).toBe(0); expect(await count('operaciones_financieras_seguras')).toBe(0);
+    await db.exec("set auditoria.fallo_caja='no'"); await vender(id); await vender(id);
+    expect(await existencias()).toBe(tipo === 'mueble' ? 98 : 90); expect(await cajaActiva()).toBe(1000);
+    expect(await count('movimientos_caja')).toBe(1);
+  });
+  test('P1-03: compra rápida fallida no aumenta stock; reintentos concurrentes conservan un egreso y una entrada', async () => {
+    const id = clave(); await db.exec("set auditoria.fallo_caja='si'"); await expect(comprarStock(id)).rejects.toThrow(/Caja/);
+    expect(await existencias()).toBe(100); expect(await count('inventario_movimientos')).toBe(0);
+    await db.exec("set auditoria.fallo_caja='no'"); await Promise.all([comprarStock(id), comprarStock(id)]);
+    expect(await existencias()).toBe(110); expect(await cajaActiva()).toBe(100); expect(await count('movimientos_caja')).toBe(1);
+    await expect(comprarStock(id, 20)).rejects.toThrow(/otros datos/); expect(await existencias()).toBe(110);
+  });
+  test('P1-04: editar alquiler falla completo y luego sincroniza depósito y Caja', async () => {
+    await deposito(); await db.exec("set auditoria.fallo_caja='si'"); expect(await editarAlquiler()).toMatchObject({ ok: false });
+    expect(await num('select monto_total n from alquileres')).toBe(1000); expect(await cajaActiva()).toBe(300);
+    await db.exec("set auditoria.fallo_caja='no'"); expect(await editarAlquiler()).toEqual({ ok: true });
+    expect(await num('select monto_total n from alquileres')).toBe(2000); expect(await cajaActiva()).toBe(600);
+  });
+  test('alquiler a crédito conserva el cobro anulado y volver a adelanto crea un ingreso activo', async () => {
+    await deposito(); expect(await editarAlquiler('credito')).toEqual({ ok: true }); expect(await cajaActiva()).toBe(0);
+    expect(await editarAlquiler()).toEqual({ ok: true }); expect(await cajaActiva()).toBe(600); expect(await count('movimientos_caja')).toBe(2);
+  });
+  test('un contrato cerrado o inexistente no crea ni modifica cobros', async () => {
+    await db.exec("update alquileres set estado='cerrado'"); expect(await editarAlquiler()).toMatchObject({ ok:false });
+    expect(await cajaActiva()).toBe(0);
+    await db.exec('delete from alquileres'); expect(await editarAlquiler()).toMatchObject({ok:false}); expect(await cajaActiva()).toBe(0);
+  });
+  test('un segundo cobro activo o una empresa ajena impiden editar el contrato', async () => {
+    await deposito(); await deposito(); expect(await editarAlquiler()).toMatchObject({ok:false});
+    expect(await num('select monto_total n from alquileres')).toBe(1000); expect(await cajaActiva()).toBe(600);
+    await db.exec('delete from movimientos_caja');
+    await db.query("update alquileres set organization_id=$1",['00000000-0000-0000-0000-000000000002']);
+    expect(await editarAlquiler()).toMatchObject({ok:false}); expect(await cajaActiva()).toBe(0);
+  });
+  test.each(['aserradero', 'alquiler'])('P1-05: un cobro cerrado impide borrar %s y conserva sus datos', async tipo => {
+    const id = tipo === 'aserradero' ? await aserradero() : contrato; if (tipo === 'alquiler') await deposito();
+    await db.exec('update movimientos_caja set periodo_cerrado=true');
+    expect(await (tipo === 'aserradero' ? deleteServicioAserradero(id) : deleteAlquilerContrato(id))).toMatchObject({ ok: false });
+    expect(await count(tipo === 'aserradero' ? 'servicios_aserradero' : 'alquileres')).toBe(1);
+    expect(await cajaActiva()).toBe(tipo === 'aserradero' ? 1000 : 300);
+  });
+  test.each(['aserradero', 'alquiler'])('anular %s abierto conserva Caja como historial sin ingreso activo', async tipo => {
+    const id = tipo === 'aserradero' ? await aserradero() : contrato; if (tipo === 'alquiler') await deposito();
+    expect(await (tipo === 'aserradero' ? deleteServicioAserradero(id) : deleteAlquilerContrato(id))).toMatchObject({ ok: true });
+    expect(await cajaActiva()).toBe(0); expect(await count('movimientos_caja')).toBe(1);
+  });
+  test('P1-06: madera cortada recupera stock por referencia real y conserva salida y devolución', async () => {
+    const id = await venderCorte(); expect(await existencias()).toBe(88);
+    expect(await deleteVentaMaderaCortada(id)).toMatchObject({ ok: true }); expect(await deleteVentaMaderaCortada(id)).toMatchObject({ ok: true });
+    expect(await existencias()).toBe(100); expect(await count('inventario_movimientos')).toBe(2);
+    expect(await count('ventas_madera_cortada')).toBe(0); expect(await cajaActiva()).toBe(0);
+  });
+  test('P1-07: un fallo en el segundo producto revierte ambos stocks, documento y Caja', async () => {
+    const segundo = '30000000-0000-4000-8000-000000000002';
+    await db.query("insert into inventario_productos(id,organization_id,nombre,stock_actual,categoria)values($1,$2,'Tabla ficticia',100,'Madera')", [segundo, org]);
+    await db.query("select set_config('auditoria.fallo_producto',$1,false)", [segundo]);
+    await expect(venderCorte(12, [producto, segundo])).rejects.toThrow(/segundo producto/);
+    expect(await existencias()).toBe(100); expect(await existencias(segundo)).toBe(100);
+    expect(await count('inventario_movimientos')).toBe(0); expect(await count('ventas_madera_cortada')).toBe(0); expect(await cajaActiva()).toBe(0);
+  });
+  test('P1-08: UPDATE efectivo cambia importes; el cierre guarda su marca y bloquea modificaciones posteriores', async () => {
+    const id = await aserradero();
+    await updateServicioAserradero(data({ id, cliente_id: cliente, fecha: '2026-10-10', precio_cobrado: 1200, costo_cubicaje: 100, pies_cubicos: 10, lineas_json: '[]' }));
+    expect(await cajaActiva()).toBe(1200);
+    await db.query('insert into cierres_mensuales(organization_id,anio,mes)values($1,2026,10)', [org]);
+    await db.exec('update movimientos_caja set periodo_cerrado=true');
+    expect((await db.query<Row>('select periodo_cerrado from movimientos_caja')).rows[0].periodo_cerrado).toBe(true);
+    await expect(db.exec('update movimientos_caja set monto=1300')).rejects.toThrow(/cerrado/);
+    await expect(db.exec('delete from movimientos_caja')).rejects.toThrow(/cerrado/); expect(await cajaActiva()).toBe(1200);
+  });
+  test('P1-09: insertar o mover un ingreso al mes cerrado se rechaza sin modificar el saldo', async () => {
+    await db.query('insert into cierres_mensuales(organization_id,anio,mes)values($1,2026,9)', [org]);
+    await expect(db.query("insert into movimientos_caja(organization_id,fecha,tipo,medio,monto)values($1,'2026-09-15','ingreso','efectivo',50)", [org])).rejects.toThrow(/cerrado/);
+    await deposito(); await expect(db.exec("update movimientos_caja set fecha='2026-09-15'")).rejects.toThrow(/cerrado/);
+    expect(await cajaActiva()).toBe(300);
+  });
+  test('P1-10: dos ventas de ocho sobre stock diez solo aceptan una', async () => {
+    await db.exec('update inventario_productos set stock_actual=10');
+    const results = await Promise.allSettled([venderCorte(8), venderCorte(8)]);
+    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1); expect(await existencias()).toBe(2);
+    expect(await count('ventas_madera_cortada')).toBe(1); expect(await cajaActiva()).toBe(4800);
+  });
+  test('P1-12: eliminar cliente incluye madera cortada, devuelve stock y anula Caja', async () => {
+    await venderMueble(); await venderCorte(); await aserradero(); await deposito();
+    await eliminarCliente(); expect(await count('clientes')).toBe(0); expect(await count('ventas_madera_cortada')).toBe(0);
+    expect(await count('ventas_mueble_terminado')).toBe(0); expect(await count('servicios_aserradero')).toBe(0);
+    expect(await count('alquileres')).toBe(0); expect(await existencias()).toBe(100); expect(await cajaActiva()).toBe(0);
+    expect(redirect).toHaveBeenLastCalledWith(expect.stringContaining('correctamente'));
+  });
+  test('un fallo tardío al eliminar cliente restaura documentos, stock y cobros anteriores', async () => {
+    await venderMueble(); await venderCorte(); await deposito();
+    await db.exec("update movimientos_caja set periodo_cerrado=true where modulo_origen='ventas_alquiler'");
+    const antes = await cajaActiva(), stockAntes = await existencias(); await eliminarCliente();
+    expect(await count('clientes')).toBe(1); expect(await count('ventas_mueble_terminado')).toBe(1);
+    expect(await count('ventas_madera_cortada')).toBe(1); expect(await cajaActiva()).toBe(antes); expect(await existencias()).toBe(stockAntes);
+    expect(await num("select count(*) n from operaciones_financieras_seguras where tipo like 'anular_%'")).toBe(0);
+  });
+  test('las funciones nuevas rechazan rol de lectura y el antiguo RPC de muebles queda bloqueado', async () => {
+    await db.exec("update perfiles set ui_role='readonly'"); await expect(comprarStock()).rejects.toThrow(/autorizado/);
+    await db.exec('set role authenticated');
+    try { await expect(db.query('select anular_operacion_integral($1,$2,$3,$4)', [org, actor, 'alquiler', contrato])).rejects.toThrow(/permission denied/); }
+    finally { await db.exec('reset role'); }
+    await expect(db.query('select cancelar_venta_mueble($1,$2)', [contrato, org])).rejects.toThrow(/actualización/);
+  });
+});
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => {
   vi.clearAllMocks();
-  await db.exec("reset role; set auditoria.fallo_caja='no'; set auditoria.fallo_categoria=''; truncate perfiles," + [...tables].map(name).join(",") + " cascade;");
+  await db.exec("reset role; set auditoria.fallo_caja='no'; set auditoria.fallo_categoria=''; set auditoria.fallo_producto=''; truncate perfiles," + [...tables].map(name).join(",") + " cascade;");
   await db.query("insert into perfiles values($1,$2,'owner_admin',null,null)", [actor, org]);
   await db.query("insert into clientes values($1,$2,'Cliente ficticio',null)", [cliente, org]);
   await db.query("insert into proveedores values($1,$2)", [cliente, org]);
-  await db.query("insert into inventario_productos values($1,$2,'Tabla ficticia',100,'PT','Madera')", [producto, org]);
-  await db.query("insert into muebles_catalogo values($1,$2,'Mueble ficticio',100)", [producto, org]);
+  await db.query("insert into muebles_catalogo(id,organization_id,nombre,stock_disponible,codigo) values($1,$2,'Mueble ficticio',100,'AUD-001')", [producto, org]);
   await db.query("insert into alquileres(id,organization_id,cliente_id,estado,monto_total,deposito_30,penalidad,penalidad_retraso_pago_pct,penalidad_devolucion_tardia_pct,penalidad_danios_pct,metodo_pago,codigo)values($1,$2,$3,'abierto',1000,300,0,3,3,3,'yape','AUDIT-ALQ')", [contrato, org, cliente]);
   await db.query("insert into cotizaciones_unificadas values($1,$2,$3,1000,'AUDIT-COT','2026-10-10','lista_produccion',$4,null)", [cot, org, cliente, JSON.stringify(defaultCotizacionDetalleV1())]);
   mocks.auth.mockResolvedValue({ userId: actor, organizationId: org, role: "owner_admin", uiRole: null });
@@ -249,6 +407,7 @@ test("instalar la migración conserva incluso importes históricos que requieren
   const copia = new PGlite();
   try {
     await copia.exec(readFileSync("tests/unit/fixtures/finanzas.sql", "utf8"));
+    await copia.exec(readFileSync("tests/unit/fixtures/finanzas-heredado.sql", "utf8"));
     await copia.query("insert into clientes values($1,$2,'Histórico ficticio',null)", [cliente, org]);
     await copia.query("insert into ventas_madera(organization_id,cliente_id,total,estado) values($1,$2,1000,'confirmada')", [org, cliente]);
     await copia.query("insert into servicios_aserradero(organization_id,cliente_id,precio_cobrado,adelanto) values($1,$2,1000,1500)", [org, cliente]);
@@ -256,6 +415,7 @@ test("instalar la migración conserva incluso importes históricos que requieren
     const cajaAnterior = (await copia.query("select * from movimientos_caja")).rows;
     const aserraderoAnterior = (await copia.query("select * from servicios_aserradero")).rows;
     await copia.exec(readFileSync("supabase/migrations/20261010010000_cobros_y_cierres_seguros.sql", "utf8"));
+    await copia.exec(readFileSync("supabase/migrations/20261011010000_integridad_caja_stock_operaciones.sql", "utf8"));
     expect((await copia.query("select * from movimientos_caja")).rows).toEqual(cajaAnterior);
     expect((await copia.query("select * from servicios_aserradero")).rows).toEqual(aserraderoAnterior);
     expect((await copia.query("select total,metodo_pago,modalidad_pago,adelanto from ventas_madera")).rows[0])

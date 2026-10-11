@@ -1,4 +1,5 @@
 "use client";
+import { OperationSubmissionId } from "@/components/ui/operation-submission-id";
 
 import { submitCreateVentaMuebleTerminadoForm } from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
@@ -12,7 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { liteClientesToCompleto, MOCK_MUEBLES_CATALOGO_VENTA } from "@/lib/combobox-mocks";
 import type { ZonaEntregaRow } from "@/lib/demo-store";
-import { formatPen } from "@/lib/utils";
+import { fechaHoyPeru, formatPen } from "@/lib/utils";
 import { NuevoClienteInlinePanel } from "@/components/sales/nuevo-cliente-inline-panel";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -61,7 +62,7 @@ export function MueblesTerminadosContextPanels({
   // Nuevos estados para el wizard
   const [step, setStep] = useState(1);
   const [cantidad, setCantidad] = useState("1");
-  const [fecha, setFecha] = useState(fechaDefault || new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(fechaDefault || fechaHoyPeru());
   // El estado rucFactura y dniBoleta redundante ha sido eliminado.
 
   const formRef = useRef<HTMLFormElement>(null);
@@ -131,7 +132,7 @@ export function MueblesTerminadosContextPanels({
     setModoCliente("buscar");
     setStep(1);
     setCantidad("1");
-    setFecha(fechaDefault || new Date().toISOString().slice(0, 10));
+    setFecha(fechaDefault || fechaHoyPeru());
     setDeliveryInfo({
       tipo_entrega: "envio",
       direccion_entrega: "",
@@ -262,6 +263,7 @@ export function MueblesTerminadosContextPanels({
           className="space-y-4"
           noValidate
         >
+          <OperationSubmissionId state={state} />
           {/* Stepper del Wizard */}
           <div className="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
             <div className="flex items-center justify-between">

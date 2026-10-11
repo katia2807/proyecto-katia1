@@ -1,5 +1,13 @@
 # Notas de parche
 
+## 1.1.73 — 10/10/2026
+
+Se corrigieron guardados parciales, anulaciones y reintentos que podían descuadrar Caja o stock. Los meses cerrados quedan protegidos y ventas, compras y alquileres conservan sus importes y pasos habituales.
+
+## 1.1.72 — 10/10/2026
+
+Se amplió la revisión de Caja, ventas, alquileres e Inventario con pruebas aisladas de errores y reintentos. Quedan identificadas las correcciones prioritarias para evitar descuadres, sin alterar datos reales.
+
 ## 1.1.71 — 10/10/2026
 
 Los cobros respetan la modalidad y el medio de pago, descuentan adelantos y evitan cierres duplicados o guardados incompletos. Se bloquean adelantos excesivos y se retira la lectura de PDF que simulaba datos.

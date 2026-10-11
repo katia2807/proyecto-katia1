@@ -1,5 +1,7 @@
 # Correcciones financieras de prioridad alta — 10/10/2026
 
+**Continuidad 1.1.73:** la incidencia de UPDATE y los otros once riesgos adicionales descubiertos en 1.1.72 se corrigieron con pruebas que incluyen los triggers heredados. Migración instalada el 11/10/2026, con 45 tablas / 274 registros conservados; publicación del código en curso. [Correcciones nuevas y alcance](CORRECCIONES_PRIORITARIAS_2026-10-10.md). Las comprobaciones históricas siguientes mantienen sus límites.
+
 Versión 1.1.71. Alcance autorizado: solucionar los problemas de prioridad alta encontrados en el diagnóstico de la versión 1.1.70, conservando las fórmulas comerciales y los datos existentes. **Migración instalada, código publicado y lecturas comprobadas en producción.** El diagnóstico original permanece en `temp/auditoria-financiera-2026-10-10/INFORME.md` como evidencia anterior.
 
 ## Hallazgos corregidos
@@ -59,6 +61,8 @@ Una primera apertura, antes de confirmar el despliegue nuevo, todavía mostraba 
 La comparación final mantiene iguales las **42 tablas públicas / 257 registros** y los metadatos de Storage (tres depósitos y doce objetos). La huella de `auth.users` cambió durante el intervalo del recorrido; no se identificó el campo cambiado y no se declara esa tabla igual al finalizar. Se utilizó una sesión existente; no se gestionaron cuentas ni se cambiaron credenciales. La igualdad completa de las 45 tablas sí corresponde a la comprobación inmediata después de instalar la migración. Evidencia y captura en `temp/auditoria-financiera-2026-10-10/`, excluidas de Git.
 
 ## Límites de la publicación
+
+**Incidencia descubierta en la revisión adicional 1.1.72, todavía sin corregir ni publicar:** la prueba anterior de SQL usaba la migración nueva con una estructura mínima y no reproducía los triggers heredados de stock/Caja. Su consulta actual reveló que `prevent_closed_period_changes` retorna `OLD` también en UPDATE. Con las acciones y el trigger vigente ejecutados en memoria, el editor de Aserradero guarda un precio de S/1,200 pero conserva S/1,000 en Caja y no devuelve error. Las correcciones de modalidad, límites y transacción permanecen implementadas; esta protección compartida de la base exige una corrección adicional antes de declarar cerrado el alcance financiero. Ver [doce riesgos confirmados y evidencias](REVISION_PRIORIDADES_PENDIENTES_2026-10-10.md). No se verificaron ni modificaron operaciones financieras del negocio para descubrirlo.
 
 Las ocho funciones nuevas conservan `security invoker` y `search_path=pg_catalog, public`; solo `service_role` puede ejecutarlas. Las cuatro columnas de madera son opcionales y las dos restricciones nuevas quedaron `NOT VALID` como estaba previsto, para proteger escrituras nuevas sin reescribir las anteriores. No se ejecutaron cobros, compras, aprobaciones o cierres financieros del negocio para verificar la instalación. Producción no tiene cotizaciones ni contratos de alquiler con los que comprobar un saldo real: esos casos siguen comprobados exclusivamente con los datos ficticios y SQL aislado descritos arriba.
 

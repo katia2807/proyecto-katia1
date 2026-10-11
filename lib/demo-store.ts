@@ -451,6 +451,7 @@ const registroCategoriaMueble = "bbbbbbb2-2222-4222-8222-222222222222";
 const registroCategoriaCaja = "bbbbbbb3-3333-4333-8333-333333333333";
 
 type DemoStore = {
+  solicitudesFinancieras: Record<string, { organizationId: string; tipo: string; firma: string; resultado: string }>;
   caja: CajaRow[];
   clientes: ClienteRow[];
   proveedores: ProveedorRow[];
@@ -492,6 +493,7 @@ export function nextCorrelativoFromStore(key: string): number {
 
 function createDefaultDemoStore(): DemoStore {
   return {
+  solicitudesFinancieras: {},
   caja: [
     ...seedCajaIniciales(),
     ...seedGastosExcel(),
@@ -1748,6 +1750,8 @@ function migrateDemoStore(raw: Record<string, unknown>): DemoStore {
       raw.correlativosCounter && typeof raw.correlativosCounter === "object"
         ? (raw.correlativosCounter as Record<string, number>)
         : defaults.correlativosCounter,
+    solicitudesFinancieras: raw.solicitudesFinancieras && typeof raw.solicitudesFinancieras === 'object' && !Array.isArray(raw.solicitudesFinancieras)
+      ? raw.solicitudesFinancieras as DemoStore['solicitudesFinancieras'] : {},
   };
 }
 
@@ -1808,6 +1812,80 @@ export function demoOperacionAtomica<T>(operacion: () => T): T {
   } finally {
     profundidadOperacion--;
   }
+}
+
+export function demoEjecutarSolicitud(id: string, organizationId: string, tipo: string, firma: string, operacion: () => string) {
+  return demoOperacionAtomica(() => {
+    const previa = store.solicitudesFinancieras[id];
+    if (previa) {
+      if (previa.organizationId !== organizationId || previa.tipo !== tipo || previa.firma !== firma) throw new Error('Esta solicitud ya se guardó con otros datos. Abre un formulario nuevo.');
+      return previa.resultado;
+    }
+    const resultado = operacion();
+    store.solicitudesFinancieras[id] = { organizationId, tipo, firma, resultado };
+    return resultado;
+  });
+}
+
+export function demoAnularOperacionIntegral(organizationId: string, tipo: 'venta_madera' | 'venta_mueble' | 'venta_madera_cortada' | 'aserradero' | 'alquiler', id: string) {
+  return demoOperacionAtomica(() => {
+    const key = `anular:${tipo}:${id}`;
+    const venta = tipo === 'venta_mueble' ? store.ventasMuebleTerminado.find(r => r.id === id && r.organization_id === organizationId)
+      : tipo === 'aserradero' ? store.serviciosAserradero.find(r => r.id === id && r.organization_id === organizationId)
+      : tipo === 'alquiler' ? store.alquileres.find(r => r.id === id && r.organization_id === organizationId)
+      : store.ventas.find(r => r.id === id && r.organization_id === organizationId &&
+        (tipo === 'venta_madera_cortada' ? Boolean(r.tipo_corte) : !r.tipo_corte));
+    if (!venta) {
+      if (store.solicitudesFinancieras[key]?.organizationId === organizationId) return;
+      throw new Error('No se encontró la operación.');
+    }
+    const fecha = 'fecha' in venta ? venta.fecha : venta.fecha_inicio;
+    demoComprobarPeriodoAbierto(organizationId, fecha);
+    const modulos = tipo === 'venta_mueble' ? ['ventas_muebles_terminados'] : tipo === 'aserradero' ? ['ventas_aserradero','aserradero']
+      : tipo === 'alquiler' ? ['ventas_alquiler','alquiler'] : [tipo === 'venta_madera' ? 'ventas_madera' : 'ventas_madera_cortada'];
+    const cobros = store.caja.filter(c => c.organization_id === organizationId && c.referencia_id === id && modulos.includes(c.modulo_origen ?? '') && !c.voided_at && !c.deleted_at);
+    if (cobros.some(c => c.periodo_cerrado)) throw new Error('El cobro pertenece a un período cerrado.');
+    for (const c of cobros) demoVoidCajaMov(c.id, 'Operación anulada desde su registro');
+    const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year:'numeric',month:'2-digit',day:'2-digit' }).format(new Date());
+    if (tipo === 'venta_mueble' && 'mueble_catalogo_id' in venta) {
+      demoCreateInventarioMovimiento({ organization_id: organizationId, producto_id: venta.mueble_catalogo_id,
+        fecha: hoy, tipo: 'ajuste', cantidad: venta.cantidad, costo_unitario: null, referencia: `anulacion:${tipo}:${id}` });
+    } else if (tipo === 'venta_madera' || tipo === 'venta_madera_cortada') {
+      const prefijo = tipo === 'venta_madera' ? 'venta' : 'venta_madera_cortada';
+      for (const mov of [...store.inventarioMovimientos].filter(m => m.organization_id === organizationId && m.tipo === 'salida_venta' && m.referencia === `${prefijo}:${id}`)) {
+        demoCreateInventarioMovimiento({ organization_id: organizationId, producto_id: mov.producto_id,
+          fecha: hoy, tipo: 'ajuste', cantidad: mov.cantidad, costo_unitario: mov.costo_unitario, referencia: `anulacion:${tipo}:${id}` });
+      }
+    }
+    const coleccion = tipo === 'venta_mueble' ? 'ventasMuebleTerminado' : tipo === 'aserradero' ? 'serviciosAserradero' : tipo === 'alquiler' ? 'alquileres' : 'ventas';
+    demoDeleteOneById(coleccion, id);
+    store.solicitudesFinancieras[key] = { organizationId, tipo: `anular_${tipo}`, firma: '', resultado: id };
+  });
+}
+
+export function demoEliminarClienteIntegral(organizationId: string, id: string) {
+  return demoOperacionAtomica(() => {
+    if (!store.clientes.some(c => c.id === id && c.organization_id === organizationId)) throw new Error('Cliente no encontrado.');
+    const ordenes = store.ordenesProduccion.filter(o => o.organization_id === organizationId && o.cliente_id === id);
+    const cotizaciones = [...store.cotizaciones, ...store.cotizacionesUnificadas].filter(c => c.organization_id === organizationId && c.cliente_id === id);
+    const refs = new Set([...ordenes, ...cotizaciones].map(r => r.id));
+    for (const caja of store.caja.filter(c => c.organization_id === organizationId && c.referencia_id && refs.has(c.referencia_id)
+      && ['ventas','cotizacion_unificada','muebles_corte'].includes(c.modulo_origen ?? '') && !c.voided_at && !c.deleted_at)) demoVoidCajaMov(caja.id, 'Cliente y operaciones eliminados');
+    for (const row of [...store.ventasMuebleTerminado].filter(r => r.organization_id === organizationId && r.cliente_id === id)) demoAnularOperacionIntegral(organizationId, 'venta_mueble', row.id);
+    for (const row of [...store.ventas].filter(r => r.organization_id === organizationId && r.cliente_id === id)) demoAnularOperacionIntegral(organizationId, row.tipo_corte ? 'venta_madera_cortada' : 'venta_madera', row.id);
+    for (const row of [...store.serviciosAserradero].filter(r => r.organization_id === organizationId && r.cliente_id === id)) demoAnularOperacionIntegral(organizationId, 'aserradero', row.id);
+    for (const row of [...store.alquileres].filter(r => r.organization_id === organizationId && r.cliente_id === id)) demoAnularOperacionIntegral(organizationId, 'alquiler', row.id);
+    store.cortes = store.cortes.filter(c => !refs.has(c.cotizacion_id));
+    store.ordenesProduccion = store.ordenesProduccion.filter(o => !(o.organization_id === organizationId && o.cliente_id === id));
+    store.cotizaciones = store.cotizaciones.filter(c => !(c.organization_id === organizationId && c.cliente_id === id));
+    store.cotizacionesUnificadas = store.cotizacionesUnificadas.filter(c => !(c.organization_id === organizationId && c.cliente_id === id));
+    store.clientes = store.clientes.filter(c => !(c.organization_id === organizationId && c.id === id));
+  });
+}
+
+export function demoComprobarPeriodoAbierto(organizationId: string, fecha: string) {
+  const [anio, mes] = fecha.split('-').map(Number);
+  if (store.cierres.some(c => c.organization_id === organizationId && c.anio === anio && c.mes === mes && !c.reopened_at)) throw new Error('La fecha pertenece a un período cerrado. No se guardó la operación.');
 }
 
 /** Devuelve una copia serializable del store local. Para respaldo / soporte. */
@@ -1955,7 +2033,9 @@ export function demoDeleteOneById(category: string, id: string): { eliminados: n
  * los listados activos (igual que el filtro voided_at IS NULL en Supabase). */
 export function demoVoidCajaMov(id: string, reason: string): void {
   const row = store.caja.find((c) => c.id === id);
-  if (row) {
+  if (row && !row.voided_at && !row.deleted_at) {
+    if (row.periodo_cerrado) throw new Error('El cobro pertenece a un período cerrado.');
+    demoComprobarPeriodoAbierto(row.organization_id, row.fecha);
     row.voided_at = new Date().toISOString();
     row.void_reason = reason;
     row.descripcion = `[ANULADO] ${row.descripcion ?? ""}`.trim();
@@ -2188,6 +2268,7 @@ type DemoCreateCajaInput = Omit<
 };
 
 export function demoCreateCaja(input: DemoCreateCajaInput) {
+  demoComprobarPeriodoAbierto(input.organization_id, input.fecha);
   if (input.id && store.caja.some(row => row.id === input.id)) {
     throw new Error("Este movimiento ya está registrado.");
   }
@@ -2595,6 +2676,10 @@ export function demoDeleteInventarioProducto(
 export function demoCreateInventarioMovimiento(
   input: Omit<InventarioMovimientoRow, "id" | "created_at">,
 ) {
+  const producto = store.inventarioProductos.find((p) => p.id === input.producto_id && p.organization_id === input.organization_id);
+  if (!producto) throw new Error('Producto de inventario no encontrado.');
+  const delta = input.tipo === 'salida_venta' ? -Number(input.cantidad) : Number(input.cantidad);
+  if (!Number.isFinite(delta) || producto.stock_actual + delta < 0) throw new Error('Stock insuficiente. Actualiza las existencias antes de registrar.');
   const row: InventarioMovimientoRow = {
     id: randomUUID(),
     created_at: nowIso(),
@@ -2602,14 +2687,12 @@ export function demoCreateInventarioMovimiento(
   };
   store.inventarioMovimientos.unshift(row);
 
-  const producto = store.inventarioProductos.find((p) => p.id === row.producto_id);
-  if (!producto) return;
-
   if (row.tipo === "entrada_compra") producto.stock_actual += Number(row.cantidad);
   if (row.tipo === "salida_venta") producto.stock_actual -= Number(row.cantidad);
   if (row.tipo === "ajuste") producto.stock_actual += Number(row.cantidad);
   syncInventarioProductoToCatalogo(producto);
   persistStore();
+  return row;
 }
 
 function reverseMovimientoStock(producto: InventarioProductoRow, row: InventarioMovimientoRow) {
@@ -2658,7 +2741,9 @@ export function demoRegistrarConteoInventario(
 }
 
 export function demoCerrarMes(organizationId: string, anio: number, mes: number) {
-  const report = demoUtilidad().find((row) => row.anio === anio && row.mes === mes) ?? {
+  return demoOperacionAtomica(() => {
+  if (store.cierres.some(c => c.organization_id === organizationId && c.anio === anio && c.mes === mes && !c.reopened_at)) throw new Error('El período ya está cerrado.');
+  const report = demoUtilidad().find((row) => row.organization_id === organizationId && row.anio === anio && row.mes === mes) ?? {
     organization_id: organizationId,
     anio,
     mes,
@@ -2686,9 +2771,11 @@ export function demoCerrarMes(organizationId: string, anio: number, mes: number)
 
   for (const row of store.caja) {
     const [y, m] = row.fecha.split("-").map(Number);
-    if (y === anio && m === mes) row.periodo_cerrado = true;
+    if (row.organization_id === organizationId && y === anio && m === mes) row.periodo_cerrado = true;
   }
   persistStore();
+
+  });
 }
 
 export function demoToggleSecurityControl(id: string) {
@@ -2837,6 +2924,9 @@ export function demoCreateVentaMuebleTerminado(
     montoCredito?: number;
   },
 ) {
+  const mueble = store.mueblesCatalogo.find(m => m.id === input.mueble_catalogo_id && m.organization_id === input.organization_id);
+  const producto = store.inventarioProductos.find(p => p.id === input.mueble_catalogo_id && p.organization_id === input.organization_id);
+  if (!mueble || !producto || mueble.stock_disponible < input.cantidad || producto.stock_actual < input.cantidad) throw new Error('Stock insuficiente para esta venta.');
   const { confirmaIngreso = true, correlativo, adelanto, montoCredito, ...row } = input;
   const newRow: VentaMuebleTerminadoRow = {
     id: randomUUID(),
@@ -2847,7 +2937,6 @@ export function demoCreateVentaMuebleTerminado(
   store.ventasMuebleTerminado.unshift(newRow);
 
   // Descuenta del stock disponible del catálogo.
-  const mueble = store.mueblesCatalogo.find((m) => m.id === newRow.mueble_catalogo_id);
   if (mueble) {
     mueble.stock_disponible = Math.max(0, mueble.stock_disponible - newRow.cantidad);
     const producto = store.inventarioProductos.find((p) =>
@@ -2880,6 +2969,7 @@ export function demoCreateVentaMuebleTerminado(
     }
   }
   persistStore();
+  return newRow;
 }
 
 export function demoMarcarEntregaMueble(id: string, nuevoEstado: EstadoEntrega) {
@@ -3165,7 +3255,7 @@ export function demoCreateVentaMaderaCortada(input: {
   direccion_entrega: string | null;
   estado_entrega: EstadoEntrega;
   inventario_producto_id: string | null;
-}) {
+}, options: { registrarMovimientos?: boolean } = {}) {
   const montoCaja = montoCobradoVenta(input.total, input.modalidad_pago, input.adelanto);
   // Reusamos VentaRow para listado simple.
   const venta: VentaRow = {
@@ -3194,7 +3284,7 @@ export function demoCreateVentaMaderaCortada(input: {
   };
   store.ventas.unshift(venta);
 
-  if (montoCaja > 0) {
+  if (montoCaja > 0 && options.registrarMovimientos !== false) {
     demoCreateCaja({
       organization_id: input.organization_id,
       fecha: input.fecha,
@@ -3211,7 +3301,7 @@ export function demoCreateVentaMaderaCortada(input: {
     });
   }
 
-  if (input.inventario_producto_id) {
+  if (input.inventario_producto_id && options.registrarMovimientos !== false) {
     demoCreateInventarioMovimiento({
       organization_id: input.organization_id,
       producto_id: input.inventario_producto_id,

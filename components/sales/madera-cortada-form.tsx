@@ -1,4 +1,5 @@
 "use client";
+import { OperationSubmissionId } from "@/components/ui/operation-submission-id";
 
 import { submitCreateVentaMaderaCortadaForm } from "@/app/actions";
 import { useMemo, useState, useEffect, useActionState, useCallback } from "react";
@@ -10,7 +11,7 @@ import { Combobox } from "@/components/ui/Combobox";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field, SelectField } from "@/components/ui/field";
 import { liteClientesToCompleto, MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
-import { formatPen } from "@/lib/utils";
+import { fechaHoyPeru, formatPen } from "@/lib/utils";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import type { ZonaEntregaRow } from "@/lib/demo-store";
 import { useToast } from "@/components/ui/toast";
@@ -111,7 +112,7 @@ export function MaderaCortadaForm({
   onSuccess,
 }: MaderaCortadaFormProps) {
   const { showToast } = useToast();
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = fechaHoyPeru();
 
   // Wizard Navigation States
   const [step, setStep] = useState(1);
@@ -294,6 +295,7 @@ export function MaderaCortadaForm({
 
   return (
     <form action={formAction} className="space-y-6">
+          <OperationSubmissionId state={state} />
       {/* ── STEPPER DE WIZARD ── */}
       <div className="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
         <div className="flex items-center justify-between">

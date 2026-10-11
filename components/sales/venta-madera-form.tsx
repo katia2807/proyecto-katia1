@@ -1,4 +1,5 @@
 "use client";
+import { OperationSubmissionId } from "@/components/ui/operation-submission-id";
 
 import { submitCreateVentaMaderaForm } from "@/app/actions";
 import { useMemo, useState, useActionState, useEffect } from "react";
@@ -10,7 +11,7 @@ import { Field, SelectField } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { liteClientesToCompleto, MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
-import { formatPen } from "@/lib/utils";
+import { fechaHoyPeru, formatPen } from "@/lib/utils";
 
 type Cliente = { id: string; nombre: string; ruc?: string | null; documento?: string | null };
 type Producto = {
@@ -35,7 +36,7 @@ export function VentaMaderaForm({
   onSuccess,
 }: VentaMaderaFormProps) {
   const { showToast } = useToast();
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = fechaHoyPeru();
 
   // Form States
   const [clienteId, setClienteId] = useState("");
@@ -156,6 +157,7 @@ export function VentaMaderaForm({
 
   return (
     <form action={formAction} className="space-y-6">
+          <OperationSubmissionId state={state} />
       {/* Stepper del Wizard */}
       <div className="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
         <div className="flex items-center justify-between">
