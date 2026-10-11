@@ -2453,66 +2453,77 @@ export function demoCreateCompraMadera(
   });
 }
 
-/** Elimina cotización `mueble_personalizado` si no tiene orden de producción vinculada (misma regla que Supabase `ON DELETE RESTRICT`). */
+/** Conserva cotizaciones con órdenes o movimientos de Caja, incluso históricos. */
 export function demoDeleteCotizacionMueblePersonalizada(
   id: string,
+  organizationId: string = DEFAULT_ORG_ID,
 ): { ok: true } | { ok: false; error: string } {
-  const idx = store.cotizaciones.findIndex((c) => c.id === id);
-  if (idx === -1) {
-    return { ok: false, error: "Cotización no encontrada." };
-  }
-  const row = store.cotizaciones[idx];
-  if (row.tipo !== "mueble_personalizado") {
-    return {
-      ok: false,
-      error: "Solo se pueden eliminar cotizaciones de mueble personalizado desde este listado.",
-    };
-  }
-  const cliente = store.clientes.find((c) => c.id === row.cliente_id);
-  if (cliente && cliente.estado === "activo") {
-    return { ok: false, error: "El cliente está activo. Cambie su estado manualmente." };
-  }
-  const tieneOrden = store.ordenesProduccion.some((o) => o.cotizacion_id === id);
-  if (tieneOrden) {
-    return {
-      ok: false,
-      error:
-        "No se puede eliminar: hay una orden de producción vinculada. Quitá o completá esa orden desde el tablero Kanban antes de borrar la cotización.",
-    };
-  }
-  store.cortes = store.cortes.filter((c) => c.cotizacion_id !== id);
-  store.cotizaciones.splice(idx, 1);
-  persistStore();
-  return { ok: true };
+  return demoOperacionAtomica(() => {
+    const idx = store.cotizaciones.findIndex((c) => c.id === id && c.organization_id === organizationId);
+    if (idx === -1) {
+      return { ok: false, error: "Cotización no encontrada." };
+    }
+    const row = store.cotizaciones[idx];
+    if (row.tipo !== "mueble_personalizado") {
+      return {
+        ok: false,
+        error: "Solo se pueden eliminar cotizaciones de mueble personalizado desde este listado.",
+      };
+    }
+    if (store.caja.some(c => c.organization_id === organizationId && c.referencia_id === id)) {
+      return { ok: false, error: 'Esta cotización tiene movimientos en Caja. Conserva el documento y revisa los cobros antes de corregirla.' };
+    }
+    const cliente = store.clientes.find((c) => c.id === row.cliente_id && c.organization_id === organizationId);
+    if (!cliente) return { ok: false, error: 'Cliente no encontrado en esta empresa.' };
+    if (cliente.estado === "activo") {
+      return { ok: false, error: "El cliente está activo. Cambie su estado manualmente." };
+    }
+    const tieneOrden = store.ordenesProduccion.some((o) => o.organization_id === organizationId && o.cotizacion_id === id);
+    if (tieneOrden) {
+      return {
+        ok: false,
+        error:
+          "No se puede eliminar: hay una orden de producción vinculada. Quitá o completá esa orden desde el tablero Kanban antes de borrar la cotización.",
+      };
+    }
+    store.cortes = store.cortes.filter((c) => c.cotizacion_id !== id);
+    store.cotizaciones.splice(idx, 1);
+    persistStore();
+    return { ok: true };
+  });
 }
 
 export function demoCreateCotizacion(
   input: Omit<CotizacionRow, "id" | "created_at" | "correlativo"> & {
     correlativo?: string | null;
+    id?: string;
   },
 ) {
-  const { correlativo: correlativoOpt, ...rest } = input;
-  const row: CotizacionRow = {
-    id: randomUUID(),
-    created_at: nowIso(),
-    correlativo: correlativoOpt ?? null,
-    ...rest,
-  };
-  store.cotizaciones.unshift(row);
-  if (row.estado === "confirmada") {
-    demoCreateCaja({
-      organization_id: row.organization_id,
-      fecha: row.fecha,
-      tipo: "ingreso",
-      medio: "efectivo",
-      categoria: "servicio_corte_mueble",
-      monto: row.precio_acordado,
-      descripcion: "Ingreso automático por servicio confirmado",
-      modulo_origen: "muebles_corte",
-      referencia_id: row.id,
+  return demoOperacionAtomica(() => {
+    const { correlativo: correlativoOpt, id: idOpt, ...rest } = input;
+    const row: CotizacionRow = {
+      id: idOpt ?? randomUUID(),
+      created_at: nowIso(),
+      correlativo: correlativoOpt ?? null,
+      ...rest,
+    };
+    store.cotizaciones.unshift(row);
+    if (row.tipo === 'servicio_corte' && row.estado === "confirmada") {
+      demoCreateCaja({
+        organization_id: row.organization_id,
+        fecha: row.fecha,
+        tipo: "ingreso",
+        medio: "efectivo",
+        categoria: "servicio_corte_mueble",
+        monto: row.precio_acordado,
+        descripcion: "Ingreso automático por servicio confirmado",
+        modulo_origen: "muebles_corte",
+        referencia_id: row.id,
     });
   }
   persistStore();
+  return row;
+  });
 }
 
 export function demoCreateCorte(input: Omit<CorteRow, "id" | "created_at">) {

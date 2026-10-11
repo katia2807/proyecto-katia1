@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.75";
+export const APP_VERSION = "1.1.77";
 export const APP_LAST_UPDATE = "11/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Se corrigieron borrados, conteos y reintentos que podían alterar stock o duplicar cobros. Cotizaciones respeta los adelantos recibidos y los permisos se aplican correctamente, sin cambiar los cálculos habituales.";
+  "La cotización rápida de muebles ya no registra cobros al confirmarla. Los reintentos conservan una sola cotización y el borrado protege documentos con cobros u órdenes, para mantener Caja y producción coherentes.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {

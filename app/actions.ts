@@ -24,7 +24,6 @@ import {
   demoUpdateClienteDatos,
   demoCreateCotizacionUnificada,
   demoCreateCorte,
-  demoCreateCotizacion,
   demoCreateEmpleado,
   demoCreateInventarioMovimiento,
   demoCreateInventarioProducto,
@@ -76,6 +75,7 @@ import { roundMoney, safeDivide, parseDecimal } from "@/lib/utils";
 import { claveOperacion, registrarOperacionIntegral, anularOperacionIntegral, nombreClienteOperacion } from '@/lib/operaciones-integrales';
 import { montoCobradoVenta, mensajeOperacionFinanciera } from "@/lib/ventas-pago";
 import { registrarServicioIntegral } from '@/lib/servicios-integrales';
+import { registrarCotizacionRapida } from '@/lib/cotizacion-rapida';
 import { canCorrectHistoricalMadera } from '@/lib/permissions';
 import { resumenCobroLocal } from "@/lib/cotizacion-cobros";
 import {
@@ -1638,7 +1638,8 @@ export async function createCompraMadera(_formData: FormData) {
 }
 
 export async function createCotizacion(formData: FormData) {
-  await requireMutationAccess(ventasRoles);
+  const actor = await requireMutationAccess(ventasRoles);
+  const clave = claveOperacion(formData, true);
   const parsed = cotizacionSchema.safeParse({
     clienteId: formData.get("cliente_id"),
     fecha: formData.get("fecha"),
@@ -1658,41 +1659,19 @@ export async function createCotizacion(formData: FormData) {
     throw new Error(`Datos de cotización inválidos. Errores: ${errorDetails}`);
   }
 
-  if (!hasSupabaseEnv()) {
-    const correlativo = await nextCorrelativo("cotizacion");
-    demoCreateCotizacion({
-      organization_id: DEFAULT_ORG_ID,
-      cliente_id: parsed.data.clienteId,
-      fecha: parsed.data.fecha,
-      tipo: parsed.data.tipo,
-      especie_madera: parsed.data.especieMadera,
-      unidad_medida: parsed.data.unidadMedida,
-      origen_material: "cliente",
-      precio_calculado: parsed.data.precioCalculado,
-      precio_acordado: parsed.data.precioAcordado,
-      motivo_ajuste: parsed.data.motivoAjuste ?? null,
-      estado: parsed.data.estado,
-      correlativo,
-    });
-  } else {
-    const supabase = getSupabaseServerClient();
-    const { error } = await supabase.from("cotizaciones_mueble").insert({
-      organization_id: DEFAULT_ORG_ID,
-      cliente_id: parsed.data.clienteId,
-      fecha: parsed.data.fecha,
-      tipo: parsed.data.tipo,
-      especie_madera: parsed.data.especieMadera,
-      unidad_medida: parsed.data.unidadMedida,
-      origen_material: "cliente",
-      precio_calculado: parsed.data.precioCalculado,
-      precio_acordado: parsed.data.precioAcordado,
-      motivo_ajuste: parsed.data.motivoAjuste ?? null,
-      estado: parsed.data.estado,
-    });
-    if (error) {
-      throw new Error(error.message);
-    }
-  }
+  await registrarCotizacionRapida(actor, clave, {
+    cliente_id: parsed.data.clienteId,
+    fecha: parsed.data.fecha,
+    tipo: parsed.data.tipo,
+    especie_madera: parsed.data.especieMadera,
+    unidad_medida: parsed.data.unidadMedida,
+    origen_material: "cliente",
+    precio_calculado: parsed.data.precioCalculado,
+    precio_acordado: parsed.data.precioAcordado,
+    motivo_ajuste: parsed.data.motivoAjuste ?? null,
+    estado: parsed.data.estado,
+    ...(!hasSupabaseEnv() ? { correlativo: await nextCorrelativo("cotizacion") } : {}),
+  });
 
   revalidatePath("/ventas/muebles-corte");
   revalidatePath("/ventas/muebles-personalizados");
@@ -1703,13 +1682,13 @@ export async function deleteCotizacionMueblePersonalizada(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    await requireMutationAccess(ventasRoles);
+    const actor = await requireMutationAccess(ventasRoles);
     const parsedId = z.string().uuid().safeParse(id);
     if (!parsedId.success) {
       return { ok: false, error: "Identificador inválido." };
     }
     if (!hasSupabaseEnv()) {
-      const res = demoDeleteCotizacionMueblePersonalizada(id);
+      const res = demoDeleteCotizacionMueblePersonalizada(id, actor.organizationId);
       if (!res.ok) {
         return { ok: false, error: res.error };
       }
@@ -1717,49 +1696,11 @@ export async function deleteCotizacionMueblePersonalizada(
       revalidatePath("/ventas");
       return { ok: true };
     }
-    const supabase = getSupabaseServerClient();
-    const { data: row, error: selErr } = await supabase
-      .from("cotizaciones_mueble")
-      .select("id, tipo, cliente_id")
-      .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .maybeSingle();
-    if (selErr) {
-      return { ok: false, error: selErr.message };
-    }
-    if (!row) {
-      return { ok: false, error: "Cotización no encontrada." };
-    }
-    if (row.tipo !== "mueble_personalizado") {
-      return {
-        ok: false,
-        error: "Solo se pueden eliminar cotizaciones de mueble personalizado desde este listado.",
-      };
-    }
-    const { data: cliente } = await supabase.from("clientes").select("estado").eq("id", row.cliente_id).maybeSingle();
-    if (cliente && cliente.estado === "activo") {
-      return { ok: false, error: "El cliente está activo. Cambie su estado manualmente." };
-    }
-    const { data: orden } = await supabase
-      .from("ordenes_produccion")
-      .select("id")
-      .eq("cotizacion_id", id)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .maybeSingle();
-    if (orden) {
-      return {
-        ok: false,
-        error:
-          "No se puede eliminar: hay una orden de producción vinculada. Quitá o completá esa orden desde el tablero Kanban antes de borrar la cotización.",
-      };
-    }
-    const { error } = await supabase
-      .from("cotizaciones_mueble")
-      .delete()
-      .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID);
+    const { error } = await getSupabaseServerClient().rpc('eliminar_cotizacion_mueble_segura', {
+      p_org: actor.organizationId, p_actor: actor.userId, p_id: id,
+    });
     if (error) {
-      return { ok: false, error: error.message };
+      return { ok: false, error: mensajeOperacionFinanciera(error) };
     }
     revalidatePath("/ventas/muebles-personalizados");
     revalidatePath("/ventas");

@@ -62,7 +62,8 @@ try {
  started = true;
  for (const file of ['tests/unit/fixtures/finanzas.sql','tests/unit/fixtures/finanzas-heredado.sql',
    'supabase/migrations/20261010010000_cobros_y_cierres_seguros.sql','supabase/migrations/20261011010000_integridad_caja_stock_operaciones.sql',
-   'tests/unit/fixtures/finanzas-adicional.sql','supabase/migrations/20261011020000_integridad_adicional_operaciones.sql']) {
+   'tests/unit/fixtures/finanzas-adicional.sql','supabase/migrations/20261011020000_integridad_adicional_operaciones.sql',
+   'tests/unit/fixtures/finanzas-cotizacion-rapida.sql','supabase/migrations/20261011030000_cotizacion_rapida_segura.sql']) {
    execFileSync(exe('psql'), [...args, '-f', path.join(root, file)], { windowsHide: true, timeout: 20000 });
  }
  sql(`create table prueba_sincronizacion(id text primary key);create extension pgcrypto;create schema app;create function app.current_role() returns text language sql as $$select 'owner_admin'::text$$;
@@ -143,6 +144,31 @@ try {
  assert.equal(paid[0].status,'fulfilled');assert.equal(paid[1].status,'rejected');assert.equal(sql('select total from cotizaciones_unificadas'),'1000');
  assert.equal(sql('select estado_flujo from cotizaciones_unificadas'),'cobrada');assert.equal(sql('select sum(monto) from movimientos_caja'),'1000.00');
  results.push('Cobro y edición simultáneos: conserva el total cobrado y rechaza el formulario anterior.');
+ reset();const rapidKey=randomUUID();
+ const rapidDocument={cliente_id:customer,fecha:'2026-10-11',tipo:'mueble_personalizado',especie_madera:'Ficticia',unidad_medida:'cm',
+   precio_calculado:1000,precio_acordado:1000,motivo_ajuste:null,estado:'confirmada'};
+ const rapidQuery=`select registrar_cotizacion_rapida_segura('${org}','${actor}','${rapidKey}',${literal(rapidDocument)});`;
+ assert((await competing(rapidQuery,rapidQuery)).every(r=>r.status==='fulfilled'));
+ assert.equal(sql('select count(*) from cotizaciones_mueble'),'1');assert.equal(sql('select count(*) from movimientos_caja'),'0');
+ assert.equal(sql('select count(*) from operaciones_financieras_seguras'),'1');
+ results.push('Dos conexiones envían la misma cotización rápida: un documento, un recibo y ningún ingreso automático.');
+ const approveRapid=id=>`select aprobar_cotizacion_con_adelanto('${org}','${actor}','${id}',false,1000,300,'yape',
+   ${literal({fecha_aprobacion:'2026-10-11',notas:null,correlativo:'RAP-01'})});`;
+ const deleteRapid=id=>`select eliminar_cotizacion_mueble_segura('${org}','${actor}','${id}');`;
+ sql(`update clientes set estado='inactivo' where id='${customer}';`);
+ const deleteFirst=await competing(deleteRapid(rapidKey),approveRapid(rapidKey));
+ assert.equal(deleteFirst[0].status,'fulfilled');assert.equal(deleteFirst[1].status,'rejected');
+ assert.equal(sql('select count(*) from cotizaciones_mueble'),'0');assert.equal(sql('select count(*) from ordenes_produccion'),'0');
+ assert.equal(sql('select count(*) from movimientos_caja'),'0');
+ results.push('Borrado seguido de aprobación concurrente: elimina solo la cotización sin cobros y rechaza la aprobación, sin ingreso huérfano.');
+ reset();const approvedKey=randomUUID();
+ sql(`select registrar_cotizacion_rapida_segura('${org}','${actor}','${approvedKey}',${literal(rapidDocument)});
+   update clientes set estado='inactivo' where id='${customer}';`);
+ const approveFirst=await competing(approveRapid(approvedKey),deleteRapid(approvedKey));
+ assert.equal(approveFirst[0].status,'fulfilled');assert.equal(approveFirst[1].status,'rejected');
+ assert.equal(sql('select count(*) from cotizaciones_mueble'),'1');assert.equal(sql('select count(*) from ordenes_produccion'),'1');
+ assert.equal(sql('select sum(monto) from movimientos_caja'),'300.00');
+ results.push('Aprobación seguida de borrado concurrente: conserva cotización, orden y adelanto 300, sin separar su origen.');
  fs.writeFileSync(path.join(work, 'resultado.json'), JSON.stringify({ ok: true, postgres: sql('show server_version'), results }, null, 2));
  console.log(JSON.stringify({ ok: true, pruebas: results.length, evidencia: path.join(work, 'resultado.json') }));
 } finally {

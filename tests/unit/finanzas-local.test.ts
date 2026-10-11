@@ -200,3 +200,41 @@ test('eliminar cliente incluye madera cortada y se revierte completo ante fallo 
   expect(demo.demoClientesRows().some(c=>c.id===cliente)).toBe(false); expect(stock(id)).toBe(100);
   expect(demo.demoVentasRows().some(v=>v.cliente_id===cliente)).toBe(false);
 });
+
+const rapidaLocal = (id=crypto.randomUUID(), patch:Record<string,unknown>={}) => actions.createCotizacion(form({
+  submission_id:id,cliente_id:cliente,fecha:'2026-10-11',tipo:'mueble_personalizado',especie_madera:'Ficticia',
+  unidad_medida:'cm',precio_calculado:1000,precio_acordado:1000,estado:'confirmada',motivo_ajuste:'',...patch,
+}));
+test('cotización rápida local confirma y reconoce reintentos sin registrar dinero',async()=>{
+  const id=crypto.randomUUID(),caja=totalCaja();await rapidaLocal(id);await rapidaLocal(id);
+  expect(demo.demoCotizacionesRows().filter(c=>c.id===id)).toHaveLength(1);expect(totalCaja()).toBe(caja);
+  await expect(rapidaLocal(id,{precio_acordado:900})).rejects.toThrow(/otros datos/);
+  expect(demo.demoCotizacionesRows().find(c=>c.id===id)!.precio_acordado).toBe(1000);
+});
+test('cotización rápida local no deja documento ni recibo si falla el disco',async()=>{
+  const anterior=demo.demoExportStore(),id=crypto.randomUUID();falloDisco();
+  await expect(rapidaLocal(id)).rejects.toThrow(/Disco/);expect(demo.demoExportStore()).toEqual(anterior);
+  await rapidaLocal(id);expect(demo.demoCotizacionesRows().filter(c=>c.id===id)).toHaveLength(1);
+});
+test('aprobar la cotización rápida local cobra solo el adelanto indicado',async()=>{
+  const id=crypto.randomUUID(),caja=totalCaja();await rapidaLocal(id);
+  await actions.aprobarCotizacionAOrden(form({cotizacion_id:id,adelanto:300,metodo_adelanto:'yape',notas:''}));
+  expect(totalCaja()-caja).toBe(300);expect(demo.demoOrdenesProduccionRows().filter(o=>o.cotizacion_id===id)).toHaveLength(1);
+});
+test('borrar una rápida con dinero enlazado conserva Caja y su documento en local',async()=>{
+  const id=crypto.randomUUID();await rapidaLocal(id);demo.demoUpdateClienteEstado(cliente,'inactivo');
+  demo.demoCreateCaja({organization_id:org,fecha:'2026-10-11',tipo:'ingreso',medio:'yape',categoria:'Cobro ficticio',
+    monto:300,descripcion:null,modulo_origen:'muebles_corte',referencia_id:id});
+  const anterior=demo.demoExportStore();expect(await actions.deleteCotizacionMueblePersonalizada(id)).toMatchObject({ok:false,error:expect.stringMatching(/movimientos en Caja/)});
+  expect(demo.demoExportStore()).toEqual(anterior);
+});
+test('borrado local sin cobros conserva memoria ante fallo y no revive al reintentar el alta',async()=>{
+  const id=crypto.randomUUID();await rapidaLocal(id);demo.demoUpdateClienteEstado(cliente,'inactivo');
+  const anterior=demo.demoExportStore();falloDisco();expect((await actions.deleteCotizacionMueblePersonalizada(id)).ok).toBe(false);
+  expect(demo.demoExportStore()).toEqual(anterior);expect(await actions.deleteCotizacionMueblePersonalizada(id)).toEqual({ok:true});
+  await expect(rapidaLocal(id)).rejects.toThrow(/ya fue eliminada/);expect(demo.demoCotizacionesRows().some(c=>c.id===id)).toBe(false);
+});
+test('servicio de corte local conserva el cobro habitual sin repetirlo por envío',async()=>{
+  const id=crypto.randomUUID(),caja=totalCaja();await rapidaLocal(id,{tipo:'servicio_corte'});await rapidaLocal(id,{tipo:'servicio_corte'});
+  expect(totalCaja()-caja).toBe(1000);expect(demo.demoCotizacionesRows().filter(c=>c.id===id)).toHaveLength(1);
+});

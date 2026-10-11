@@ -1,5 +1,13 @@
 # Notas de parche
 
+## 1.1.77 — 11/10/2026
+
+La cotización rápida de muebles ya no registra cobros al confirmarla. Los reintentos conservan una sola cotización y el borrado protege documentos con cobros u órdenes, para mantener Caja y producción coherentes.
+
+## 1.1.76 — 11/10/2026
+
+Se revisó la cotización rápida de muebles y se detectaron cobros automáticos, duplicaciones al reintentar y borrados sin anular Caja. Quedaron documentados para corregirlos, sin modificar datos ni cálculos.
+
 ## 1.1.75 — 11/10/2026
 
 Se corrigieron borrados, conteos y reintentos que podían alterar stock o duplicar cobros. Cotizaciones respeta los adelantos recibidos y los permisos se aplican correctamente, sin cambiar los cálculos habituales.

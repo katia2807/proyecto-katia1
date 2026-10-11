@@ -9,6 +9,8 @@ import { Field, SelectField } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { liteClientesToCompleto, MOCK_COTIZACIONES_APROBACION } from "@/lib/combobox-mocks";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
+import type { MutationFormState } from "@/lib/mutation-form-state";
+import { OperationSubmissionId } from "@/components/ui/operation-submission-id";
 import type { ComponentProps } from "react";
 import { useEffect, useMemo, useState, useActionState } from "react";
 import Link from "next/link";
@@ -30,9 +32,11 @@ type MueblesPersonalizadosContextPanelsProps = {
 function CrearCotizacionRapidaFormFields({
   clienteOptions,
   formAction,
+  state,
 }: {
   clienteOptions: { value: string; label: string }[];
   formAction: FormActionProp;
+  state: MutationFormState;
 }) {
   const [localClientes, setLocalClientes] = useState(clienteOptions);
   const [clienteId, setClienteId] = useState("");
@@ -107,6 +111,7 @@ function CrearCotizacionRapidaFormFields({
 
   return (
     <form action={formAction} className="grid gap-3">
+      <OperationSubmissionId state={state} />
       {/* Tipo oculto */}
       <input type="hidden" name="tipo" value="mueble_personalizado" />
 
@@ -274,6 +279,8 @@ function CrearCotizacionRapidaFormFields({
         />
       </div>
 
+      <p className="text-xs text-[var(--color-text-secondary)]">Confirmar la cotización la deja lista para producción. El adelanto se registra al aprobar la orden.</p>
+
       <Field
         name="motivo_ajuste"
         label="Motivo del ajuste (opcional)"
@@ -413,7 +420,7 @@ export function MueblesPersonalizadosContextPanels({
           if (!next) setCreateKey((k) => k + 1);
         }}
       >
-        <CrearCotizacionRapidaFormFields key={createKey} clienteOptions={clienteOptions} formAction={actionCreate} />
+        <CrearCotizacionRapidaFormFields key={createKey} clienteOptions={clienteOptions} formAction={actionCreate} state={stateCreate} />
       </ContextActionPanel>
 
       {/* Botón 3: Aprobar cotización → crear orden de producción + registrar adelanto */}
