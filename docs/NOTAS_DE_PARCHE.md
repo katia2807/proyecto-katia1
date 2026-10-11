@@ -1,6 +1,6 @@
 # Notas de parche
 
-## 1.1.71 — 10/10/2026 (local, pendiente de publicar)
+## 1.1.71 — 10/10/2026
 
 Los cobros respetan la modalidad y el medio de pago, descuentan adelantos y evitan cierres duplicados o guardados incompletos. Se bloquean adelantos excesivos y se retira la lectura de PDF que simulaba datos.
 

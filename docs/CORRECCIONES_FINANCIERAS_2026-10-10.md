@@ -1,6 +1,6 @@
 # Correcciones financieras de prioridad alta — 10/10/2026
 
-Versión 1.1.71. Alcance autorizado: solucionar los problemas de prioridad alta encontrados en el diagnóstico de la versión 1.1.70, conservando las fórmulas comerciales y los datos existentes. **Migración instalada en la base habitual; publicación del código en curso.** El diagnóstico original permanece en `temp/auditoria-financiera-2026-10-10/INFORME.md` como evidencia anterior.
+Versión 1.1.71. Alcance autorizado: solucionar los problemas de prioridad alta encontrados en el diagnóstico de la versión 1.1.70, conservando las fórmulas comerciales y los datos existentes. **Migración instalada, código publicado y lecturas comprobadas en producción.** El diagnóstico original permanece en `temp/auditoria-financiera-2026-10-10/INFORME.md` como evidencia anterior.
 
 ## Hallazgos corregidos
 
@@ -50,13 +50,19 @@ La base habitual `rzjxobfgtlzdqmhbbvsk` recibió únicamente la migración `2026
 
 El respaldo manual conservado del 07/10/2026 mantiene su SHA-256 `f58116f333edce08c28ebb412d4083e4b7d0a5be9aa9a911720744363571d41d`; no es una copia nueva. La comparación inmediata antes/después de la instalación abarca las 42 tablas públicas más usuarios de Auth, depósitos y objetos de Storage: **45 tablas, 274 registros, cero diferencias**. Huella conjunta `c39dc3cca390f29bbcc23c849b8736f8`. La comparación de madera omite únicamente las cuatro columnas opcionales añadidas para comprobar los valores anteriores. No se corrigieron importes históricos, cambiaron cuentas ni creó otra base.
 
-La publicación del código y su comprobación de lectura siguen pendientes en este punto del registro.
+GitHub recibió el commit `92eb8c199dcda3329f2900ba496dfd509fc0a96c` en `main`. La integración existente confirmó la publicación de Vercel en el equipo y proyecto habituales, [despliegue FeGVrbREg2CkwW8RQ9W9ZwKG9pUw](https://vercel.com/grupo-ark-ccatun-rumi-sac/project-ukk6w/FeGVrbREg2CkwW8RQ9W9ZwKG9pUw). No se usó el enlace local de Vercel, que apunta a otro destino, ni se creó un proyecto nuevo.
 
-## Condiciones de publicación
+Con la sesión habitual se comprobaron Ventas (35 operaciones visibles, sin el importador simulado), Cotizaciones (cero registros, formulario disponible), Aserradero (ocho servicios y editor de uno existente, sin guardar) y Caja de empresa (53 movimientos, ingresos S/74,697.29, gastos S/20 y saldo S/74,677.29). Las pantallas muestran **1.1.71 / 10/10/2026**. Salud pública y Login respondieron HTTP 200; salud confirma Supabase habitual y modo demo desactivado. El local quedó reiniciado en desarrollo, puerto 3001 y el mismo almacén aislado, con salud HTTP 200 y sin Supabase.
 
-1. Verificar el estado de migraciones de la base habitual y el respaldo conservado; instalar esta migración antes de desplegar 1.1.71. Añade columnas de pago opcionales a madera, restricciones para escrituras nuevas y funciones; no reescribe importes anteriores ni crea otra base del negocio.
-2. Publicar el código y comprobar salud, versión y lecturas del saldo con la sesión habitual. Las operaciones de creación/cierre se verifican con registros aislados, sin modificar registros reales para probar.
-3. Si faltan funciones en la base, las acciones afectadas muestran el requisito y no usan el guardado incompleto anterior como alternativa. Madera necesita las nuevas columnas; no publicar solo el código.
+Una primera apertura, antes de confirmar el despliegue nuevo, todavía mostraba 1.1.70 y falló al cargar un archivo de esa versión (`ChunkLoadError`). Tras recargar con 1.1.71 cargó Ventas; no se detectaron nuevos errores de consola en el recorrido posterior. Esta observación no es una prueba de todos los navegadores ni garantiza que una pestaña antigua se actualice sin recargar.
+
+La comparación final mantiene iguales las **42 tablas públicas / 257 registros** y los metadatos de Storage (tres depósitos y doce objetos). La huella de `auth.users` cambió durante el intervalo del recorrido; no se identificó el campo cambiado y no se declara esa tabla igual al finalizar. Se utilizó una sesión existente; no se gestionaron cuentas ni se cambiaron credenciales. La igualdad completa de las 45 tablas sí corresponde a la comprobación inmediata después de instalar la migración. Evidencia y captura en `temp/auditoria-financiera-2026-10-10/`, excluidas de Git.
+
+## Límites de la publicación
+
+Las ocho funciones nuevas conservan `security invoker` y `search_path=pg_catalog, public`; solo `service_role` puede ejecutarlas. Las cuatro columnas de madera son opcionales y las dos restricciones nuevas quedaron `NOT VALID` como estaba previsto, para proteger escrituras nuevas sin reescribir las anteriores. No se ejecutaron cobros, compras, aprobaciones o cierres financieros del negocio para verificar la instalación. Producción no tiene cotizaciones ni contratos de alquiler con los que comprobar un saldo real: esos casos siguen comprobados exclusivamente con los datos ficticios y SQL aislado descritos arriba.
+
+Si faltan funciones en otra instalación, las acciones afectadas muestran el requisito y no usan el guardado incompleto anterior como alternativa. Madera necesita las nuevas columnas; instalar la migración antes del código en cualquier futura réplica.
 
 El diagnóstico no autoriza corregir cobros históricos automáticamente: sus vínculos y lo efectivamente recibido deben contrastarse antes de cualquier ajuste. Corregir el código no reconcilia movimientos antiguos que ya pudieran haberse registrado mal.
 
@@ -65,4 +71,4 @@ El diagnóstico no autoriza corregir cobros históricos automáticamente: sus v�
 - Precisión de `roundMoney`: `10.075` puede producir `10.07` en vez de `10.08`. Afecta también el caso de cubicaje que debería entregar S/2.19 y actualmente da S/2.18.
 - Ganancia de costo S/20.15 y margen 50%: redondea a S/10.07 en vez de S/10.08.
 
-Se atenderán como precisión decimal, preservando las fórmulas, en un cambio separado. No quedan declarados corregidos por esta entrega. La revisión actual cierra los hallazgos altos descritos en local; no garantiza ausencia de otros errores en todo el programa.
+El usuario confirmó que el redondeo comercial de Aserradero fue solicitado por la clienta: el PT comercial hacia abajo se conserva. Los dos casos anteriores corresponden a precisión al redondear dinero al centavo y se revisarán en un cambio separado, conservando las fórmulas y la regla comercial acordada. No quedan declarados corregidos por esta entrega. Los hallazgos altos descritos tienen código y migración publicados, con escrituras comprobadas en aislamiento y lecturas en producción; no garantiza ausencia de otros errores en todo el programa.
