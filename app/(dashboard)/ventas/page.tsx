@@ -9,7 +9,6 @@ import {
   TruckIcon,
 } from "lucide-react";
 import { VentasHubContextPanels } from "@/components/ventas/ventas-hub-context-panels";
-import { VentasPdfImport } from "@/components/ventas/ventas-pdf-import";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
@@ -288,7 +287,6 @@ export default async function VentasHubPage({ searchParams }: VentasPageProps) {
       </Card>
 
 
-      <VentasPdfImport clientes={clientes.map(c => ({ id: c.id, nombre: c.nombre }))} />
 
       <Card>
         <CardTitle>Resumen de catálogos disponibles</CardTitle>

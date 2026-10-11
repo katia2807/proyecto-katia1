@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.71 — 10/10/2026 (local, pendiente de publicar)
+
+Los cobros respetan la modalidad y el medio de pago, descuentan adelantos y evitan cierres duplicados o guardados incompletos. Se bloquean adelantos excesivos y se retira la lectura de PDF que simulaba datos.
+
 ## 1.1.70 — 09/10/2026
 
 Se comprobaron Excel, CSV y PDF de la selección de Reportes: sus fechas e importes coinciden. El registro de revisión conserva esta evidencia para retomar el trabajo con un estado claro y actualizado.

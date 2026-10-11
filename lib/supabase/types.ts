@@ -599,6 +599,10 @@ export type Database = {
           correlativo: string | null;
           created_at: string;
           created_by: string | null;
+          metodo_pago?: string | null;
+          modalidad_pago?: string | null;
+          adelanto?: number | null;
+          fecha_pago_credito?: string | null;
         };
         Insert: {
           id?: string;
@@ -610,6 +614,10 @@ export type Database = {
           correlativo?: string | null;
           created_at?: string;
           created_by?: string | null;
+          metodo_pago?: string;
+          modalidad_pago?: string;
+          adelanto?: number;
+          fecha_pago_credito?: string | null;
         };
         Update: {
           estado?: "borrador" | "confirmada";
@@ -1135,6 +1143,12 @@ export type Database = {
       };
     };
     Functions: {
+      editar_aserradero_con_caja: { Args: { p_org: string; p_actor: string; p_servicio_id: string; p_snapshot_esperado: Json; p_servicio: Json; p_monto_caja: number }; Returns: undefined };
+      crear_compra_madera_con_caja: { Args: { p_org: string; p_actor: string; p_compra: Json }; Returns: string };
+      consultar_cobro_cotizacion: { Args: { p_org: string; p_actor: string; p_cot: string }; Returns: Json };
+      registrar_cobro_cotizacion_seguro: { Args: { p_org: string; p_actor: string; p_cot: string; p_total_esperado: number; p_saldo_esperado: number; p_medio: string; p_fecha: string }; Returns: undefined };
+      aprobar_cotizacion_con_adelanto: { Args: { p_org: string; p_actor: string; p_cot: string; p_unificada: boolean; p_total_esperado: number; p_adelanto: number; p_medio: string; p_orden: Json }; Returns: string };
+      cerrar_alquiler_con_caja: { Args: { p_org: string; p_actor: string; p_contrato: string; p_fecha: string; p_observaciones: string | null; p_snapshot_esperado: Json; p_penalidad: number }; Returns: undefined };
       limpiar_datos_operativos_atomico: { Args: { p_organization_id: string; p_user_id: string; p_user_name: string | null }; Returns: undefined };
       importar_producto_inventario: { Args: { p_organization_id: string; p_user_id: string; p_producto: Json; p_por_nombre: boolean; p_fecha: string }; Returns: string };
       corregir_venta_madera_cortada_historica: {

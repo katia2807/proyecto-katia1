@@ -126,30 +126,20 @@ export function VentaMaderaForm({
   }, [total, modalidadPago, adelanto]);
 
   // Validation checks per step
-  const stepErrors = useMemo(() => {
-    const errors: Record<number, boolean> = {};
-
+  const stepErrors: Record<number, boolean> = {
     // Paso 1: Cliente y Fecha (si es factura, RUC obligatorio de 11 dígitos)
-    errors[1] = !clienteId || !fecha || (tipoComprobante === "factura" && !hasRuc);
-
+    1: !clienteId || !fecha || (tipoComprobante === "factura" && !hasRuc),
     // Paso 2: Producto, Cantidad y Precio
-    errors[2] =
+    2:
       !productoId ||
       cantidad === "" ||
       cantidad <= 0 ||
       precioUnitario === "" ||
       precioUnitario <= 0 ||
-      (productoSeleccionado !== undefined && cantidad > stockDisponible);
-
+      (productoSeleccionado !== undefined && cantidad > stockDisponible),
     // Paso 3: Adelanto si aplica
-    if (modalidadPago === "adelanto") {
-      errors[3] = adelanto === "" || adelanto < 0 || adelanto > total;
-    } else {
-      errors[3] = false;
-    }
-
-    return errors;
-  }, [clienteId, fecha, productoId, cantidad, precioUnitario, productoSeleccionado, stockDisponible, modalidadPago, adelanto, total]);
+    3: modalidadPago === "adelanto" && (adelanto === "" || adelanto < 0 || adelanto > total),
+  };
 
   function handleClienteCreado(id: string, nombre: string) {
     setClientesLocales((prev) => [...prev, { id, nombre }]);
@@ -648,6 +638,9 @@ export function VentaMaderaForm({
       {/* Hidden inputs to matching createVentaMadera form expectations */}
       <input type="hidden" name="total" value={total.toFixed(2)} />
       <input type="hidden" name="estado" value="confirmada" />
+      <input type="hidden" name="metodo_pago" value={metodoPago} />
+      <input type="hidden" name="modalidad_pago" value={modalidadPago} />
+      <input type="hidden" name="adelanto" value={adelanto === "" ? "0" : adelanto} />
       <input type="hidden" name="cantidad_product" value={cantidad} />
       <input type="hidden" name="cantidad_producto" value={cantidad} />
       {state?.error && (

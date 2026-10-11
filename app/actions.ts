@@ -80,6 +80,8 @@ import type { MutationFormState } from "@/lib/mutation-form-state";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole, Json } from "@/lib/supabase/types";
 import { roundMoney, safeDivide, parseDecimal } from "@/lib/utils";
+import { montoCobradoVenta, mensajeOperacionFinanciera } from "@/lib/ventas-pago";
+import { resumenCobroLocal } from "@/lib/cotizacion-cobros";
 import {
   buildMaderaCortadaVoucherLines,
   parseMaderaCortadaCubicajeLines,
@@ -114,6 +116,10 @@ const ventaSchema = z.object({
   fecha: z.string().min(1),
   total: moneySchema(z.number().positive()),
   estado: z.enum(["borrador", "confirmada"]).default("borrador"),
+  metodoPago: z.enum(["efectivo", "yape", "transferencia", "billetera_digital", "otro"]).default("efectivo"),
+  modalidadPago: z.enum(["contado", "adelanto", "adelanto_saldo", "credito"]).default("contado"),
+  adelanto: moneySchema(z.number().nonnegative()).default(0),
+  fechaPagoCredito: z.string().optional(),
   productoInventarioId: z.string().uuid().optional(),
   cantidadProducto: z.preprocess(
     (value) => (value === "" || value === null ? undefined : value),
@@ -233,20 +239,6 @@ const ventaMuebleTerminadoSchema = z.object({
   urlComprobante: z.string().optional().nullable(),
 });
 
-const ventaPdfSchema = z.object({
-  clienteId: z.string().uuid(),
-  fecha: z.string().min(1),
-  total: moneySchema(z.number().positive()),
-  tipoEvento: z.string().default("General"),
-  detalle: z.string().optional(),
-  metodoPago: metodoPagoEnum.default("efectivo"),
-  modalidadPago: modalidadPagoEnum.default("contado"),
-  referenciaPdf: z.string().optional(),
-  banco: z.string().optional(),
-  numeroOperacion: z.string().optional(),
-  notasCompletas: z.string().optional(),
-});
-
 const aprobarCotizacionSchema = z.object({
   cotizacionId: z.string().uuid(),
   notas: z.string().optional(),
@@ -323,8 +315,8 @@ const servicioAserraderoSchema = z.object({
   costoCubicaje: moneySchema(z.number().nonnegative()),
   precioCobrado: moneySchema(z.number().positive()),
   lineas: z.string().optional(), // JSON con desglose si aplica
-  metodoPago: z.string().optional().default("efectivo"),
-  modalidadPago: z.string().optional().default("contado"),
+  metodoPago: metodoPagoEnum.default("efectivo"),
+  modalidadPago: modalidadPagoEnum.default("contado"),
   fechaPagoCredito: z.string().optional(),
   adelanto: moneySchema(z.number().nonnegative()).optional().default(0),
   tipoComprobante: z.enum(["factura", "boleta", "ninguno"]).optional().default("ninguno"),
@@ -484,7 +476,6 @@ function normalizeMedioImport(raw: string | undefined): "efectivo" | "banco" | "
   return "efectivo";
 }
 
-const PENALIDAD_ALQUILER_PCT_DEFAULT = 3;
 
 /** Alineado con `mapMetodoPagoToMedio` del demo-store → columnas `medio` en caja. */
 function mapMetodoPagoVentaToMedioCaja(
@@ -931,6 +922,10 @@ export async function createVentaMadera(formData: FormData) {
     fecha: formData.get("fecha"),
     total: formData.get("total"),
     estado: formData.get("estado"),
+    metodoPago: formData.get("metodo_pago") ?? undefined,
+    modalidadPago: formData.get("modalidad_pago") ?? undefined,
+    adelanto: formData.get("adelanto") ?? undefined,
+    fechaPagoCredito: formData.get("fecha_pago_credito") ?? undefined,
     productoInventarioId: formData.get("inventario_producto_id"),
     cantidadProducto: formData.get("cantidad_producto"),
     tipoComprobante: formData.get("tipo_comprobante") || "ninguno",
@@ -940,6 +935,10 @@ export async function createVentaMadera(formData: FormData) {
   if (!parsed.success) {
     throw new Error("Datos de venta inválidos.");
   }
+
+  const modalidadPago = parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago;
+  const adelanto = modalidadPago === "adelanto" ? parsed.data.adelanto : 0;
+  const montoCaja = montoCobradoVenta(parsed.data.total, modalidadPago, adelanto);
 
   // Obtener nombre de cliente para la descripción de caja
   let clienteNombre = "Cliente Desconocido";
@@ -959,7 +958,7 @@ export async function createVentaMadera(formData: FormData) {
   if (!hasSupabaseEnv()) {
     const anioCorrel = Number(parsed.data.fecha.slice(0, 4)) || new Date().getFullYear();
     const correlativo = await nextCorrelativo("venta_madera", anioCorrel);
-    demoCreateVenta({
+    const venta = demoCreateVenta({
       organization_id: DEFAULT_ORG_ID,
       cliente_id: parsed.data.clienteId,
       fecha: parsed.data.fecha,
@@ -967,6 +966,10 @@ export async function createVentaMadera(formData: FormData) {
       estado: parsed.data.estado,
       correlativo,
       confirmaIngreso: false,
+      metodo_pago: parsed.data.metodoPago,
+      modalidad_pago: modalidadPago,
+      adelanto,
+      fecha_pago_credito: parsed.data.fechaPagoCredito || null,
     });
     if (parsed.data.estado === "confirmada" && parsed.data.productoInventarioId && parsed.data.cantidadProducto) {
       demoCreateInventarioMovimiento({
@@ -979,16 +982,17 @@ export async function createVentaMadera(formData: FormData) {
         referencia: "Venta confirmada",
       });
     }
-    if (parsed.data.estado === "confirmada") {
+    if (parsed.data.estado === "confirmada" && montoCaja > 0) {
       demoCreateCaja({
         organization_id: DEFAULT_ORG_ID,
         fecha: parsed.data.fecha,
         tipo: "ingreso",
-        medio: "efectivo",
+        medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
         categoria: "venta_madera",
-        monto: parsed.data.total,
+        monto: montoCaja,
         descripcion: `Venta de madera - ${clienteNombre}`,
         modulo_origen: "ventas_madera",
+        referencia_id: venta.id,
       });
     }
   } else {
@@ -1006,6 +1010,10 @@ export async function createVentaMadera(formData: FormData) {
         estado: parsed.data.estado,
         correlativo,
         created_by: actor.userId,
+        metodo_pago: parsed.data.metodoPago,
+        modalidad_pago: modalidadPago,
+        adelanto,
+        fecha_pago_credito: parsed.data.fechaPagoCredito || null,
       })
       .select("id")
       .single();
@@ -1045,14 +1053,14 @@ export async function createVentaMadera(formData: FormData) {
       inventarioInsertado = true;
     }
 
-    if (parsed.data.estado === "confirmada") {
+    if (parsed.data.estado === "confirmada" && montoCaja > 0) {
       const { error: cajaError } = await supabase.from("movimientos_caja").insert({
         organization_id: DEFAULT_ORG_ID,
         fecha: parsed.data.fecha,
         tipo: "ingreso",
-        medio: "efectivo",
+        medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
         categoria: "venta_madera",
-        monto: parsed.data.total,
+        monto: montoCaja,
         descripcion: `Venta de madera - ${clienteNombre}`,
         modulo_origen: "ventas_madera",
         referencia_id: data.id,
@@ -1799,139 +1807,66 @@ export async function pasarCotizacionAProduccion(
   }
 }
 
+export async function consultarCobroCotizacionUnificada(id: string): Promise<
+  { ok: true; total: number; cobrado: number; saldo: number } | { ok: false; error: string }
+> {
+  try {
+    const actor = await requireMutationAccess(ventasRoles);
+    if (!z.uuid().safeParse(id).success) return { ok: false, error: "Cotización inválida." };
+    if (!hasSupabaseEnv()) {
+      const { demoCajaRows, demoOrdenesProduccionRows } = await import("@/lib/demo-store");
+      const row = demoGetCotizacionUnificada(id);
+      if (!row || row.deleted_at) return { ok: false, error: "Cotización no encontrada." };
+      return { ok: true, ...resumenCobroLocal(Number(row.total), id, DEFAULT_ORG_ID, demoCajaRows(), demoOrdenesProduccionRows()) };
+    }
+    const { data, error } = await getSupabaseServerClient().rpc("consultar_cobro_cotizacion", {
+      p_org: DEFAULT_ORG_ID, p_actor: actor.userId, p_cot: id,
+    });
+    if (error) return { ok: false, error: mensajeOperacionFinanciera(error) };
+    const parsed = z.object({ total: z.number().finite().positive(), cobrado: z.number().finite().nonnegative(), saldo: z.number().finite().nonnegative() }).safeParse(data);
+    if (!parsed.success) return { ok: false, error: "No se pudo comprobar el saldo de la cotización." };
+    return { ok: true, ...parsed.data };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "No se pudo comprobar el saldo." }; }
+}
+
 export async function registrarCobroCotizacionUnificada(
   id: string,
-  cobro: { medio: "efectivo" | "banco" | "yape" | "otro"; totalEsperado: number },
+  cobro: { medio: "efectivo" | "banco" | "yape" | "otro"; totalEsperado: number; saldoEsperado?: number },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    await requireMutationAccess(ventasRoles);
-    const datosCobro = z.object({ medio: z.enum(["efectivo", "banco", "yape", "otro"]), totalEsperado: z.number().finite().positive() }).safeParse(cobro);
-    if (!datosCobro.success) return { ok: false, error: "Confirma el importe y un medio de cobro válido." };
+    const actor = await requireMutationAccess(ventasRoles);
+    const datos = z.object({ medio: z.enum(["efectivo", "banco", "yape", "otro"]), totalEsperado: z.number().finite().positive(), saldoEsperado: z.number().finite().positive().optional() }).safeParse(cobro);
+    if (!datos.success || !z.uuid().safeParse(id).success) return { ok: false, error: "Confirma el importe y un medio de cobro válido." };
     const fecha = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-
+    const saldoEsperado = datos.data.saldoEsperado ?? datos.data.totalEsperado;
     if (!hasSupabaseEnv()) {
-      const row = demoGetCotizacionUnificada(id);
-      if (!row || row.deleted_at) {
-        return { ok: false, error: "Cotización no encontrada." };
-      }
-      if (row.estado_flujo !== "lista_produccion" && row.estado_flujo !== "en_produccion") {
-        return {
-          ok: false,
-          error: "Solo se puede cobrar una cotización en lista de producción o en producción.",
-        };
-      }
-      const total = Number(row.total);
-      if (!Number.isFinite(total) || total <= 0 || !totalClienteCoincideConServidor(datosCobro.data.totalEsperado, total)) {
-        return { ok: false, error: "El total cambió o no es válido. Actualiza la cotización antes de cobrar." };
-      }
-      const { demoCajaRows } = await import("@/lib/demo-store");
-      if (demoCajaRows().some((mov) => mov.organization_id === DEFAULT_ORG_ID && mov.referencia_id === id &&
-          mov.modulo_origen === "cotizacion_unificada" && mov.tipo === "ingreso" && !mov.voided_at)) {
-        return { ok: false, error: "Esta cotización ya tiene un cobro registrado en Caja." };
-      }
-      const estadoAnterior = row.estado_flujo;
-      demoUpdateCotizacionUnificada(id, { estado_flujo: "cobrada" });
-      const label = row.correlativo ?? id.slice(0, 8);
-      try { demoCreateCaja({
-        organization_id: DEFAULT_ORG_ID,
-        fecha,
-        tipo: "ingreso",
-        medio: datosCobro.data.medio,
-        categoria: "cotizaciones",
-        monto: total,
-        descripcion: `Cobro cotización ${label}`,
-        modulo_origen: "cotizacion_unificada",
-        referencia_id: id,
-        es_personal: false,
-      }); } catch (error) {
-        demoUpdateCotizacionUnificada(id, { estado_flujo: estadoAnterior });
-        throw error;
-      }
-      revalidatePath("/cotizacion");
-      revalidatePath("/caja");
-      revalidatePath("/ventas");
-      return { ok: true };
+      const { demoCajaRows, demoOrdenesProduccionRows, demoOperacionAtomica } = await import("@/lib/demo-store");
+      demoOperacionAtomica(() => {
+        const row = demoGetCotizacionUnificada(id);
+        if (!row || row.deleted_at) throw new Error("Cotización no encontrada.");
+        if (row.estado_flujo !== "lista_produccion" && row.estado_flujo !== "en_produccion") throw new Error("La cotización cambió o ya está cobrada. Actualiza antes de cobrar.");
+        const resumen = resumenCobroLocal(Number(row.total), id, DEFAULT_ORG_ID, demoCajaRows(), demoOrdenesProduccionRows());
+        if (!totalClienteCoincideConServidor(datos.data.totalEsperado, resumen.total)) throw new Error("El total cambió. Actualiza antes de cobrar.");
+        if (resumen.saldo <= 0) throw new Error("Esta cotización ya tiene un cobro completo registrado en Caja.");
+        if (!totalClienteCoincideConServidor(saldoEsperado, resumen.saldo)) throw new Error("El saldo cambió. Actualiza los cobros antes de confirmar.");
+        const anterior = row.estado_flujo;
+        try {
+          demoCreateCaja({ organization_id: DEFAULT_ORG_ID, fecha, tipo: "ingreso", medio: datos.data.medio,
+            categoria: "cotizaciones", monto: resumen.saldo, descripcion: "Cobro cotización " + (row.correlativo ?? id.slice(0, 8)),
+            modulo_origen: "cotizacion_unificada", referencia_id: id, es_personal: false });
+          demoUpdateCotizacionUnificada(id, { estado_flujo: "cobrada" });
+        } catch (e) { demoUpdateCotizacionUnificada(id, { estado_flujo: anterior }); throw e; }
+      });
+    } else {
+      const { error } = await getSupabaseServerClient().rpc("registrar_cobro_cotizacion_seguro", {
+        p_org: DEFAULT_ORG_ID, p_actor: actor.userId, p_cot: id, p_total_esperado: datos.data.totalEsperado,
+        p_saldo_esperado: saldoEsperado, p_medio: datos.data.medio, p_fecha: fecha,
+      });
+      if (error) return { ok: false, error: mensajeOperacionFinanciera(error) };
     }
-
-    const supabase = getSupabaseServerClient();
-    const { data: row, error: lecturaError } = await supabase
-      .from("cotizaciones_unificadas")
-      .select("estado_flujo,total,correlativo")
-      .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .is("deleted_at", null)
-      .maybeSingle();
-
-    if (lecturaError) return { ok: false, error: lecturaError.message };
-    if (!row) {
-      return { ok: false, error: "Cotización no encontrada." };
-    }
-    if (row.estado_flujo !== "lista_produccion" && row.estado_flujo !== "en_produccion") {
-      return {
-        ok: false,
-        error: "Solo se puede cobrar una cotización en lista de producción o en producción.",
-      };
-    }
-
-    const total = Number(row.total);
-    if (!Number.isFinite(total) || total <= 0 || !totalClienteCoincideConServidor(datosCobro.data.totalEsperado, total)) {
-      return { ok: false, error: "El total cambió o no es válido. Actualiza la cotización antes de cobrar." };
-    }
-    const { data: cobrosPrevios, error: lecturaCajaError } = await supabase.from("movimientos_caja")
-      .select("id").eq("organization_id", DEFAULT_ORG_ID).eq("referencia_id", id)
-      .eq("modulo_origen", "cotizacion_unificada").eq("tipo", "ingreso").is("voided_at", null).limit(1);
-    if (lecturaCajaError) return { ok: false, error: lecturaCajaError.message };
-    if (cobrosPrevios?.length) return { ok: false, error: "Esta cotización ya tiene un cobro registrado en Caja." };
-    const prevEstado = row.estado_flujo;
-    const label = row.correlativo ?? id.slice(0, 8);
-
-    const { data: updatedRows, error: upErr } = await supabase
-      .from("cotizaciones_unificadas")
-      .update({ estado_flujo: "cobrada" })
-      .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .is("deleted_at", null)
-      .eq("total", total)
-      .in("estado_flujo", ["lista_produccion", "en_produccion"])
-      .select("id");
-
-    if (upErr) {
-      return { ok: false, error: upErr.message };
-    }
-    if (!updatedRows?.length) {
-      return { ok: false, error: "La cotización cambió o ya está cobrada. Actualiza antes de cobrar." };
-    }
-
-    const { error: cajaErr } = await supabase.from("movimientos_caja").insert({
-      organization_id: DEFAULT_ORG_ID,
-      fecha,
-      tipo: "ingreso",
-      medio: datosCobro.data.medio,
-      categoria: "cotizaciones",
-      monto: total,
-      descripcion: `Cobro cotización ${label}`,
-      modulo_origen: "cotizacion_unificada",
-      referencia_id: id,
-      es_personal: false,
-    });
-
-    if (cajaErr) {
-      await supabase
-        .from("cotizaciones_unificadas")
-        .update({ estado_flujo: prevEstado })
-        .eq("id", id)
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .eq("estado_flujo", "cobrada");
-      return { ok: false, error: cajaErr.message };
-    }
-
-    revalidatePath("/cotizacion");
-    revalidatePath("/caja");
-    revalidatePath("/ventas");
+    revalidatePath("/cotizacion"); revalidatePath("/caja"); revalidatePath("/ventas");
     return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
-  }
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "No se pudo confirmar el cobro." }; }
 }
 
 export async function cambiarEstadoCotizacion(formData: FormData) {
@@ -2183,58 +2118,14 @@ export async function createCompraMadera(formData: FormData) {
       url_comprobante: parsed.data.urlComprobante || null,
     });
   } else {
-    const supabase = getSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("compras_madera")
-      .insert({
-        organization_id: DEFAULT_ORG_ID,
-        proveedor_id: parsed.data.proveedorId,
-        fecha: parsed.data.fecha,
-        especie_madera: parsed.data.especieMadera,
-        detalle: parsed.data.detalle ?? null,
-        cantidad: parsed.data.cantidad,
-        unidad: parsed.data.unidad,
-        precio_unitario: parsed.data.precioUnitario,
-        total,
-        modalidad_pago: parsed.data.modalidadPago,
-        adelanto,
-        saldo_pendiente: saldoPendiente,
-        estado: parsed.data.estado,
-        created_by: actor.userId,
-      })
-      .select("id")
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (parsed.data.estado === "confirmada") {
-      const egreso = parsed.data.modalidadPago === "fiado" ? adelanto : total;
-      if (egreso > 0) {
-        const { error: cajaError } = await supabase.from("movimientos_caja").insert({
-          organization_id: DEFAULT_ORG_ID,
-          fecha: parsed.data.fecha,
-          tipo: "egreso",
-          medio: "efectivo",
-          categoria: "compra_madera",
-          monto: egreso,
-          descripcion:
-            parsed.data.modalidadPago === "fiado"
-              ? "Egreso por adelanto de compra fiada"
-              : "Egreso por compra de madera al contado",
-          modulo_origen: "compras_madera",
-          referencia_id: data.id,
-          tipo_comprobante: parsed.data.urlComprobante ? "boleta" : "ninguno", // If file uploaded, assume boleta/factura or default boleta as voucher present
-          url_comprobante: parsed.data.urlComprobante || null,
-          created_by: actor.userId,
-          updated_by: actor.userId,
-        });
-        if (cajaError) {
-          throw new Error(cajaError.message);
-        }
-      }
-    }
+    const { error } = await getSupabaseServerClient().rpc("crear_compra_madera_con_caja", {
+      p_org: DEFAULT_ORG_ID, p_actor: actor.userId,
+      p_compra: { proveedor_id: parsed.data.proveedorId, fecha: parsed.data.fecha, especie_madera: parsed.data.especieMadera,
+        detalle: parsed.data.detalle ?? null, cantidad: parsed.data.cantidad, unidad: parsed.data.unidad,
+        precio_unitario: parsed.data.precioUnitario, total, modalidad_pago: parsed.data.modalidadPago, adelanto,
+        saldo_pendiente: saldoPendiente, estado: parsed.data.estado, url_comprobante: parsed.data.urlComprobante || null },
+    });
+    if (error) throw new Error(mensajeOperacionFinanciera(error));
   }
 
   revalidatePath("/ventas");
@@ -3267,93 +3158,9 @@ export async function createRegistroGeneral(formData: FormData) {
   revalidatePath("/");
 }
 
-export async function createVentaDesdePdf(formData: FormData) {
-  const actor = await requireMutationAccess(ventasRoles);
-  const parsed = ventaPdfSchema.safeParse({
-    clienteId: formData.get("cliente_id"),
-    fecha: formData.get("fecha"),
-    total: formData.get("total"),
-    tipoEvento: formData.get("tipo_evento"),
-    detalle: formData.get("detalle"),
-    metodoPago: formData.get("metodo_pago"),
-    modalidadPago: formData.get("modalidad_pago"),
-    referenciaPdf: formData.get("referencia_pdf"),
-    banco: formData.get("banco"),
-    numeroOperacion: formData.get("numero_operacion"),
-    notasCompletas: formData.get("notas_completas"),
-  });
-
-  if (!parsed.success) {
-    console.error("[createVentaDesdePdf] Error de validación:", parsed.error);
-    throw new Error("Datos de venta PDF inválidos.");
-  }
-
-  const { 
-    clienteId, fecha, total, tipoEvento, detalle, 
-    metodoPago, modalidadPago, referenciaPdf, 
-    banco, numeroOperacion, notasCompletas 
-  } = parsed.data;
-
-  if (!hasSupabaseEnv()) {
-    const correlativo = await nextCorrelativo("venta_pdf");
-    demoCreateVenta({
-      organization_id: DEFAULT_ORG_ID,
-      cliente_id: clienteId,
-      fecha,
-      total,
-      estado: "confirmada",
-      correlativo: `PDF-${correlativo}`,
-    });
-    // También asentar en caja
-    demoCreateCaja({
-      organization_id: DEFAULT_ORG_ID,
-      fecha,
-      tipo: "ingreso",
-      medio: mapMetodoPagoVentaToMedioCaja(metodoPago),
-      categoria: `venta_pdf_${tipoEvento.toLowerCase()}`,
-      monto: total,
-      descripcion: `Venta PDF (${tipoEvento}): ${detalle || "Sin detalle"}. Ref: ${referenciaPdf || "N/A"}. Banco: ${banco || "N/A"}. Op: ${numeroOperacion || "N/A"}. Notas: ${notasCompletas || "N/A"}`,
-      modulo_origen: "ventas_pdf",
-      es_personal: false,
-    });
-  } else {
-    const supabase = getSupabaseServerClient();
-    const correlativo = await nextCorrelativo("venta_pdf");
-    
-    const { data: venta, error: ventaErr } = await supabase.from("ventas_madera").insert({
-      organization_id: DEFAULT_ORG_ID,
-      cliente_id: clienteId,
-      fecha,
-      total,
-      estado: "confirmada",
-      correlativo: `PDF-${correlativo}`,
-      created_by: actor.userId
-    }).select("id").single();
-
-    if (ventaErr) throw new Error(ventaErr.message);
-
-    // Asentar en caja con todos los datos detallados
-    const { error: cajaErr } = await supabase.from("movimientos_caja").insert({
-      organization_id: DEFAULT_ORG_ID,
-      fecha,
-      tipo: "ingreso",
-      medio: mapMetodoPagoVentaToMedioCaja(metodoPago),
-      categoria: "ventas_pdf",
-      descripcion: `Venta PDF ${tipoEvento} - Ref: ${referenciaPdf || correlativo} | Banco: ${banco || "N/A"} | Op: ${numeroOperacion || "N/A"} | Detalles: ${detalle || ""} | Notas: ${notasCompletas || ""}`,
-      modulo_origen: "ventas_madera",
-      referencia_id: venta.id,
-      created_by: actor.userId
-    });
-
-    if (cajaErr) throw new Error(cajaErr.message);
-  }
-
-  revalidatePath("/ventas");
-  revalidatePath("/caja");
-  revalidatePath("/registro");
-  
-  const returnTo = formData.get("return_to")?.toString();
-  if (returnTo) redirect(returnTo);
+export async function createVentaDesdePdf(_formData: FormData) {
+  await requireMutationAccess(ventasRoles);
+  throw new Error("La lectura automática de PDF no está disponible. Registra la venta desde su formulario y adjunta el comprobante real.");
 }
 
 // ---------------------------------------------------------------------------
@@ -3556,12 +3363,7 @@ export async function createVentaMuebleTerminado(formData: FormData) {
 
   const total = roundMoney(parsed.data.precioUnitario * parsed.data.cantidad);
 
-  let montoCaja = total;
-  if (parsed.data.modalidadPago === "credito") {
-    montoCaja = 0;
-  } else if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
-    montoCaja = roundMoney(parsed.data.adelanto ?? 0);
-  }
+  const montoCaja = montoCobradoVenta(total, parsed.data.modalidadPago, parsed.data.adelanto);
 
   // Obtener nombre de cliente para la descripción de caja
   let clienteNombre = "Cliente Desconocido";
@@ -3787,269 +3589,64 @@ export async function cancelarVentaMueble(formData: FormData) {
  */
 export async function aprobarCotizacionAOrden(formData: FormData) {
   const actor = await requireMutationAccess(ventasRoles);
-  const parsed = aprobarCotizacionSchema.safeParse({
-    cotizacionId: formData.get("cotizacion_id"),
-    notas: formData.get("notas"),
-    adelanto: formData.get("adelanto"),
-    metodoAdelanto: formData.get("metodo_adelanto"),
-  });
-  if (!parsed.success) {
-    throw new Error("Cotización inválida.");
-  }
+  const parsed = aprobarCotizacionSchema.safeParse({ cotizacionId: formData.get("cotizacion_id"), notas: formData.get("notas"),
+    adelanto: formData.get("adelanto"), metodoAdelanto: formData.get("metodo_adelanto") });
+  if (!parsed.success) throw new Error("Cotización inválida.");
+  const { cotizacionId, notas } = parsed.data;
+  const adelanto = parsed.data.adelanto ?? 0;
+  const medio = parsed.data.metodoAdelanto ?? "efectivo";
+  const correlativo = await nextCorrelativo("orden_produccion");
+  const fecha = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   if (!hasSupabaseEnv()) {
-    const { demoCotizacionesRows, demoCotizacionesUnificadasRows, demoUpdateCotizacionUnificada } = await import("@/lib/demo-store");
-    const cotizacion = demoCotizacionesRows().find((c) => c.id === parsed.data.cotizacionId);
-    let isUnificada = false;
-    let clienteId = "";
-    let correlativo = "";
-    let total = 0;
-
-    if (cotizacion) {
-      clienteId = cotizacion.cliente_id;
-      correlativo = cotizacion.correlativo ?? cotizacion.id.slice(0, 8);
-      total = Number(cotizacion.precio_acordado);
-    } else {
-      const cu = (demoCotizacionesUnificadasRows() as unknown as { id: string; cliente_id: string; correlativo?: string | null; total: number }[]).find((c) => c.id === parsed.data.cotizacionId);
-      if (!cu) {
-        throw new Error("La cotización ya no existe.");
+    const { demoCotizacionesRows, demoGetCotizacionUnificada, demoCajaRows, demoOrdenesProduccionRows, demoOperacionAtomica } = await import("@/lib/demo-store");
+    demoOperacionAtomica(() => {
+      const antigua = demoCotizacionesRows().find(c => c.id === cotizacionId);
+      const unificada = antigua ? undefined : demoGetCotizacionUnificada(cotizacionId);
+      const cot = antigua ?? unificada;
+      if (!cot || unificada?.deleted_at) throw new Error("La cotización ya no existe.");
+      if ((antigua && antigua.estado !== "confirmada") || (unificada && !["lista_produccion", "en_produccion"].includes(unificada.estado_flujo))) throw new Error("Solo se puede aprobar una cotización aceptada y sin cobro completo.");
+      const ordenes = demoOrdenesProduccionRows();
+      if (ordenes.some(o => o.organization_id === DEFAULT_ORG_ID && (antigua ? o.cotizacion_id : o.cotizacion_unificada_id) === cotizacionId)) throw new Error("Esta cotización ya tiene una orden de producción.");
+      const total = Number(antigua ? antigua.precio_acordado : unificada!.total);
+      montoCobradoVenta(total, "adelanto", adelanto);
+      const resumen = resumenCobroLocal(total, cotizacionId, DEFAULT_ORG_ID, demoCajaRows(), ordenes, !antigua);
+      if (adelanto > resumen.saldo) throw new Error("El adelanto no puede superar el saldo de la cotización.");
+      let notasFinal = notas?.trim() || null;
+      if (unificada) {
+        const cliente = demoClientesRows().find(c => c.id === unificada.cliente_id && c.organization_id === DEFAULT_ORG_ID);
+        const resumenOrden = textoNotasOrdenProduccionDesdeUnificada({ clienteNombre: cliente?.nombre ?? "Cliente", correlativo: unificada.correlativo,
+          cotIdShort: cotizacionId.slice(0, 8), total, detalle: unificada.detalle });
+        notasFinal = notasFinal ? notasFinal + "\n\n---\n" + resumenOrden : resumenOrden;
       }
-      isUnificada = true;
-      clienteId = cu.cliente_id;
-      correlativo = cu.correlativo ?? cu.id.slice(0, 8);
-      total = Number(cu.total);
-    }
-
-    if (isUnificada) {
-      demoUpdateCotizacionUnificada(parsed.data.cotizacionId, { estado_flujo: "en_produccion" });
-      demoCreateOrdenProduccion({
-        organization_id: DEFAULT_ORG_ID,
-        cliente_id: clienteId,
-        cotizacion_id: null,
-        cotizacion_unificada_id: parsed.data.cotizacionId,
-        estado: "en_produccion",
-        notas: parsed.data.notas || `Generada desde cotización ${correlativo} · Total S/ ${total.toFixed(2)}`,
-        correlativo: await nextCorrelativo("orden_produccion"),
-      });
-    } else {
-      demoCreateOrdenProduccion({
-        organization_id: DEFAULT_ORG_ID,
-        cliente_id: clienteId,
-        cotizacion_id: parsed.data.cotizacionId,
-        cotizacion_unificada_id: null,
-        estado: "en_produccion",
-        notas: parsed.data.notas || null,
-        correlativo: await nextCorrelativo("orden_produccion"),
-      });
-    }
-
-    const adelanto = parsed.data.adelanto ?? 0;
-    if (adelanto > 0) {
-      const medio = parsed.data.metodoAdelanto ?? "efectivo";
-      demoCreateCaja({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: new Date().toISOString().slice(0, 10),
-        tipo: "ingreso",
-        medio,
-        categoria: "adelanto_mueble_personalizado",
-        monto: adelanto,
-        descripcion: `Adelanto al aprobar cotización ${correlativo}`,
-        modulo_origen: "ventas",
-        referencia_id: parsed.data.cotizacionId,
-      });
-    }
+      const orden = demoCreateOrdenProduccion({ organization_id: DEFAULT_ORG_ID, cliente_id: cot.cliente_id,
+        cotizacion_id: antigua ? cotizacionId : null, cotizacion_unificada_id: antigua ? null : cotizacionId,
+        estado: "en_produccion", notas: notasFinal, correlativo, fecha_aprobacion: fecha });
+      if (adelanto > 0) demoCreateCaja({ organization_id: DEFAULT_ORG_ID, fecha, tipo: "ingreso", medio,
+        categoria: "adelanto_mueble_personalizado", monto: adelanto, descripcion: "Adelanto al aprobar cotización " + (cot.correlativo ?? cotizacionId.slice(0, 8)),
+        modulo_origen: "ventas", referencia_id: orden.id });
+      if (unificada) demoUpdateCotizacionUnificada(cotizacionId, { estado_flujo: "en_produccion" });
+    });
   } else {
     const supabase = getSupabaseServerClient();
-    const { data: cot, error: cotErr } = await supabase
-      .from("cotizaciones_mueble")
-      .select("id, cliente_id, estado, fecha")
-      .eq("id", parsed.data.cotizacionId)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .maybeSingle();
-
-    if (cotErr) {
-      throw new Error(cotErr.message);
+    const { data: antigua, error: lecturaAntigua } = await supabase.from("cotizaciones_mueble").select("id,cliente_id,estado,precio_acordado").eq("id", cotizacionId).eq("organization_id", DEFAULT_ORG_ID).maybeSingle();
+    if (lecturaAntigua) throw new Error(lecturaAntigua.message);
+    let total = antigua ? Number(antigua.precio_acordado) : 0;
+    let notasFinal = notas?.trim() || null;
+    if (!antigua) {
+      const { data: cu, error } = await supabase.from("cotizaciones_unificadas").select("id,cliente_id,total,detalle,correlativo").eq("id", cotizacionId).eq("organization_id", DEFAULT_ORG_ID).is("deleted_at", null).maybeSingle();
+      if (error || !cu) throw new Error(error?.message ?? "La cotización ya no existe.");
+      total = Number(cu.total);
+      const { data: cliente } = await supabase.from("clientes").select("nombre").eq("id", cu.cliente_id).eq("organization_id", DEFAULT_ORG_ID).maybeSingle();
+      const resumen = textoNotasOrdenProduccionDesdeUnificada({ clienteNombre: cliente?.nombre ?? "Cliente", correlativo: cu.correlativo, cotIdShort: cotizacionId.slice(0, 8), total, detalle: cu.detalle });
+      notasFinal = notasFinal ? notasFinal + "\n\n---\n" + resumen : resumen;
     }
-
-    if (cot) {
-      if (cot.estado !== "confirmada") {
-        throw new Error("Solo se pueden aprobar cotizaciones confirmadas.");
-      }
-
-      const { data: ordenExistente } = await supabase
-        .from("ordenes_produccion")
-        .select("id")
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .eq("cotizacion_id", cot.id)
-        .maybeSingle();
-
-      if (ordenExistente) {
-        throw new Error("Esta cotización ya tiene una orden de producción.");
-      }
-
-      const correlativo = await nextCorrelativo("orden_produccion");
-      const hoy = new Date().toISOString().slice(0, 10);
-
-      const { data: orden, error: ordenErr } = await supabase
-        .from("ordenes_produccion")
-        .insert({
-          organization_id: DEFAULT_ORG_ID,
-          cliente_id: cot.cliente_id,
-          cotizacion_id: cot.id,
-          cotizacion_unificada_id: null,
-          estado: "en_produccion",
-          notas: parsed.data.notas?.trim() || null,
-          fecha_aprobacion: hoy,
-          correlativo,
-          created_by: actor.userId,
-          updated_by: actor.userId,
-        })
-        .select("id")
-        .single();
-
-      if (ordenErr || !orden) {
-        throw new Error(ordenErr?.message ?? "No se pudo crear la orden.");
-      }
-
-      const adelanto = parsed.data.adelanto ?? 0;
-      if (adelanto > 0) {
-        const medio = parsed.data.metodoAdelanto ?? "efectivo";
-        const { error: cajaError } = await supabase.from("movimientos_caja").insert({
-          organization_id: DEFAULT_ORG_ID,
-          fecha: hoy,
-          tipo: "ingreso",
-          medio,
-          categoria: "adelanto_mueble_personalizado",
-          monto: adelanto,
-          descripcion: `Adelanto al aprobar cotización ${cot.fecha} (${cot.id.slice(0, 8)})`,
-          modulo_origen: "ventas",
-          referencia_id: orden.id,
-          created_by: actor.userId,
-          updated_by: actor.userId,
-        });
-        if (cajaError) {
-          throw new Error(cajaError.message);
-        }
-      }
-    } else {
-      const { data: cu, error: cuErr } = await supabase
-        .from("cotizaciones_unificadas")
-        .select("id, cliente_id, estado_flujo, fecha, total, detalle, correlativo")
-        .eq("id", parsed.data.cotizacionId)
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .maybeSingle();
-
-      if (cuErr) {
-        throw new Error(cuErr.message);
-      }
-      if (!cu) {
-        throw new Error("La cotización ya no existe.");
-      }
-      if (cu.estado_flujo === "cobrada") {
-        throw new Error("La cotización ya fue cobrada.");
-      }
-
-      const { data: ordenExistente } = await supabase
-        .from("ordenes_produccion")
-        .select("id")
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .eq("cotizacion_unificada_id", cu.id)
-        .maybeSingle();
-
-      if (ordenExistente) {
-        throw new Error("Esta cotización ya tiene una orden de producción.");
-      }
-
-      const prevEstado = cu.estado_flujo;
-      const debeActualizarFlujo = prevEstado !== "en_produccion";
-
-      if (debeActualizarFlujo) {
-        const { error: upErr } = await supabase
-          .from("cotizaciones_unificadas")
-          .update({ estado_flujo: "en_produccion" })
-          .eq("id", cu.id)
-          .eq("organization_id", DEFAULT_ORG_ID);
-        if (upErr) {
-          throw new Error(upErr.message);
-        }
-      }
-
-      const correlativo = await nextCorrelativo("orden_produccion");
-      const hoy = new Date().toISOString().slice(0, 10);
-
-      const { data: clienteRow } = await supabase
-        .from("clientes")
-        .select("nombre")
-        .eq("id", cu.cliente_id)
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .maybeSingle();
-
-      const clienteNombre = clienteRow?.nombre ?? "Cliente";
-
-      const defaultNotas = textoNotasOrdenProduccionDesdeUnificada({
-        clienteNombre,
-        correlativo: cu.correlativo,
-        cotIdShort: cu.id.slice(0, 8),
-        total: Number(cu.total),
-        detalle: cu.detalle,
-      });
-
-      const notasFinal = parsed.data.notas?.trim()
-        ? `${parsed.data.notas.trim()}\n\n---\n${defaultNotas}`
-        : defaultNotas;
-
-      const { data: orden, error: ordenErr } = await supabase
-        .from("ordenes_produccion")
-        .insert({
-          organization_id: DEFAULT_ORG_ID,
-          cliente_id: cu.cliente_id,
-          cotizacion_id: null,
-          cotizacion_unificada_id: cu.id,
-          estado: "en_produccion",
-          notas: notasFinal,
-          fecha_aprobacion: hoy,
-          correlativo,
-          created_by: actor.userId,
-          updated_by: actor.userId,
-        })
-        .select("id")
-        .single();
-
-      if (ordenErr || !orden) {
-        if (debeActualizarFlujo) {
-          await supabase
-            .from("cotizaciones_unificadas")
-            .update({ estado_flujo: prevEstado })
-            .eq("id", cu.id)
-            .eq("organization_id", DEFAULT_ORG_ID);
-        }
-        throw new Error(ordenErr?.message ?? "No se pudo crear la orden.");
-      }
-
-      const adelanto = parsed.data.adelanto ?? 0;
-      if (adelanto > 0) {
-        const medio = parsed.data.metodoAdelanto ?? "efectivo";
-        const { error: cajaError } = await supabase.from("movimientos_caja").insert({
-          organization_id: DEFAULT_ORG_ID,
-          fecha: hoy,
-          tipo: "ingreso",
-          medio,
-          categoria: "adelanto_mueble_personalizado",
-          monto: adelanto,
-          descripcion: `Adelanto al aprobar cotización ${cu.fecha} (${cu.id.slice(0, 8)})`,
-          modulo_origen: "ventas",
-          referencia_id: orden.id,
-          created_by: actor.userId,
-          updated_by: actor.userId,
-        });
-        if (cajaError) {
-          throw new Error(cajaError.message);
-        }
-      }
-    }
+    montoCobradoVenta(total, "adelanto", adelanto);
+    const { error } = await supabase.rpc("aprobar_cotizacion_con_adelanto", { p_org: DEFAULT_ORG_ID, p_actor: actor.userId,
+      p_cot: cotizacionId, p_unificada: !antigua, p_total_esperado: total, p_adelanto: adelanto, p_medio: medio,
+      p_orden: { notas: notasFinal, correlativo, fecha_aprobacion: fecha } });
+    if (error) throw new Error(mensajeOperacionFinanciera(error));
   }
-  revalidatePath("/ventas");
-  revalidatePath("/ventas/muebles-personalizados");
-  revalidatePath("/caja");
+  revalidatePath("/ventas/muebles-personalizados"); revalidatePath("/cotizacion"); revalidatePath("/ventas"); revalidatePath("/caja");
 }
 
 export async function cambiarEstadoOrden(formData: FormData) {
@@ -4143,6 +3740,7 @@ export async function createVentaMaderaCortada(formData: FormData) {
   const totalManualRaw = formData.get("total_manual_input");
   const usaTotalManual = typeof totalManualRaw === "string" && totalManualRaw.trim().length > 0;
   const totalCobrado = usaTotalManual ? parsed.data.total : totalCalculadoReal;
+  const montoCaja = montoCobradoVenta(totalCobrado, parsed.data.modalidadPago, parsed.data.adelanto);
   const precioUnitarioComercialReal = cantidadPiezasReal > 0
     ? roundMoney(totalCobrado / cantidadPiezasReal)
     : 0;
@@ -4164,6 +3762,7 @@ export async function createVentaMaderaCortada(formData: FormData) {
       metodo_pago: parsed.data.metodoPago,
       modalidad_pago: parsed.data.modalidadPago,
       fecha_pago_credito: parsed.data.fechaPagoCredito || null,
+      adelanto: parsed.data.adelanto,
       chofer_id: parsed.data.choferId || null,
       tipo_entrega: parsed.data.tipoEntrega,
       direccion_entrega: parsed.data.direccionEntrega || null,
@@ -4270,12 +3869,6 @@ export async function createVentaMaderaCortada(formData: FormData) {
       throw new Error(ventaErr?.message ?? "No se pudo registrar la venta.");
     }
 
-    const montoCaja = 
-      parsed.data.modalidadPago === "credito" 
-        ? 0 
-        : parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo"
-        ? (parsed.data.adelanto || 0)
-        : totalCobrado;
     let cajaRegistrado = false;
     if (montoCaja > 0) {
       const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
@@ -4416,6 +4009,7 @@ export async function createContratoAlquiler(formData: FormData) {
 
   // Calculate deposito30 dynamically
   const total = roundMoney(parsed.data.montoTotal);
+  montoCobradoVenta(total, parsed.data.modalidadPago, parsed.data.adelanto);
   let deposito30 = roundMoney(total * 0.3);
   if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
     if (parsed.data.adelanto !== undefined && parsed.data.adelanto > 0) {
@@ -4606,68 +4200,15 @@ export async function cerrarContratoAlquiler(formData: FormData) {
       }
       penalidadTotal = roundMoney(penalidadTotal);
 
-      const penalidadAcum = roundMoney(Number(row.penalidad) + penalidadTotal);
-
-      const { error: updErr } = await supabase
-        .from("alquileres")
-        .update({
-          estado: "cerrado",
-          fecha_fin: parsed.data.fechaCierre,
-          observaciones_retorno:
-            parsed.data.observaciones?.trim() || row.observaciones_retorno,
-          penalidad: penalidadAcum,
-        })
-        .eq("id", row.id)
-        .eq("organization_id", DEFAULT_ORG_ID);
-
-      if (updErr) {
-        return { ok: false, error: updErr.message };
-      }
-
-      const refCodigo = row.codigo ?? row.id.slice(0, 8);
-
-      if (penalidadTotal > 0) {
-        const { error: penErr } = await supabase.from("movimientos_caja").insert({
-          organization_id: DEFAULT_ORG_ID,
-          fecha: parsed.data.fechaCierre,
-          tipo: "ingreso",
-          medio: "efectivo",
-          categoria: "penalidad_alquiler",
-          monto: penalidadTotal,
-          descripcion: `Penalidad cierre contrato ${refCodigo}`,
-          modulo_origen: "ventas_alquiler",
-          referencia_id: row.id,
-          created_by: actor.userId,
-          updated_by: actor.userId,
-        });
-        if (penErr) {
-          return { ok: false, error: penErr.message };
-        }
-      }
-
-      const deposito = row.deposito_30 != null ? Number(row.deposito_30) : 0;
-      if (montoTotal != null && montoTotal > 0) {
-        const saldo = roundMoney(montoTotal - deposito);
-        if (saldo > 0) {
-          const medioSaldo = mapMetodoPagoVentaToMedioCaja(row.metodo_pago ?? "efectivo");
-          const { error: saldoErr } = await supabase.from("movimientos_caja").insert({
-            organization_id: DEFAULT_ORG_ID,
-            fecha: parsed.data.fechaCierre,
-            tipo: "ingreso",
-            medio: medioSaldo,
-            categoria: "alquiler_bomba_mixer",
-            monto: saldo,
-            descripcion: `Saldo final contrato ${refCodigo}`,
-            modulo_origen: "ventas_alquiler",
-            referencia_id: row.id,
-            created_by: actor.userId,
-            updated_by: actor.userId,
-          });
-          if (saldoErr) {
-            return { ok: false, error: saldoErr.message };
-          }
-        }
-      }
+      const { error } = await supabase.rpc("cerrar_alquiler_con_caja", {
+        p_org: DEFAULT_ORG_ID, p_actor: actor.userId, p_contrato: row.id, p_fecha: parsed.data.fechaCierre,
+        p_observaciones: parsed.data.observaciones?.trim() || null, p_penalidad: penalidadTotal,
+        p_snapshot_esperado: { monto_total: row.monto_total == null ? null : Number(row.monto_total),
+          deposito_30: row.deposito_30 == null ? null : Number(row.deposito_30), penalidad: Number(row.penalidad),
+          retraso_pct: Number(row.penalidad_retraso_pago_pct), devolucion_pct: Number(row.penalidad_devolucion_tardia_pct),
+          danios_pct: Number(row.penalidad_danios_pct), metodo_pago: row.metodo_pago ?? null },
+      });
+      if (error) return { ok: false, error: mensajeOperacionFinanciera(error) };
     }
     revalidatePath("/ventas/alquiler-mixer");
     revalidatePath("/alquiler");
@@ -4778,6 +4319,9 @@ export async function createServicioAserradero(formData: FormData) {
   if (!parsed.success) {
     throw new Error("Datos de servicio invalidos.");
   }
+  const modalidadPago = parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago;
+  const adelanto = modalidadPago === "adelanto" ? parsed.data.adelanto : 0;
+  const montoCaja = montoCobradoVenta(parsed.data.precioCobrado, modalidadPago, adelanto);
 
   let lineasJson: Record<string, unknown>[] = [];
   if (parsed.data.lineas) {
@@ -4841,15 +4385,19 @@ export async function createServicioAserradero(formData: FormData) {
         lineas_json: lineasJson,
         correlativo: await nextCorrelativo("servicio_aserradero"),
         confirmaIngreso: false,
+        metodo_pago: parsed.data.metodoPago,
+        modalidad_pago: modalidadPago,
+        adelanto,
+        fecha_pago_credito: parsed.data.fechaPagoCredito || null,
       });
-      if (parsed.data.precioCobrado > 0) {
+      if (montoCaja > 0) {
         demoCreateCaja({
           organization_id: DEFAULT_ORG_ID,
           fecha: parsed.data.fecha,
           tipo: "ingreso",
-          medio: "efectivo",
+          medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
           categoria: "servicio_aserradero",
-          monto: parsed.data.precioCobrado,
+          monto: montoCaja,
           descripcion: `Servicio de aserradero - ${clienteNombre}`,
           modulo_origen: "ventas_aserradero",
           referencia_id: serviceRow?.id ?? null,
@@ -4873,9 +4421,9 @@ export async function createServicioAserradero(formData: FormData) {
           lineas_json: lineasPayload,
           correlativo,
           metodo_pago: parsed.data.metodoPago ?? "efectivo",
-          modalidad_pago: parsed.data.modalidadPago ?? "contado",
+          modalidad_pago: modalidadPago,
           fecha_pago_credito: parsed.data.fechaPagoCredito ?? null,
-          adelanto: parsed.data.adelanto ?? 0,
+          adelanto,
           created_by: actor.userId,
         })
         .select("id")
@@ -4885,14 +4433,14 @@ export async function createServicioAserradero(formData: FormData) {
         throw new Error(servicioErr?.message ?? "No se pudo registrar el servicio.");
       }
 
-      if (parsed.data.precioCobrado > 0) {
+      if (montoCaja > 0) {
         const { error: cajaError } = await supabase.from("movimientos_caja").insert({
           organization_id: DEFAULT_ORG_ID,
           fecha: parsed.data.fecha,
           tipo: "ingreso",
-          medio: "efectivo",
+          medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
           categoria: "servicio_aserradero",
-          monto: parsed.data.precioCobrado,
+          monto: montoCaja,
           descripcion: `Servicio de aserradero - ${clienteNombre}`,
           modulo_origen: "ventas_aserradero",
           referencia_id: servicio.id,
@@ -5596,6 +5144,7 @@ export async function updateContratoAlquiler(
     }
 
     const total = roundMoney(parsed.data.montoTotal);
+    montoCobradoVenta(total, parsed.data.modalidadPago, parsed.data.adelanto);
     let deposito30 = roundMoney(total * 0.3);
     if (parsed.data.modalidadPago === "adelanto" || parsed.data.modalidadPago === "adelanto_saldo") {
       if (parsed.data.adelanto !== undefined && parsed.data.adelanto > 0) {
@@ -5965,174 +5514,61 @@ export async function deleteAlquilerContrato(
 
 export async function updateServicioAserradero(formData: FormData) {
   const actor = await requireMutationAccess(ventasRoles);
-  const id = formData.get("id") as string;
-  if (!id) throw new Error("ID de servicio requerido.");
-
-  const parsed = servicioAserraderoSchema.safeParse({
-    clienteId: formData.get("cliente_id"),
-    fecha: formData.get("fecha"),
-    piesCubicos: formData.get("pies_cubicos"),
-    costoCubicaje: formData.get("costo_cubicaje"),
-    precioCobrado: formData.get("precio_cobrado"),
-    lineas: formData.get("lineas_json"),
-  });
-  if (!parsed.success) {
-    throw new Error("Datos de servicio inválidos.");
-  }
-
-  let lineasJson: Record<string, unknown>[] = [];
+  const id = String(formData.get("id") ?? "");
+  if (!z.uuid().safeParse(id).success) throw new Error("ID de servicio requerido.");
+  const demo = !hasSupabaseEnv();
+  const storeDemo = demo ? await import("@/lib/demo-store") : null;
+  const supabase = demo ? null : getSupabaseServerClient();
+  const lectura = supabase ? await supabase.from("servicios_aserradero").select("*").eq("id", id).eq("organization_id", DEFAULT_ORG_ID).maybeSingle() : null;
+  if (lectura?.error) throw new Error(lectura.error.message);
+  const current = storeDemo ? storeDemo.demoServiciosAserraderoRows().find(s => s.id === id && s.organization_id === DEFAULT_ORG_ID) : lectura?.data;
+  if (!current) throw new Error("Servicio no encontrado.");
+  const parsed = servicioAserraderoSchema.safeParse({ clienteId: formData.get("cliente_id"), fecha: formData.get("fecha"),
+    piesCubicos: formData.get("pies_cubicos"), costoCubicaje: formData.get("costo_cubicaje"), precioCobrado: formData.get("precio_cobrado"),
+    lineas: formData.get("lineas_json"), metodoPago: formData.get("metodo_pago") ?? current.metodo_pago ?? "efectivo",
+    modalidadPago: formData.get("modalidad_pago") ?? current.modalidad_pago ?? "contado",
+    adelanto: formData.get("adelanto") ?? current.adelanto ?? 0, fechaPagoCredito: formData.get("fecha_pago_credito") ?? current.fecha_pago_credito ?? undefined });
+  if (!parsed.success) throw new Error("Datos de servicio inválidos.");
+  const modalidadPago = parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago;
+  const adelanto = modalidadPago === "adelanto" ? parsed.data.adelanto : 0;
+  const monto = montoCobradoVenta(parsed.data.precioCobrado, modalidadPago, adelanto);
+  let lineas: Json = [];
   if (parsed.data.lineas) {
     try {
-      const parsedLineas = JSON.parse(parsed.data.lineas);
-      if (Array.isArray(parsedLineas)) {
-        lineasJson = parsedLineas;
-      } else {
-        throw new Error("El detalle histórico no contiene un arreglo JSON válido.");
-      }
-    } catch {
-      throw new Error("El detalle histórico contiene JSON inválido. No se guardó ningún cambio.");
-    }
+      const data: unknown = JSON.parse(parsed.data.lineas);
+      if (!Array.isArray(data)) throw new Error("Formato inválido");
+      lineas = data as Json;
+    } catch { throw new Error("El detalle histórico contiene JSON inválido. No se guardó ningún cambio."); }
   }
-
-  // Obtener nombre de cliente para la descripción de caja
-  let clienteNombre = "Cliente Desconocido";
-  if (!hasSupabaseEnv()) {
-    const { demoClientesRows } = await import("@/lib/demo-store");
-    const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
-    if (c) clienteNombre = c.nombre;
+  const payload = { cliente_id: parsed.data.clienteId, fecha: parsed.data.fecha, pies_cubicos: parsed.data.piesCubicos,
+    costo_cubicaje: parsed.data.costoCubicaje, precio_cobrado: parsed.data.precioCobrado, lineas_json: lineas,
+    metodo_pago: parsed.data.metodoPago, modalidad_pago: modalidadPago,
+    adelanto, fecha_pago_credito: parsed.data.fechaPagoCredito || null };
+  const cliente = storeDemo ? { data: storeDemo.demoClientesRows().find(c => c.id === payload.cliente_id && c.organization_id === DEFAULT_ORG_ID), error: null }
+    : await supabase!.from("clientes").select("nombre").eq("id", payload.cliente_id).eq("organization_id", DEFAULT_ORG_ID).maybeSingle();
+  if (cliente.error || !cliente.data) throw new Error(cliente.error?.message ?? "Cliente no encontrado.");
+  const descripcion = `Servicio de aserradero - ${cliente.data.nombre}`;
+  const medio = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
+  if (storeDemo) {
+    storeDemo.demoOperacionAtomica(() => {
+      const movimientos = storeDemo.demoCajaRows().filter(c => c.organization_id === DEFAULT_ORG_ID && c.referencia_id === id && c.modulo_origen === "ventas_aserradero" && !c.voided_at && !c.deleted_at);
+      if (movimientos.length > 1) throw new Error("Revisa los movimientos vinculados al servicio antes de editar.");
+      const movimiento = movimientos[0];
+      if (movimiento?.periodo_cerrado) throw new Error("El movimiento pertenece a un período cerrado.");
+      Object.assign(current, payload);
+      if (movimiento && monto > 0) Object.assign(movimiento, { monto, medio, fecha: payload.fecha, descripcion });
+      else if (movimiento) storeDemo.demoDeleteOneById("caja", movimiento.id);
+      else if (monto > 0) storeDemo.demoCreateCaja({ organization_id: DEFAULT_ORG_ID, fecha: payload.fecha, tipo: "ingreso", medio,
+        categoria: "servicio_aserradero", monto, descripcion, modulo_origen: "ventas_aserradero", referencia_id: id });
+    });
   } else {
-    const supabase = getSupabaseServerClient();
-    const { data: cData } = await supabase
-      .from("clientes")
-      .select("nombre")
-      .eq("id", parsed.data.clienteId)
-      .maybeSingle();
-    if (cData) clienteNombre = cData.nombre;
+    const { error } = await supabase!.rpc("editar_aserradero_con_caja", { p_org: DEFAULT_ORG_ID, p_actor: actor.userId, p_servicio_id: id,
+      p_snapshot_esperado: { precio_cobrado: Number(current.precio_cobrado), metodo_pago: current.metodo_pago ?? null,
+        modalidad_pago: current.modalidad_pago ?? null, adelanto: current.adelanto == null ? null : Number(current.adelanto) },
+      p_servicio: { ...payload, medio_caja: medio, descripcion_caja: descripcion }, p_monto_caja: monto });
+    if (error) throw new Error(mensajeOperacionFinanciera(error));
   }
-
-  if (!hasSupabaseEnv()) {
-    const { demoServiciosAserraderoRows, demoCajaRows, demoCreateCaja, demoDeleteOneById, persistStore } = await import("@/lib/demo-store");
-    const row = demoServiciosAserraderoRows().find((x) => x.id === id);
-    if (row) {
-      row.cliente_id = parsed.data.clienteId;
-      row.fecha = parsed.data.fecha;
-      row.pies_cubicos = parsed.data.piesCubicos;
-      row.costo_cubicaje = parsed.data.costoCubicaje;
-      row.precio_cobrado = parsed.data.precioCobrado;
-      row.lineas_json = lineasJson;
-    }
-
-    // Sync movements:
-    const cRow = demoCajaRows().find((c) => c.referencia_id === id && c.modulo_origen === "ventas_aserradero");
-    if (cRow) {
-      if (parsed.data.precioCobrado > 0) {
-        cRow.monto = parsed.data.precioCobrado;
-        cRow.fecha = parsed.data.fecha;
-        cRow.descripcion = `Servicio de aserradero - ${clienteNombre}`;
-      } else {
-        demoDeleteOneById("caja", cRow.id);
-      }
-    } else if (parsed.data.precioCobrado > 0) {
-      demoCreateCaja({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fecha,
-        tipo: "ingreso",
-        medio: "efectivo",
-        categoria: "servicio_aserradero",
-        monto: parsed.data.precioCobrado,
-        descripcion: `Servicio de aserradero - ${clienteNombre}`,
-        modulo_origen: "ventas_aserradero",
-        referencia_id: id,
-      });
-    }
-    persistStore();
-  } else {
-    const supabase = getSupabaseServerClient();
-    const lineasPayload = lineasJson as unknown as Json;
-
-    const { error: errServ } = await supabase
-      .from("servicios_aserradero")
-      .update({
-        cliente_id: parsed.data.clienteId,
-        fecha: parsed.data.fecha,
-        pies_cubicos: parsed.data.piesCubicos,
-        costo_cubicaje: parsed.data.costoCubicaje,
-        precio_cobrado: parsed.data.precioCobrado,
-        lineas_json: lineasPayload,
-      })
-      .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID);
-
-    if (errServ) {
-      throw new Error(errServ.message);
-    }
-
-    // Sync movements using the exact requested pattern:
-    // - Buscar: SELECT id FROM movimientos_caja WHERE referencia_id = p_id AND modulo_origen = 'x'
-    const { data: existingCaja, error: cajaSelectErr } = await supabase
-      .from("movimientos_caja")
-      .select("id")
-      .eq("referencia_id", id)
-      .eq("modulo_origen", "ventas_aserradero")
-      .maybeSingle();
-
-    if (cajaSelectErr) {
-      throw new Error(cajaSelectErr.message);
-    }
-
-    if (existingCaja) {
-      if (parsed.data.precioCobrado > 0) {
-        // - Si existe -> UPDATE
-        const { error: updCajaErr } = await supabase
-          .from("movimientos_caja")
-          .update({
-            fecha: parsed.data.fecha,
-            monto: parsed.data.precioCobrado,
-            descripcion: `Servicio de aserradero - ${clienteNombre}`,
-          })
-          .eq("id", existingCaja.id)
-          .eq("organization_id", DEFAULT_ORG_ID);
-
-        if (updCajaErr) {
-          throw new Error(updCajaErr.message);
-        }
-      } else {
-        // - Si existe y monto = 0 -> DELETE
-        const { error: delCajaErr } = await supabase
-          .from("movimientos_caja")
-          .delete()
-          .eq("id", existingCaja.id)
-          .eq("organization_id", DEFAULT_ORG_ID);
-
-        if (delCajaErr) {
-          throw new Error(delCajaErr.message);
-        }
-      }
-    } else if (parsed.data.precioCobrado > 0) {
-      // - Si no existe y monto > 0 -> INSERT
-      const { error: insCajaErr } = await supabase.from("movimientos_caja").insert({
-        organization_id: DEFAULT_ORG_ID,
-        fecha: parsed.data.fecha,
-        tipo: "ingreso",
-        medio: "efectivo",
-        categoria: "servicio_aserradero",
-        monto: parsed.data.precioCobrado,
-        descripcion: `Servicio de aserradero - ${clienteNombre}`,
-        modulo_origen: "ventas_aserradero",
-        referencia_id: id,
-        created_by: actor.userId,
-        updated_by: actor.userId,
-      });
-
-      if (insCajaErr) {
-        throw new Error(insCajaErr.message);
-      }
-    }
-  }
-
-  revalidatePath("/ventas");
-  revalidatePath("/ventas/aserradero-servicios");
-  revalidatePath("/caja");
+  revalidatePath("/ventas"); revalidatePath("/ventas/aserradero-servicios"); revalidatePath("/caja");
 }
 
 export async function submitUpdateServicioAserraderoForm(

@@ -3,6 +3,7 @@ import { readStoreFromDisk, writeStoreToDisk } from "@/lib/store-persistence";
 import { isDemoDatabaseMode } from "@/lib/demo-mode";
 import { monthlyCashRows } from "@/lib/reportes-model";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
+import { montoCobradoVenta } from "@/lib/ventas-pago";
 import { validateBackupRow, validateBackupReferences } from "@/lib/backup-validation";
 import type { MaderaCortadaVoucherLine, TipoComprobanteVenta } from "@/lib/madera-cortada-print-model";
 
@@ -113,6 +114,8 @@ type VentaRow = {
   precio_unitario_comercial?: number;
   metodo_pago?: MetodoPago;
   modalidad_pago?: ModalidadPago;
+  adelanto?: number;
+  fecha_pago_credito?: string | null;
   tipo_entrega?: TipoEntrega;
   direccion_entrega?: string | null;
   estado_entrega?: EstadoEntrega;
@@ -289,6 +292,10 @@ type ServicioAserraderoRow = {
   lineas_json: Record<string, unknown>[];
   created_at: string;
   correlativo: string | null;
+  metodo_pago?: MetodoPago;
+  modalidad_pago?: ModalidadPago;
+  adelanto?: number;
+  fecha_pago_credito?: string | null;
 };
 
 export type ServicioEspecialTarifaRow = {
@@ -1781,8 +1788,26 @@ const demoStoreRuntime =
   (demoStoreRuntimeRegistry[demoStoreRuntimeKey] = { store: loadPersistedStore() });
 const store = demoStoreRuntime.store;
 
+let profundidadOperacion = 0;
 export function persistStore() {
+  if (profundidadOperacion > 0) return;
   writeStoreToDisk(store);
+}
+
+/** Agrupa escrituras locales síncronas y restaura la memoria si el guardado falla. */
+export function demoOperacionAtomica<T>(operacion: () => T): T {
+  const anterior = demoExportStore();
+  profundidadOperacion++;
+  try {
+    const resultado = operacion();
+    if (profundidadOperacion === 1) writeStoreToDisk(store, { strict: true });
+    return resultado;
+  } catch (error) {
+    Object.assign(store, anterior);
+    throw error;
+  } finally {
+    profundidadOperacion--;
+  }
 }
 
 /** Devuelve una copia serializable del store local. Para respaldo / soporte. */
@@ -2278,6 +2303,10 @@ export function demoCreateVenta(
     estado: input.estado,
     total: input.total,
     correlativo: input.correlativo ?? null,
+    metodo_pago: input.metodo_pago,
+    modalidad_pago: input.modalidad_pago,
+    adelanto: input.adelanto,
+    fecha_pago_credito: input.fecha_pago_credito,
   };
   store.ventas.unshift(row);
   if (row.estado === "confirmada" && input.confirmaIngreso !== false) {
@@ -2294,6 +2323,7 @@ export function demoCreateVenta(
     });
   }
   persistStore();
+  return row;
 }
 
 export function demoCreateCompraMadera(
@@ -2301,35 +2331,38 @@ export function demoCreateCompraMadera(
     url_comprobante?: string | null;
   },
 ) {
-  const row: CompraMaderaRow = {
-    id: randomUUID(),
-    created_at: nowIso(),
-    created_by: null,
-    url_comprobante: input.url_comprobante ?? null,
-    ...input,
-  };
-  store.comprasMadera.unshift(row);
+  return demoOperacionAtomica(() => {
+    const row: CompraMaderaRow = {
+      id: randomUUID(),
+      created_at: nowIso(),
+      created_by: null,
+      url_comprobante: input.url_comprobante ?? null,
+      ...input,
+    };
+    store.comprasMadera.unshift(row);
 
-  if (row.estado === "confirmada") {
-    const egreso = row.modalidad_pago === "fiado" ? row.adelanto : row.total;
-    if (egreso > 0) {
-      demoCreateCaja({
-        organization_id: row.organization_id,
-        fecha: row.fecha,
-        tipo: "egreso",
-        medio: "efectivo",
-        categoria: "compra_madera",
-        monto: egreso,
-        descripcion:
-          row.modalidad_pago === "fiado"
-            ? "Egreso por adelanto de compra fiada"
-            : "Egreso por compra de madera al contado",
-        modulo_origen: "compras_madera",
-        referencia_id: row.id,
+    if (row.estado === "confirmada") {
+      const egreso = row.modalidad_pago === "fiado" ? row.adelanto : row.total;
+      if (egreso > 0) {
+        demoCreateCaja({
+          organization_id: row.organization_id,
+          fecha: row.fecha,
+          tipo: "egreso",
+          medio: "efectivo",
+          categoria: "compra_madera",
+          monto: egreso,
+          descripcion:
+            row.modalidad_pago === "fiado"
+              ? "Egreso por adelanto de compra fiada"
+              : "Egreso por compra de madera al contado",
+          modulo_origen: "compras_madera",
+          referencia_id: row.id,
       });
     }
   }
   persistStore();
+  return row;
+  });
 }
 
 /** Elimina cotización `mueble_personalizado` si no tiene orden de producción vinculada (misma regla que Supabase `ON DELETE RESTRICT`). */
@@ -3051,39 +3084,41 @@ export function demoCerrarContratoAlquiler(
   id: string,
   input: { fechaCierre: string; observaciones?: string | null; penalidades: PenalidadFlags },
 ) {
-  const row = store.alquileres.find((a) => a.id === id);
-  if (!row) return;
+  return demoOperacionAtomica(() => {
+    const row = store.alquileres.find((a) => a.id === id);
+    if (!row) throw new Error("Contrato no encontrado.");
+    if (row.estado === "cerrado") throw new Error("El contrato ya está cerrado.");
 
-  let penalidadTotal = 0;
-  if (row.monto_total) {
-    if (input.penalidades.retraso_pago) {
-      penalidadTotal += (row.monto_total * row.penalidad_retraso_pago_pct) / 100;
+    let penalidadTotal = 0;
+    if (row.monto_total) {
+      if (input.penalidades.retraso_pago) {
+        penalidadTotal += (row.monto_total * row.penalidad_retraso_pago_pct) / 100;
+      }
+      if (input.penalidades.devolucion_tardia) {
+        penalidadTotal += (row.monto_total * row.penalidad_devolucion_tardia_pct) / 100;
+      }
+      if (input.penalidades.danios) {
+        penalidadTotal += (row.monto_total * row.penalidad_danios_pct) / 100;
+      }
     }
-    if (input.penalidades.devolucion_tardia) {
-      penalidadTotal += (row.monto_total * row.penalidad_devolucion_tardia_pct) / 100;
-    }
-    if (input.penalidades.danios) {
-      penalidadTotal += (row.monto_total * row.penalidad_danios_pct) / 100;
-    }
-  }
-  penalidadTotal = Number(penalidadTotal.toFixed(2));
+    penalidadTotal = Number(penalidadTotal.toFixed(2));
 
-  row.estado = "cerrado";
-  row.fecha_fin = input.fechaCierre;
-  row.observaciones_retorno = input.observaciones ?? row.observaciones_retorno;
-  row.penalidad = (row.penalidad ?? 0) + penalidadTotal;
+    row.estado = "cerrado";
+    row.fecha_fin = input.fechaCierre;
+    row.observaciones_retorno = input.observaciones ?? row.observaciones_retorno;
+    row.penalidad = (row.penalidad ?? 0) + penalidadTotal;
 
-  if (penalidadTotal > 0) {
-    demoCreateCaja({
-      organization_id: row.organization_id,
-      fecha: input.fechaCierre,
-      tipo: "ingreso",
-      medio: "efectivo",
-      categoria: "penalidad_alquiler",
-      monto: penalidadTotal,
-      descripcion: `Penalidad cierre contrato ${row.codigo ?? row.id.slice(0, 8)}`,
-      modulo_origen: "ventas_alquiler",
-      referencia_id: row.id,
+    if (penalidadTotal > 0) {
+      demoCreateCaja({
+        organization_id: row.organization_id,
+        fecha: input.fechaCierre,
+        tipo: "ingreso",
+        medio: "efectivo",
+        categoria: "penalidad_alquiler",
+        monto: penalidadTotal,
+        descripcion: `Penalidad cierre contrato ${row.codigo ?? row.id.slice(0, 8)}`,
+        modulo_origen: "ventas_alquiler",
+        referencia_id: row.id,
     });
   }
 
@@ -3106,6 +3141,7 @@ export function demoCerrarContratoAlquiler(
   }
 
   persistStore();
+  });
 }
 
 export function demoCreateVentaMaderaCortada(input: {
@@ -3122,6 +3158,7 @@ export function demoCreateVentaMaderaCortada(input: {
   total: number;
   metodo_pago: MetodoPago;
   modalidad_pago: ModalidadPago;
+  adelanto?: number;
   fecha_pago_credito: string | null;
   chofer_id: string | null;
   tipo_entrega: TipoEntrega;
@@ -3129,6 +3166,7 @@ export function demoCreateVentaMaderaCortada(input: {
   estado_entrega: EstadoEntrega;
   inventario_producto_id: string | null;
 }) {
+  const montoCaja = montoCobradoVenta(input.total, input.modalidad_pago, input.adelanto);
   // Reusamos VentaRow para listado simple.
   const venta: VentaRow = {
     id: randomUUID(),
@@ -3147,6 +3185,7 @@ export function demoCreateVentaMaderaCortada(input: {
     precio_unitario_comercial: input.precio_unitario_comercial,
     metodo_pago: input.metodo_pago,
     modalidad_pago: input.modalidad_pago,
+    adelanto: input.adelanto,
     tipo_entrega: input.tipo_entrega,
     direccion_entrega: input.direccion_entrega,
     estado_entrega: input.estado_entrega,
@@ -3155,14 +3194,14 @@ export function demoCreateVentaMaderaCortada(input: {
   };
   store.ventas.unshift(venta);
 
-  if (input.modalidad_pago !== "credito" && input.total > 0) {
+  if (montoCaja > 0) {
     demoCreateCaja({
       organization_id: input.organization_id,
       fecha: input.fecha,
       tipo: "ingreso",
       medio: mapMetodoPagoToMedio(input.metodo_pago),
       categoria: "venta_madera_cortada",
-      monto: input.total,
+      monto: montoCaja,
       descripcion:
         input.cantidad_piezas && input.precio_unitario_comercial
           ? `Venta ${input.cantidad_piezas} pzs x S/ ${input.precio_unitario_comercial.toFixed(2)} (${input.tipo_corte})`

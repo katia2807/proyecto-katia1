@@ -70,6 +70,22 @@ const withInsert: typeof fetch = async (input, init) => {
   const url = new URL(String(input));
   const tabla = url.pathname.split("/").pop()!;
   const body = JSON.parse(String(init.body));
+  if (tabla === "registrar_cobro_cotizacion_seguro") {
+    expect(body.p_org).toBe(DEFAULT_ORG_ID);
+    const response = (message: string) => new Response(JSON.stringify({ message, code: "P0001" }), { status: 400, headers: { "content-type": "application/json" } });
+    if (fallo === "cambio") { row.total = 900; fallo = null; }
+    if (fallo === "cobro") { row.estado_flujo = "cobrada"; fallo = null; }
+    if (fallo === "eliminacion") { row.deleted_at = "2026-10-04T10:00:00Z"; fallo = null; }
+    if (row.deleted_at) return response("Cotización no encontrada");
+    if (!["lista_produccion", "en_produccion"].includes(row.estado_flujo)) return response("La cotización cambió o ya está cobrada");
+    if (body.p_total_esperado !== row.total) return response("El total cambió");
+    if (caja.some(m => !m.voided_at)) return response("Esta cotización ya tiene un cobro completo");
+    if (fallo === "caja" || fallo === "lectura") return response("Caja no disponible");
+    const movimiento = { organization_id: DEFAULT_ORG_ID, referencia_id: id, modulo_origen: "cotizacion_unificada", tipo: "ingreso", monto: body.p_saldo_esperado, medio: body.p_medio };
+    caja.push(movimiento); row.estado_flujo = "cobrada";
+    escrituras.push({ tabla: "movimientos_caja", body: movimiento, url });
+    return new Response("null", { status: 200, headers: { "content-type": "application/json" } });
+  }
   expect(body.organization_id).toBe(DEFAULT_ORG_ID);
   escrituras.push({ tabla, body, url });
   if (fallo === "caja") return new Response(JSON.stringify({ message: "Caja no disponible", code: "XX000" }), { status: 500, headers: { "content-type": "application/json" } });
