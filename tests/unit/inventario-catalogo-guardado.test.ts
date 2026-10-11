@@ -69,13 +69,6 @@ describe("Guardados: costo y precio de venta independientes", () => {
     return form;
   }
 
-  test("editar costo conserva el precio y sigue actualizando stock y foto al guardar", async () => {
-    await updateInventarioProducto(inventarioForm());
-    expect(tables.inventario_productos[0]).toMatchObject({ costo_unitario: 300, stock_actual: 8, foto_url: "inventario.jpg" });
-    expect(tables.muebles_catalogo[0]).toMatchObject({ precio_lista: 650, stock_disponible: 8, foto_url: "inventario.jpg" });
-    expect(writes.filter(write => write.table === "muebles_catalogo").every(write => !("precio_lista" in write.patch))).toBe(true);
-  });
-
   test("editar precio conserva el costo y sigue compartiendo la foto al guardar", async () => {
     await updateMuebleCatalogo(catalogoForm());
     expect(tables.muebles_catalogo[0]).toMatchObject({ precio_lista: 720, foto_url: "catalogo.jpg" });

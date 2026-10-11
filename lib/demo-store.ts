@@ -4,6 +4,7 @@ import { isDemoDatabaseMode } from "@/lib/demo-mode";
 import { monthlyCashRows } from "@/lib/reportes-model";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { montoCobradoVenta } from "@/lib/ventas-pago";
+import { resumenCobroLocal } from "@/lib/cotizacion-cobros";
 import { validateBackupRow, validateBackupReferences } from "@/lib/backup-validation";
 import type { MaderaCortadaVoucherLine, TipoComprobanteVenta } from "@/lib/madera-cortada-print-model";
 
@@ -2166,9 +2167,15 @@ export function demoUpdateCotizacionUnificada(
 ) {
   const row = store.cotizacionesUnificadas.find((c) => c.id === id);
   if (!row) return null;
-  Object.assign(row, patch);
-  persistStore();
-  return row;
+  return demoOperacionAtomica(() => {
+    if (patch.total !== undefined) {
+      const resumen = resumenCobroLocal(Math.max(patch.total, 0.01), id, row.organization_id, store.caja, store.ordenesProduccion);
+      if (patch.total < 0 || resumen.cobrado > patch.total) throw new Error('El total no puede ser inferior al dinero ya recibido. Revisa los cobros.');
+    }
+    Object.assign(row, patch);
+    persistStore();
+    return row;
+  });
 }
 
 export function demoDeleteCotizacionUnificada(id: string) {
@@ -2583,11 +2590,7 @@ export function demoCreateSueldo(input: Omit<SueldoRow, "id" | "created_at">, su
 function syncInventarioProductoToCatalogo(producto: InventarioProductoRow, syncFoto = false) {
   if (producto.categoria !== "Muebles") return;
   const match = store.mueblesCatalogo.find((m) =>
-    m.organization_id === producto.organization_id && (
-      m.id === producto.id ||
-      (producto.codigo && m.codigo.toLowerCase() === producto.codigo.toLowerCase()) ||
-      m.nombre.toLowerCase() === producto.nombre.toLowerCase()
-    ),
+    m.organization_id === producto.organization_id && m.id === producto.id,
   );
   if (!match) {
     store.mueblesCatalogo.push({
@@ -2634,16 +2637,25 @@ export function demoUpdateInventarioProducto(
   patch: Partial<
     Pick<InventarioProductoRow, "codigo" | "nombre" | "categoria" | "unidad" | "stock_minimo" | "activo" | "stock_actual" | "foto_url" | "costo_unitario">
   >,
+  stockEsperado?: number | null,
 ) {
   const row = store.inventarioProductos.find((p) => p.id === id);
   if (!row) return null;
 
-  Object.assign(row, patch);
+  return demoOperacionAtomica(() => {
+  const datos = { ...patch };
+  if (datos.stock_actual !== undefined && stockEsperado !== undefined) {
+    if (stockEsperado === null) throw new Error('Vuelve a abrir el producto antes de modificar su stock.');
+    if (datos.stock_actual === stockEsperado) delete datos.stock_actual;
+    else if (row.stock_actual !== stockEsperado) throw new Error('El stock cambió mientras editabas. Actualiza antes de modificarlo.');
+  }
+  Object.assign(row, datos);
 
   syncInventarioProductoToCatalogo(row, patch.foto_url !== undefined);
 
   persistStore();
   return row;
+  });
 }
 
 export function demoToggleInventarioProductoActivo(id: string, activo: boolean) {
@@ -2654,7 +2666,9 @@ export function demoDeleteInventarioProducto(
   id: string,
   opts?: { forzarConMovimientos?: boolean },
 ): { ok: true } | { ok: false; error: string } {
+  return demoOperacionAtomica(() => {
   const movs = store.inventarioMovimientos.filter((m) => m.producto_id === id);
+  if (movs.some(m => movimientoInventarioVinculado(m))) throw new Error('Este producto tiene movimientos de venta, compra o anulación. Desactívalo o corrige la operación de origen.');
   if (movs.length > 0 && !opts?.forzarConMovimientos) {
     return {
       ok: false,
@@ -2671,6 +2685,7 @@ export function demoDeleteInventarioProducto(
   store.inventarioProductos.splice(idx, 1);
   persistStore();
   return { ok: true };
+  });
 }
 
 export function demoCreateInventarioMovimiento(
@@ -2695,25 +2710,30 @@ export function demoCreateInventarioMovimiento(
   return row;
 }
 
-function reverseMovimientoStock(producto: InventarioProductoRow, row: InventarioMovimientoRow) {
-  if (row.tipo === "entrada_compra") producto.stock_actual -= Number(row.cantidad);
-  if (row.tipo === "salida_venta") producto.stock_actual += Number(row.cantidad);
-  if (row.tipo === "ajuste") producto.stock_actual -= Number(row.cantidad);
+function movimientoInventarioVinculado(row: InventarioMovimientoRow) {
+  return /^(venta:|venta_madera_cortada:|anulacion:|devolucion:)/.test(row.referencia ?? '')
+    || store.caja.some(c => c.organization_id === row.organization_id && c.modulo_origen === 'inventario' && c.referencia_id === row.id)
+    || Object.values(store.solicitudesFinancieras).some(s => s.organizationId === row.organization_id && s.tipo === 'compra_inventario' && s.resultado === row.id);
 }
 
 export function demoDeleteInventarioMovimiento(id: string) {
+  return demoOperacionAtomica(() => {
   const idx = store.inventarioMovimientos.findIndex((m) => m.id === id);
   if (idx < 0) return false;
   const row = store.inventarioMovimientos[idx];
+  if (movimientoInventarioVinculado(row)) throw new Error('Este movimiento pertenece a una venta, compra o anulación. Corrige la operación de origen para conservar Caja y stock.');
   const producto = store.inventarioProductos.find((p) => p.id === row.producto_id);
+  if (!producto) throw new Error('Producto no encontrado. No se eliminó el movimiento.');
   if (producto) {
-    reverseMovimientoStock(producto, row);
-    if (producto.stock_actual < 0) producto.stock_actual = 0;
+    const nuevo = producto.stock_actual + (row.tipo === 'salida_venta' ? Number(row.cantidad) : -Number(row.cantidad));
+    if (nuevo < 0) throw new Error('No se puede eliminar: parte de esta entrada ya se utilizó. Revisa el stock.');
+    producto.stock_actual = nuevo;
     syncInventarioProductoToCatalogo(producto);
   }
   store.inventarioMovimientos.splice(idx, 1);
   persistStore();
   return true;
+  });
 }
 
 export function demoRegistrarConteoInventario(
@@ -2721,9 +2741,12 @@ export function demoRegistrarConteoInventario(
   stockContado: number,
   fecha: string,
   referencia: string,
+  stockEsperado?: number,
 ) {
+  return demoOperacionAtomica(() => {
   const producto = store.inventarioProductos.find((p) => p.id === productoId);
   if (!producto) return { ok: false as const, error: "Producto no encontrado." };
+  if (stockEsperado !== undefined && stockEsperado !== Number(producto.stock_actual)) return { ok: false as const, error: 'El stock cambió. Actualiza y comprueba el conteo antes de guardarlo.' };
   const diferencia = Number((stockContado - Number(producto.stock_actual)).toFixed(2));
   if (Math.abs(diferencia) < 0.0001) {
     return { ok: true as const, diferencia: 0 };
@@ -2738,6 +2761,7 @@ export function demoRegistrarConteoInventario(
     referencia,
   });
   return { ok: true as const, diferencia };
+  });
 }
 
 export function demoCerrarMes(organizationId: string, anio: number, mes: number) {

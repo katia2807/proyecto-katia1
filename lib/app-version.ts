@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.73";
-export const APP_LAST_UPDATE = "10/10/2026";
+export const APP_VERSION = "1.1.75";
+export const APP_LAST_UPDATE = "11/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Se corrigieron guardados parciales, anulaciones y reintentos que podían descuadrar Caja o stock. Los meses cerrados quedan protegidos y ventas, compras y alquileres conservan sus importes y pasos habituales.";
+  "Se corrigieron borrados, conteos y reintentos que podían alterar stock o duplicar cobros. Cotizaciones respeta los adelantos recibidos y los permisos se aplican correctamente, sin cambiar los cálculos habituales.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {

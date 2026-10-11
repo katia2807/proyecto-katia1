@@ -39,7 +39,7 @@ describe.each(["madera", "aserradero", "cortada"])("Cobros locales de %s", tipo 
       metodo_pago: "yape", modalidad_pago: modalidad, adelanto: 300, tipo_comprobante: "ninguno", fecha_pago_credito: "2026-10-31" };
     if (tipo === "madera") await actions.createVentaMadera(form({ ...base,
       inventario_producto_id: demo.demoInventarioProductosRows().find(p => p.organization_id === org)!.id, cantidad_producto: 1 }));
-    else if (tipo === "aserradero") await actions.createServicioAserradero(form({ ...base, pies_cubicos: 10, costo_cubicaje: 100, precio_cobrado: 1000, lineas_json: "[]" }));
+    else if (tipo === "aserradero") await actions.createServicioAserradero(form({ submission_id: crypto.randomUUID(), ...base, pies_cubicos: 10, costo_cubicaje: 100, precio_cobrado: 1000, lineas_json: "[]" }));
     else await actions.createVentaMaderaCortada(form({ ...base, chofer_id: "", tipo_entrega: "entrega_local", direccion_entrega: "", estado_entrega: "pendiente",
       monto_credito: 0, tipo_corte: "tabla", total_pt: 20, precio_por_pt: 50, cantidad_piezas: 10, precio_unitario_comercial: 100, inventario_producto_id: "",
       lineas_cubicaje: JSON.stringify([{ cantidad: 10, espesor: 1, ancho: 6, largo: 4, descripcion: "Pieza ficticia" }]) }));
@@ -64,21 +64,54 @@ test("un fallo al guardar el cierre local restaura todo y permite reintentar", a
   expect(await cerrar(id)).toEqual({ ok: true });
   expect(mocks.disk).toHaveBeenLastCalledWith(expect.anything(), { strict: true });
 });
-test("una compra local no queda confirmada si falla el guardado conjunto", async () => {
-  demo.demoCreateProveedor({ organization_id: org, nombre: "Proveedor ficticio" });
-  const proveedor = demo.demoProveedoresRows()[0].id;
-  const data = form({ proveedor_id: proveedor, fecha: "2026-10-10", especie_madera: "Prueba", detalle: "", cantidad: 10,
-    unidad: "PT", precio_unitario: 100, modalidad_pago: "fiado", adelanto: 300, estado: "confirmada", url_comprobante: "" });
+test("la compra antigua retirada no altera la copia local", async () => {
   const anterior = demo.demoExportStore();
-  falloDisco();
-  await expect(actions.createCompraMadera(data)).rejects.toThrow(/Disco/);
+  await expect(actions.createCompraMadera(form({}))).rejects.toThrow(/no está disponible/);
   expect(demo.demoExportStore()).toEqual(anterior);
-  await actions.createCompraMadera(data);
-  expect(totalCaja() - anterior.caja.reduce((s, m) => s + m.monto, 0)).toBe(300);
 });
 const cotizacion = () => demo.demoCreateCotizacionUnificada({ organization_id: org, cliente_id: cliente, fecha: "2026-10-10",
   correlativo: "LOCAL-COT", tipo_cliente: "natural", total: 1000, estado_flujo: "lista_produccion", detalle: defaultCotizacionDetalleV1() });
 const aprobar = (id: string) => actions.aprobarCotizacionAOrden(form({ cotizacion_id: id, notas: "", adelanto: 300, metodo_adelanto: "yape" }));
+
+function productoManual() {
+  const id=demo.demoCreateInventarioProducto({organization_id:org,codigo:'LOCAL-'+crypto.randomUUID(),nombre:'Producto ficticio',categoria:'Maderas',unidad:'unidad',stock_minimo:0,foto_url:null,costo_unitario:null});
+  const entrada=demo.demoCreateInventarioMovimiento({organization_id:org,producto_id:id,fecha:'2026-10-11',tipo:'entrada_compra',cantidad:100,costo_unitario:null,referencia:'Entrada manual ficticia'});
+  return {id,entrada};
+}
+test('un fallo de disco al borrar Kardex revierte la existencia y el movimiento',async()=>{
+  const {entrada}=productoManual(),anterior=demo.demoExportStore();falloDisco();
+  await expect(actions.deleteInventarioMovimiento(form({id:entrada.id}))).rejects.toThrow(/Disco/);
+  expect(demo.demoExportStore()).toEqual(anterior);
+});
+test('un fallo del conteo local revierte el ajuste y permite reintentar sin duplicarlo',async()=>{
+  const {id}=productoManual(),anterior=demo.demoExportStore();
+  const data=form({producto_id:id,fecha:'2026-10-11',stock_contado:120,stock_esperado:100,referencia:'Conteo ficticio'});
+  falloDisco();await expect(actions.registrarConteoInventario(data)).rejects.toThrow(/Disco/);expect(demo.demoExportStore()).toEqual(anterior);
+  await actions.registrarConteoInventario(data);
+  expect(demo.demoInventarioProductosRows().find(p=>p.id===id)?.stock_actual).toBe(120);
+  await expect(actions.registrarConteoInventario(data)).rejects.toThrow(/stock cambió/);
+  expect(demo.demoInventarioMovimientosRows().filter(m=>m.producto_id===id)).toHaveLength(2);
+});
+test('el editor local conserva el stock intervenido al guardar solo un nombre',async()=>{
+  const {id}=productoManual();demo.demoCreateInventarioMovimiento({organization_id:org,producto_id:id,fecha:'2026-10-11',tipo:'salida_venta',cantidad:10,costo_unitario:null,referencia:'Manual ficticia'});
+  await actions.updateInventarioProducto(form({id,codigo:'LOCAL-EDIT',nombre:'Nombre corregido',categoria:'Maderas',unidad:'unidad',stock_minimo:0,stock_actual:100,stock_esperado:100,foto_url:'',costo_unitario:''}));
+  expect(demo.demoInventarioProductosRows().find(p=>p.id===id)).toMatchObject({stock_actual:90,nombre:'Nombre corregido'});
+});
+test('una cotización local con adelanto no pierde dinero al editar su total',async()=>{
+  const id=cotizacion().id;await aprobar(id);const anterior=demo.demoExportStore();
+  expect(()=>demo.demoUpdateCotizacionUnificada(id,{total:100})).toThrow(/cobros/);
+  expect(demo.demoExportStore()).toEqual(anterior);
+  falloDisco();expect(()=>demo.demoUpdateCotizacionUnificada(id,{total:1500})).toThrow(/Disco/);
+  expect(demo.demoExportStore()).toEqual(anterior);
+});
+test('el cliente provisional, Aserradero y Caja locales se revierten juntos; el reintento conserva un solo ingreso',async()=>{
+  const data=form({submission_id:crypto.randomUUID(),usarClienteProvisional:true,fecha:'2026-10-11',precio_cobrado:1000,pies_cubicos:10,costo_cubicaje:100,
+    lineas_json:'[]',metodo_pago:'yape',modalidad_pago:'contado',adelanto:0,tipo_comprobante:'ninguno',url_comprobante:''});
+  const anterior=demo.demoExportStore();falloDisco();await expect(actions.createServicioAserradero(data)).rejects.toThrow(/Disco/);expect(demo.demoExportStore()).toEqual(anterior);
+  await actions.createServicioAserradero(data);await actions.createServicioAserradero(data);
+  const actual=demo.demoExportStore();expect(actual.serviciosAserradero.length-anterior.serviciosAserradero.length).toBe(1);
+  expect(actual.clientes.length-anterior.clientes.length).toBe(1);expect(totalCaja()-anterior.caja.reduce((s,m)=>s+m.monto,0)).toBe(1000);
+});
 test("el adelanto local se vincula a la orden y el cobro final suma solo el saldo", async () => {
   const id = cotizacion().id, inicial = totalCaja();
   await aprobar(id);

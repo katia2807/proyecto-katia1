@@ -194,6 +194,7 @@ function ProductoIrAEdicion({
 }
 
 export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Props) {
+  const [conteoStockEsperado, setConteoStockEsperado] = useState('');
   const {
     productos,
     movimientos,
@@ -1191,7 +1192,11 @@ export function InventarioInteractivo({ data, canMutate, mueblesCatalogo }: Prop
                 }
               }}
             >
-              <SelectField name="producto_id" label="Producto" defaultValue="" required>
+              <input type="hidden" name="stock_esperado" value={conteoStockEsperado} />
+              <SelectField name="producto_id" label="Producto" defaultValue="" required onChange={event => {
+                const producto = productos.find(p => p.id === event.target.value);
+                setConteoStockEsperado(producto ? String(producto.stock_actual) : '');
+              }}>
                 <option value="" disabled>Seleccionar</option>
                 {productos.filter((p) => p.activo !== false).map((p) => (
                   <option key={p.id} value={p.id}>

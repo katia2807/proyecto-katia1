@@ -22,9 +22,7 @@ import {
   demoUpdateChofer,
   demoCreateCliente,
   demoUpdateClienteDatos,
-  demoCreateCompraMadera,
   demoCreateCotizacionUnificada,
-  demoCreateContratoAlquiler,
   demoCreateCorte,
   demoCreateCotizacion,
   demoCreateEmpleado,
@@ -49,7 +47,6 @@ import {
   demoDeleteByCategory,
   demoDeleteOneById,
   demoResetStore,
-  demoCreateServicioAserradero,
   demoCreateSueldo,
   demoCreateZonaEntrega,
   demoMarcarEntregaMueble,
@@ -67,7 +64,6 @@ import {
   textoNotasOrdenProduccionDesdeUnificada,
 } from "@/lib/cotizacion-unificada-payload";
 import { nextCorrelativo } from "@/lib/numeracion";
-import type { FilaImportada } from "@/lib/importar";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { inventarioCostoUnitarioOpcionalSchema } from "@/lib/inventario-validation";
 import { cajaMovimientoSchema } from "@/lib/caja-movimiento-validation";
@@ -79,6 +75,8 @@ import type { AppRole, Json } from "@/lib/supabase/types";
 import { roundMoney, safeDivide, parseDecimal } from "@/lib/utils";
 import { claveOperacion, registrarOperacionIntegral, anularOperacionIntegral, nombreClienteOperacion } from '@/lib/operaciones-integrales';
 import { montoCobradoVenta, mensajeOperacionFinanciera } from "@/lib/ventas-pago";
+import { registrarServicioIntegral } from '@/lib/servicios-integrales';
+import { canCorrectHistoricalMadera } from '@/lib/permissions';
 import { resumenCobroLocal } from "@/lib/cotizacion-cobros";
 import {
   buildMaderaCortadaVoucherLines,
@@ -328,20 +326,6 @@ const proveedorSchema = z.object({
   tipo_proveedor: z.string().optional(),
 });
 
-const compraMaderaSchema = z.object({
-  proveedorId: z.string().uuid(),
-  fecha: z.string().min(1),
-  especieMadera: z.string().min(2),
-  detalle: z.string().optional(),
-  cantidad: z.coerce.number().positive(),
-  unidad: z.string().min(1).default("unidad"),
-  precioUnitario: moneySchema(z.number().positive()),
-  modalidadPago: z.enum(["contado", "fiado"]).default("contado"),
-  adelanto: moneySchema(z.number().nonnegative()).default(0),
-  estado: z.enum(["borrador", "confirmada"]).default("confirmada"),
-  urlComprobante: z.string().optional(),
-});
-
 const inventarioProductoSchema = z.object({
   codigo: z.string().min(2),
   nombre: z.string().min(2),
@@ -457,24 +441,6 @@ async function requireMutationAccess(allowedRoles: readonly AppRole[]) {
   return context;
 }
 
-function parseBoolPersonalImport(f: FilaImportada): boolean {
-  const raw = (f.es_personal ?? f.personal ?? "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "");
-  if (["1", "true", "si", "yes", "s"].includes(raw)) return true;
-  if (["0", "false", "no", "n"].includes(raw)) return false;
-  return false;
-}
-
-function normalizeMedioImport(raw: string | undefined): "efectivo" | "banco" | "yape" | "otro" {
-  const m = (raw ?? "").trim().toLowerCase();
-  if (m === "efectivo" || m === "yape" || m === "banco" || m === "otro") return m;
-  return "efectivo";
-}
-
-
 /** Alineado con `mapMetodoPagoToMedio` del demo-store → columnas `medio` en caja. */
 function mapMetodoPagoVentaToMedioCaja(
   metodo: "efectivo" | "yape" | "transferencia" | "billetera_digital" | "otro",
@@ -561,277 +527,18 @@ export async function createCajaMovimiento(formData: FormData) {
  * Genera copias de los egresos del mes anterior en el mes actual, con el mismo día.
  * Útil para gastos recurrentes (luz, planilla, alquiler, etc.).
  */
-export async function repetirGastosMesAnterior(formData: FormData) {
+export async function repetirGastosMesAnterior(_formData: FormData) {
+  void _formData;
   await requireMutationAccess(cajaRoles);
-  const incluirPersonal =
-    formData.get("incluir_personal") === "on" || formData.get("incluir_personal") === "true";
-
-  const hoy = new Date();
-  const anioActual = hoy.getFullYear();
-  const mesActual = hoy.getMonth() + 1;
-  const mesPrevio = mesActual === 1 ? 12 : mesActual - 1;
-  const anioPrevio = mesActual === 1 ? anioActual - 1 : anioActual;
-
-  if (!hasSupabaseEnv()) {
-    const { demoCajaRows } = await import("@/lib/demo-store");
-    const todos = demoCajaRows();
-
-    const candidatos = todos.filter((r) => {
-      if (r.tipo !== "egreso") return false;
-      if (!incluirPersonal && r.es_personal) return false;
-      const d = new Date(r.fecha);
-      return d.getFullYear() === anioPrevio && d.getMonth() + 1 === mesPrevio;
-    });
-
-    let creados = 0;
-    for (const r of candidatos) {
-      const fechaOriginal = new Date(r.fecha);
-      const dia = fechaOriginal.getDate();
-      const ultimoDiaMesActual = new Date(anioActual, mesActual, 0).getDate();
-      const diaAjustado = Math.min(dia, ultimoDiaMesActual);
-      const fechaNueva = `${anioActual}-${String(mesActual).padStart(2, "0")}-${String(diaAjustado).padStart(2, "0")}`;
-      demoCreateCaja({
-        organization_id: r.organization_id,
-        fecha: fechaNueva,
-        tipo: r.tipo,
-        medio: r.medio,
-        categoria: r.categoria,
-        monto: Number(r.monto),
-        descripcion: r.descripcion ? `${r.descripcion} (recurrente)` : "Recurrente del mes anterior",
-        modulo_origen: r.modulo_origen ?? "caja",
-        es_personal: r.es_personal,
-        url_comprobante: r.url_comprobante,
-      });
-      creados += 1;
-    }
-    revalidatePath("/caja");
-    if (creados === 0) {
-      throw new Error(
-        `No se encontraron egresos en ${String(mesPrevio).padStart(2, "0")}/${anioPrevio} para repetir.`,
-      );
-    }
-  } else {
-    const supabase = getSupabaseServerClient();
-    const startPrev = `${anioPrevio}-${String(mesPrevio).padStart(2, "0")}-01`;
-    const lastDayPrev = new Date(anioPrevio, mesPrevio, 0).getDate();
-    const endPrev = `${anioPrevio}-${String(mesPrevio).padStart(2, "0")}-${String(lastDayPrev).padStart(2, "0")}`;
-
-    const { data: rows, error: qErr } = await supabase
-      .from("movimientos_caja")
-      .select("*")
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .eq("tipo", "egreso")
-      .gte("fecha", startPrev)
-      .lte("fecha", endPrev);
-
-    if (qErr) {
-      throw new Error(qErr.message);
-    }
-
-    const candidatos = (rows ?? []).filter((r) => !(r.es_personal && !incluirPersonal));
-    if (candidatos.length === 0) {
-      throw new Error(
-        `No se encontraron egresos en ${String(mesPrevio).padStart(2, "0")}/${anioPrevio} para repetir.`,
-      );
-    }
-
-    const inserts = candidatos.map((r) => {
-      const fechaOriginal = new Date(`${r.fecha}T12:00:00`);
-      const dia = fechaOriginal.getDate();
-      const ultimoDiaMesActual = new Date(anioActual, mesActual, 0).getDate();
-      const diaAjustado = Math.min(dia, ultimoDiaMesActual);
-      const fechaNueva = `${anioActual}-${String(mesActual).padStart(2, "0")}-${String(diaAjustado).padStart(2, "0")}`;
-      const desc = r.descripcion?.trim()
-        ? `${r.descripcion} (recurrente)`
-        : "Recurrente del mes anterior";
-      return {
-        organization_id: DEFAULT_ORG_ID,
-        fecha: fechaNueva,
-        tipo: r.tipo as "egreso",
-        medio: r.medio,
-        categoria: r.categoria,
-        monto: Number(r.monto),
-        descripcion: desc,
-        modulo_origen: r.modulo_origen ?? "caja",
-        es_personal: Boolean(r.es_personal),
-        url_comprobante:
-          r.url_comprobante != null && String(r.url_comprobante).trim() !== ""
-            ? String(r.url_comprobante)
-            : null,
-      };
-    });
-
-    const { error: insErr } = await supabase.from("movimientos_caja").insert(inserts);
-    if (insErr) {
-      throw new Error(insErr.message);
-    }
-
-    revalidatePath("/caja");
-    revalidatePath("/");
-  }
+  throw new Error('La repetición antigua de gastos no está disponible. Registra cada gasto desde Caja.');
 }
 
-/**
- * Importa filas desde un archivo Excel (.xlsx) o CSV en uno de los buckets:
- * gastos (caja), clientes o proveedores. Devuelve mediante exception el resumen.
- */
-export async function importarArchivo(formData: FormData) {
+export async function importarArchivo(_formData: FormData) {
+  void _formData;
   await requireMutationAccess(cajaRoles);
-  const tipo = String(formData.get("tipo") ?? "");
-  const file = formData.get("archivo");
-  if (!(file instanceof File) || file.size === 0) {
-    throw new Error("Adjunta un archivo .xlsx o .csv válido.");
-  }
-  if (!hasSupabaseEnv()) {
-    const { leerFilas } = await import("@/lib/importar");
-    const { demoCreateCliente, demoCreateProveedor } = await import("@/lib/demo-store");
-    const filas = await leerFilas(file);
-    let creados = 0;
-
-    if (tipo === "gastos") {
-      for (const f of filas) {
-        const monto = Number(f.monto ?? f.importe ?? 0);
-        if (!Number.isFinite(monto) || monto <= 0) continue;
-        demoCreateCaja({
-          organization_id: DEFAULT_ORG_ID,
-          fecha: f.fecha || new Date().toISOString().slice(0, 10),
-          tipo: "egreso",
-          medio: normalizeMedioImport(f.medio),
-          categoria: f.categoria || "general",
-          monto,
-          descripcion: f.descripcion || null,
-          modulo_origen: "caja",
-          es_personal: parseBoolPersonalImport(f),
-        });
-        creados += 1;
-      }
-    } else if (tipo === "clientes") {
-      for (const f of filas) {
-        const nombre = (f.nombre || "").trim();
-        if (!nombre) continue;
-        demoCreateCliente({
-          organization_id: DEFAULT_ORG_ID,
-          nombre,
-          documento: f.documento || f.dni || null,
-          telefono: f.telefono || null,
-          ruc: f.ruc || null,
-          direccion: f.direccion || null,
-          tipo_persona: f.tipo_persona === "empresa" ? "empresa" : "natural",
-        });
-        creados += 1;
-      }
-    } else if (tipo === "proveedores") {
-      for (const f of filas) {
-        const nombre = (f.nombre || "").trim();
-        if (!nombre) continue;
-        demoCreateProveedor({
-          organization_id: DEFAULT_ORG_ID,
-          nombre,
-          documento: f.documento || f.ruc || null,
-          telefono: f.telefono || null,
-        });
-        creados += 1;
-      }
-    } else {
-      throw new Error(`Tipo de importación desconocido: ${tipo}`);
-    }
-
-    revalidatePath("/admin/importar");
-    revalidatePath("/caja");
-    revalidatePath("/ventas");
-    if (creados === 0) {
-      throw new Error("No se procesó ninguna fila válida del archivo.");
-    }
-  } else {
-    const { leerFilas } = await import("@/lib/importar");
-    const supabase = getSupabaseServerClient();
-    let creados = 0;
-
-    if (tipo === "gastos") {
-      let filas =
-        file.name.toLowerCase().endsWith(".xlsx") || file.name.toLowerCase().endsWith(".xlsm")
-          ? await leerFilas(file, { sheetName: "Caja" })
-          : await leerFilas(file);
-      if (
-        filas.length === 0 &&
-        (file.name.toLowerCase().endsWith(".xlsx") || file.name.toLowerCase().endsWith(".xlsm"))
-      ) {
-        filas = await leerFilas(file);
-      }
-      for (const f of filas) {
-        const tipoRow = (f.tipo ?? "egreso").trim().toLowerCase();
-        if (tipoRow && tipoRow !== "egreso") continue;
-        const monto = Number(String(f.monto ?? f.importe ?? "").replace(",", "."));
-        if (!Number.isFinite(monto) || monto <= 0) continue;
-        const fechaStr = (f.fecha ?? "").trim() || new Date().toISOString().slice(0, 10);
-        const { error } = await supabase.from("movimientos_caja").insert({
-          organization_id: DEFAULT_ORG_ID,
-          fecha: fechaStr,
-          tipo: "egreso",
-          medio: normalizeMedioImport(f.medio),
-          categoria: (f.categoria || "general").trim() || "general",
-          monto,
-          descripcion: f.descripcion?.trim() || null,
-          modulo_origen: "caja",
-          es_personal: parseBoolPersonalImport(f),
-        });
-        if (error) {
-          throw new Error(error.message);
-        }
-        creados += 1;
-      }
-    } else if (tipo === "clientes") {
-      const filas = await leerFilas(file);
-      for (const f of filas) {
-        const nombre = (f.nombre || "").trim();
-        if (!nombre) continue;
-        const { error } = await supabase.from("clientes").insert({
-          organization_id: DEFAULT_ORG_ID,
-          nombre,
-          documento: f.documento || f.dni || null,
-          telefono: f.telefono || null,
-          ruc: f.ruc || null,
-          direccion: f.direccion || null,
-          tipo_persona: f.tipo_persona === "empresa" ? "empresa" : "natural",
-        });
-        if (error) {
-          throw new Error(error.message);
-        }
-        creados += 1;
-      }
-    } else if (tipo === "proveedores") {
-      const filas = await leerFilas(file);
-      for (const f of filas) {
-        const nombre = (f.nombre || "").trim();
-        if (!nombre) continue;
-        const { error } = await supabase.from("proveedores").insert({
-          organization_id: DEFAULT_ORG_ID,
-          nombre,
-          documento: f.documento || f.ruc || null,
-          telefono: f.telefono || null,
-        });
-        if (error) {
-          throw new Error(error.message);
-        }
-        creados += 1;
-      }
-    } else {
-      throw new Error(`Tipo de importación desconocido: ${tipo}`);
-    }
-
-    revalidatePath("/admin/importar");
-    revalidatePath("/caja");
-    revalidatePath("/ventas");
-    if (creados === 0) {
-      throw new Error("No se procesó ninguna fila válida del archivo.");
-    }
-  }
+  throw new Error('El importador antiguo no está disponible. Registra los movimientos desde su apartado habitual.');
 }
 
-/**
- * Restaura un respaldo JSON completo del store local. Reemplaza todas las
- * tablas existentes; usar con cuidado.
- */
 export async function restaurarRespaldoJSON(formData: FormData) {
   await requireMutationAccess(["owner_admin", "gerencia"] as const);
   const file = formData.get("archivo");
@@ -1262,7 +969,7 @@ export async function saveCotizacionUnificada(input: {
   estadoFlujo: "pendiente" | "lista_produccion";
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   try {
-    await requireMutationAccess(ventasRoles);
+    const actor = await requireMutationAccess(ventasRoles);
     const detParsed = cotizacionDetalleV1Schema.safeParse(input.detalle);
     if (!detParsed.success) {
       return { ok: false, error: "Detalle de cotización inválido." };
@@ -1362,26 +1069,13 @@ export async function saveCotizacionUnificada(input: {
     }
 
     if (input.id) {
-      const { data: updated, error } = await supabase
-        .from("cotizaciones_unificadas")
-        .update({
-          cliente_id: input.clienteId,
-          tipo_cliente: input.tipoCliente,
-          fecha: input.fecha,
-          total: calculo.totalFinal,
-          estado_flujo: estadoFlujo,
-          detalle: detalleConResumen as unknown as Json,
-        })
-        .eq("id", input.id)
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .eq("estado_flujo", cotizacionAnterior!.estado_flujo)
-        .eq("total", cotizacionAnterior!.total)
-        .is("deleted_at", null)
-        .select("id");
-      if (error) {
-        return { ok: false, error: error.message };
-      }
-      if (!updated?.length) return { ok: false, error: "La cotización cambió o ya está cobrada. Actualiza antes de guardar." };
+      const { error } = await supabase.rpc('editar_cotizacion_unificada_segura', {
+        p_org: actor.organizationId, p_actor: actor.userId, p_id: input.id,
+        p_datos: { cliente_id: input.clienteId, tipo_cliente: input.tipoCliente, fecha: input.fecha,
+          total: calculo.totalFinal, estado_flujo: estadoFlujo, detalle: detalleConResumen },
+        p_total_esperado: cotizacionAnterior!.total, p_estado_esperado: cotizacionAnterior!.estado_flujo,
+      });
+      if (error) return { ok: false, error: error.message };
       revalidatePath("/cotizacion");
       return { ok: true, id: input.id };
     }
@@ -1937,65 +1631,10 @@ export async function updateProveedor(id: string, formData: FormData) {
   revalidatePath("/ventas");
 }
 
-export async function createCompraMadera(formData: FormData) {
-  const actor = await requireMutationAccess(ventasRoles);
-  const parsed = compraMaderaSchema.safeParse({
-    proveedorId: formData.get("proveedor_id"),
-    fecha: formData.get("fecha"),
-    especieMadera: formData.get("especie_madera"),
-    detalle: formData.get("detalle"),
-    cantidad: formData.get("cantidad"),
-    unidad: formData.get("unidad"),
-    precioUnitario: formData.get("precio_unitario"),
-    modalidadPago: formData.get("modalidad_pago"),
-    adelanto: formData.get("adelanto"),
-    estado: formData.get("estado"),
-    urlComprobante: formData.get("url_comprobante"),
-  });
-
-  if (!parsed.success) {
-    throw new Error("Datos de compra de madera inválidos.");
-  }
-
-  const total = roundMoney(parsed.data.precioUnitario * parsed.data.cantidad);
-  const rawAdelanto = roundMoney(parsed.data.adelanto);
-  const adelanto =
-    parsed.data.modalidadPago === "fiado"
-      ? Math.min(rawAdelanto, total)
-      : total;
-  const saldoPendiente = roundMoney(total - adelanto);
-
-  if (!hasSupabaseEnv()) {
-    demoCreateCompraMadera({
-      organization_id: DEFAULT_ORG_ID,
-      proveedor_id: parsed.data.proveedorId,
-      fecha: parsed.data.fecha,
-      especie_madera: parsed.data.especieMadera,
-      detalle: parsed.data.detalle ?? null,
-      cantidad: parsed.data.cantidad,
-      unidad: parsed.data.unidad,
-      precio_unitario: parsed.data.precioUnitario,
-      total,
-      modalidad_pago: parsed.data.modalidadPago,
-      adelanto,
-      saldo_pendiente: saldoPendiente,
-      estado: parsed.data.estado,
-      url_comprobante: parsed.data.urlComprobante || null,
-    });
-  } else {
-    const { error } = await getSupabaseServerClient().rpc("crear_compra_madera_con_caja", {
-      p_org: DEFAULT_ORG_ID, p_actor: actor.userId,
-      p_compra: { proveedor_id: parsed.data.proveedorId, fecha: parsed.data.fecha, especie_madera: parsed.data.especieMadera,
-        detalle: parsed.data.detalle ?? null, cantidad: parsed.data.cantidad, unidad: parsed.data.unidad,
-        precio_unitario: parsed.data.precioUnitario, total, modalidad_pago: parsed.data.modalidadPago, adelanto,
-        saldo_pendiente: saldoPendiente, estado: parsed.data.estado, url_comprobante: parsed.data.urlComprobante || null },
-    });
-    if (error) throw new Error(mensajeOperacionFinanciera(error));
-  }
-
-  revalidatePath("/ventas");
-  revalidatePath("/");
-  maybeRedirectToQuickStep(formData);
+export async function createCompraMadera(_formData: FormData) {
+  void _formData;
+  await requireMutationAccess(ventasRoles);
+  throw new Error('La compra antigua de madera no está disponible. Usa la compra de inventario del apartado Inventario.');
 }
 
 export async function createCotizacion(formData: FormData) {
@@ -2629,7 +2268,7 @@ export async function createInventarioCompraRapida(formData: FormData) {
 }
 
 export async function updateInventarioProducto(formData: FormData) {
-  await requireMutationAccess(writerRoles);
+  const actor = await requireMutationAccess(writerRoles);
   const parsed = inventarioProductoUpdateSchema.safeParse({
     id: formData.get("id"),
     codigo: formData.get("codigo"),
@@ -2643,60 +2282,24 @@ export async function updateInventarioProducto(formData: FormData) {
   });
   if (!parsed.success) throw new Error("Datos de producto inválidos.");
 
+  const esperadoRaw = formData.get('stock_esperado');
+  const esperado = esperadoRaw === null || esperadoRaw === '' ? null : Number(esperadoRaw);
+  if (esperado !== null && (!Number.isFinite(esperado) || esperado < 0)) throw new Error('Stock anterior inválido. Vuelve a abrir el producto.');
+  if (parsed.data.stockActual !== undefined && esperado === null) throw new Error('Vuelve a abrir el producto antes de modificar su stock.');
+  const datos = { codigo: parsed.data.codigo, nombre: parsed.data.nombre, categoria: parsed.data.categoria,
+    unidad: parsed.data.unidad, stock_minimo: parsed.data.stockMinimo,
+    ...(parsed.data.stockActual !== undefined ? { stock_actual: parsed.data.stockActual } : {}),
+    foto_url: parsed.data.fotoUrl ?? null, costo_unitario: parsed.data.costoUnitario ?? null };
   if (!hasSupabaseEnv()) {
-    const updated = demoUpdateInventarioProducto(parsed.data.id, {
-      codigo: parsed.data.codigo,
-      nombre: parsed.data.nombre,
-      categoria: parsed.data.categoria,
-      unidad: parsed.data.unidad,
-      stock_minimo: parsed.data.stockMinimo,
-      ...(parsed.data.stockActual !== undefined ? { stock_actual: parsed.data.stockActual } : {}),
-      foto_url: parsed.data.fotoUrl ?? null,
-      costo_unitario: parsed.data.costoUnitario ?? null,
-    });
-    if (!updated) throw new Error("Producto no encontrado.");
+    const updated = demoUpdateInventarioProducto(parsed.data.id, datos, esperado);
+    if (!updated) throw new Error('Producto no encontrado.');
   } else {
-    const supabase = getSupabaseServerClient();
-    const { error } = await supabase
-      .from("inventario_productos")
-      .update({
-        codigo: parsed.data.codigo,
-        nombre: parsed.data.nombre,
-        categoria: parsed.data.categoria,
-        unidad: parsed.data.unidad,
-        stock_minimo: parsed.data.stockMinimo,
-        ...(parsed.data.stockActual !== undefined ? { stock_actual: parsed.data.stockActual } : {}),
-        foto_url: parsed.data.fotoUrl ?? null,
-        costo_unitario: parsed.data.costoUnitario ?? null,
-      })
-      .eq("id", parsed.data.id)
-      .eq("organization_id", DEFAULT_ORG_ID);
+    const { error } = await getSupabaseServerClient().rpc('editar_producto_inventario_seguro', {
+      p_org: actor.organizationId, p_actor: actor.userId, p_id: parsed.data.id, p_datos: datos, p_stock_esperado: esperado,
+    });
     if (error) throw new Error(error.message);
-
-    // Sincronizar foto y stock al guardar; el costo no es el precio de venta.
-    if (parsed.data.categoria === "Muebles") {
-      const filterStr = `id.eq.${parsed.data.id},codigo.eq.${parsed.data.codigo || "NONE_VALUE"},nombre.ilike.${parsed.data.nombre}`;
-      const catUpdates: {
-        foto_url: string | null;
-        codigo: string;
-        nombre: string;
-        stock_disponible?: number;
-      } = {
-        foto_url: parsed.data.fotoUrl ?? null,
-        codigo: parsed.data.codigo,
-        nombre: parsed.data.nombre,
-      };
-      if (parsed.data.stockActual !== undefined) {
-        catUpdates.stock_disponible = parsed.data.stockActual;
-      }
-      await supabase
-        .from("muebles_catalogo")
-        .update(catUpdates)
-        .or(filterStr)
-        .eq("organization_id", DEFAULT_ORG_ID);
-    }
   }
-  revalidatePath("/inventario");
+  revalidatePath('/inventario');
 }
 
 export async function toggleInventarioProductoActivo(formData: FormData) {
@@ -2723,7 +2326,7 @@ export async function toggleInventarioProductoActivo(formData: FormData) {
 }
 
 export async function deleteInventarioProducto(formData: FormData) {
-  await requireMutationAccess(writerRoles);
+  const actor = await requireMutationAccess(writerRoles);
   const parsed = inventarioDeleteProductoSchema.safeParse({
     id: formData.get("id"),
     forzarConMovimientos: formData.get("forzarConMovimientos") === "true",
@@ -2736,49 +2339,10 @@ export async function deleteInventarioProducto(formData: FormData) {
     const res = demoDeleteInventarioProducto(parsed.data.id, { forzarConMovimientos: forzar });
     if (!res.ok) throw new Error(res.error);
   } else {
-    const supabase = getSupabaseServerClient();
-    if (!forzar) {
-      const { data: movBlock, error: movErr } = await supabase
-        .from("inventario_movimientos")
-        .select("id")
-        .eq("producto_id", parsed.data.id)
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .limit(1);
-      if (movErr) throw new Error(`No se pudo verificar el kardex: ${movErr.message}`);
-      if (movBlock && movBlock.length > 0) {
-        throw new Error(
-          "[INV_KARDEX_BLOCK] No se puede eliminar: este producto tiene al menos un movimiento en el kardex. Eliminá primero esos movimientos en la pestaña Kardex o desactivá el producto.",
-        );
-      }
-    } else {
-      const { error: delMovErr } = await supabase
-        .from("inventario_movimientos")
-        .delete()
-        .eq("producto_id", parsed.data.id)
-        .eq("organization_id", DEFAULT_ORG_ID);
-      if (delMovErr) {
-        throw new Error(`No se pudieron eliminar los movimientos del kardex: ${delMovErr.message}`);
-      }
-    }
-    const { data: deletedRows, error: delErr } = await supabase
-      .from("inventario_productos")
-      .delete()
-      .eq("id", parsed.data.id)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .select("id");
-    if (delErr) {
-      if (/foreign key|violates|restrict|23503/i.test(delErr.message)) {
-        throw new Error(
-          "No se puede eliminar: el producto sigue referenciado en el sistema (p. ej. ventas o tablas vinculadas).",
-        );
-      }
-      throw new Error(delErr.message);
-    }
-    if (!deletedRows?.length) {
-      throw new Error(
-        "No se eliminó ningún registro. Verificá que el producto exista y que la variable de entorno ERP_ORG_ID coincida con organization_id en Supabase.",
-      );
-    }
+    const { error } = await getSupabaseServerClient().rpc('eliminar_producto_inventario_seguro', {
+      p_org: actor.organizationId, p_actor: actor.userId, p_id: parsed.data.id, p_forzar: forzar,
+    });
+    if (error) throw new Error(error.message);
   }
   revalidatePath("/inventario");
 }
@@ -2808,7 +2372,7 @@ export async function inventarioProductoTieneMovimientosEnKardex(productoId: str
 }
 
 export async function deleteInventarioMovimiento(formData: FormData) {
-  await requireMutationAccess(writerRoles);
+  const actor = await requireMutationAccess(writerRoles);
   const parsed = inventarioDeleteMovimientoSchema.safeParse({
     id: formData.get("id"),
   });
@@ -2818,48 +2382,16 @@ export async function deleteInventarioMovimiento(formData: FormData) {
     const ok = demoDeleteInventarioMovimiento(parsed.data.id);
     if (!ok) throw new Error("Movimiento no encontrado.");
   } else {
-    const supabase = getSupabaseServerClient();
-    const { data: mov } = await supabase
-      .from("inventario_movimientos")
-      .select("*")
-      .eq("id", parsed.data.id)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .maybeSingle();
-    if (!mov) throw new Error("Movimiento no encontrado.");
-
-    const delta =
-      mov.tipo === "entrada_compra"
-        ? -Number(mov.cantidad)
-        : mov.tipo === "salida_venta"
-          ? Number(mov.cantidad)
-          : -Number(mov.cantidad);
-    const { data: producto } = await supabase
-      .from("inventario_productos")
-      .select("stock_actual")
-      .eq("id", mov.producto_id)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .maybeSingle();
-    const stockActual = Number(producto?.stock_actual ?? 0);
-    const stockNuevo = Math.max(0, stockActual + delta);
-
-    const { error: deleteError } = await supabase
-      .from("inventario_movimientos")
-      .delete()
-      .eq("id", parsed.data.id)
-      .eq("organization_id", DEFAULT_ORG_ID);
-    if (deleteError) throw new Error(deleteError.message);
-    const { error: updateError } = await supabase
-      .from("inventario_productos")
-      .update({ stock_actual: stockNuevo })
-      .eq("id", mov.producto_id)
-      .eq("organization_id", DEFAULT_ORG_ID);
-    if (updateError) throw new Error(updateError.message);
+    const { error } = await getSupabaseServerClient().rpc('eliminar_movimiento_inventario_seguro', {
+      p_org: actor.organizationId, p_actor: actor.userId, p_id: parsed.data.id,
+    });
+    if (error) throw new Error(error.message);
   }
   revalidatePath("/inventario");
 }
 
 export async function registrarConteoInventario(formData: FormData) {
-  await requireMutationAccess(writerRoles);
+  const actor = await requireMutationAccess(writerRoles);
   const parsed = inventarioConteoSchema.safeParse({
     productoId: formData.get("producto_id"),
     fecha: formData.get("fecha"),
@@ -2868,45 +2400,20 @@ export async function registrarConteoInventario(formData: FormData) {
   });
   if (!parsed.success) throw new Error("Datos de conteo inválidos.");
 
+  const raw = formData.get('stock_esperado');
+  const esperado = raw === null || raw === '' ? NaN : Number(raw);
+  if (!Number.isFinite(esperado) || esperado < 0) throw new Error('Selecciona nuevamente el producto para comprobar su stock.');
   if (!hasSupabaseEnv()) {
-    const result = demoRegistrarConteoInventario(
-      parsed.data.productoId,
-      parsed.data.stockContado,
-      parsed.data.fecha,
-      parsed.data.referencia,
-    );
+    const result = demoRegistrarConteoInventario(parsed.data.productoId, parsed.data.stockContado, parsed.data.fecha, parsed.data.referencia, esperado);
     if (!result.ok) throw new Error(result.error);
   } else {
-    const supabase = getSupabaseServerClient();
-    const { data: producto } = await supabase
-      .from("inventario_productos")
-      .select("*")
-      .eq("id", parsed.data.productoId)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .maybeSingle();
-    if (!producto) throw new Error("Producto no encontrado.");
-    const stockActual = Number(producto.stock_actual);
-    const diferencia = roundMoney(parsed.data.stockContado - stockActual);
-    if (Math.abs(diferencia) > 0.0001) {
-      const { error: movError } = await supabase.from("inventario_movimientos").insert({
-        organization_id: DEFAULT_ORG_ID,
-        producto_id: parsed.data.productoId,
-        fecha: parsed.data.fecha,
-        tipo: "ajuste",
-        cantidad: diferencia,
-        costo_unitario: null,
-        referencia: parsed.data.referencia,
-      });
-      if (movError) throw new Error(movError.message);
-      const { error: prodError } = await supabase
-          .from("inventario_productos")
-          .update({ stock_actual: roundMoney(stockActual + diferencia) })
-        .eq("id", parsed.data.productoId)
-        .eq("organization_id", DEFAULT_ORG_ID);
-      if (prodError) throw new Error(prodError.message);
-    }
+    const { error } = await getSupabaseServerClient().rpc('registrar_conteo_inventario_seguro', {
+      p_org: actor.organizationId, p_actor: actor.userId, p_producto: parsed.data.productoId, p_fecha: parsed.data.fecha,
+      p_contado: parsed.data.stockContado, p_referencia: parsed.data.referencia, p_stock_esperado: esperado,
+    });
+    if (error) throw new Error(error.message);
   }
-  revalidatePath("/inventario");
+  revalidatePath('/inventario');
 }
 
 export async function createRegistroGeneral(formData: FormData) {
@@ -3503,125 +3010,20 @@ export async function createContratoAlquiler(formData: FormData) {
     else if (parsed.data.modalidadPago === "credito") {
         deposito30 = 0;
     }
-    // Obtener nombre de cliente para la descripción de caja
-    let clienteNombre = "Cliente Desconocido";
-    if (!hasSupabaseEnv()) {
-        const c = demoClientesRows().find((x) => x.id === parsed.data.clienteId);
-        if (c)
-            clienteNombre = c.nombre;
-    }
-    else {
-        const supabase = getSupabaseServerClient();
-        const { data: cData } = await supabase
-            .from("clientes")
-            .select("nombre")
-            .eq("id", parsed.data.clienteId)
-            .maybeSingle();
-        if (cData)
-            clienteNombre = cData.nombre;
-    }
-    if (!hasSupabaseEnv()) {
-        const { demoOperacionAtomica } = await import("@/lib/demo-store");
-        const codigo = parsed.data.codigo || (await nextCorrelativo("contrato_alquiler"));
-        demoOperacionAtomica(() => {
-            const contractRow = demoCreateContratoAlquiler({
-                organization_id: DEFAULT_ORG_ID,
-                cliente_id: parsed.data.clienteId,
-                activo: parsed.data.activo,
-                fecha_inicio: parsed.data.fechaInicio,
-                fecha_termino: parsed.data.fechaTermino || null,
-                dias_alquiler: parsed.data.diasAlquiler ?? null,
-                tarifa_unidad: parsed.data.tarifaUnidad,
-                tarifa: parsed.data.tarifa,
-                monto_total: parsed.data.montoTotal,
-                deposito_30: deposito30,
-                codigo,
-                representante: parsed.data.representante || null,
-                ruc_empresa: parsed.data.rucEmpresa || null,
-                direccion_ejecucion: parsed.data.direccionEjecucion || null,
-                metodo_pago: parsed.data.metodoPago,
-                modalidad_pago: parsed.data.modalidadPago,
-                fecha_pago_credito: parsed.data.fechaPagoCredito || null,
-                penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct,
-                penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct,
-                penalidad_danios_pct: parsed.data.penalidadDaniosPct,
-                confirmaIngreso: false,
-            });
-            if (deposito30 > 0) {
-                demoCreateCaja({
-                    organization_id: DEFAULT_ORG_ID,
-                    fecha: parsed.data.fechaInicio,
-                    tipo: "ingreso",
-                    medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
-                    categoria: "alquiler_bomba_mixer",
-                    monto: deposito30,
-                    descripcion: `Alquiler de mixer - ${clienteNombre}`,
-                    modulo_origen: "ventas_alquiler",
-                    referencia_id: contractRow?.id ?? null,
-                });
-            }
-        });
-    }
-    else {
-        const supabase = getSupabaseServerClient();
-        const codigo = parsed.data.codigo?.trim() || (await nextCorrelativo("contrato_alquiler"));
-        const montoTotal = parsed.data.montoTotal;
-        const fechaCredito = parsed.data.modalidadPago === "credito" && parsed.data.fechaPagoCredito
-            ? parsed.data.fechaPagoCredito
-            : null;
-        const { data: contrato, error: insErr } = await supabase
-            .from("alquileres")
-            .insert({
-            organization_id: DEFAULT_ORG_ID,
-            cliente_id: parsed.data.clienteId,
-            activo: parsed.data.activo.trim(),
-            fecha_inicio: parsed.data.fechaInicio,
-            fecha_fin: null,
-            fecha_termino: parsed.data.fechaTermino?.trim() || null,
-            tarifa: parsed.data.tarifa,
-            penalidad: 0,
-            estado: "abierto",
-            codigo,
-            representante: parsed.data.representante?.trim() || null,
-            ruc_empresa: parsed.data.rucEmpresa?.trim() || null,
-            direccion_ejecucion: parsed.data.direccionEjecucion?.trim() || null,
-            dias_alquiler: parsed.data.diasAlquiler ?? null,
-            tarifa_unidad: parsed.data.tarifaUnidad,
-            monto_total: montoTotal,
-            deposito_30: deposito30,
-            penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct,
-            penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct,
-            penalidad_danios_pct: parsed.data.penalidadDaniosPct,
-            metodo_pago: parsed.data.metodoPago,
-            modalidad_pago: parsed.data.modalidadPago === "adelanto_saldo" ? "adelanto" : parsed.data.modalidadPago,
-            fecha_pago_credito: fechaCredito,
-        })
-            .select("id")
-            .single();
-        if (insErr || !contrato) {
-            throw new Error(insErr?.message ?? "No se pudo crear el contrato.");
-        }
-        if (deposito30 > 0) {
-            const medioCaja = mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago);
-            const { error: cajaErr } = await supabase.from("movimientos_caja").insert({
-                organization_id: DEFAULT_ORG_ID,
-                fecha: parsed.data.fechaInicio,
-                tipo: "ingreso",
-                medio: medioCaja,
-                categoria: "alquiler_bomba_mixer",
-                monto: deposito30,
-                descripcion: `Alquiler de mixer - ${clienteNombre}`,
-                modulo_origen: "ventas_alquiler",
-                referencia_id: contrato.id,
-                created_by: actor.userId,
-                updated_by: actor.userId,
-            });
-            if (cajaErr) {
-                await supabase.from("alquileres").delete().eq("id", contrato.id);
-                throw new Error(cajaErr.message);
-            }
-        }
-    }
+    const clienteNombre = await nombreClienteOperacion(parsed.data.clienteId, actor.organizationId);
+    const codigo = parsed.data.codigo?.trim() || (await nextCorrelativo('contrato_alquiler'));
+    await registrarServicioIntegral(actor, { tipo: 'alquiler', clave: claveOperacion(formData, true), documento: {
+      cliente_id: parsed.data.clienteId, activo: parsed.data.activo.trim(), fecha_inicio: parsed.data.fechaInicio,
+      fecha_fin: null, fecha_termino: parsed.data.fechaTermino?.trim() || null, tarifa: parsed.data.tarifa,
+      penalidad: 0, estado: 'abierto', codigo, representante: parsed.data.representante?.trim() || null,
+      ruc_empresa: parsed.data.rucEmpresa?.trim() || null, direccion_ejecucion: parsed.data.direccionEjecucion?.trim() || null,
+      dias_alquiler: parsed.data.diasAlquiler ?? null, tarifa_unidad: parsed.data.tarifaUnidad, monto_total: parsed.data.montoTotal,
+      deposito_30: deposito30, penalidad_retraso_pago_pct: parsed.data.penalidadRetrasoPagoPct,
+      penalidad_devolucion_tardia_pct: parsed.data.penalidadDevolucionTardiaPct, penalidad_danios_pct: parsed.data.penalidadDaniosPct,
+      metodo_pago: parsed.data.metodoPago, modalidad_pago: parsed.data.modalidadPago === 'adelanto_saldo' ? 'adelanto' : parsed.data.modalidadPago,
+      fecha_pago_credito: parsed.data.modalidadPago === 'credito' ? parsed.data.fechaPagoCredito || null : null,
+    }, caja: deposito30 > 0 ? { fecha: parsed.data.fechaInicio, tipo: 'ingreso', medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
+      categoria: 'alquiler_bomba_mixer', monto: deposito30, descripcion: 'Alquiler de mixer - ' + clienteNombre } : null });
     revalidatePath("/ventas");
     revalidatePath("/ventas/alquiler-mixer");
     revalidatePath("/alquiler");
@@ -3715,70 +3117,6 @@ function isCodigoClienteProvisional(value: string | null | undefined) {
   return Boolean(value && value.startsWith("PEND-"));
 }
 
-function generarCodigoClienteProvisional(fecha = new Date()) {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  const yyyy = String(fecha.getFullYear());
-  const mm = pad(fecha.getMonth() + 1);
-  const dd = pad(fecha.getDate());
-  const hh = pad(fecha.getHours());
-  const mi = pad(fecha.getMinutes());
-  const ss = pad(fecha.getSeconds());
-  const suffix = randomUUID().replace(/-/g, "").slice(0, 4).toUpperCase();
-  return `PEND-${yyyy}${mm}${dd}-${hh}${mi}${ss}-${suffix}`;
-}
-
-async function crearClienteProvisionalServicioAserradero() {
-  const codigo = generarCodigoClienteProvisional();
-  if (!hasSupabaseEnv()) {
-    const id = demoCreateCliente({
-      organization_id: DEFAULT_ORG_ID,
-      nombre: CLIENTE_PROVISIONAL_NOMBRE,
-      documento: codigo,
-      telefono: null,
-      ruc: null,
-      direccion: null,
-      tipo_persona: null,
-    });
-    return { id, codigo };
-  }
-
-  const supabase = getSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("clientes")
-    .insert({
-      organization_id: DEFAULT_ORG_ID,
-      nombre: CLIENTE_PROVISIONAL_NOMBRE,
-      documento: codigo,
-      telefono: null,
-      ruc: null,
-      direccion: null,
-      tipo_persona: null,
-    })
-    .select("id")
-    .single();
-
-  if (error || !data) {
-    throw new Error(error?.message ?? "No se pudo crear el cliente provisional.");
-  }
-
-  return { id: data.id, codigo };
-}
-
-async function cleanupClienteProvisionalCreado(clienteId: string | null) {
-  if (!clienteId) return;
-  if (!hasSupabaseEnv()) {
-    demoDeleteCliente(clienteId);
-    return;
-  }
-
-  const supabase = getSupabaseServerClient();
-  await supabase
-    .from("clientes")
-    .delete()
-    .eq("id", clienteId)
-    .eq("organization_id", DEFAULT_ORG_ID);
-}
-
 export async function createServicioAserradero(formData: FormData) {
     const actor = await requireMutationAccess(ventasRoles);
     const usarClienteProvisional = formData.get("usarClienteProvisional") === "true";
@@ -3821,131 +3159,25 @@ export async function createServicioAserradero(formData: FormData) {
             throw new Error("El detalle de Aserradero contiene JSON inválido y no puede guardarse.");
         }
     }
-    let clienteId = parsed.data.clienteId;
-    let clienteProvisionalCreadoId: string | null = null;
-    try {
-        if (usarClienteProvisional) {
-            const provisional = await crearClienteProvisionalServicioAserradero();
-            clienteId = provisional.id;
-            clienteProvisionalCreadoId = provisional.id;
-        }
-        // Obtener nombre de cliente para la descripcion de caja y validar factura provisional.
-        let clienteNombre = "Cliente Desconocido";
-        let clienteDocumento: string | null = null;
-        if (!hasSupabaseEnv()) {
-            const c = demoClientesRows().find((x) => x.id === clienteId);
-            if (c) {
-                clienteNombre = c.nombre;
-                clienteDocumento = c.documento ?? null;
-            }
-        }
-        else {
-            const supabase = getSupabaseServerClient();
-            const { data: cData } = await supabase
-                .from("clientes")
-                .select("nombre,documento")
-                .eq("id", clienteId)
-                .maybeSingle();
-            if (cData) {
-                clienteNombre = cData.nombre;
-                clienteDocumento = cData.documento ?? null;
-            }
-        }
-        if (parsed.data.tipoComprobante === "factura" && isCodigoClienteProvisional(clienteDocumento)) {
-            throw new Error("Completa un cliente con RUC valido antes de emitir factura.");
-        }
-        if (!hasSupabaseEnv()) {
-            const { demoOperacionAtomica } = await import("@/lib/demo-store");
-            const correlativoLocal = await nextCorrelativo("servicio_aserradero");
-            demoOperacionAtomica(() => {
-                const serviceRow = demoCreateServicioAserradero({
-                    organization_id: DEFAULT_ORG_ID,
-                    cliente_id: clienteId,
-                    fecha: parsed.data.fecha,
-                    pies_cubicos: parsed.data.piesCubicos,
-                    costo_cubicaje: parsed.data.costoCubicaje,
-                    precio_cobrado: parsed.data.precioCobrado,
-                    utilidad: 0,
-                    lineas_json: lineasJson,
-                    correlativo: correlativoLocal,
-                    confirmaIngreso: false,
-                    metodo_pago: parsed.data.metodoPago,
-                    modalidad_pago: modalidadPago,
-                    adelanto,
-                    fecha_pago_credito: parsed.data.fechaPagoCredito || null,
-                });
-                if (montoCaja > 0) {
-                    demoCreateCaja({
-                        organization_id: DEFAULT_ORG_ID,
-                        fecha: parsed.data.fecha,
-                        tipo: "ingreso",
-                        medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
-                        categoria: "servicio_aserradero",
-                        monto: montoCaja,
-                        descripcion: `Servicio de aserradero - ${clienteNombre}`,
-                        modulo_origen: "ventas_aserradero",
-                        referencia_id: serviceRow?.id ?? null,
-                    });
-                }
-            });
-        }
-        else {
-            const supabase = getSupabaseServerClient();
-            const correlativo = await nextCorrelativo("servicio_aserradero");
-            const lineasPayload = lineasJson as unknown as Json;
-            const { data: servicio, error: servicioErr } = await supabase
-                .from("servicios_aserradero")
-                .insert({
-                organization_id: DEFAULT_ORG_ID,
-                cliente_id: clienteId,
-                fecha: parsed.data.fecha,
-                pies_cubicos: parsed.data.piesCubicos,
-                costo_cubicaje: parsed.data.costoCubicaje,
-                precio_cobrado: parsed.data.precioCobrado,
-                utilidad: 0,
-                lineas_json: lineasPayload,
-                correlativo,
-                metodo_pago: parsed.data.metodoPago ?? "efectivo",
-                modalidad_pago: modalidadPago,
-                fecha_pago_credito: parsed.data.fechaPagoCredito ?? null,
-                adelanto,
-                created_by: actor.userId,
-            })
-                .select("id")
-                .single();
-            if (servicioErr || !servicio) {
-                throw new Error(servicioErr?.message ?? "No se pudo registrar el servicio.");
-            }
-            if (montoCaja > 0) {
-                const { error: cajaError } = await supabase.from("movimientos_caja").insert({
-                    organization_id: DEFAULT_ORG_ID,
-                    fecha: parsed.data.fecha,
-                    tipo: "ingreso",
-                    medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
-                    categoria: "servicio_aserradero",
-                    monto: montoCaja,
-                    descripcion: `Servicio de aserradero - ${clienteNombre}`,
-                    modulo_origen: "ventas_aserradero",
-                    referencia_id: servicio.id,
-                    tipo_comprobante: parsed.data.tipoComprobante,
-                    url_comprobante: parsed.data.urlComprobante ?? null,
-                    created_by: actor.userId,
-                    updated_by: actor.userId,
-                });
-                if (cajaError) {
-                    await supabase.from("servicios_aserradero").delete().eq("id", servicio.id);
-                    throw new Error(cajaError.message);
-                }
-            }
-        }
+    let clienteNombre = CLIENTE_PROVISIONAL_NOMBRE;
+    if (!usarClienteProvisional) {
+      clienteNombre = await nombreClienteOperacion(parsed.data.clienteId, actor.organizationId);
+      const documento = !hasSupabaseEnv() ? demoClientesRows().find(c => c.id === parsed.data.clienteId)?.documento
+        : (await getSupabaseServerClient().from('clientes').select('documento').eq('id', parsed.data.clienteId).eq('organization_id', actor.organizationId).maybeSingle()).data?.documento;
+      if (parsed.data.tipoComprobante === 'factura' && isCodigoClienteProvisional(documento)) throw new Error('Completa un cliente con RUC valido antes de emitir factura.');
     }
-    catch (error) {
-        await cleanupClienteProvisionalCreado(clienteProvisionalCreadoId);
-        throw error;
-    }
-    revalidatePath("/ventas");
-    revalidatePath("/ventas/aserradero-servicios");
-    revalidatePath("/caja");
+    const correlativo = await nextCorrelativo('servicio_aserradero');
+    await registrarServicioIntegral(actor, { tipo: 'aserradero', clave: claveOperacion(formData, true), provisional: usarClienteProvisional,
+      documento: { cliente_id: usarClienteProvisional ? null : parsed.data.clienteId, fecha: parsed.data.fecha,
+        pies_cubicos: parsed.data.piesCubicos, costo_cubicaje: parsed.data.costoCubicaje, precio_cobrado: parsed.data.precioCobrado,
+        utilidad: 0, lineas_json: lineasJson, correlativo, metodo_pago: parsed.data.metodoPago,
+        modalidad_pago: modalidadPago, adelanto, fecha_pago_credito: parsed.data.fechaPagoCredito || null },
+      caja: montoCaja > 0 ? { fecha: parsed.data.fecha, tipo: 'ingreso', medio: mapMetodoPagoVentaToMedioCaja(parsed.data.metodoPago),
+        categoria: 'servicio_aserradero', monto: montoCaja, descripcion: 'Servicio de aserradero - ' + clienteNombre,
+        tipo_comprobante: parsed.data.tipoComprobante, url_comprobante: parsed.data.urlComprobante ?? null } : null });
+    revalidatePath('/ventas');
+    revalidatePath('/ventas/aserradero-servicios');
+    revalidatePath('/caja');
 }
 
 export async function submitCreateServicioAserraderoForm(
@@ -4928,7 +4160,7 @@ function parseConfirmedCorrectionPieces(raw: FormDataEntryValue | null) {
  */
 export async function correctVentaMaderaCortadaHistorica(formData: FormData) {
   const actor = await requireAuthContext({ redirectTo: null });
-  if (actor.role !== "owner_admin" && actor.uiRole !== "owner_admin") {
+  if (!canCorrectHistoricalMadera(actor.role, actor.uiRole)) {
     throw new Error("Solo Katia puede corregir comprobantes históricos.");
   }
   if (formData.get("confirmacion") !== "on") {
@@ -5034,10 +4266,15 @@ export async function correctVentaMaderaCortadaHistorica(formData: FormData) {
   const changesTotal = Math.abs(nextTotal - current.total) >= 0.01;
 
   if (!hasSupabaseEnv()) {
-    const { demoVentasRows, demoCajaRows, persistStore } = await import("@/lib/demo-store");
+    const { demoVentasRows, demoCajaRows, demoOperacionAtomica, demoComprobarPeriodoAbierto } = await import("@/lib/demo-store");
     const row = demoVentasRows().find((item) => item.id === parsed.data.id);
     if (!row) throw new Error("La venta cambió mientras la revisabas. Vuelve a abrirla.");
 
+    demoOperacionAtomica(() => {
+    const cobros = demoCajaRows().filter(c => c.organization_id === actor.organizationId && c.referencia_id === current!.id
+      && c.modulo_origen === 'ventas_madera_cortada' && !c.voided_at && !c.deleted_at);
+    const recibido = roundMoney(cobros.reduce((sum,c) => sum + (c.tipo === 'ingreso' ? c.monto : c.tipo === 'egreso' ? -c.monto : 0),0));
+    if (current.modalidad_pago !== 'contado' && (recibido < 0 || nextTotal < recibido)) throw new Error('El total no puede ser inferior al dinero ya recibido. Revisa los cobros.');
     if (changesTotal && current.modalidad_pago === "contado") {
       const cashRows = demoCajaRows().filter(
         (item) => item.referencia_id === current?.id
@@ -5049,6 +4286,7 @@ export async function correctVentaMaderaCortadaHistorica(formData: FormData) {
       if (cashRows[0].periodo_cerrado) {
         throw new Error("El movimiento pertenece a un período cerrado y no puede modificarse.");
       }
+      demoComprobarPeriodoAbierto(actor.organizationId, cashRows[0].fecha);
       cashRows[0].monto = nextTotal;
     }
 
@@ -5057,7 +4295,7 @@ export async function correctVentaMaderaCortadaHistorica(formData: FormData) {
     row.precio_unitario_comercial = roundMoney(nextTotal / calculatedQuantity);
     row.lineas_comprobante = voucherLines;
     row.total = nextTotal;
-    persistStore();
+    });
   } else {
     const supabase = getSupabaseServerClient();
     let syncCash = false;

@@ -1,6 +1,7 @@
 "use client";
 
 import { submitCreateServicioAserraderoForm } from "@/app/actions";
+import { OperationSubmissionId } from "@/components/ui/operation-submission-id";
 import { CubicajeInput } from "@/components/sales/cubicaje-input";
 import { NuevoClienteInlinePanel } from "@/components/sales/nuevo-cliente-inline-panel";
 import { Button } from "@/components/ui/button";
@@ -369,6 +370,7 @@ export function AserraderoForm({
 
   return (
     <form action={formAction} className="space-y-5">
+      <OperationSubmissionId state={state} />
       <nav className="grid grid-cols-3 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
         {[
           { number: 1, label: "Cubicaje y tarifa" },

@@ -1,5 +1,13 @@
 # Notas de parche
 
+## 1.1.75 — 11/10/2026
+
+Se corrigieron borrados, conteos y reintentos que podían alterar stock o duplicar cobros. Cotizaciones respeta los adelantos recibidos y los permisos se aplican correctamente, sin cambiar los cálculos habituales.
+
+## 1.1.74 — 11/10/2026
+
+Se amplió la revisión con pruebas aisladas de permisos, Kardex, conteos y reintentos. Se identificaron riesgos nuevos que pueden alterar cobros o existencias, con evidencia y prioridades, sin modificar datos reales.
+
 ## 1.1.73 — 10/10/2026
 
 Se corrigieron guardados parciales, anulaciones y reintentos que podían descuadrar Caja o stock. Los meses cerrados quedan protegidos y ventas, compras y alquileres conservan sus importes y pasos habituales.

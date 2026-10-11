@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { formatPen } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useId, useRef } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 
 type ProductoEnriched = {
   id: string;
@@ -51,6 +51,7 @@ export function InventarioProductoEditModal({
 }) {
   const router = useRouter();
   const formId = useId();
+  const [stockEsperado] = useState(product?.stock_actual);
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(saveProductoAction, { ok: false, err: null });
 
@@ -90,6 +91,7 @@ export function InventarioProductoEditModal({
           </p>
           <form key={product.id} ref={formRef} id={formId} action={formAction} className="grid gap-3 sm:grid-cols-2">
             <input type="hidden" name="id" value={product.id} />
+            <input type="hidden" name="stock_esperado" value={String(stockEsperado ?? '')} />
             <Field name="codigo" label="Código" defaultValue={product.codigo} required disabled={!canMutate} />
             <Field name="nombre" label="Nombre" defaultValue={product.nombre} required disabled={!canMutate} />
             <Field name="categoria_disabled" label="Categoría" defaultValue={product.categoria} required disabled={true} />

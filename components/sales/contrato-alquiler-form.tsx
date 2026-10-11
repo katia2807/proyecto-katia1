@@ -2,6 +2,8 @@
 
 import type { ComponentProps } from "react";
 import { useMemo, useState } from "react";
+import { OperationSubmissionId } from "@/components/ui/operation-submission-id";
+import { mutationFormInitialState } from "@/lib/mutation-form-state";
 
 /** Firma que admite `<form action>` con `useActionState` (React tipa la acción enlazada como 1 arg). */
 type FormActionProp = Exclude<ComponentProps<"form">["action"], string | undefined>;
@@ -108,6 +110,7 @@ export function ContratoAlquilerForm({
 
   return (
     <form action={panelAction} noValidate className="space-y-6">
+      {!contrato ? <OperationSubmissionId state={mutationFormInitialState} /> : null}
       {contrato?.id && <input type="hidden" name="id" value={contrato.id} />}
       {/* ── STEPPER DE WIZARD ── */}
       <div className="mb-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">

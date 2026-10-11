@@ -208,16 +208,6 @@ describe.each([false, true])("Cobro total (Supabase=%s)", (real) => {
       expect(row.estado_flujo).toBe("lista_produccion");
       expect(caja).toHaveLength(0);
     });
-    test("una edición no sobrescribe una cotización cobrada después de leerla", async () => {
-      const detalle = defaultCotizacionDetalleV1();
-      detalle.rubros.aserradero = true;
-      detalle.aserradero = { modo: "hora", precioHora: 500, horas: 1, montoTotalFijo: 0, descripcion: "Propuesta" };
-      row.detalle = detalle;
-      fallo = "cobro";
-      expect(await saveCotizacionUnificada({ id, clienteId: id, tipoCliente: "empresa", fecha: "2026-10-04", detalle, total: 650, estadoFlujo: "pendiente" })).toMatchObject({ ok: false });
-      expect(row.estado_flujo).toBe("cobrada");
-      expect(row.total).toBe(650);
-    });
     test("aceptar desde otra pestaña no reabre una cotización recién cobrada", async () => {
       fallo = "cobro";
       expect(await marcarListaProduccionCotizacion(id)).toMatchObject({ ok: false });

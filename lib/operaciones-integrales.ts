@@ -18,8 +18,9 @@ export type OperacionIntegral = {
     stock?: Fila[];
     caja?: Fila | null;
 };
-export function claveOperacion(data: FormData) {
+export function claveOperacion(data: FormData, requerida = false) {
     const value = data.get('submission_id');
+    if (!value && requerida) throw new Error('Actualiza la página y vuelve a abrir el formulario antes de guardar.');
     if (!value)
         return randomUUID();
     const parsed = z.uuid().safeParse(value);

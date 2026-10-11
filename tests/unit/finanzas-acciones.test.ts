@@ -30,7 +30,7 @@ type Row = Record<string, unknown>;
 const tables = new Set(["clientes", "proveedores", "inventario_productos", "muebles_catalogo", "ventas_madera", "ventas_madera_lineas",
   "inventario_movimientos", "ventas_mueble_terminado", "ventas_madera_cortada", "servicios_aserradero", "compras_madera",
   "alquileres", "cotizaciones_unificadas", "cotizaciones_mueble", "ordenes_produccion", "movimientos_caja", "cierres_mensuales", "operaciones_financieras_seguras"]);
-const functions = new Set(["crear_compra_madera_con_caja", "cerrar_alquiler_con_caja", "consultar_cobro_cotizacion",
+const functions = new Set(["registrar_servicio_integral", "crear_compra_madera_con_caja", "cerrar_alquiler_con_caja", "consultar_cobro_cotizacion",
   "registrar_cobro_cotizacion_seguro", "aprobar_cotizacion_con_adelanto", "editar_aserradero_con_caja", "registrar_operacion_integral", "anular_operacion_integral", "editar_alquiler_integral", "eliminar_cliente_integral"]);
 const name = (value: string) => { if (!/^[a-z_][a-z_0-9]*$/.test(value)) throw new Error("Nombre inválido"); return '"' + value + '"'; };
 const parameter = (value: unknown) => typeof value === "object" && value !== null ? JSON.stringify(value) : value;
@@ -90,6 +90,8 @@ beforeAll(async () => {
   await db.exec(readFileSync("tests/unit/fixtures/finanzas-heredado.sql", "utf8"));
   await db.exec(readFileSync("supabase/migrations/20261010010000_cobros_y_cierres_seguros.sql", "utf8"));
   await db.exec(readFileSync("supabase/migrations/20261011010000_integridad_caja_stock_operaciones.sql", "utf8"));
+  await db.exec(readFileSync("tests/unit/fixtures/finanzas-adicional.sql", "utf8"));
+  await db.exec(readFileSync("supabase/migrations/20261011020000_integridad_adicional_operaciones.sql", "utf8"));
   await db.exec(`create function fallo_stock_ficticio() returns trigger language plpgsql as $$begin
     if new.producto_id::text=current_setting('auditoria.fallo_producto',true) then raise exception 'Fallo ficticio del segundo producto'; end if;return new;end $$;
     create trigger fallo_stock before insert on inventario_movimientos for each row execute function fallo_stock_ficticio();`);
@@ -120,7 +122,7 @@ const cajaActiva = () => num('select coalesce(sum(monto),0) n from movimientos_c
 const deposito = () => db.query(`insert into movimientos_caja(organization_id,fecha,tipo,medio,categoria,monto,referencia_id,modulo_origen)
   values($1,'2026-10-10','ingreso','yape','alquiler_bomba_mixer',300,$2,'ventas_alquiler')`, [org, contrato]);
 const aserradero = async () => {
-  await createServicioAserradero(data({ ...baseVenta, precio_cobrado: 1000, costo_cubicaje: 100, pies_cubicos: 10, lineas_json: '[]' }));
+  await createServicioAserradero(data({ submission_id: clave(), ...baseVenta, precio_cobrado: 1000, costo_cubicaje: 100, pies_cubicos: 10, lineas_json: '[]' }));
   return String((await db.query<Row>('select id from servicios_aserradero')).rows[0].id);
 };
 const eliminarCliente = () => forzarEliminarClienteCompleto(data({ id: cliente, confirmacion: 'ELIMINAR TODO' }));
@@ -265,7 +267,7 @@ describe.each(["madera", "aserradero", "muebles", "madera cortada"])("Cobros de 
     const base = { cliente_id: cliente, fecha: "2026-10-10", total: 1000, metodo_pago: "yape", modalidad_pago: modalidad,
       adelanto, estado: "confirmada", tipo_comprobante: "ninguno", fecha_pago_credito: "2026-10-31" };
     if (tipo === "madera") return createVentaMadera(data({ ...base, inventario_producto_id: producto, cantidad_producto: 1 }));
-    if (tipo === "aserradero") return createServicioAserradero(data({ ...base, pies_cubicos: 10, costo_cubicaje: 100, precio_cobrado: 1000, lineas_json: "[]" }));
+    if (tipo === "aserradero") return createServicioAserradero(data({ submission_id: clave(), ...base, pies_cubicos: 10, costo_cubicaje: 100, precio_cobrado: 1000, lineas_json: "[]" }));
     const entrega = { chofer_id: "", tipo_entrega: "entrega_local", direccion_entrega: "", estado_entrega: "pendiente", monto_credito: 0 };
     if (tipo === "muebles") return createVentaMuebleTerminado(data({ ...base, ...entrega, mueble_catalogo_id: producto, cantidad: 2, precio_unitario: 500 }));
     return createVentaMaderaCortada(data({ ...base, ...entrega, tipo_corte: "tabla", total_pt: 20, precio_por_pt: 50,
@@ -349,14 +351,14 @@ describe("Cotización y adelantos ya recibidos", () => {
 });
 describe("Compra y PDF simulado", () => {
   const compra = () => createCompraMadera(data({ proveedor_id: cliente, fecha: "2026-10-10", especie_madera: "Cedro", detalle: "Ficticio", cantidad: 10, unidad: "PT", precio_unitario: 100, modalidad_pago: "contado", adelanto: 0, estado: "confirmada", url_comprobante: "" }));
-  test("fallo del egreso no deja una compra confirmada", async () => {
+  test("la compra antigua retirada no crea operaciones ni egresos", async () => {
     await db.exec("set auditoria.fallo_caja='si'");
-    await expect(compra()).rejects.toThrow(/Caja/);
+    await expect(compra()).rejects.toThrow(/no está disponible/);
     expect(await count("compras_madera")).toBe(0);
     await db.exec("set auditoria.fallo_caja='no'");
-    await compra();
-    expect(await count("compras_madera")).toBe(1);
-    expect(await totalCaja()).toBe(1000);
+    await expect(compra()).rejects.toThrow(/no está disponible/);
+    expect(await count("compras_madera")).toBe(0);
+    expect(await totalCaja()).toBe(0);
   });
   test("el acceso directo al importador simulado no escribe ningún registro", async () => {
     await expect(createVentaDesdePdf(data({ cliente_id: cliente, total: 1000 }))).rejects.toThrow(/no está disponible/);
@@ -367,7 +369,7 @@ describe("Compra y PDF simulado", () => {
 
 describe("Editar aserradero conserva el cobro real", () => {
   async function crear(modalidad: string, adelanto: number) {
-    await createServicioAserradero(data({ cliente_id: cliente, fecha: "2026-10-10", precio_cobrado: 1000, costo_cubicaje: 100,
+    await createServicioAserradero(data({ submission_id: clave(), cliente_id: cliente, fecha: "2026-10-10", precio_cobrado: 1000, costo_cubicaje: 100,
       pies_cubicos: 10, lineas_json: "[]", metodo_pago: "yape", modalidad_pago: modalidad, adelanto, tipo_comprobante: "ninguno" }));
     return String((await db.query<Row>("select id from servicios_aserradero")).rows[0].id);
   }
