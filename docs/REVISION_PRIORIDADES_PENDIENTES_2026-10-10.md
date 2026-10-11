@@ -1,6 +1,6 @@
 # Revisión adicional de prioridades — 10/10/2026
 
-**Estado posterior:** los doce hallazgos se corrigieron y comprobaron en local en 1.1.73. Migración instalada el 11/10/2026 sin diferencias en los registros existentes; publicación del código en curso. Ver [correcciones, regresión y límites](CORRECCIONES_PRIORITARIAS_2026-10-10.md). El resto de este documento conserva el diagnóstico original y sus evidencias anteriores a los cambios.
+**Estado posterior:** los doce hallazgos se corrigieron y comprobaron en local en 1.1.73. Migración instalada y código publicado el 11/10/2026 sin diferencias en los registros existentes; pantallas comprobadas por lectura. Ver [correcciones, regresión y límites](CORRECCIONES_PRIORITARIAS_2026-10-10.md). El resto de este documento conserva el diagnóstico original y sus evidencias anteriores a los cambios.
 
 Registro local **1.1.72**. La versión publicada continúa en **1.1.71**. Petición: buscar riesgos prioritarios que quedaron fuera del diagnóstico anterior. Esta entrega documenta hallazgos; **no corrige acciones, instala SQL ni publica cambios**. Los doce riesgos siguientes son P1 por pérdida de coherencia entre operaciones, cobros y existencias. No demuestran por sí mismos que ya hayan ocurrido en los datos del negocio.
 
