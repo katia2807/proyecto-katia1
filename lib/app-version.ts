@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.77";
+export const APP_VERSION = "1.1.78";
 export const APP_LAST_UPDATE = "11/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "La cotización rápida de muebles ya no registra cobros al confirmarla. Los reintentos conservan una sola cotización y el borrado protege documentos con cobros u órdenes, para mantener Caja y producción coherentes.";
+  "Los botones de acción usan ahora colores neutrales en ambos temas: oscuros en modo claro y claros en modo oscuro. Los estados e iconos conservan sus colores, para mantener las alertas fáciles de reconocer.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {

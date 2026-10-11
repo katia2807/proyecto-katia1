@@ -109,6 +109,33 @@ html[data-appearance="propuesta"] :is(button, a)[class~="[background:var(--katia
   color: var(--color-on-accent);
 }
 
+/* Acentos de acciones: solo botones y enlaces con apariencia de botón. */
+html[data-appearance="propuesta"] :is(button, a):is(
+  [class~="bg-[var(--color-accent)]"],
+  [class~="border-[var(--color-accent)]"],
+  [class~="hover:bg-[var(--color-accent)]"]
+),
+html[data-appearance="propuesta"] button[class~="text-[var(--color-accent)]"] {
+  --color-accent: var(--katia-primary);
+}
+
+html[data-appearance="propuesta"] :is(button, a)[class~="bg-[var(--color-accent)]"] {
+  color: var(--color-on-accent);
+}
+
+html[data-appearance="propuesta"] :is(button, a)[class~="border-[var(--color-accent)]"]:not([class~="bg-[var(--color-accent)]"]) {
+  color: var(--katia-primary);
+}
+
+html[data-appearance="propuesta"] :is(button, a)[class~="hover:bg-[var(--color-accent)]"]:hover {
+  color: var(--color-on-accent);
+}
+
+html[data-appearance="propuesta"] input[class~="file:bg-[var(--color-accent)]"]::file-selector-button {
+  background: var(--katia-primary);
+  color: var(--color-on-accent);
+}
+
 /* Los acentos claros del modo oscuro necesitan texto oscuro para seguir legibles. */
 html[data-appearance="propuesta"][data-theme="dark"] [class~="bg-[var(--katia-primary)]"][class~="text-white"],
 html[data-appearance="propuesta"][data-theme="dark"] input[class~="file:bg-[var(--katia-primary)]"]::file-selector-button {

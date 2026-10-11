@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.78 — 11/10/2026
+
+Los botones de acción usan ahora colores neutrales en ambos temas: oscuros en modo claro y claros en modo oscuro. Los estados e iconos conservan sus colores, para mantener las alertas fáciles de reconocer.
+
 ## 1.1.77 — 11/10/2026
 
 La cotización rápida de muebles ya no registra cobros al confirmarla. Los reintentos conservan una sola cotización y el borrado protege documentos con cobros u órdenes, para mantener Caja y producción coherentes.
