@@ -67,13 +67,14 @@ try {
    'supabase/migrations/20261011040000_cotizacion_unificada_segura.sql','supabase/migrations/20261011050000_altas_inventario_y_catalogo_seguros.sql']) {
    execFileSync(exe('psql'), [...args, '-f', path.join(root, file)], { windowsHide: true, timeout: 20000 });
  }
- sql(`create table prueba_sincronizacion(id text primary key);create extension pgcrypto;create schema app;create function app.current_role() returns text language sql as $$select 'owner_admin'::text$$;
+ sql(`create table prueba_sincronizacion(id text primary key);create schema extensions;create extension pgcrypto with schema extensions;create schema app;create function app.current_role() returns text language sql as $$select 'owner_admin'::text$$;
  create table sueldos(organization_id uuid,periodo text,monto_neto numeric);
  create table auditoria_prueba(organization_id uuid,accion text,datos jsonb);
  create function log_audit_event(uuid,text,text,uuid,jsonb) returns void language sql as $$insert into auditoria_prueba values($1,$2,$5)$$;`);
  const view = fs.readFileSync(path.join(root, 'supabase/migrations/20261006233000_restantes_integridad.sql'), 'utf8')
    .split('create or replace view public.utilidad_mensual')[1].split('commit;')[0];
  sql('create or replace view public.utilidad_mensual' + view);
+ execFileSync(exe('psql'), [...args, '-f', path.join(root, 'supabase/migrations/20261011060000_cierre_mensual_huella_segura.sql')], { windowsHide: true, timeout: 20000 });
  reset();
  const doubleSale = await competing(sale(),sale());
  assert.equal(doubleSale.filter(r => r.status === 'fulfilled').length, 1);

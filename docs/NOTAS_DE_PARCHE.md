@@ -1,5 +1,9 @@
 # Notas de parche
 
+## 1.1.82 — 11/10/2026
+
+Se revisó Caja histórica y se probaron cobros, stock y permisos con una copia completa de la base. Se corrigió el cierre mensual para guardar su firma, conservando los datos reales y los redondeos.
+
 ## 1.1.81 — 11/10/2026
 
 Se protegen cotizaciones, adelantos y entradas de inventario frente a reintentos y guardados incompletos. La auditoría y los adjuntos respetan los permisos; los selectores usan registros existentes y fechas de Perú.

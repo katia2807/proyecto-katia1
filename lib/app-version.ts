@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.81";
+export const APP_VERSION = "1.1.82";
 export const APP_LAST_UPDATE = "11/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Se protegen cotizaciones, adelantos y entradas de inventario frente a reintentos y guardados incompletos. La auditoría y los adjuntos respetan los permisos; los selectores usan registros existentes y fechas de Perú.";
+  "Se revisó Caja histórica y se probaron cobros, stock y permisos con una copia completa de la base. Se corrigió el cierre mensual para guardar su firma, conservando los datos reales y los redondeos.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {
