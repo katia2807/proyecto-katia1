@@ -2,6 +2,8 @@
 
 Fecha: 11/10/2026. Implementación inicial 1.1.80, incorporada a la entrega local **1.1.81**. Producción continúa en **1.1.78**: no se consultó la base real ni se instaló o publicó esta reparación.
 
+Actualización de publicación del mismo día: **1.1.81 instalada, publicada y comprobada por lectura**, tras un respaldo completo y conservación de registros. El párrafo anterior describe la etapa local; el cierre y sus límites constan en [el informe general](REVISION_GENERAL_PRIORITARIA_2026-10-11.md#publicación-y-comprobación-de-lectura). No se hicieron operaciones financieras ni altas de prueba en la base real.
+
 El [diagnóstico 1.1.79](REVISION_COTIZACION_UNIFICADA_Y_PERSONAL_2026-10-11.md) se conserva como evidencia anterior. Sus once casos reproducen errores; las regresiones siguientes exigen resultados corregidos.
 
 | Hallazgo | Reparación y resultado comprobado |
