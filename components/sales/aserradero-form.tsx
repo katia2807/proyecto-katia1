@@ -10,7 +10,7 @@ import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { liteClientesToCompleto } from "@/lib/combobox-mocks";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
-import { formatPen, parseDecimal, roundMoney } from "@/lib/utils";
+import { fechaHoyPeru,  formatPen, parseDecimal, roundMoney } from "@/lib/utils";
 import {
   calculateAserraderoAdjustment,
   calculateAserraderoCutSubtotal,
@@ -95,7 +95,7 @@ export function AserraderoForm({
   onSuccess,
 }: AserraderoFormProps) {
   const { showToast } = useToast();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = fechaHoyPeru();
   const [step, setStep] = useState(1);
   const [pieces, setPieces] = useState<CubicajePieza[]>([]);
   const [tarifaPorPT, setTarifaPorPT] = useState(0.5);

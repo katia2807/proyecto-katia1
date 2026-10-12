@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { LEGACY_LOCAL_AUTH_COOKIE, getSupabaseAuthServerClient } from "@/lib/auth";
 import { isDemoDatabaseMode } from "@/lib/demo-mode";
+import { ANTIFRAUDE_COOKIE } from '@/lib/antifraude-acceso';
 
 export type LoginFormState = {
   error?: string;
@@ -78,6 +79,7 @@ export async function loginWithPassword(_prevState: LoginFormState, formData: Fo
 export async function logout() {
   const cookieStore = await cookies();
   cookieStore.delete(LEGACY_LOCAL_AUTH_COOKIE);
+  cookieStore.delete(ANTIFRAUDE_COOKIE);
 
   const authClient = await getSupabaseAuthServerClient();
   if (authClient) {

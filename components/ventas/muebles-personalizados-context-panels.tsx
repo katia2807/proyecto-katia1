@@ -1,4 +1,5 @@
 "use client";
+import { fechaHoyPeru } from "@/lib/utils";
 
 import { submitAprobarCotizacionForm, submitCreateCotizacionForm, createClienteCotizacionRapida } from "@/app/actions";
 import { ContextActionPanel } from "@/components/context-action-panel";
@@ -7,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/Combobox";
 import { Field, SelectField } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { liteClientesToCompleto, MOCK_COTIZACIONES_APROBACION } from "@/lib/combobox-mocks";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import type { MutationFormState } from "@/lib/mutation-form-state";
 import { OperationSubmissionId } from "@/components/ui/operation-submission-id";
@@ -40,7 +40,7 @@ function CrearCotizacionRapidaFormFields({
 }) {
   const [localClientes, setLocalClientes] = useState(clienteOptions);
   const [clienteId, setClienteId] = useState("");
-  const hoy = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const hoy = useMemo(() => fechaHoyPeru(), []);
 
   const [showNewCliente, setShowNewCliente] = useState(false);
   const [newClientNombre, setNewClientNombre] = useState("");
@@ -310,7 +310,7 @@ function AceptarCotizacionFormFields({
           value={cotizacionAprId}
           onChange={setCotizacionAprId}
           hiddenInputName="cotizacion_id"
-          placeholder="Buscar cotización confirmada…"
+          placeholder="Buscar cotización aceptada…"
           inputAriaLabel="Cotización para pasar a orden"
         />
       </label>
@@ -348,7 +348,6 @@ function AceptarCotizacionFormFields({
 export function MueblesPersonalizadosContextPanels({
   clientes,
   opcionesAprobacion,
-  mockData = false,
 }: MueblesPersonalizadosContextPanelsProps) {
   const { showToast } = useToast();
   const router = useRouter();
@@ -393,12 +392,11 @@ export function MueblesPersonalizadosContextPanels({
   }, [clientes]);
 
   const cotizacionAprOptions = useMemo(() => {
-    const src = mockData ? MOCK_COTIZACIONES_APROBACION : opcionesAprobacion;
-    return src.map((o) => ({
+    return opcionesAprobacion.map((o) => ({
       value: o.id,
       label: o.label,
     }));
-  }, [mockData, opcionesAprobacion]);
+  }, [opcionesAprobacion]);
 
   return (
     <>
@@ -426,8 +424,8 @@ export function MueblesPersonalizadosContextPanels({
       {/* Botón 3: Aprobar cotización → crear orden de producción + registrar adelanto */}
       <ContextActionPanel
         triggerLabel="Aprobar → Orden + Adelanto"
-        title="Aprobar cotización confirmada"
-        description="En un solo paso: crea la orden de producción y registra el adelanto en caja. Solo aplica a cotizaciones con estado 'Confirmada'."
+        title="Aprobar cotización aceptada"
+        description="Crea la orden y registra solo el adelanto recibido. Si la cotización ya está pagada, deja el adelanto en cero: se creará únicamente la orden."
         open={openApr}
         onOpenChange={(next) => {
           setOpenApr(next);

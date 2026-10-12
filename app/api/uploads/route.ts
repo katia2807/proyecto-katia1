@@ -3,8 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireApiAuth } from "@/lib/api-auth";
-import { WRITER_ROLES } from "@/lib/auth";
-import { canMutateCaja } from "@/lib/permissions";
+import { canMutateCaja, canMutateInventario } from "@/lib/permissions";
 import { getServerWritableDataDir } from "@/lib/server-data-dir";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -43,7 +42,7 @@ export async function POST(request: Request) {
   }
   const permitido = bucket === "caja"
     ? canMutateCaja(auth.context.role, auth.context.uiRole)
-    : WRITER_ROLES.includes(auth.context.role);
+    : canMutateInventario(auth.context.role, auth.context.uiRole);
   if (!permitido) {
     return NextResponse.json({ error: "No tienes permisos para adjuntar este archivo." }, { status: 403 });
   }

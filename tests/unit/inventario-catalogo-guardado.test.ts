@@ -21,6 +21,17 @@ let writes: Array<{ table: string; patch: Row }>;
 const fixtureFetch: typeof fetch = async (input, init) => {
   const url = new URL(String(input));
   const table = url.pathname.split("/").at(-1)!;
+  if (url.hostname !== 'guardado.test') throw new Error('Red externa bloqueada');
+  if (url.pathname.includes('/rpc/')) {
+    if (table !== 'editar_mueble_catalogo_seguro') throw new Error('RPC inesperada');
+    const { p_id, p_datos } = JSON.parse(String(init?.body));
+    const row = tables.muebles_catalogo.find(r => r.id === p_id);
+    if (!row) return Response.json({message:'Mueble no encontrado'},{status:400});
+    Object.assign(row,p_datos);writes.push({table:'muebles_catalogo',patch:p_datos});
+    const inv = tables.inventario_productos.find(r => r.id === p_id);
+    if (inv) {inv.foto_url=p_datos.foto_url;writes.push({table:'inventario_productos',patch:{foto_url:p_datos.foto_url}});}
+    return Response.json(p_id);
+  }
   let selected = [...tables[table]];
   for (const [key, value] of url.searchParams) {
     if (value.startsWith("eq.")) selected = selected.filter(row => String(row[key]) === value.slice(3));

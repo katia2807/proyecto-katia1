@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Combobox, type ComboboxOption } from "@/components/ui/Combobox";
-import { MOCK_CLIENTES_COMPLETO, type ClienteCompleto } from "@/lib/combobox-mocks";
+import { type ClienteCompleto } from "@/lib/combobox-mocks";
 import { cn } from "@/lib/utils";
 
 export type { ClienteCompleto };
@@ -30,7 +30,6 @@ function formatSublabel(c: ClienteCompleto) {
 
 export function ClienteCombobox({
   clientes,
-  mockData,
   value,
   onChange,
   onSelectFull,
@@ -41,7 +40,7 @@ export function ClienteCombobox({
   inputAriaLabel = "Buscar cliente",
   label,
 }: ClienteComboboxProps) {
-  const source = (mockData && clientes.length === 0) ? MOCK_CLIENTES_COMPLETO : clientes;
+  const source = clientes;
 
   const options: ComboboxOption[] = useMemo(
     () =>

@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { Combobox } from "@/components/ui/Combobox";
 import { Field, SelectField } from "@/components/ui/field";
-import { MOCK_CHOFERES, MOCK_ZONAS_ENTREGA } from "@/lib/combobox-mocks";
 import type { EstadoEntrega, TipoEntrega, ZonaEntregaRow } from "@/lib/demo-store";
 import { formatPen } from "@/lib/utils";
 
@@ -55,7 +54,6 @@ export function EntregaFormFields({
   defaultEstadoEntrega = "pendiente",
   defaultZonaId = "",
   choferesHref = "/personal",
-  mockData = false,
 }: EntregaFormFieldsProps) {
   const [tipo, setTipo] = useState<TipoEntrega>(defaultTipoEntrega);
   const [zonaId, setZonaId] = useState(defaultZonaId);
@@ -63,29 +61,8 @@ export function EntregaFormFields({
   const name = (n: string) => (prefix ? `${prefix}_${n}` : n);
   const requiereDireccion = tipo !== "entrega_local";
 
-  const effectiveChoferes = useMemo((): ChoferOption[] => {
-    if (!mockData) return choferes;
-    const injected: ChoferOption[] = MOCK_CHOFERES.map((c) => ({
-      id: c.id,
-      nombre: c.nombre,
-      telefono: c.telefono,
-      placa: c.placa,
-    }));
-    return [...injected, ...choferes];
-  }, [choferes, mockData]);
-
-  const effectiveZonas = useMemo(() => {
-    if (!mockData) return zonas;
-    const injected: Pick<ZonaEntregaRow, "id" | "nombre" | "tarifa" | "distancia_km">[] = MOCK_ZONAS_ENTREGA.map(
-      (z) => ({
-        id: z.id,
-        nombre: z.nombre,
-        tarifa: z.tarifa,
-        distancia_km: z.distancia_km,
-      }),
-    );
-    return [...injected, ...zonas];
-  }, [mockData, zonas]);
+  const effectiveChoferes = choferes;
+  const effectiveZonas = zonas;
 
   const choferComboboxOptions = useMemo(
     () => [

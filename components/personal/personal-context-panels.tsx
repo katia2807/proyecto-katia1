@@ -46,7 +46,7 @@ export function PersonalContextPanels({ empleados }: PersonalContextPanelsProps)
         title="Nuevo adelanto"
         description="Registra monto y fecha para el empleado seleccionado."
       >
-        <FeedbackForm action={formData => submitPersonalForm("adelanto", formData)} className="space-y-3">
+        <FeedbackForm action={formData => submitPersonalForm("adelanto", formData)} idempotent className="space-y-3">
           <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
             <span>Empleado</span>
             <Combobox

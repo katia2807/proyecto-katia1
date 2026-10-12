@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { IconSparkles, IconPencil } from "@tabler/icons-react";
 import { previsualizarCodigo } from "@/lib/codigo-producto";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ export function CodigoProductoPreview({
   codigoFieldName = "codigo",
   defaultCodigo = "",
 }: CodigoProductoPreviewProps) {
+  const inputId = useId();
   const [nombre, setNombre] = useState("");
   const [codigoManual, setCodigoManual] = useState(defaultCodigo);
   const [modoManual, setModoManual] = useState(Boolean(defaultCodigo));
@@ -27,10 +28,11 @@ export function CodigoProductoPreview({
       {/* Campo nombre con listener */}
       <div className="grid gap-3 md:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-[var(--katia-text-primary)] mb-1.5">
+          <label htmlFor={`${inputId}-nombre`} className="block text-sm font-medium text-[var(--katia-text-primary)] mb-1.5">
             Nombre <span aria-hidden className="text-[var(--katia-danger)]">*</span>
           </label>
           <input
+            id={`${inputId}-nombre`}
             name="nombre"
             required
             value={nombre}
@@ -46,7 +48,7 @@ export function CodigoProductoPreview({
         {/* Campo código: sugerido o manual */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-sm font-medium text-[var(--katia-text-primary)]">
+            <label htmlFor={`${inputId}-codigo`} className="text-sm font-medium text-[var(--katia-text-primary)]">
               Código <span aria-hidden className="text-[var(--katia-danger)]">*</span>
             </label>
             <button
@@ -60,10 +62,11 @@ export function CodigoProductoPreview({
           </div>
           <div className="relative">
             <input
-              name={codigoFieldName}
+              id={`${inputId}-codigo`}
+              name={modoManual ? codigoFieldName : undefined}
               required
               readOnly={!modoManual}
-              value={modoManual ? codigoManual : (sugerido?.replace("###", "001") ?? "")}
+              value={modoManual ? codigoManual : (sugerido ?? "")}
               onChange={(e) => modoManual && setCodigoManual(e.target.value)}
               placeholder={modoManual ? "MAD-ROB-2605-001" : "Escribe el nombre para sugerir…"}
               className={cn(
@@ -79,6 +82,10 @@ export function CodigoProductoPreview({
               <IconSparkles className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-[var(--katia-primary)]" />
             ) : null}
           </div>
+          {!modoManual ? <>
+            <input type="hidden" name={codigoFieldName} value={sugerido ?? ""} />
+            <input type="hidden" name={`${codigoFieldName}_automatico`} value="1" />
+          </> : null}
           {!modoManual && sugerido ? (
             <p className="mt-1 text-xs text-[var(--katia-text-tertiary)]">
               Código sugerido automáticamente · ### = secuencia al guardar

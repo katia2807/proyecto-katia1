@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.78";
+export const APP_VERSION = "1.1.81";
 export const APP_LAST_UPDATE = "11/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Los botones de acción usan ahora colores neutrales en ambos temas: oscuros en modo claro y claros en modo oscuro. Los estados e iconos conservan sus colores, para mantener las alertas fáciles de reconocer.";
+  "Se protegen cotizaciones, adelantos y entradas de inventario frente a reintentos y guardados incompletos. La auditoría y los adjuntos respetan los permisos; los selectores usan registros existentes y fechas de Perú.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {

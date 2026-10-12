@@ -94,6 +94,15 @@ describe("subida del comprobante", () => {
 });
 
 describe("permisos y almacenamiento del comprobante", () => {
+  test.each(['muebles','compras','comprobantes'])('respeta solo lectura aunque el rol heredado sea dueña: %s', async bucket => {
+    mocks.getAuthContext.mockResolvedValue({role:'owner_admin',uiRole:'readonly',organizationId:org});
+    expect((await POST(peticion(bucket))).status).toBe(403);
+    expect(mocks.mkdir).not.toHaveBeenCalled();expect(mocks.upload).not.toHaveBeenCalled();
+  });
+  test.each(['muebles','comprobantes'])('almacén puede adjuntar en su formulario: %s', async bucket => {
+    mocks.getAuthContext.mockResolvedValue({role:'almacen',uiRole:null,organizationId:org});
+    expect((await POST(peticion(bucket))).status).toBe(200);
+  });
   test.each(["owner_admin", "gerencia", "caja", "operaciones_caja"])("permite adjuntar al rol de Caja %s", async role => {
     mocks.getAuthContext.mockResolvedValue({ role, uiRole: null, organizationId: org });
     const respuesta = await POST(peticion());

@@ -22,11 +22,8 @@ import {
   demoUpdateChofer,
   demoCreateCliente,
   demoUpdateClienteDatos,
-  demoCreateCotizacionUnificada,
   demoCreateCorte,
   demoCreateEmpleado,
-  demoCreateInventarioMovimiento,
-  demoCreateInventarioProducto,
   demoDeleteInventarioMovimiento,
   demoDeleteInventarioProducto,
   demoCreateMuebleCatalogo,
@@ -65,17 +62,19 @@ import {
 import { nextCorrelativo } from "@/lib/numeracion";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { inventarioCostoUnitarioOpcionalSchema } from "@/lib/inventario-validation";
+import { registrarAltaInventario } from '@/lib/inventario-altas';
 import { cajaMovimientoSchema } from "@/lib/caja-movimiento-validation";
 import { cajaEliminacionBloqueo } from "@/lib/caja-eliminacion";
 import { cajaReintentoCoincide, CAJA_REINTENTO_CONFLICTO } from "@/lib/caja-reintento";
 import type { MutationFormState } from "@/lib/mutation-form-state";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { AppRole, Json } from "@/lib/supabase/types";
-import { roundMoney, safeDivide, parseDecimal } from "@/lib/utils";
+import { roundMoney, safeDivide, parseDecimal, fechaHoyPeru } from "@/lib/utils";
 import { claveOperacion, registrarOperacionIntegral, anularOperacionIntegral, nombreClienteOperacion } from '@/lib/operaciones-integrales';
 import { montoCobradoVenta, mensajeOperacionFinanciera } from "@/lib/ventas-pago";
 import { registrarServicioIntegral } from '@/lib/servicios-integrales';
 import { registrarCotizacionRapida } from '@/lib/cotizacion-rapida';
+import { cotizacionUnificadaIdentidadSchema, registrarCotizacionUnificada } from '@/lib/cotizacion-unificada-guardado';
 import { canCorrectHistoricalMadera } from '@/lib/permissions';
 import { resumenCobroLocal } from "@/lib/cotizacion-cobros";
 import {
@@ -109,13 +108,13 @@ const margenGananciaConfigSchema = z.object({
 
 const ventaSchema = z.object({
   clienteId: z.string().uuid(),
-  fecha: z.string().min(1),
+  fecha: z.iso.date(),
   total: moneySchema(z.number().positive()),
   estado: z.enum(["borrador", "confirmada"]).default("borrador"),
   metodoPago: z.enum(["efectivo", "yape", "transferencia", "billetera_digital", "otro"]).default("efectivo"),
   modalidadPago: z.enum(["contado", "adelanto", "adelanto_saldo", "credito"]).default("contado"),
   adelanto: moneySchema(z.number().nonnegative()).default(0),
-  fechaPagoCredito: z.string().optional(),
+  fechaPagoCredito: z.iso.date().optional().or(z.literal("")),
   productoInventarioId: z.string().uuid().optional(),
   cantidadProducto: z.preprocess(
     (value) => (value === "" || value === null ? undefined : value),
@@ -128,14 +127,14 @@ const ventaSchema = z.object({
 const alquilerSchema = z.object({
   clienteId: z.string().uuid(),
   activo: z.string().min(2),
-  fechaInicio: z.string().min(1),
+  fechaInicio: z.iso.date(),
   tarifa: z.coerce.number().positive(),
   penalidad: z.coerce.number().nonnegative().default(0),
 });
 
 const cotizacionSchema = z.object({
   clienteId: z.string().uuid(),
-  fecha: z.string().min(1),
+  fecha: z.iso.date(),
   tipo: z.enum(["mueble_personalizado", "servicio_corte"]),
   especieMadera: z.string().min(2),
   unidadMedida: z.enum(["cm", "in", "otro"]),
@@ -221,14 +220,14 @@ const ventaMuebleTerminadoSchema = z.object({
   muebleCatalogoId: z.string().uuid(),
   cantidad: z.coerce.number().int().positive(),
   precioUnitario: moneySchema(z.number().positive()),
-  fecha: z.string().min(1),
+  fecha: z.iso.date(),
   choferId: z.string().uuid().optional().or(z.literal("")),
   tipoEntrega: tipoEntregaEnum.default("envio"),
   direccionEntrega: z.string().optional(),
   estadoEntrega: estadoEntregaEnum.default("pendiente"),
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("contado"),
-  fechaPagoCredito: z.string().optional().or(z.literal("")),
+  fechaPagoCredito: z.iso.date().optional().or(z.literal("")),
   adelanto: moneySchema(z.number().nonnegative()).optional().default(0),
   montoCredito: moneySchema(z.number().nonnegative()).optional().default(0),
   tipoComprobante: z.enum(["factura", "boleta", "ninguno"]).optional().default("ninguno"),
@@ -250,7 +249,7 @@ const cambiarEstadoOrdenSchema = z.object({
 
 const ventaMaderaCortadaSchema = z.object({
   clienteId: z.string().uuid(),
-  fecha: z.string().min(1),
+  fecha: z.iso.date(),
   tipoCorte: z.enum(["tabla", "liston", "cuarton", "poste"]),
   totalPt: z.preprocess(preprocessDecimal, z.coerce.number().positive()),
   precioPorPt: moneySchema(z.number().nonnegative()),
@@ -259,7 +258,7 @@ const ventaMaderaCortadaSchema = z.object({
   total: moneySchema(z.number().nonnegative()),
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("contado"),
-  fechaPagoCredito: z.string().optional().or(z.literal("")),
+  fechaPagoCredito: z.iso.date().optional().or(z.literal("")),
   adelanto: moneySchema(z.number().nonnegative()).optional().default(0),
   montoCredito: moneySchema(z.number().nonnegative()).optional().default(0),
   choferId: z.string().uuid().optional().or(z.literal("")),
@@ -278,15 +277,15 @@ const contratoAlquilerSchema = z.object({
   representante: z.string().optional(),
   rucEmpresa: z.string().optional(),
   direccionEjecucion: z.string().optional(),
-  fechaInicio: z.string().min(1),
-  fechaTermino: z.string().optional().or(z.literal("")),
+  fechaInicio: z.iso.date(),
+  fechaTermino: z.iso.date().optional().or(z.literal("")),
   diasAlquiler: z.coerce.number().int().positive().optional(),
   tarifaUnidad: z.enum(["hora_maquina", "m3", "dia"]).default("hora_maquina"),
   tarifa: moneySchema(z.number().positive()),
   montoTotal: moneySchema(z.number().positive()),
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("adelanto"),
-  fechaPagoCredito: z.string().optional().or(z.literal("")),
+  fechaPagoCredito: z.iso.date().optional().or(z.literal("")),
   adelanto: moneySchema(z.number().nonnegative()).optional().default(0),
   montoCredito: moneySchema(z.number().nonnegative()).optional().default(0),
   penalidadRetrasoPagoPct: z.coerce.number().nonnegative().optional().default(3),
@@ -296,7 +295,7 @@ const contratoAlquilerSchema = z.object({
 
 const cerrarContratoSchema = z.object({
   contratoId: z.string().uuid(),
-  fechaCierre: z.string().min(1),
+  fechaCierre: z.iso.date(),
   observaciones: z.string().optional(),
   retrasoPago: z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean()).default(false),
   devolucionTardia: z.preprocess((v) => v === "on" || v === "true" || v === true, z.boolean()).default(false),
@@ -306,14 +305,14 @@ const cerrarContratoSchema = z.object({
 
 const servicioAserraderoSchema = z.object({
   clienteId: z.string().uuid(),
-  fecha: z.string().min(1),
+  fecha: z.iso.date(),
   piesCubicos: z.preprocess(preprocessDecimal, z.coerce.number().positive()),
   costoCubicaje: moneySchema(z.number().nonnegative()),
   precioCobrado: moneySchema(z.number().positive()),
   lineas: z.string().optional(), // JSON con desglose si aplica
   metodoPago: metodoPagoEnum.default("efectivo"),
   modalidadPago: modalidadPagoEnum.default("contado"),
-  fechaPagoCredito: z.string().optional(),
+  fechaPagoCredito: z.iso.date().optional().or(z.literal("")),
   adelanto: moneySchema(z.number().nonnegative()).optional().default(0),
   tipoComprobante: z.enum(["factura", "boleta", "ninguno"]).optional().default("ninguno"),
   urlComprobante: z.string().optional().nullable(),
@@ -327,17 +326,19 @@ const proveedorSchema = z.object({
 });
 
 const inventarioProductoSchema = z.object({
-  codigo: z.string().min(2),
-  nombre: z.string().min(2),
+  codigo: z.string().trim().min(2),
+  nombre: z.string().trim().min(2),
   categoria: z.string().min(2),
   unidad: z.string().min(1),
   stockMinimo: z.coerce.number().nonnegative(),
   fotoUrl: z.string().optional().nullable(),
+  stockInicial: z.coerce.number().nonnegative(),
+  costoUnitario: z.preprocess(v => v === null || v === "" ? undefined : v, z.coerce.number().nonnegative().optional()),
 });
 
 const inventarioMovimientoSchema = z.object({
   productoId: z.string().uuid(),
-  fecha: z.string().min(1),
+  fecha: z.iso.date(),
   tipo: z.enum(["entrada_compra", "salida_venta", "ajuste"]),
   cantidad: z.coerce.number().positive(),
   costoUnitario: inventarioCostoUnitarioOpcionalSchema,
@@ -355,7 +356,7 @@ const inventarioCompraRapidaSchema = z.object({
     z.number().nonnegative().optional(),
   ).transform((value) => value === undefined ? undefined : money(value)),
   proveedor: z.string().optional(),
-  fecha: z.string().min(1),
+  fecha: z.iso.date(),
   nota: z.string().optional(),
   tipoComprobante: z.enum(["factura", "boleta", "ninguno"]).optional().default("ninguno"),
   urlComprobante: z.string().optional().nullable(),
@@ -408,7 +409,7 @@ const inventarioDeleteMovimientoSchema = z.object({
 
 const inventarioConteoSchema = z.object({
   productoId: z.string().uuid(),
-  fecha: z.string().min(1),
+  fecha: z.iso.date(),
   stockContado: z.coerce.number().nonnegative(),
   referencia: z.string().min(3),
 });
@@ -961,6 +962,7 @@ export async function ensureClientesGenericosCotizacion(): Promise<
 
 export async function saveCotizacionUnificada(input: {
   id?: string;
+  submissionId?: string;
   clienteId: string;
   tipoCliente: "natural" | "empresa";
   fecha: string;
@@ -970,6 +972,8 @@ export async function saveCotizacionUnificada(input: {
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   try {
     const actor = await requireMutationAccess(ventasRoles);
+    const identidad = cotizacionUnificadaIdentidadSchema.safeParse(input);
+    if (!identidad.success) return { ok: false, error: 'Datos de cotización inválidos. Revisa cliente, fecha y estado; si la página es antigua, actualízala antes de guardar.' };
     const detParsed = cotizacionDetalleV1Schema.safeParse(input.detalle);
     if (!detParsed.success) {
       return { ok: false, error: "Detalle de cotización inválido." };
@@ -1053,22 +1057,9 @@ export async function saveCotizacionUnificada(input: {
         revalidatePath("/cotizacion");
         return { ok: true, id: input.id };
       }
-      const correlativo = await nextCorrelativo("cotizacion");
-      const row = demoCreateCotizacionUnificada({
-        organization_id: DEFAULT_ORG_ID,
-        cliente_id: input.clienteId,
-        fecha: input.fecha,
-        correlativo,
-        tipo_cliente: input.tipoCliente,
-        total: calculo.totalFinal,
-        estado_flujo: input.estadoFlujo,
-        detalle: detalleRecord,
-      });
-      revalidatePath("/cotizacion");
-      return { ok: true, id: row.id };
     }
 
-    if (input.id) {
+    if (input.id && supabase) {
       const { error } = await supabase.rpc('editar_cotizacion_unificada_segura', {
         p_org: actor.organizationId, p_actor: actor.userId, p_id: input.id,
         p_datos: { cliente_id: input.clienteId, tipo_cliente: input.tipoCliente, fecha: input.fecha,
@@ -1080,25 +1071,18 @@ export async function saveCotizacionUnificada(input: {
       return { ok: true, id: input.id };
     }
     const correlativo = await nextCorrelativo("cotizacion");
-    const { data, error } = await supabase
-      .from("cotizaciones_unificadas")
-      .insert({
-        organization_id: DEFAULT_ORG_ID,
+    const id = await registrarCotizacionUnificada(actor, identidad.data.submissionId!, {
+        organization_id: actor.organizationId,
         cliente_id: input.clienteId,
         fecha: input.fecha,
         correlativo,
         tipo_cliente: input.tipoCliente,
         total: calculo.totalFinal,
         estado_flujo: input.estadoFlujo,
-        detalle: detalleConResumen as unknown as Json,
-      })
-      .select("id")
-      .single();
-    if (error || !data) {
-      return { ok: false, error: error?.message ?? "No se pudo guardar." };
-    }
+        detalle: detalleRecord,
+      });
     revalidatePath("/cotizacion");
-    return { ok: true, id: data.id };
+    return { ok: true, id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
   }
@@ -1236,133 +1220,16 @@ export async function marcarListaProduccionCotizacion(
   }
 }
 
+/** Acción antigua sustituida por la aprobación conjunta de orden y adelanto. */
 export async function pasarCotizacionAProduccion(
-  id: string,
+  _id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const actor = await requireMutationAccess(ventasRoles);
-    if (!hasSupabaseEnv()) {
-      const row = demoGetCotizacionUnificada(id);
-      if (!row || row.deleted_at) {
-        return { ok: false, error: "Cotización no encontrada." };
-      }
-      if (row.estado_flujo === "cobrada") {
-        return { ok: false, error: "La cotización ya fue cobrada." };
-      }
-      if (row.estado_flujo === "en_produccion") {
-        return { ok: false, error: "Esta cotización ya está en producción." };
-      }
-      demoUpdateCotizacionUnificada(id, { estado_flujo: "en_produccion" });
-      demoCreateOrdenProduccion({
-        organization_id: DEFAULT_ORG_ID,
-        cliente_id: row.cliente_id,
-        cotizacion_id: null,
-        cotizacion_unificada_id: id,
-        estado: "en_produccion",
-        notas: `Generada desde cotización ${row.correlativo ?? id.slice(0, 8)} · Total S/ ${row.total.toFixed(2)}`,
-        correlativo: await nextCorrelativo("orden_produccion"),
-      });
-      revalidatePath("/cotizacion");
-      revalidatePath("/ventas/muebles-personalizados");
-      return { ok: true };
-    }
-    const supabase = getSupabaseServerClient();
-    const { data: row } = await supabase
-      .from("cotizaciones_unificadas")
-      .select("*")
-      .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (!row) {
-      return { ok: false, error: "Cotización no encontrada." };
-    }
-    if (row.estado_flujo === "cobrada") {
-      return { ok: false, error: "La cotización ya fue cobrada." };
-    }
-
-    const { data: ordenExistente } = await supabase
-      .from("ordenes_produccion")
-      .select("id")
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .eq("cotizacion_unificada_id", id)
-      .maybeSingle();
-
-    if (ordenExistente) {
-      return {
-        ok: false,
-        error: "Esta cotización ya tiene una orden de producción.",
-      };
-    }
-
-    const prevEstado = row.estado_flujo;
-    const debeActualizarFlujo = prevEstado !== "en_produccion";
-
-    if (debeActualizarFlujo) {
-      const { data: updated, error: upErr } = await supabase
-        .from("cotizaciones_unificadas")
-        .update({ estado_flujo: "en_produccion" })
-        .eq("id", id)
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .is("deleted_at", null)
-        .neq("estado_flujo", "cobrada")
-        .select("id");
-      if (upErr) {
-        return { ok: false, error: upErr.message };
-      }
-      if (!updated?.length) return { ok: false, error: "La cotización cambió o ya está cobrada. Actualiza antes de continuar." };
-    }
-
-    const correlativo = await nextCorrelativo("orden_produccion");
-    const hoy = new Date().toISOString().slice(0, 10);
-
-    const { data: clienteRow } = await supabase
-      .from("clientes")
-      .select("nombre")
-      .eq("id", row.cliente_id)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .maybeSingle();
-
-    const clienteNombre = clienteRow?.nombre ?? "Cliente";
-
-    const notas = textoNotasOrdenProduccionDesdeUnificada({
-      clienteNombre,
-      correlativo: row.correlativo,
-      cotIdShort: id.slice(0, 8),
-      total: Number(row.total),
-      detalle: row.detalle,
-    });
-
-    const { error: ordenErr } = await supabase.from("ordenes_produccion").insert({
-      organization_id: DEFAULT_ORG_ID,
-      cliente_id: row.cliente_id,
-      cotizacion_id: null,
-      cotizacion_unificada_id: id,
-      estado: "en_produccion",
-      notas,
-      fecha_aprobacion: hoy,
-      correlativo,
-      created_by: actor.userId,
-      updated_by: actor.userId,
-    });
-
-    if (ordenErr) {
-      if (debeActualizarFlujo) {
-        await supabase
-          .from("cotizaciones_unificadas")
-          .update({ estado_flujo: prevEstado })
-          .eq("id", id)
-          .eq("organization_id", DEFAULT_ORG_ID)
-          .neq("estado_flujo", "cobrada");
-      }
-      return { ok: false, error: ordenErr.message };
-    }
-
-    revalidatePath("/cotizacion");
-    revalidatePath("/ventas/muebles-personalizados");
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Ocurrio un problema, intenta de nuevo." };
+    void _id;
+    await requireMutationAccess(ventasRoles);
+    return { ok: false, error: 'Usa «Aprobar → Orden + Adelanto» en Muebles personalizados para crear la orden de forma segura.' };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'No se pudo comprobar el acceso.' };
   }
 }
 
@@ -1849,6 +1716,7 @@ export async function createEmpleado(formData: FormData) {
 
 export async function createAdelanto(formData: FormData) {
   const actor = await requireMutationAccess(rrhhRoles);
+  const submissionId = claveOperacion(formData, true);
   const parsed = adelantoSchema.safeParse({
     empleadoId: formData.get("empleado_id"),
     fecha: formData.get("fecha"),
@@ -1864,17 +1732,24 @@ export async function createAdelanto(formData: FormData) {
       empleado_id: parsed.data.empleadoId,
       fecha: parsed.data.fecha,
       monto: parsed.data.monto,
-    });
+    }, submissionId);
   } else {
     const supabase = getSupabaseServerClient();
     const { error } = await supabase.from("adelantos").insert({
+      id: submissionId,
       organization_id: actor.organizationId,
       empleado_id: parsed.data.empleadoId,
       fecha: parsed.data.fecha,
       monto: parsed.data.monto,
       estado: "pendiente",
     });
-    if (error) {
+    if (error?.code === '23505') {
+      const { data: previo, error: lectura } = await supabase.from('adelantos').select('empleado_id,fecha,monto')
+        .eq('id', submissionId).eq('organization_id', actor.organizationId).maybeSingle();
+      if (lectura || !previo || previo.empleado_id !== parsed.data.empleadoId || previo.fecha !== parsed.data.fecha || Number(previo.monto) !== parsed.data.monto) {
+        throw new Error('Este envío no coincide con el adelanto guardado. Revisa el historial antes de volver a registrarlo.');
+      }
+    } else if (error) {
       throw new Error(error.message);
     }
   }
@@ -2000,144 +1875,37 @@ export async function toggleSecurityControl(formData: FormData) {
 }
 
 export async function createInventarioProducto(formData: FormData) {
-  await requireMutationAccess(writerRoles);
+  const actor = await requireMutationAccess(writerRoles);
   const parsed = inventarioProductoSchema.safeParse({
-    codigo: formData.get("codigo"),
-    nombre: formData.get("nombre"),
-    categoria: formData.get("categoria"),
-    unidad: formData.get("unidad"),
-    stockMinimo: formData.get("stock_minimo"),
-    fotoUrl: formData.get("foto_url"),
+    codigo: formData.get('codigo'), nombre: formData.get('nombre'), categoria: formData.get('categoria'),
+    unidad: formData.get('unidad'), stockMinimo: formData.get('stock_minimo'), fotoUrl: formData.get('foto_url'),
+    stockInicial: formData.get('stock_inicial'), costoUnitario: formData.get('costo_unitario'),
   });
-  if (!parsed.success) {
-    const errors = parsed.error.flatten().fieldErrors;
-    if (errors.categoria || errors.unidad) {
-      throw new Error("Selecciona una categoría y una unidad antes de guardar.");
-    }
-    throw new Error("Datos de producto inválidos.");
-  }
-
-  // Parse new optional fields
-  const stockInicialRaw = formData.get("stock_inicial");
-  const costoUnitarioRaw = formData.get("costo_unitario");
-  const stockInicial = stockInicialRaw ? Number(stockInicialRaw) : 0;
-  const costoUnitario = costoUnitarioRaw ? Number(costoUnitarioRaw) : 0;
-
-  const productoId = randomUUID();
-
-  if (!hasSupabaseEnv()) {
-    demoCreateInventarioProducto({
-      id: productoId,
-      organization_id: DEFAULT_ORG_ID,
-      codigo: parsed.data.codigo,
-      nombre: parsed.data.nombre,
-      categoria: parsed.data.categoria,
-      unidad: parsed.data.unidad,
-      stock_minimo: parsed.data.stockMinimo,
-      foto_url: parsed.data.fotoUrl ?? null,
-      costo_unitario: costoUnitario > 0 ? costoUnitario : null,
-    });
-
-    if (stockInicial > 0) {
-      demoCreateInventarioMovimiento({
-        organization_id: DEFAULT_ORG_ID,
-        producto_id: productoId,
-        fecha: new Date().toISOString().split("T")[0],
-        tipo: "entrada_compra",
-        cantidad: stockInicial,
-        costo_unitario: costoUnitario > 0 ? costoUnitario : null,
-        referencia: "Carga inicial de inventario",
-      });
-    }
-  } else {
-    const supabase = getSupabaseServerClient();
-    const { error } = await supabase.from("inventario_productos").insert({
-      id: productoId,
-      organization_id: DEFAULT_ORG_ID,
-      codigo: parsed.data.codigo,
-      nombre: parsed.data.nombre,
-      categoria: parsed.data.categoria,
-      unidad: parsed.data.unidad,
-      stock_minimo: parsed.data.stockMinimo,
-      stock_actual: 0,
-      activo: true,
-      foto_url: parsed.data.fotoUrl ?? null,
-      costo_unitario: costoUnitario > 0 ? costoUnitario : null,
-    });
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (stockInicial > 0) {
-      const { error: movError } = await supabase.from("inventario_movimientos").insert({
-        organization_id: DEFAULT_ORG_ID,
-        producto_id: productoId,
-        fecha: new Date().toISOString().split("T")[0],
-        tipo: "entrada_compra",
-        cantidad: stockInicial,
-        costo_unitario: costoUnitario > 0 ? costoUnitario : null,
-        referencia: "Carga inicial de inventario",
-      });
-      if (movError) {
-        throw new Error(movError.message);
-      }
-    }
-  }
-  revalidatePath("/inventario");
-  revalidatePath("/");
-  try {
-    maybeRedirectToQuickStep(formData);
-  } catch {
-    /* redirect intencional */
-  }
+  if (!parsed.success) throw new Error('Datos de producto inválidos. Revisa el código, las existencias y el costo.');
+  const p = parsed.data;
+  const id = await registrarAltaInventario(actor, 'producto_inventario', claveOperacion(formData, true), {
+    codigo: p.codigo, nombre: p.nombre, categoria: p.categoria, unidad: p.unidad, stock_minimo: p.stockMinimo,
+    foto_url: p.fotoUrl ?? null, costo_unitario: p.costoUnitario && p.costoUnitario > 0 ? p.costoUnitario : null,
+    stock_inicial: p.stockInicial, fecha: fechaHoyPeru(),
+    ...(formData.get('codigo_automatico') === '1' ? { codigo_automatico: true } : {}),
+  });
+  revalidatePath('/inventario'); revalidatePath('/');
+  return id;
 }
 
 export async function createInventarioMovimiento(formData: FormData) {
-  await requireMutationAccess(writerRoles);
+  const actor = await requireMutationAccess(writerRoles);
   const parsed = inventarioMovimientoSchema.safeParse({
-    productoId: formData.get("producto_id"),
-    fecha: formData.get("fecha"),
-    tipo: formData.get("tipo"),
-    cantidad: formData.get("cantidad"),
-    costoUnitario: formData.get("costo_unitario"),
-    referencia: formData.get("referencia"),
+    productoId: formData.get('producto_id'), fecha: formData.get('fecha'), tipo: formData.get('tipo'),
+    cantidad: formData.get('cantidad'), costoUnitario: formData.get('costo_unitario'), referencia: formData.get('referencia'),
   });
-  if (!parsed.success) {
-    throw new Error("Datos de movimiento de inventario inválidos.");
-  }
-
-  if (!hasSupabaseEnv()) {
-    demoCreateInventarioMovimiento({
-      organization_id: DEFAULT_ORG_ID,
-      producto_id: parsed.data.productoId,
-      fecha: parsed.data.fecha,
-      tipo: parsed.data.tipo,
-      cantidad: parsed.data.cantidad,
-      costo_unitario: parsed.data.costoUnitario ?? null,
-      referencia: parsed.data.referencia ?? null,
-    });
-  } else {
-    const supabase = getSupabaseServerClient();
-    const { error } = await supabase.from("inventario_movimientos").insert({
-      organization_id: DEFAULT_ORG_ID,
-      producto_id: parsed.data.productoId,
-      fecha: parsed.data.fecha,
-      tipo: parsed.data.tipo,
-      cantidad: parsed.data.cantidad,
-      costo_unitario: parsed.data.costoUnitario ?? null,
-      referencia: parsed.data.referencia ?? null,
-    });
-    if (error) {
-      throw new Error(error.message);
-    }
-  }
-  revalidatePath("/inventario");
-  revalidatePath("/");
-  try {
-    maybeRedirectToQuickStep(formData);
-  } catch {
-    /* redirect intencional */
-  }
+  if (!parsed.success) throw new Error('Datos de movimiento de inventario inválidos. Revisa producto, fecha, cantidad y costo.');
+  const p = parsed.data;
+  await registrarAltaInventario(actor, 'movimiento_inventario', claveOperacion(formData, true), {
+    producto_id: p.productoId, fecha: p.fecha, tipo: p.tipo, cantidad: p.cantidad,
+    costo_unitario: p.costoUnitario ?? null, referencia: p.referencia ?? null,
+  });
+  revalidatePath('/inventario'); revalidatePath('/');
 }
 
 export async function submitCreateInventarioProductoForm(
@@ -2145,11 +1913,12 @@ export async function submitCreateInventarioProductoForm(
   formData: FormData,
 ): Promise<MutationFormState> {
   try {
-    await createInventarioProducto(formData);
+    const id = await createInventarioProducto(formData);
     return {
       success: true,
       error: null,
       message: "Producto creado con éxito.",
+      id,
     };
   } catch (e) {
     return {
@@ -2456,63 +2225,22 @@ export async function createMuebleCatalogo(formData: FormData) {
 }
 
 export async function updateMuebleCatalogo(formData: FormData) {
-  await requireMutationAccess(ventasRoles);
-  const parsed = muebleCatalogoUpdateSchema.safeParse({
-    id: formData.get("id"),
-    descripcion: formData.get("descripcion"),
-    precioLista: formData.get("precio_lista"),
-    fotoUrl: formData.get("foto_url"),
-  });
-  if (!parsed.success) {
-    throw new Error("Datos de mueble inválidos.");
-  }
-
+  const actor = await requireMutationAccess(ventasRoles);
+  const parsed = muebleCatalogoUpdateSchema.safeParse({ id: formData.get('id'), descripcion: formData.get('descripcion'),
+    precioLista: formData.get('precio_lista'), fotoUrl: formData.get('foto_url') });
+  if (!parsed.success) throw new Error('Datos de mueble inválidos.');
+  const p = parsed.data, datos = { descripcion: p.descripcion?.trim() || null,
+    precio_lista: p.precioLista, foto_url: p.fotoUrl?.trim() || null };
   if (!hasSupabaseEnv()) {
-    const updated = demoUpdateMuebleCatalogo(parsed.data.id, {
-      descripcion: parsed.data.descripcion?.trim() || null,
-      precio_lista: parsed.data.precioLista,
-      foto_url: parsed.data.fotoUrl?.trim() || null,
-    });
-    if (!updated) throw new Error("Mueble no encontrado.");
+    if (!demoUpdateMuebleCatalogo(p.id, datos)) throw new Error('Mueble no encontrado.');
   } else {
-    const supabase = getSupabaseServerClient();
-
-    // Obtener los datos del catálogo actual para hacer matching en el inventario
-    const { data: currentMueble } = await supabase
-      .from("muebles_catalogo")
-      .select("codigo, nombre")
-      .eq("id", parsed.data.id)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .single();
-
-    const { error } = await supabase
-      .from("muebles_catalogo")
-      .update({
-        descripcion: parsed.data.descripcion?.trim() || null,
-        precio_lista: parsed.data.precioLista,
-        foto_url: parsed.data.fotoUrl?.trim() || null,
-      })
-      .eq("id", parsed.data.id)
-      .eq("organization_id", DEFAULT_ORG_ID);
-    if (error) throw new Error(error.message);
-
-    // Sincronizar la foto al guardar, conservando el costo del inventario.
-    if (currentMueble) {
-      const filterStr = `id.eq.${parsed.data.id},codigo.eq.${currentMueble.codigo || "NONE_VALUE"},nombre.ilike.${currentMueble.nombre}`;
-      await supabase
-        .from("inventario_productos")
-        .update({
-          foto_url: parsed.data.fotoUrl?.trim() || null,
-        })
-        .or(filterStr)
-        .eq("organization_id", DEFAULT_ORG_ID);
-    }
+    const { data, error } = await getSupabaseServerClient().rpc('editar_mueble_catalogo_seguro', {
+      p_org: actor.organizationId, p_actor: actor.userId, p_id: p.id, p_datos: datos,
+    });
+    if (error) throw new Error(mensajeOperacionFinanciera(error));
+    if (data !== p.id) throw new Error('No se pudo confirmar el cambio del catálogo. Actualiza antes de reintentar.');
   }
-
-  revalidatePath("/inventario");
-  revalidatePath("/ventas");
-  revalidatePath("/ventas/muebles-terminados");
-  revalidatePath("/cotizacion");
+  revalidatePath('/inventario'); revalidatePath('/ventas'); revalidatePath('/ventas/muebles-terminados'); revalidatePath('/cotizacion');
 }
 
 export async function toggleMuebleCatalogoActivo(formData: FormData) {
@@ -2717,12 +2445,13 @@ export async function aprobarCotizacionAOrden(formData: FormData) {
       const unificada = antigua ? undefined : demoGetCotizacionUnificada(cotizacionId);
       const cot = antigua ?? unificada;
       if (!cot || unificada?.deleted_at) throw new Error("La cotización ya no existe.");
-      if ((antigua && antigua.estado !== "confirmada") || (unificada && !["lista_produccion", "en_produccion"].includes(unificada.estado_flujo))) throw new Error("Solo se puede aprobar una cotización aceptada y sin cobro completo.");
+      if ((antigua && antigua.estado !== "confirmada") || (unificada && !["lista_produccion", "en_produccion", "cobrada"].includes(unificada.estado_flujo))) throw new Error("Solo se puede aprobar una cotización aceptada.");
       const ordenes = demoOrdenesProduccionRows();
       if (ordenes.some(o => o.organization_id === DEFAULT_ORG_ID && (antigua ? o.cotizacion_id : o.cotizacion_unificada_id) === cotizacionId)) throw new Error("Esta cotización ya tiene una orden de producción.");
       const total = Number(antigua ? antigua.precio_acordado : unificada!.total);
       montoCobradoVenta(total, "adelanto", adelanto);
       const resumen = resumenCobroLocal(total, cotizacionId, DEFAULT_ORG_ID, demoCajaRows(), ordenes, !antigua);
+      if (unificada?.estado_flujo === 'cobrada' && (resumen.saldo !== 0 || adelanto !== 0)) throw new Error('La cotización cobrada solo puede generar la orden, con adelanto cero y pago completo verificado.');
       if (adelanto > resumen.saldo) throw new Error("El adelanto no puede superar el saldo de la cotización.");
       let notasFinal = notas?.trim() || null;
       if (unificada) {
@@ -2737,7 +2466,7 @@ export async function aprobarCotizacionAOrden(formData: FormData) {
       if (adelanto > 0) demoCreateCaja({ organization_id: DEFAULT_ORG_ID, fecha, tipo: "ingreso", medio,
         categoria: "adelanto_mueble_personalizado", monto: adelanto, descripcion: "Adelanto al aprobar cotización " + (cot.correlativo ?? cotizacionId.slice(0, 8)),
         modulo_origen: "ventas", referencia_id: orden.id });
-      if (unificada) demoUpdateCotizacionUnificada(cotizacionId, { estado_flujo: "en_produccion" });
+      if (unificada && unificada.estado_flujo !== 'cobrada') demoUpdateCotizacionUnificada(cotizacionId, { estado_flujo: "en_produccion" });
     });
   } else {
     const supabase = getSupabaseServerClient();

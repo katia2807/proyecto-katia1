@@ -20,6 +20,7 @@ import { formatDate, formatPen } from "@/lib/utils";
 import { ReportesResumenPanel } from "@/components/reportes/reportes-resumen-panel";
 import { buildReportesResumen, normalizeReportesResumen, reportesResumenError, reportesResumenQuery, type ReportesResumenParams } from "@/lib/reportes-resumen";
 import { listadoPagina, listadoTamano } from "@/lib/listado-paginacion";
+import { ANTIFRAUDE_COOKIE, verificarAccesoAntifraude } from '@/lib/antifraude-acceso';
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ type ReportesPageProps = {
   searchParams?: Promise<ReportesResumenParams & { por_pagina?: string | string[]; pagina?: string | string[] }>;
 };
 
-const COOKIE_KEY = "antifraud_access";
+const COOKIE_KEY = ANTIFRAUDE_COOKIE;
 
 function firstParam(value: string | string[] | undefined): string {
   if (Array.isArray(value)) return value[0] ?? "";
@@ -54,7 +55,7 @@ export default async function ReportesPage({ searchParams }: ReportesPageProps) 
   const seleccionQuery = reportesResumenQuery(filtros);
   const paginaHref = (page: number) => `/reportes?${seleccionQuery ? `${seleccionQuery}&` : ""}por_pagina=${pageSize}&pagina=${page}#movimientos-reportes`;
   const canAccessAntifraude = canDoCloseMonth;
-  const hasAntifraudePermission = cookieStore.get(COOKIE_KEY)?.value === "granted";
+  const hasAntifraudePermission = verificarAccesoAntifraude(cookieStore.get(COOKIE_KEY)?.value, context);
   const today = fechaHoyPeru();
   const anio = Number(today.slice(0, 4));
   const mes = Number(today.slice(5, 7));

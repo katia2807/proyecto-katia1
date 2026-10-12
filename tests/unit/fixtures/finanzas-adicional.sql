@@ -1,5 +1,6 @@
 -- Completa únicamente la estructura ficticia usada en las pruebas sin red.
 alter table inventario_productos add column if not exists costo_unitario numeric;
+alter table inventario_productos add column if not exists deleted_at timestamptz;
 alter table cotizaciones_unificadas add column if not exists tipo_cliente text;
 create type public.estado_cotizacion_unificada as enum('pendiente','lista_produccion','en_produccion','cobrada','terminado','entregado','inactivo','deudor');
 alter table cotizaciones_unificadas alter column estado_flujo type public.estado_cotizacion_unificada using estado_flujo::public.estado_cotizacion_unificada;

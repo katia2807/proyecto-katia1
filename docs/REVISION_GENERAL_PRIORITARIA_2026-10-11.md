@@ -1,0 +1,56 @@
+# Revisión ampliada y correcciones prioritarias
+
+Fecha: 11/10/2026. Revisión y reparación local **1.1.81**, seguida de instalación de los controles SQL el mismo día. La publicación del código y su lectura final están pendientes; última publicación comprobada **1.1.78**. Durante la reparación no se accedió a producción. La instalación posterior, autorizada por «Publicarlo», usa únicamente la base habitual y no crea otras bases del negocio.
+
+Se amplió el recorrido de fuentes y acciones a todo el programa, priorizando dinero, existencias, guardados y permisos. Esto es una revisión por riesgos y regresiones, no una certificación exhaustiva de cada combinación de datos o de ausencia de errores. Conserva las fórmulas y preferencias acordadas; incluye [la reparación de Cotización unificada y Personal](CORRECCIONES_COTIZACION_UNIFICADA_Y_PERSONAL_2026-10-11.md).
+
+## Nuevos problemas corregidos
+
+| ID / prioridad | Evidencia y corrección |
+| --- | --- |
+| INV-ALTA-01 / alta | Al fallar el Kardex quedaba el producto con stock cero. Alta y carga inicial pasan a una sola transacción con clave estable: el fallo revierte producto, catálogo, movimiento y recibo. No se añade un egreso de Caja a una carga inicial. Se validan existencias/costo sin cambiar su tratamiento numérico anterior. |
+| INV-ALTA-02 / alta | Perder la respuesta de una entrada y reintentar producía dos movimientos y stock 120 en vez de 110. La misma clave conserva una entrada; otra clave permite otra operación. Stock insuficiente o producto ajeno no deja filas parciales. |
+| ADJ-01 / alta | Adjuntos ajenos a Caja usaban el rol heredado e ignoraban «solo lectura». Se usa el permiso efectivo de cada apartado antes de escribir archivo o Storage. Almacén conserva la subida de fotos y comprobantes de inventario. No se cambian buckets, archivos o permisos reales. |
+| AUD-01 / alta | El acceso adicional a la auditoría aceptaba el literal `granted`, que un usuario con sesión y acceso a Reportes podía introducir en su navegador sin validar el código. Ahora se firma la autorización con el código existente, vinculada a cuenta/empresa y cuatro horas. Código correcto y revocación conservan el flujo. Un marcador antiguo, alterado, vencido o ajeno se rechaza. No permite saltarse la autenticación ni se probó explotación en producción. |
+| CAT-01 / media | La sincronización de fotos por nombre/código también modificaba otro producto de nombre coincidente. Guardar catálogo y foto pasa a una transacción por identidad/empresa, conserva costo/stock y rechaza un ID inexistente. Fallo de sincronización revierte el precio. |
+| SEL-01 / media, local con flag | Los selectores de aprobación, inventario, madera y entrega reemplazaban o mezclaban registros del almacén con ejemplos cuando `NEXT_PUBLIC_COMBOBOX_MOCK` estaba activo. Clientes/catalogo vacíos también recibían IDs ficticios. Los selectores operativos ahora usan registros recibidos, también en demo. Las plantillas de ejemplo explícitas se conservan; no se afirma que la bandera estuviera activa en producción. |
+| FECHA-01 / media | Cotización rápida, Aserradero, Alquiler y cierre de contrato proponían fecha UTC. Ahora proponen el día de Perú, editable. Las acciones de documentos/movimientos comprueban fechas de calendario válidas. No se cambiaron duración, penalidades ni fórmulas. |
+| INV-UI-01 / uso | «Guardar y agregar movimiento» no describía el resultado real del guardado. Se aclara como «Guardar producto», se confirma el ID y se conserva el cierre habitual del panel. Se evita interpretar una redirección como fallo posterior al guardado. Nombre/código reciben etiquetas asociadas para navegación accesible. |
+| INV-UI-02 / media | Tras guardar desde `quick=producto`, cambiar de pestaña reabría el alta vacía. Los envíos exitosos retiran los parámetros de apertura conservando consulta/pestaña; los avisos se procesan una vez por resultado. Compra, Producto y Movimiento conservan campos ante un error y bloquean el envío pendiente. El envío manual evita el reinicio automático del formulario que React realizaba también cuando el servidor devolvía un error. |
+| COD-01 / media | La sugerencia decía que asignaría secuencia al guardar, pero enviaba siempre «001»: dos nombres con el mismo prefijo chocaban. Ahora envía la plantilla estable y el guardado asigna el siguiente código bajo el bloqueo de empresa. Reintentar conserva código/stock y dos solicitudes concurrentes reciben códigos distintos. Códigos escritos manualmente y registros anteriores no se renumeran; 999 pasa a 1000 sin truncar. |
+
+Las tres primeras reproducciones de Inventario/Catálogo se ejecutaron antes de reparar usando acciones actuales, SDK y SQL ficticios. Fallaron las aserciones del resultado correcto: dos productos tras fallo de carga, dos entradas tras respuesta perdida y foto del producto ajeno reemplazada. Diagnóstico privado: `temp/revision-1.1.80/diagnostico-inventario.json`. No integrar el resultado incorrecto como requisito para publicar.
+
+## Recorrido por apartados
+
+| Área | Alcance adicional de esta revisión |
+| --- | --- |
+| Inicio, Caja y Ventas | Lectores/resúmenes y acciones financieras compartidas; regresiones previas de cobros, cierre mensual, anulaciones, stock y edición incluidas en la batería. No se retocan pantallas o fórmulas sin un hallazgo. |
+| Cotización / Producción / Personal | Ocho hallazgos del diagnóstico 1.1.79 reparados; guardados fallidos, reintentos y vínculos comprobados. |
+| Inventario / Catálogo | Altas, movimientos manuales y sincronización por identidad reparados. Conteos, edición y borrados seguros anteriores se vuelven a comprobar en los tests. |
+| Clientes / Registro | Acciones y validaciones revisadas; baterías existentes incluidas. Fecha inválida se rechaza. No se fusionan clientes, borran registros reales ni cambian clasificaciones. |
+| Centro de Mando / Reportes | Lectores completos y resúmenes revisados. La nómina sigue informativa y no se resta dos veces de Caja. Acceso a auditoría firmado; no se cambian indicadores. |
+| Usuarios / Cuenta / Configuración | Revisión de autorizaciones y resultados parciales de Auth/perfil/empresa; regresiones actuales incluidas. No se enviaron invitaciones ni cambiaron cuentas, tarifas o contraseña. |
+| Respaldo / Importación / Adjuntos | Lectura del control de permisos, importación por fila y rutas de archivos. Nuevo permiso de adjuntos comprobado con almacenamiento simulado. No se restauró, limpió ni importó una base real. |
+| Ayuda / Navegación / auxiliares | Rutas, aliases y controles existentes revisados por carga local. No se activan funciones ocultas ni se rediseña el programa. |
+
+## Evidencia
+
+- Batería final: **881 pruebas en 62 archivos**, sin fallos. `temp/revision-1.1.80/completas-cierre.json`. El registro anterior de 876 es la etapa previa al arreglo de la sugerencia de códigos.
+- **24 escenarios con conexiones independientes a PostgreSQL 17.11**, sin fallos. Incluyen cinco casos de Inventario: alta repetida, códigos manuales en conflicto, asignación concurrente de códigos sugeridos, entrada repetida y salidas concurrentes con stock insuficiente. Cluster solo loopback, directorio temporal exclusivo y apagado al terminar. `temp/pruebas-operaciones-postgres/a51dea26-843e-4119-ab0c-8c5374e7ccc0/resultado.json`.
+- SDK/PGlite aislados y memoria local con persistencia simulada en `tests/unit/inventario-altas-{seguras,local}.test.ts`. Permisos de adjuntos en `caja-comprobante.test.ts`; firma, cuenta/empresa, vencimiento, manipulación y revocación en `antifraude-acceso.test.ts`.
+- Tipos de aplicación/pruebas y compilación optimizada aprobados. ESLint sin errores; advertencias existentes de código no usado, sin desactivar reglas. Revisión React: hooks incondicionales, claves conservadas al fallar, estados pendientes recuperados, sin secretos enviados al cliente y etiquetas de formulario asociadas.
+- Edge, copia aislada: producción de cotización pagada sin nuevo cobro, historial de adelanto S/150 y acceso/revocación de auditoría aprobados. Inventario: producto con carga inicial 10 y entrada manual 10 → stock 20; segundo producto con carga/entrada 1 → stock 2. El intento con código ocupado conserva nombre, categoría, unidad, mínimo, cantidad y costo; el código sugerido recibe 002 y cierra el panel. Cambiar a Kardex/Productos ya no lo reabre. Cuatro movimientos y dos productos/catalogo nuevos solo en la copia. Consola sin errores/advertencias detectados en el recorrido. Capturas en `temp/revision-1.1.80/`, incluida `inventario-verificado-local.png`.
+- Comparación del almacén aislado: 46 movimientos de Caja, todos sus importes/vínculos y las filas anteriores conservados. Se documenta la normalización del hidratador sobre siete filas ficticias sembradas sin `deleted_at` y sobre el comprobante nulo del pago ficticio; no afecta dinero ni los archivos originales. Evidencia `temp/revision-1.1.80/cierre-navegador.json`.
+- Lectura HTTP de las **35 rutas de página sin ID**, derivadas del manifiesto compilado: respuesta 200 con encabezados y sin pantalla de error. Ocho redirecciones esperadas: sesión ya iniciada, aliases, auditoría y rutas fuera del menú permitido. Esto verifica carga del servidor, no la interacción de cada componente ni los flujos reales de Auth. El almacén de la copia no cambió durante las cargas. `temp/revision-1.1.80/rutas-locales.json`.
+- Servidor habitual restaurado en desarrollo/3001 con `temp/propuesta-visual-1.1.64/store.json`, salud 200 en demo sin Supabase. Huellas originales de este archivo y `data/store.json` iguales al inicio. Servidor aislado/3002 y PostgreSQL/56383 apagados.
+
+## Límites y continuidad
+
+Las pruebas usan estructura financiera de regresión con los triggers heredados relevantes, no una reproducción íntegra de todas las políticas/índices/triggers de producción. No se realizaron pruebas de carga masiva, escrituras en Auth/Storage reales, recuperación completa nueva ni todos los recorridos en teléfono. Los demás informes mantienen su alcance y sus limitaciones.
+
+Las **dos migraciones** `20261011040000_cotizacion_unificada_segura.sql` y `20261011050000_altas_inventario_y_catalogo_seguros.sql` se instalaron el 11/10/2026, antes del código, tras preparar un respaldo completo nuevo. Índice y SHA-256 del dump comprobados; dump y huellas comparten instantánea de lectura. Comparación protegida antes/después e inmediata posterior: **46 tablas / 274 registros sin diferencias**. Cinco funciones exclusivas del servidor; fuentes instaladas coinciden con las revisadas. Evidencia privada en `temp/publicacion-1.1.81/`. Faltan publicación del código y comprobación de lectura; no aplicar reconciliaciones históricas automáticas.
+
+Las preferencias de redondeo pospuestas siguen pendientes de decisión del usuario. Antes de replicar para otras empresas, la configuración de empresa única requiere una revisión específica; este trabajo no convierte el programa en un servicio multiempresa. No añadir funciones, automatización ni nuevos indicadores como sustituto de resolver errores.
+
+Nota de parche 1.1.81 (215 caracteres): Se protegen cotizaciones, adelantos y entradas de inventario frente a reintentos y guardados incompletos. La auditoría y los adjuntos respetan los permisos; los selectores usan registros existentes y fechas de Perú.

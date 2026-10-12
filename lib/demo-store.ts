@@ -2168,6 +2168,13 @@ export function demoUpdateCotizacionUnificada(
   const row = store.cotizacionesUnificadas.find((c) => c.id === id);
   if (!row) return null;
   return demoOperacionAtomica(() => {
+    if (patch.cliente_id && !store.clientes.some(c => c.id === patch.cliente_id && c.organization_id === row.organization_id)) {
+      throw new Error('Cliente no encontrado en esta empresa.');
+    }
+    if (patch.cliente_id && patch.cliente_id !== row.cliente_id && (
+      store.ordenesProduccion.some(o => o.organization_id === row.organization_id && o.cotizacion_unificada_id === id) ||
+      store.caja.some(m => m.organization_id === row.organization_id && m.referencia_id === id)
+    )) throw new Error('No se puede cambiar el cliente: la cotización tiene una orden o movimientos en Caja vinculados.');
     if (patch.total !== undefined) {
       const resumen = resumenCobroLocal(Math.max(patch.total, 0.01), id, row.organization_id, store.caja, store.ordenesProduccion);
       if (patch.total < 0 || resumen.cobrado > patch.total) throw new Error('El total no puede ser inferior al dinero ya recibido. Revisa los cobros.');
@@ -2582,9 +2589,18 @@ export function demoCreateEmpleado(input: Omit<EmpleadoRow, "id" | "created_at" 
   persistStore();
 }
 
-export function demoCreateAdelanto(input: Omit<AdelantoRow, "id" | "created_at" | "estado">) {
-  store.adelantos.unshift({ id: randomUUID(), created_at: nowIso(), estado: "pendiente", ...input });
-  persistStore();
+export function demoCreateAdelanto(input: Omit<AdelantoRow, "id" | "created_at" | "estado">, submissionId: string = randomUUID()) {
+  return demoOperacionAtomica(() => {
+    const previo = store.adelantos.find(a => a.id === submissionId);
+    if (previo) {
+      if (Object.entries(input).some(([key, value]) => previo[key as keyof AdelantoRow] !== value)) {
+        throw new Error('Este envío no coincide con el adelanto guardado. Revisa el historial antes de volver a registrarlo.');
+      }
+      return;
+    }
+    store.adelantos.unshift({ id: submissionId, created_at: nowIso(), estado: "pendiente", ...input });
+    persistStore();
+  });
 }
 
 export function demoCreateSueldo(input: Omit<SueldoRow, "id" | "created_at">, submissionId: string = randomUUID()) {
@@ -2903,6 +2919,7 @@ export function demoUpdateMuebleCatalogo(
 ) {
   const row = store.mueblesCatalogo.find((m) => m.id === id);
   if (!row) return null;
+  return demoOperacionAtomica(() => {
   row.precio_lista = patch.precio_lista;
   row.descripcion = patch.descripcion ?? null;
   
@@ -2912,10 +2929,7 @@ export function demoUpdateMuebleCatalogo(
 
   // Actualizar también la fila correspondiente en el inventario
   const invRow = store.inventarioProductos.find(
-    (p) =>
-      p.id === id ||
-      (row.codigo && p.codigo === row.codigo) ||
-      p.nombre.toLowerCase() === row.nombre.toLowerCase()
+    (p) => p.id === id && p.organization_id === row.organization_id
   );
   if (invRow) {
     invRow.nombre = row.nombre;
@@ -2928,6 +2942,7 @@ export function demoUpdateMuebleCatalogo(
 
   persistStore();
   return row;
+  });
 }
 
 export function demoToggleMuebleCatalogoActivo(id: string, activo: boolean) {

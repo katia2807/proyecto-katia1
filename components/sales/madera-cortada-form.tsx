@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/Combobox";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field, SelectField } from "@/components/ui/field";
-import { liteClientesToCompleto, MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
+import { liteClientesToCompleto } from "@/lib/combobox-mocks";
 import { fechaHoyPeru, formatPen } from "@/lib/utils";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import type { ZonaEntregaRow } from "@/lib/demo-store";
@@ -206,17 +206,7 @@ export function MaderaCortadaForm({
 
 
 
-  const effectiveProductos = useMemo((): Producto[] => {
-    if (!mockData) return productos;
-    return MOCK_INVENTARIO_PRODUCTOS.map((p) => ({
-      id: p.id,
-      nombre: p.nombre,
-      unidad: p.unidad,
-      stock_actual: p.stock_actual,
-      categoria: p.categoria,
-      costo_unitario: p.costo_unitario,
-    }));
-  }, [mockData, productos]);
+  const effectiveProductos = productos;
 
   const clientesCombo = useMemo(() => liteClientesToCompleto(todosLosClientes), [todosLosClientes]);
 

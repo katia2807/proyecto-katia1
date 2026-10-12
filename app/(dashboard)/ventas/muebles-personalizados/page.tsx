@@ -15,6 +15,7 @@ import {
 import { resumenEspeciesDesdeDetalle, parseCotizacionDetalle } from "@/lib/cotizacion-unificada-payload";
 import { canMutateVentas } from "@/lib/permissions";
 import { formatDate, formatPen } from "@/lib/utils";
+import { cotizacionUnificadaAprobable, presentacionCotizacionProduccion } from '@/lib/cotizacion-produccion';
 
 export default async function MueblesPersonalizadosPage() {
   const comboMock =
@@ -37,6 +38,7 @@ export default async function MueblesPersonalizadosPage() {
   // Obtener IDs de cotizaciones que ya tienen orden de produccion para evitar duplicaciones
   const ordenesCotizacionIds = new Set(ordenes.map((o) => o.cotizacion_id).filter(Boolean));
   const ordenesCotizacionUnificadaIds = new Set(ordenes.map((o) => o.cotizacion_unificada_id).filter(Boolean));
+  const ordenesUnificadasById = new Map(ordenes.filter(o => o.cotizacion_unificada_id).map(o => [o.cotizacion_unificada_id!, o]));
 
   const cotizacionesPersonalizadas = cotizaciones.filter(
     (c) => c.tipo === "mueble_personalizado",
@@ -56,6 +58,7 @@ export default async function MueblesPersonalizadosPage() {
       clienteId: c.cliente_id,
       especie: c.especie_madera,
       estado: c.estado,
+      produccion: null as string | null,
       precioCalculado: Number(c.precio_calculado),
       precioAcordado: Number(c.precio_acordado),
       tipo: "legacy" as const,
@@ -63,18 +66,15 @@ export default async function MueblesPersonalizadosPage() {
     })),
     ...cotizacionesUnificadasMuebles.map((c) => {
       const especie = resumenEspeciesDesdeDetalle(c.detalle) ?? "Mueble";
-      let estadoUI = c.estado_flujo as string;
-      if (c.estado_flujo === "pendiente") estadoUI = "pendiente";
-      else if (c.estado_flujo === "lista_produccion") estadoUI = "lista prod.";
-      else if (c.estado_flujo === "en_produccion") estadoUI = "producción";
-      else if (c.estado_flujo === "cobrada") estadoUI = "cobrada";
+      const presentacion = presentacionCotizacionProduccion(c.estado_flujo, ordenesUnificadasById.get(c.id)?.estado);
       return {
         id: c.id,
         correlativo: c.correlativo,
         fecha: c.fecha,
         clienteId: c.cliente_id,
         especie,
-        estado: estadoUI,
+        estado: presentacion.estado,
+        produccion: presentacion.produccion,
         precioCalculado: Number(c.total),
         precioAcordado: Number(c.total),
         tipo: "unificada" as const,
@@ -94,8 +94,7 @@ export default async function MueblesPersonalizadosPage() {
   // Filtrar cotizaciones unificadas (inteligentes) aprobables
   const aprobablesUnificadas = cotizacionesUnificadas.filter(
     (c) =>
-      ["pendiente", "lista_produccion", "cobrada"].includes(c.estado_flujo) &&
-      !ordenesCotizacionUnificadaIds.has(c.id)
+      cotizacionUnificadaAprobable(c.estado_flujo, ordenesCotizacionUnificadaIds.has(c.id))
   );
 
   // Mapear ambas a un formato de opcion comun
@@ -192,6 +191,7 @@ export default async function MueblesPersonalizadosPage() {
                     <Badge variant={c.estado === "confirmada" || c.estado === "lista prod." || c.estado === "cobrada" ? "success" : "neutral"}>
                       {c.estado}
                     </Badge>
+                    {c.produccion ? <p className="mt-1 text-xs text-[var(--color-text-secondary)]">{c.produccion}</p> : null}
                   </TD>
                   <TD className="text-right">{formatPen(Number(c.precioCalculado))}</TD>
                   <TD className="text-right font-semibold">

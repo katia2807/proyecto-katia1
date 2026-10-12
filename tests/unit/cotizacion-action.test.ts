@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getSupabaseServerClient: vi.fn(),
   hasSupabaseEnv: vi.fn(),
   insert: vi.fn(),
+  rpc: vi.fn(),
   nextCorrelativo: vi.fn(),
   requireAuthContext: vi.fn(),
   revalidatePath: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('@/lib/runtime', () => ({ hasSupabaseEnv: mocks.hasSupabaseEnv }));
 vi.mock('@/lib/numeracion', () => ({ nextCorrelativo: mocks.nextCorrelativo }));
 vi.mock('@/lib/company-config', () => ({ getEmpresaConfig: mocks.getEmpresaConfig }));
 vi.mock('@/lib/supabase/server', () => ({ getSupabaseServerClient: mocks.getSupabaseServerClient }));
+vi.mock('@/lib/store-persistence', () => ({ readStoreFromDisk: () => null, writeStoreToDisk: vi.fn() }));
 vi.mock('@/lib/demo-store', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/demo-store')>();
   return {
@@ -27,6 +29,7 @@ vi.mock('@/lib/demo-store', async (importOriginal) => {
     demoCreateCotizacionUnificada: mocks.demoCreateCotizacionUnificada,
     demoGetCotizacionUnificada: mocks.demoGetCotizacionUnificada,
     demoUpdateCotizacionUnificada: mocks.demoUpdateCotizacionUnificada,
+    demoClientesRows: () => [{ id: '11111111-1111-4111-8111-111111111111', organization_id: '00000000-0000-0000-0000-000000000001' }],
   };
 });
 
@@ -44,6 +47,7 @@ function inputCotizacion(total: unknown) {
     descripcion: 'Servicio E2E',
   };
   return {
+    submissionId: crypto.randomUUID(),
     clienteId: '11111111-1111-4111-8111-111111111111',
     tipoCliente: 'empresa' as const,
     fecha: '2026-07-24',
@@ -56,12 +60,13 @@ function inputCotizacion(total: unknown) {
 describe('saveCotizacionUnificada', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.requireAuthContext.mockResolvedValue({ role: 'owner_admin', uiRole: 'owner_admin' });
+    mocks.requireAuthContext.mockResolvedValue({ role: 'owner_admin', uiRole: 'owner_admin', organizationId: '00000000-0000-0000-0000-000000000001', userId: '10000000-0000-4000-8000-000000000001' });
     mocks.getEmpresaConfig.mockResolvedValue({ margen_ganancia_default_pct: 30 });
     mocks.nextCorrelativo.mockResolvedValue('N°0026');
     mocks.demoCreateCotizacionUnificada.mockReturnValue({
       id: '22222222-2222-4222-8222-222222222222',
     });
+    mocks.demoGetCotizacionUnificada.mockReturnValue({ id: '22222222-2222-4222-8222-222222222222' });
 
     const single = vi.fn().mockResolvedValue({
       data: { id: '33333333-3333-4333-8333-333333333333' },
@@ -71,6 +76,7 @@ describe('saveCotizacionUnificada', () => {
     mocks.insert.mockReturnValue({ select });
     mocks.getSupabaseServerClient.mockReturnValue({
       from: vi.fn().mockReturnValue({ insert: mocks.insert }),
+      rpc: mocks.rpc.mockResolvedValue({ data: '33333333-3333-4333-8333-333333333333', error: null }),
     });
   });
 
@@ -103,7 +109,8 @@ describe('saveCotizacionUnificada', () => {
       ok: true,
       id: '33333333-3333-4333-8333-333333333333',
     });
-    expect(mocks.insert).toHaveBeenCalledWith(
+    expect(mocks.rpc).toHaveBeenCalledWith('registrar_cotizacion_unificada_segura',
+      expect.objectContaining({ p_datos:
       expect.objectContaining({
         total: 312,
         detalle: expect.objectContaining({
@@ -114,7 +121,7 @@ describe('saveCotizacionUnificada', () => {
             totalFinal: 312,
           },
         }),
-      }),
+      }) }),
     );
   });
 
@@ -199,7 +206,7 @@ describe('saveCotizacionUnificada', () => {
     expect(mocks.demoCreateCotizacionUnificada).toHaveBeenCalledWith(expect.objectContaining({ detalle: expect.objectContaining({ condiciones_pago: input.detalle.condiciones_pago }) }));
     mocks.hasSupabaseEnv.mockReturnValue(true);
     expect(await saveCotizacionUnificada(input)).toMatchObject({ ok: true });
-    expect(mocks.insert).toHaveBeenCalledWith(expect.objectContaining({ detalle: expect.objectContaining({ condiciones_pago: input.detalle.condiciones_pago }) }));
+    expect(mocks.rpc).toHaveBeenCalledWith('registrar_cotizacion_unificada_segura', expect.objectContaining({ p_datos: expect.objectContaining({ detalle: expect.objectContaining({ condiciones_pago: input.detalle.condiciones_pago }) }) }));
   });
   test.each([0, 312.01])('rechaza el adelanto %s antes de escribir', async (adelanto) => {
     mocks.hasSupabaseEnv.mockReturnValue(false);

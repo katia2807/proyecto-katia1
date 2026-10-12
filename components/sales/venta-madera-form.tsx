@@ -10,7 +10,7 @@ import { Combobox } from "@/components/ui/Combobox";
 import { Field, SelectField } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
-import { liteClientesToCompleto, MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
+import { liteClientesToCompleto } from "@/lib/combobox-mocks";
 import { fechaHoyPeru, formatPen } from "@/lib/utils";
 
 type Cliente = { id: string; nombre: string; ruc?: string | null; documento?: string | null };
@@ -79,16 +79,7 @@ export function VentaMaderaForm({
   const selectedClienteDoc = selectedCliente?.documento || "";
   const hasRuc = !!(selectedClienteRuc && selectedClienteRuc.trim().length === 11);
 
-  const effectiveProductos = useMemo((): Producto[] => {
-    if (!mockData) return productos;
-    return MOCK_INVENTARIO_PRODUCTOS.map((p) => ({
-      id: p.id,
-      nombre: p.nombre,
-      unidad: p.unidad,
-      stock_actual: p.stock_actual,
-      categoria: p.categoria,
-    }));
-  }, [mockData, productos]);
+  const effectiveProductos = productos;
 
   const productoComboOptions = useMemo(
     () => [

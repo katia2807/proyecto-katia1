@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field, SelectField } from "@/components/ui/field";
 import { contratoClientesToCompleto } from "@/lib/combobox-mocks";
-import { formatPen, roundMoney } from "@/lib/utils";
+import { fechaHoyPeru,  formatPen, roundMoney } from "@/lib/utils";
 import type { Database } from "@/lib/supabase/types";
 
 type Cliente = { id: string; nombre: string; ruc?: string | null };
@@ -51,7 +51,7 @@ export function ContratoAlquilerForm({
   contrato,
   completarDatos = false,
 }: ContratoAlquilerFormProps) {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = fechaHoyPeru();
   const [step, setStep] = useState(completarDatos && contrato?.cliente_id && contrato.activo ? 3 : 1);
 
   // Paso 1 State

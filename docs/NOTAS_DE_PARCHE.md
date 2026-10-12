@@ -1,5 +1,17 @@
 # Notas de parche
 
+## 1.1.81 — 11/10/2026
+
+Se protegen cotizaciones, adelantos y entradas de inventario frente a reintentos y guardados incompletos. La auditoría y los adjuntos respetan los permisos; los selectores usan registros existentes y fechas de Perú.
+
+## 1.1.80 — 11/10/2026
+
+Las cotizaciones y los adelantos reconocen reintentos sin duplicarse. Se protege el cliente de documentos vinculados y se aclara la producción, conservando los cobros reales, los importes y los pasos habituales.
+
+## 1.1.79 — 11/10/2026
+
+Se revisaron reintentos, validaciones y seguimiento de cotizaciones y adelantos. Los errores confirmados quedaron priorizados para corregirlos y evitar registros incoherentes, sin cambiar datos del negocio.
+
 ## 1.1.78 — 11/10/2026
 
 Los botones de acción usan ahora colores neutrales en ambos temas: oscuros en modo claro y claros en modo oscuro. Los estados e iconos conservan sus colores, para mantener las alertas fáciles de reconocer.

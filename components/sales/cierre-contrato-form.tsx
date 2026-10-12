@@ -5,7 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
-import { formatPen } from "@/lib/utils";
+import { fechaHoyPeru,  formatPen } from "@/lib/utils";
 
 type ContratoLite = {
   id: string;
@@ -21,7 +21,7 @@ type CierreContratoFormProps = {
 };
 
 export function CierreContratoForm({ contratos }: CierreContratoFormProps) {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = fechaHoyPeru();
   const [step, setStep] = useState(1);
 
   // Paso 1 State

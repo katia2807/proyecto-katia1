@@ -13,12 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/Combobox";
 import { useToast } from "@/components/ui/toast";
 import { Field, SelectField } from "@/components/ui/field";
-import { MOCK_INVENTARIO_PRODUCTOS } from "@/lib/combobox-mocks";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
 import { fechaHoyPeru } from "@/lib/utils";
 import { getInventarioConsultaHref } from "@/lib/inventario-filtros";
 import { IconArrowsLeftRight, IconCirclePlus, IconShoppingCart } from "@tabler/icons-react";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { CodigoProductoPreview } from "@/components/inventario/codigo-producto-preview";
 import { FotoUpload } from "@/components/sales/foto-upload";
@@ -37,6 +36,20 @@ const CATEGORIAS_BASE = [
   "Otro",
 ];
 
+/** El envío manual evita que React vacíe los campos también cuando la acción devuelve un error. */
+function dispatchPanelForm(
+  event: React.FormEvent<HTMLFormElement>, action: (data: FormData) => void,
+  busy: { current: boolean }, validate?: (event: React.FormEvent<HTMLFormElement>) => void,
+) {
+  validate?.(event);
+  if (event.defaultPrevented) return;
+  event.preventDefault();
+  if (busy.current) return;
+  const data = new FormData(event.currentTarget);
+  busy.current = true;
+  startTransition(() => action(data));
+}
+
 type InventarioContextPanelsProps = {
   quick: string;
   productos: ProductoOpt[];
@@ -49,11 +62,12 @@ export function InventarioContextPanels({
   quick,
   productos,
   proveedores = [],
-  mockData = false,
   unidadesExtra = [],
 }: InventarioContextPanelsProps) {
   const searchParams = useSearchParams();
   const consultaHref = getInventarioConsultaHref(searchParams);
+  const quickSearch = searchParams.get("quick");
+  const quickProductoId = searchParams.get("producto_id")?.trim();
   const router = useRouter();
   const [productoMovId, setProductoMovId] = useState("");
   const [productoCompraId, setProductoCompraId] = useState("");
@@ -69,15 +83,21 @@ export function InventarioContextPanels({
   
   const [openCompra, setOpenCompra] = useState(quick === "compra");
   const [compraFormKey, setCompraFormKey] = useState(0);
-  const [compraState, compraFormAction] = useActionState(submitInventarioCompraRapidaForm, mutationFormInitialState);
+  const [compraState, compraFormAction, compraPending] = useActionState(submitInventarioCompraRapidaForm, mutationFormInitialState);
 
   const [openProducto, setOpenProducto] = useState(quick === "producto");
   const [productoFormKey, setProductoFormKey] = useState(0);
-  const [productoState, productoFormAction] = useActionState(submitCreateInventarioProductoForm, mutationFormInitialState);
+  const [productoState, productoFormAction, productoPending] = useActionState(submitCreateInventarioProductoForm, mutationFormInitialState);
 
   const [openMovimiento, setOpenMovimiento] = useState(quick === "movimiento");
   const [movimientoFormKey, setMovimientoFormKey] = useState(0);
-  const [movimientoState, movimientoFormAction] = useActionState(submitCreateInventarioMovimientoForm, mutationFormInitialState);
+  const [movimientoState, movimientoFormAction, movimientoPending] = useActionState(submitCreateInventarioMovimientoForm, mutationFormInitialState);
+  const compraHandled = useRef(compraState);
+  const productoHandled = useRef(productoState);
+  const movimientoHandled = useRef(movimientoState);
+  const compraBusy = useRef(false);
+  const productoBusy = useRef(false);
+  const movimientoBusy = useRef(false);
 
   const [showCubicaje, setShowCubicaje] = useState(false);
   const [cantidadCubicada, setCantidadCubicada] = useState("");
@@ -202,10 +222,7 @@ export function InventarioContextPanels({
     return [...CATEGORIAS_BASE, ...categoriasExtra];
   }, [categoriasExtra]);
 
-  const effectiveProductos = useMemo((): ProductoOpt[] => {
-    if (!mockData) return productos;
-    return MOCK_INVENTARIO_PRODUCTOS.map((p) => ({ id: p.id, nombre: p.nombre }));
-  }, [mockData, productos]);
+  const effectiveProductos = productos;
 
   const productoOptions = useMemo(
     () =>
@@ -217,14 +234,8 @@ export function InventarioContextPanels({
   );
 
   useEffect(() => {
-    if (quick === "compra") setOpenCompra(true);
-    if (quick === "producto") setOpenProducto(true);
-    if (quick === "movimiento") setOpenMovimiento(true);
-  }, [quick]);
-
-  useEffect(() => {
-    const q = searchParams.get("quick");
-    const pid = searchParams.get("producto_id")?.trim();
+    const q = quickSearch;
+    const pid = quickProductoId;
     if (q === "compra") {
       setOpenCompra(true);
       if (pid && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pid)) {
@@ -238,9 +249,12 @@ export function InventarioContextPanels({
         setProductoMovId(pid);
       }
     }
-  }, [searchParams]);
+  }, [quickSearch, quickProductoId]);
 
   useEffect(() => {
+    if (compraHandled.current === compraState) return;
+    compraHandled.current = compraState;
+    compraBusy.current = false;
     if (compraState.success && compraState.message) {
       showToast({ variant: "success", message: compraState.message });
       setOpenCompra(false);
@@ -250,13 +264,17 @@ export function InventarioContextPanels({
       setCompraErrors({});
       setShowCubicaje(false);
       setCantidadCubicada("");
+      router.replace(consultaHref, { scroll: false });
       router.refresh();
     } else if (compraState.error) {
       showToast({ variant: "error", message: compraState.error });
     }
-  }, [compraState, showToast, router]);
+  }, [compraState, showToast, router, consultaHref]);
 
   useEffect(() => {
+    if (productoHandled.current === productoState) return;
+    productoHandled.current = productoState;
+    productoBusy.current = false;
     if (productoState.success && productoState.message) {
       showToast({ variant: "success", message: productoState.message });
       setOpenProducto(false);
@@ -265,24 +283,29 @@ export function InventarioContextPanels({
       setSelectedUnidad("");
       setStockInicial("");
       setCostoUnitario("");
+      router.replace(consultaHref, { scroll: false });
       router.refresh();
     } else if (productoState.error) {
       showToast({ variant: "error", message: productoState.error });
     }
-  }, [productoState, showToast, router]);
+  }, [productoState, showToast, router, consultaHref]);
 
   useEffect(() => {
+    if (movimientoHandled.current === movimientoState) return;
+    movimientoHandled.current = movimientoState;
+    movimientoBusy.current = false;
     if (movimientoState.success && movimientoState.message) {
       showToast({ variant: "success", message: movimientoState.message });
       setOpenMovimiento(false);
       setMovimientoFormKey((k) => k + 1);
       setProductoMovId("");
       setMovimientoErrors({});
+      router.replace(consultaHref, { scroll: false });
       router.refresh();
     } else if (movimientoState.error) {
       showToast({ variant: "error", message: movimientoState.error });
     }
-  }, [movimientoState, showToast, router]);
+  }, [movimientoState, showToast, router, consultaHref]);
 
   function handleAgregarCategoria() {
     const valor = nuevaCategoriaInput.trim();
@@ -327,7 +350,8 @@ export function InventarioContextPanels({
           }
         }}
       >
-        <form key={compraFormKey} action={compraFormAction} onSubmit={handleCompraSubmit} className="grid gap-3 md:grid-cols-2">
+        <form key={compraFormKey} onSubmit={e => dispatchPanelForm(e, compraFormAction, compraBusy, handleCompraSubmit)} className="grid gap-3 md:grid-cols-2">
+          <fieldset disabled={compraPending} className="contents">
           <OperationSubmissionId state={compraState} />
           <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)] md:col-span-2">
             <span>Producto</span>
@@ -454,6 +478,7 @@ export function InventarioContextPanels({
           <div className="md:col-span-2">
             <Button>Guardar compra</Button>
           </div>
+          </fieldset>
         </form>
       </ContextActionPanel>
 
@@ -477,7 +502,9 @@ export function InventarioContextPanels({
         }}
         replacePathOnClose={consultaHref}
       >
-        <form key={productoFormKey} action={productoFormAction} className="grid gap-3 md:grid-cols-2">
+        <form key={productoFormKey} onSubmit={e => dispatchPanelForm(e, productoFormAction, productoBusy)} className="grid gap-3 md:grid-cols-2">
+          <fieldset disabled={productoPending} className="contents">
+          <OperationSubmissionId state={productoState} />
           {/* Nombre + código con sugerencia automática */}
           <CodigoProductoPreview />
 
@@ -674,11 +701,10 @@ export function InventarioContextPanels({
               label={selectedCategoria === "Muebles" ? "Foto del mueble (Muy sugerido)" : "Foto del producto (Opcional)"}
             />
           </div>
-          <input type="hidden" name="return_to" value="/inventario" />
-          <input type="hidden" name="next_quick" value="movimiento" />
           <div className="md:col-span-2 flex gap-2">
-            <Button>Guardar y agregar movimiento</Button>
+            <Button>Guardar producto</Button>
           </div>
+          </fieldset>
         </form>
       </ContextActionPanel>
 
@@ -700,7 +726,9 @@ export function InventarioContextPanels({
         }}
         replacePathOnClose={consultaHref}
       >
-        <form key={movimientoFormKey} action={movimientoFormAction} onSubmit={handleMovimientoSubmit} className="grid gap-3 md:grid-cols-2">
+        <form key={movimientoFormKey} onSubmit={e => dispatchPanelForm(e, movimientoFormAction, movimientoBusy, handleMovimientoSubmit)} className="grid gap-3 md:grid-cols-2">
+          <fieldset disabled={movimientoPending} className="contents">
+          <OperationSubmissionId state={movimientoState} />
           <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--color-text-primary)]">
             <span>Producto</span>
             <Combobox
@@ -729,10 +757,10 @@ export function InventarioContextPanels({
           </div>
           <Field name="costo_unitario" label="Costo unitario (opcional)" type="number" min="0" step="0.01" />
           <Field name="referencia" label="Referencia" placeholder="Factura, pedido, ajuste..." />
-          <input type="hidden" name="return_to" value="/inventario" />
           <div className="md:col-span-2">
             <Button>Guardar movimiento</Button>
           </div>
+          </fieldset>
         </form>
       </ContextActionPanel>
     </>

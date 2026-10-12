@@ -3,11 +3,12 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requireAuthContext } from "@/lib/auth";
+import { ANTIFRAUDE_COOKIE, ANTIFRAUDE_DURACION, crearAccesoAntifraude } from '@/lib/antifraude-acceso';
 
-const COOKIE_KEY = "antifraud_access";
+const COOKIE_KEY = ANTIFRAUDE_COOKIE;
 
 export async function requestAntifraudeAccess(formData: FormData) {
-  await requireAuthContext({
+  const context = await requireAuthContext({
     allowedRoles: ["owner_admin", "gerencia"],
     redirectTo: null,
   });
@@ -22,12 +23,12 @@ export async function requestAntifraudeAccess(formData: FormData) {
   }
 
   const cookieStore = await cookies();
-  cookieStore.set(COOKIE_KEY, "granted", {
+  cookieStore.set(COOKIE_KEY, crearAccesoAntifraude(context, expected), {
     path: "/",
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 4,
+    maxAge: ANTIFRAUDE_DURACION,
   });
 
   revalidatePath("/reportes/antifraude");

@@ -7,7 +7,6 @@ import {
   updateClienteCotizacionRapida,
   deleteCotizacionUnificada,
   marcarListaProduccionCotizacion,
-  pasarCotizacionAProduccion,
   saveCotizacionUnificada,
   cambiarEstadoCotizacionUnificada,
 } from "@/app/actions";
@@ -38,10 +37,7 @@ import {
 } from "@/lib/cotizacion-unificada-lineas";
 import type { ClienteCompleto } from "@/lib/combobox-mocks";
 import {
-  MOCK_INVENTARIO_PRODUCTOS,
-  MOCK_MUEBLES_CATALOGO_VENTA,
   MOCK_WIZARD_MUEBLE_PLANTILLAS,
-  mockClientesAsRows,
 } from "@/lib/combobox-mocks";
 import type { EmpresaConfig } from "@/lib/company-config";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
@@ -168,6 +164,7 @@ type CotizacionDraft = {
   detalle?: CotizacionDetalleV1;
   clienteId?: string | null;
   guardadaId?: string | null;
+  submissionId?: string | null;
   descripcionPersonalizada?: string | null;
   montoAdelantoUI?: string;
   selectedPiezaIndexUI?: number;
@@ -508,16 +505,13 @@ export function CotizacionUnificadaWizard({
   const [clientesCreados, setClientesCreados] = useState<ClienteRow[]>([]);
   const effectiveClientes = useMemo(
     () => {
-      const registrados = (mockData && clientes.length === 0) ? mockClientesAsRows(DEFAULT_ORG_ID) : clientes;
+      const registrados = clientes;
       const idsRegistrados = new Set(registrados.map((cliente) => cliente.id));
       return [...clientesCreados.filter((cliente) => !idsRegistrados.has(cliente.id)), ...registrados];
     },
-    [mockData, clientes, clientesCreados],
+    [clientes, clientesCreados],
   );
-  const effectiveProductos = useMemo(
-    () => ((mockData && productos.length === 0) ? MOCK_INVENTARIO_PRODUCTOS : productos),
-    [mockData, productos],
-  );
+  const effectiveProductos = productos;
   const router = useRouter();
   const searchParams = useSearchParams();
   const editarId = searchParams.get("editar");
@@ -535,6 +529,8 @@ export function CotizacionUnificadaWizard({
     return d;
   });
   const [guardadaId, setGuardadaId] = useState<string | null>(null);
+  const submissionId = useRef<string | null>(null);
+  const guardando = useRef(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [maxStep, setMaxStep] = useState(0);
   const [error, setError] = useState("");
@@ -755,13 +751,6 @@ export function CotizacionUnificadaWizard({
     return Math.min(Math.max(0, selectedPiezaIndexUI), piezasMuebleActual.length - 1);
   }, [piezasMuebleActual.length, selectedPiezaIndexUI]);
   const muebleOptions = useMemo(() => {
-    if (mockData && mueblesCatalogo.length === 0) {
-      return MOCK_MUEBLES_CATALOGO_VENTA.map((m) => ({
-        id: m.id,
-        nombre: `${m.codigo} — ${m.nombre}`,
-        origen: "catalogo" as const,
-      }));
-    }
     const catalogoActivo = mueblesCatalogo.filter((m) => m.activo !== false);
     if (catalogoActivo.length > 0) {
       return catalogoActivo.map((m) => ({
@@ -784,7 +773,7 @@ export function CotizacionUnificadaWizard({
       { id: "ejemplo-escritorio", nombre: "Escritorio ejecutivo", origen: "ejemplo" as const },
       { id: "ejemplo-repostero", nombre: "Repostero de cocina", origen: "ejemplo" as const },
     ];
-  }, [mockData, mueblesCatalogo, effectiveProductos]);
+  }, [mueblesCatalogo, effectiveProductos]);
 
   const effectiveMuebleTemplates = useMemo((): MuebleTemplate[] => {
     if (!mockData) return muebleTemplates;
@@ -1096,6 +1085,7 @@ export function CotizacionUnificadaWizard({
       detalle,
       clienteId,
       guardadaId,
+      submissionId: submissionId.current,
       descripcionPersonalizada,
       montoAdelantoUI,
       selectedPiezaIndexUI,
@@ -1193,6 +1183,7 @@ export function CotizacionUnificadaWizard({
     setFecha(draft.fecha);
     applyCotizacionPreset(draft.tipoCotizacionPreset);
     setGuardadaId(draft.guardadaId ?? null);
+    submissionId.current = draft.submissionId ?? null;
     setClienteId(draft.clienteId ?? null);
     setSelectedPiezaIndexUI(draft.selectedPiezaIndexUI ?? 0);
     setMontoAdelantoUI(draft.montoAdelantoUI ?? "");
@@ -1231,6 +1222,7 @@ export function CotizacionUnificadaWizard({
 
   const resetWizardFast = useCallback(() => {
     setGuardadaId(null);
+    submissionId.current = null;
     clearEditingQuery();
     setClienteId(null);
     setNombreCliente("");
@@ -1566,6 +1558,7 @@ export function CotizacionUnificadaWizard({
 
   const handleGuardar = useCallback(
     async (estadoFlujo: "pendiente" | "lista_produccion" = "pendiente", imprimir?: boolean) => {
+      if (guardando.current) return;
       if (!puedeGuardarCotizacion) {
         setError(!canSave ? "Tu rol no puede guardar cotizaciones."
           : guardadaRow?.estado_flujo === "cobrada" ? "Esta cotización ya está cobrada y no se puede editar."
@@ -1575,52 +1568,72 @@ export function CotizacionUnificadaWizard({
       setError("");
       const errorPago = validarCondicionesPagoCotizacion(detalleParaLineas.condiciones_pago, totalGral);
       if (errorPago) { setError(errorPago); return; }
+      guardando.current = true;
       setBusy(true);
-      const cli = await ensureCliente();
-      if (!cli.ok) {
+      try {
+        const cli = await ensureCliente();
+        if (!cli.ok) {
+          setBusy(false);
+          setError(cli.error);
+          return;
+        }
+
+        let det = { ...detalleParaLineas };
+        if (!det.rubros.muebles) {
+          det = { ...det, muebles_lineas: [] };
+        }
+        if (!det.rubros.aserradero) {
+          det = { ...det, aserradero: null };
+        }
+        if (!det.rubros.alquiler) {
+          det = { ...det, alquiler: null };
+        }
+
+        setDetalle(det);
+
+        if (!guardadaId) {
+          submissionId.current ??= crypto.randomUUID();
+          // Conserva la clave al recuperar el borrador después de una respuesta perdida.
+          const draft = loadDraftFromStorage();
+          if (draft) {
+            try { localStorage.setItem(COTIZACION_DRAFT_KEY, JSON.stringify({ ...draft, clienteId: cli.id, submissionId: submissionId.current })); }
+            catch { /* El reintento en esta pestaña conserva la clave en memoria. */ }
+          }
+        }
+
+        const res = await saveCotizacionUnificada({
+          id: guardadaId ?? undefined,
+          submissionId: guardadaId ? undefined : submissionId.current ?? undefined,
+          clienteId: cli.id,
+          tipoCliente,
+          fecha,
+          detalle: det,
+          total: totalGral,
+          estadoFlujo,
+        });
         setBusy(false);
-        setError(cli.error);
-        return;
-      }
-
-      let det = { ...detalleParaLineas };
-      if (!det.rubros.muebles) {
-        det = { ...det, muebles_lineas: [] };
-      }
-      if (!det.rubros.aserradero) {
-        det = { ...det, aserradero: null };
-      }
-      if (!det.rubros.alquiler) {
-        det = { ...det, alquiler: null };
-      }
-
-      setDetalle(det);
-
-      const res = await saveCotizacionUnificada({
-        id: guardadaId ?? undefined,
-        clienteId: cli.id,
-        tipoCliente,
-        fecha,
-        detalle: det,
-        total: totalGral,
-        estadoFlujo,
-      });
-      setBusy(false);
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      setGuardadaId(res.id);
-      clearDraft();
-      router.refresh();
-      if (imprimir) {
-        window.open(`/cotizacion/unificada/${res.id}/pdf`, "_blank");
+        if (!res.ok) {
+          setError(res.error);
+          return;
+        }
+        setGuardadaId(res.id);
+        clearDraft();
+        router.refresh();
+        if (imprimir) {
+          window.open(`/cotizacion/unificada/${res.id}/pdf`, "_blank");
+        }
+      } catch {
+        setError('No se pudo confirmar el guardado. Conservamos los datos para que puedas reintentar.');
+      } finally {
+        guardando.current = false;
+        setBusy(false);
       }
     },
     [puedeGuardarCotizacion, canSave, guardadaRow?.estado_flujo, clearDraft, detalleParaLineas, ensureCliente, fecha, guardadaId, router, tipoCliente, totalGral],
   );
 
   const loadCotizacion = useCallback((row: CotizacionUnificadaRow) => {
+    submissionId.current = null;
     const d = parseCotizacionDetalle(row.detalle as unknown);
     setGuardadaId(row.id);
     setTipoCliente(row.tipo_cliente);
@@ -3543,20 +3556,7 @@ export function CotizacionUnificadaWizard({
                   >
                     Marcar lista producción
                   </button>
-                  <button
-                    type="button"
-                    disabled={!canSave || busy}
-                    onClick={async () => {
-                      setBusy(true);
-                      const r = await pasarCotizacionAProduccion(guardadaId);
-                      setBusy(false);
-                      if (!r.ok) setError(r.error);
-                      else window.location.reload();
-                    }}
-                    className="h-9 rounded-lg bg-emerald-50 px-3 text-xs font-semibold text-emerald-900"
-                  >
-                    Pasar a producción (orden taller)
-                  </button>
+
                 </>
               ) : null}
               {puedeRegistrarCobro ? (

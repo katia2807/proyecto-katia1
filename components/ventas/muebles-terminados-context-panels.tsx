@@ -11,7 +11,7 @@ import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
-import { liteClientesToCompleto, MOCK_MUEBLES_CATALOGO_VENTA } from "@/lib/combobox-mocks";
+import { liteClientesToCompleto } from "@/lib/combobox-mocks";
 import type { ZonaEntregaRow } from "@/lib/demo-store";
 import { fechaHoyPeru, formatPen } from "@/lib/utils";
 import { NuevoClienteInlinePanel } from "@/components/sales/nuevo-cliente-inline-panel";
@@ -162,17 +162,7 @@ export function MueblesTerminadosContextPanels({
     [clientes, clientesLocales],
   );
 
-  const activeMuebles = useMemo((): MuebleOpt[] => {
-    return (mockData && muebles.length === 0)
-      ? [...MOCK_MUEBLES_CATALOGO_VENTA].map((m) => ({
-        id: m.id,
-        codigo: m.codigo,
-        nombre: m.nombre,
-        precio_lista: m.precio_lista,
-        stock_disponible: m.stock_disponible,
-      }))
-      : muebles;
-  }, [mockData, muebles]);
+  const activeMuebles = muebles;
 
   useEffect(() => {
     if (!selectedMuebleId) return;
