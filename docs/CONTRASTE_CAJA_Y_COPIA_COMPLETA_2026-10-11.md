@@ -1,6 +1,6 @@
 # Caja histórica y flujos sobre copia completa
 
-Continuidad del 11/10/2026: respaldo reciente completo comprobado e instalación exacta de `20261011060000` realizada en la única base habitual. Solo cambió la ubicación de `digest`; 46 tablas / 274 registros coinciden antes/después, con propietario, permisos y configuración conservados. No se ejecutaron cierres ni reconciliaciones del negocio. Código/publicación y recorrido de lectura pendientes; el texto siguiente conserva el ensayo local anterior.
+Continuidad del 11/10/2026: **1.1.82 instalada, publicada y comprobada por lectura**. Respaldo reciente completo comprobado e instalación exacta de `20261011060000` realizada en la única base habitual. Solo cambió la ubicación de `digest`; 46 tablas / 274 registros coinciden antes/después, con propietario, permisos y configuración conservados. Código `e5c63fe` en `main`, despliegue Vercel `6qHEP7ZsAURkKPjjFgpqvbLMw2rk` confirmado en el equipo/proyecto habituales. El ensayo y los pendientes locales siguientes se conservan como registro histórico; la instalación/publicación descrita aquí los sustituye.
 
 Fecha: 11/10/2026. Versión 1.1.82 **local, pendiente de instalación/publicación**. Producción permanece en 1.1.81. El usuario autorizó contrastar Caja histórica y probar una copia íntegra; los dos casos de precisión monetaria siguen pospuestos hasta que los solicite.
 
@@ -46,6 +46,14 @@ La prueba opcional `tests/integration/operaciones-postgres.mjs` ahora instala pg
 
 La evidencia de ejecución y del navegador se conserva en `temp/revision-historica-1.1.82/`. Las pruebas preparan y limpian datos exclusivamente de las empresas ficticias entre casos; durante el flujo evaluado se mantienen las reglas originales. Dos triggers añadidos solo a la copia provocan fallos de escritura tardíos y permiten comprobar el rollback. No se probaron nuevas escrituras reales en Storage, cargas masivas, todos los teléfonos ni toda combinación posible de políticas. El ensayo no garantiza que no existan otros errores.
 
-Antes de publicar: respaldo reciente, instalar la migración exacta en la base habitual sin ejecutar un cierre para probarla, luego publicar código/nota y comprobar por lectura. La revisión actual no autoriza cambiar datos históricos ni resolver los redondeos pospuestos.
+## Comprobación publicada
+
+- Respaldo completo nuevo: `temp/publicacion-1.1.82/respaldo-previo/base-completa.dump`, índice y SHA-256 comprobados; dump y huellas comparten instantánea. La instalación verificó que solo cambió `digest → extensions.digest` y que propietario, permisos y configuración se conservaron; la fuente instalada coincide con el archivo revisado.
+- Caja y Reportes muestran 1.1.82 con sesión existente. Resumen y primera página de Caja idénticos antes/después. Reportes conserva cero cierres y muestra la acción correspondiente, sin abrir/enviar su confirmación ni ejecutar un cierre del negocio. Captura de lectura: `temp/publicacion-1.1.82/reportes-publicados.png`.
+- Salud pública HTTP 200, Supabase listo y demo desactivado. Sin errores/advertencias de consola detectados en el recorrido. Los registros del servidor de Vercel no se inspeccionaron con la cuenta propietaria; no se afirma una revisión exhaustiva de producción.
+- Comparación final: las 45 tablas ajenas a Auth conservan sus huellas. En `auth.users` solo cambió `updated_at`; cuentas, contraseñas y permisos iguales según comparación por columnas con el respaldo. No se atribuye la causa concreta de ese metadato. No se guardaron ventas, cobros, cierres, anulaciones, reconciliaciones ni configuraciones del negocio para comprobar pantallas.
+- Evidencias privadas en `temp/publicacion-1.1.82/`: `instalacion.json`, `verificacion-base.json`, `diagnostico-auth.json`, comparaciones de Caja, `salud-publica.json` y `cierre-publicacion.json`. Los datos privados no se incorporan al repositorio. Local habitual reiniciado en desarrollo/3001 con el mismo almacén, salud 200 sin Supabase y las dos huellas originales conservadas.
+
+Quedan por confirmar con la clienta las 17 observaciones históricas. Los dos casos de precisión monetaria siguen pospuestos hasta petición del usuario; el redondeo comercial y las fórmulas se conservan. El funcionamiento del cierre se ensayó en la copia completa; en producción se verificaron por lectura la instalación, la pantalla y la conservación de registros.
 
 Nota de parche 1.1.82, 197 caracteres: Se revisó Caja histórica y se probaron cobros, stock y permisos con una copia completa de la base. Se corrigió el cierre mensual para guardar su firma, conservando los datos reales y los redondeos.
