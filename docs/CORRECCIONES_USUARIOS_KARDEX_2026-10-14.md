@@ -1,5 +1,7 @@
 # Usuarios y Kardex: correcciones comprobadas en local — 14/10/2026
 
+**Actualización posterior:** estas correcciones se instalaron y publicaron en 1.1.90 con respaldo previo; ver [publicación y comprobaciones de lectura](PUBLICACION_USUARIOS_KARDEX_2026-10-14.md). El resto de este informe conserva la evidencia y el estado de la entrega local 1.1.89.
+
 **1.1.89 está preparada y comprobada en un candidato funcional separado. No se publicó ni instaló nada en producción, cuya última versión comprobada sigue siendo 1.1.82.** H83-01, H83-02 y M83-01 se corrigen para operaciones nuevas; no se reconstruyen históricos ni se modifican fórmulas o redondeos.
 
 ## Resultado de las correcciones
