@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.82";
-export const APP_LAST_UPDATE = "11/10/2026";
+export const APP_VERSION = "1.1.90";
+export const APP_LAST_UPDATE = "14/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Se revisó Caja histórica y se probaron cobros, stock y permisos con una copia completa de la base. Se corrigió el cierre mensual para guardar su firma, conservando los datos reales y los redondeos.";
+  "Las invitaciones conservan las cuentas existentes y los cambios de usuarios protegen la última dueña activa. Las ventas nuevas de muebles aparecen en Kardex, con una sola salida de stock y sin alterar el historial.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {

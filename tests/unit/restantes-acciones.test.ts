@@ -10,11 +10,34 @@ import {getEmpresaConfig} from "@/lib/company-config";
 import {updateAccountSettings} from "@/app/(dashboard)/cuenta/actions";
 import {updateMargenGananciaPredeterminado,updateServicioEspecialTarifa,submitMargenGananciaPredeterminado,submitServicioEspecialTarifa} from "@/app/actions";
 const org="00000000-0000-0000-0000-000000000001",other="00000000-0000-0000-0000-000000000002",user="10000000-0000-4000-8000-000000000058";
-let requests:{url:URL;method:string;body:Record<string,unknown>}[],profile:Record<string,unknown>,mode:string;
+let requests:{url:URL;method:string;body:Record<string,unknown>}[],profile:Record<string,unknown>,mode:string,account:Record<string,unknown>,ticket:Record<string,unknown>|null;
 const fixtureFetch:typeof fetch=async(input,init)=>{
  const url=new URL(String(input)),method=init?.method??"GET",body=typeof init?.body==="string"?JSON.parse(init.body):{};requests.push({url,method,body});
  const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json"}});
- if(url.pathname.includes('/auth/v1/admin/users/')){if(mode==='concurrent-ui'){profile.ui_role='readonly';return json({message:'fallo aislado'},400);}return mode==='auth-fail'?json({message:'fallo aislado'},400):json({user:{id:user}});}
+ if(url.pathname.endsWith('/rpc/iniciar_gestion_usuario_segura')) {
+  if(profile.organization_id!==org||mode==='zero-update')return json({message:'Usuario no encontrado.',code:'P0001'},400);
+  const anterior={full_name:profile.full_name,role:profile.role,ui_role:profile.ui_role,deactivated_at:profile.deactivated_at};
+  const datos=body.p_datos as Record<string,unknown>;
+  if(body.p_tipo==='perfil'){profile={...profile,full_name:datos.full_name,...(datos.role==='conservar'?{}:{role:datos.role,ui_role:null})};}
+  if(body.p_tipo==='estado')profile={...profile,deactivated_at:datos.active?null:'2026-10-14T12:00:00+00:00'};
+  const actual={full_name:profile.full_name,role:profile.role,ui_role:profile.ui_role,deactivated_at:profile.deactivated_at};
+  ticket={id:body.p_clave,estado:'pendiente',anterior,actual,error:null};return json(ticket);
+ }
+ if(url.pathname.endsWith('/rpc/finalizar_gestion_usuario_segura')) {
+  if(!ticket)return json({message:'Sin gestión',code:'P0001'},400);
+  const actual={full_name:profile.full_name,role:profile.role,ui_role:profile.ui_role,deactivated_at:profile.deactivated_at};
+  if(JSON.stringify(actual)!==JSON.stringify(ticket.actual))return json({message:'El perfil cambió',code:'P0001'},400);
+  if(!body.p_confirmar)profile={...profile,...ticket.anterior as Record<string,unknown>};
+  ticket={...ticket,estado:body.p_confirmar?'confirmada':'revertida'};return json(ticket);
+ }
+ if(url.pathname.includes('/auth/v1/admin/users/')){
+  if(method==='GET')return json({user:account});
+  if(mode==='concurrent-ui'){profile.ui_role='readonly';return json({message:'fallo aislado'},400);}
+  if(mode==='auth-fail')return json({message:'fallo aislado'},400);
+  if(body.user_metadata)account={...account,user_metadata:body.user_metadata};
+  if(body.ban_duration)account={...account,banned_until:body.ban_duration==='none'?null:'2126-10-14T12:00:00Z'};
+  return json({user:account});
+ }
  if(url.pathname.endsWith('/perfiles')){
   if(url.searchParams.get('organization_id')!==`eq.${profile.organization_id}`)return json(null);
   if(method==='GET')return json(url.searchParams.has('user_id')?profile:[profile]);
@@ -29,9 +52,9 @@ const fixtureFetch:typeof fetch=async(input,init)=>{
  if(url.pathname.includes('/storage/'))return json([]);
  throw Error('Petición inesperada '+url.pathname+' '+method);
 };
-beforeEach(()=>{requests=[];mode='normal';profile={id:'perfil',user_id:user,organization_id:org,full_name:'Original',role:'ventas',ui_role:'operaciones',deactivated_at:null};mocks.auth.mockResolvedValue({organizationId:org,userId:'owner',role:'owner_admin',uiRole:'owner_admin',fullName:'Dueña'});mocks.client.mockReturnValue(createClient('https://fixture.supabase.co','test',{auth:{persistSession:false},global:{fetch:fixtureFetch}}));});
+beforeEach(()=>{requests=[];mode='normal';ticket=null;account={id:user,user_metadata:{full_name:'Original'},banned_until:null};profile={id:'perfil',user_id:user,organization_id:org,full_name:'Original',role:'ventas',ui_role:'operaciones',deactivated_at:null};mocks.auth.mockResolvedValue({organizationId:org,userId:'owner',role:'owner_admin',uiRole:'owner_admin',fullName:'Dueña'});mocks.client.mockReturnValue(createClient('https://fixture.supabase.co','test',{auth:{persistSession:false},global:{fetch:fixtureFetch}}));});
 describe('Usuarios aislados',()=>{
- test('usuario ajeno no llega a Auth ni recibe cambios',async()=>{profile.organization_id=other;expect((await updateOrganizationUser({userId:user,fullName:'Cambio',role:'conservar'})).ok).toBe(false);expect(requests.every(r=>r.method==='GET')).toBe(true);});
+ test('usuario ajeno no llega a Auth ni recibe cambios',async()=>{profile.organization_id=other;expect((await updateOrganizationUser({userId:user,fullName:'Cambio',role:'conservar'})).ok).toBe(false);expect(requests.some(r=>r.url.pathname.includes('/auth/'))).toBe(false);});
  test('editar nombre mantiene rol histórico y UI',async()=>{expect((await updateOrganizationUser({userId:user,fullName:'Cambio',role:'conservar'})).ok).toBe(true);expect(profile).toMatchObject({full_name:'Cambio',role:'ventas',ui_role:'operaciones'});});
  test('fallo de Auth restaura permisos y nombre',async()=>{mode='auth-fail';const result=await updateOrganizationUser({userId:user,fullName:'Cambio',role:'vendedor'});expect(result.ok).toBe(false);expect(profile).toMatchObject({full_name:'Original',role:'ventas',ui_role:'operaciones'});});
  test('un fallo de Auth no revierte un permiso cambiado simultáneamente en otra sesión',async()=>{mode='concurrent-ui';const result=await updateOrganizationUser({userId:user,fullName:'Cambio',role:'conservar'});expect(result).toMatchObject({ok:false,error:expect.stringContaining('Revisa el usuario')});expect(profile.ui_role).toBe('readonly');});

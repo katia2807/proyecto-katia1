@@ -1,5 +1,37 @@
 # Notas de parche
 
+## 1.1.90 — 14/10/2026
+
+Las invitaciones conservan las cuentas existentes y los cambios de usuarios protegen la última dueña activa. Las ventas nuevas de muebles aparecen en Kardex, con una sola salida de stock y sin alterar el historial.
+
+## 1.1.89 — 14/10/2026
+
+Se corrigieron en local las invitaciones y los cambios simultáneos de usuarios para conservar cuentas y una dueña activa. Las ventas de muebles registran su salida en Kardex sin descontar stock dos veces.
+
+## 1.1.88 — 14/10/2026
+
+Se comprobó la disponibilidad del programa publicado y se probó su código en una copia aislada. La revisión conserva los datos reales y documenta los riesgos pendientes para decidir las próximas correcciones.
+
+## 1.1.87 — 13/10/2026
+
+Inicio presenta una prioridad por vez y conserva lo revisado, decidido o pospuesto en la propuesta local. Permite pausar, retomar y consultar otros temas, para orientar el trabajo sin imponer un recorrido.
+
+## 1.1.86 — 13/10/2026
+
+La propuesta local de Inicio muestra cifras grandes, iconos y un flujo visual de Caja. Se retiró la guía y se separaron los cobros pendientes, para reconocer lo importante y revisar el negocio con menos lectura.
+
+## 1.1.85 — 13/10/2026
+
+Se aclaró la propuesta local conservando sus cifras: cada importe explica qué representa y qué período incluye. Una guía breve distingue el saldo acumulado del dinero pendiente, para leer el resumen con facilidad.
+
+## 1.1.84 — 12/10/2026
+
+Se preparó una propuesta local que reúne Inicio y Centro de Mando: pendientes destacados, resumen de Caja y accesos diarios. Permite comparar el diseño con datos ilustrativos antes de conectar sus funciones.
+
+## 1.1.83 — 11/10/2026
+
+Se amplió la revisión de sueldos, usuarios y existencias. Se confirmaron dos fallos de acceso y una salida de muebles ausente en Kardex; quedan documentados para corregirlos sin tocar datos reales.
+
 ## 1.1.82 — 11/10/2026
 
 Se revisó Caja histórica y se probaron cobros, stock y permisos con una copia completa de la base. Se corrigió el cierre mensual para guardar su firma, conservando los datos reales y los redondeos.
