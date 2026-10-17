@@ -17,7 +17,7 @@ import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { getInicioData } from "@/lib/inicio-data";
 import { getInventarioProductosRows } from "@/lib/data";
 import { getVentasBorradorRows, getAlquileresConPenalidadRows, getAdelantosPendientesRows, getAlertasCriticasRows } from "@/lib/inicio-pendientes";
-import DashboardPage from "@/app/(dashboard)/page";
+import DashboardPage from "@/components/inicio/inicio-anterior";
 
 type Fixture = Record<string, unknown>;
 let tables: Record<string, Fixture[]>;

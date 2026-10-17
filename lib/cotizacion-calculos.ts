@@ -1,4 +1,5 @@
 import { roundMoney } from "@/lib/utils";
+import { MoneyDecimal, productMoney, sumMoney, roundLegacyMoney } from "@/lib/money";
 import type { CotizacionDetalleV1, MuebleLineaMadera } from "@/lib/cotizacion-unificada-payload";
 
 export const DEFAULT_MARGEN_GANANCIA_PCT = 30;
@@ -21,7 +22,7 @@ export function parseMargenGananciaInput(value: unknown, fallback = DEFAULT_MARG
 export function calcularGananciaPorMargen(costoProduccion: number, margenPct: number): number {
   const costo = Math.max(0, Number.isFinite(costoProduccion) ? costoProduccion : 0);
   const margen = Math.max(0, Number.isFinite(margenPct) ? margenPct : 0);
-  return round2((costo * margen) / 100);
+  return productMoney([costo, margen], 100);
 }
 
 export function calcularPrecioConMargen(costoProduccion: number, margenPct: number): number {
@@ -72,7 +73,7 @@ export function totalPtLinea(
   return piezas.reduce((acc, p) => acc + calcularPieTablar(p.cantidad, p.espesor, p.ancho, p.largo), 0);
 }
 
-export function computeTotalesDetalle(detalle: CotizacionDetalleV1): TotalesRubros {
+function computeTotalesDetalleLegacy(detalle: CotizacionDetalleV1): TotalesRubros {
   let muebles = 0;
   if (detalle.rubros.muebles && detalle.muebles_lineas.length > 0) {
     for (const linea of detalle.muebles_lineas) {
@@ -107,17 +108,38 @@ export function computeTotalesDetalle(detalle: CotizacionDetalleV1): TotalesRubr
   }
 
   return {
-    muebles: round2(muebles),
-    aserradero: round2(aserradero),
-    alquiler: round2(alquilerBase + garantia),
-    alquiler_base: round2(alquilerBase),
-    garantia: round2(garantia),
+    muebles: roundLegacyMoney(muebles),
+    aserradero: roundLegacyMoney(aserradero),
+    alquiler: roundLegacyMoney(alquilerBase + garantia),
+    alquiler_base: roundLegacyMoney(alquilerBase),
+    garantia: roundLegacyMoney(garantia),
   };
+}
+
+export function computeTotalesDetalle(detalle: CotizacionDetalleV1): TotalesRubros {
+  let muebles = new MoneyDecimal(0);
+  if (detalle.rubros.muebles) {
+    for (const linea of detalle.muebles_lineas) {
+      const pt = linea.piezas.reduce((total,p) => total.plus(new MoneyDecimal(p.cantidad).times(p.espesor).times(p.ancho).times(p.largo).div(12)), new MoneyDecimal(0));
+      muebles = muebles.plus(pt.times(Math.max(0,linea.precioPorPt)));
+    }
+    muebles = muebles.plus(Math.max(0,detalle.costoAcabadoSoles ?? 0)).plus(Math.max(0,detalle.costoManoObra ?? 0));
+  }
+  const a=detalle.rubros.aserradero ? detalle.aserradero : null;
+  const aserradero=a ? a.modo==="hora" ? new MoneyDecimal(Math.max(0,a.precioHora)).times(Math.max(0,a.horas)) : new MoneyDecimal(Math.max(0,a.montoTotalFijo)) : new MoneyDecimal(0);
+  const al=detalle.rubros.alquiler ? detalle.alquiler : null;
+  const base=al ? new MoneyDecimal(Math.max(0,al.tarifa)).times(Math.max(0,al.unidades_tiempo)) : new MoneyDecimal(0);
+  const garantia=al?.incluye_garantia_danios ? Math.max(0,al.monto_garantia) : 0;
+  return {muebles:muebles.toDP(2).toNumber(),aserradero:aserradero.toDP(2).toNumber(),alquiler:base.plus(garantia).toDP(2).toNumber(),alquiler_base:base.toDP(2).toNumber(),garantia:roundMoney(garantia)};
+}
+
+export function computeTotalesCotizacion(detalle:CotizacionDetalleV1,precisionVersion:1|2=2):TotalesRubros {
+  return precisionVersion===1 ? computeTotalesDetalleLegacy(detalle) : computeTotalesDetalle(detalle);
 }
 
 export function totalGeneralDetalle(detalle: CotizacionDetalleV1): number {
   const t = computeTotalesDetalle(detalle);
-  return round2(t.muebles + t.aserradero + t.alquiler);
+  return sumMoney([t.muebles,t.aserradero,t.alquiler]);
 }
 
 export function calcularContratoCotizacion(
@@ -132,7 +154,7 @@ export function calcularContratoCotizacion(
     throw new RangeError('El subtotal de la cotización debe ser un importe finito.');
   }
   const margenNormalizado = roundMoney(margenPctAplicado);
-  const margenMonto = roundMoney((subtotalBase * margenNormalizado) / 100);
+  const margenMonto = productMoney([subtotalBase,margenNormalizado],100);
   const precioSugerido = roundMoney(subtotalBase + margenMonto);
   return {
     subtotalBase,
@@ -145,8 +167,10 @@ export function calcularContratoCotizacion(
 
 export function crearInstantaneaCalculoCotizacion(
   calculo: ContratoCalculoCotizacion,
-): Omit<ContratoCalculoCotizacion, 'precioSugerido'> {
+  precisionVersion: 1 | 2 = 2,
+): Omit<ContratoCalculoCotizacion, 'precioSugerido'> & { precisionVersion: 1 | 2 } {
   return {
+    precisionVersion,
     margenPctAplicado: calculo.margenPctAplicado,
     subtotalBase: calculo.subtotalBase,
     margenMonto: calculo.margenMonto,
@@ -174,6 +198,29 @@ export function totalClienteCoincideConServidor(
   return importeEnCentavos(totalCliente) === importeEnCentavos(totalServidor);
 }
 
+function calcularContratoLegacy(detalle:CotizacionDetalleV1,margen:number):ContratoCalculoCotizacion {
+  const t=computeTotalesDetalleLegacy(detalle),subtotalBase=roundLegacyMoney(t.muebles+t.aserradero+t.alquiler);
+  const margenPctAplicado=roundLegacyMoney(margen),margenMonto=roundLegacyMoney(subtotalBase*margenPctAplicado/100);
+  const totalFinal=roundLegacyMoney(subtotalBase+margenMonto);
+  return {subtotalBase,margenPctAplicado,margenMonto,totalFinal,precioSugerido:totalFinal};
+}
+function baseEconomica(detalle:CotizacionDetalleV1) {
+  return JSON.stringify({rubros:detalle.rubros,muebles:detalle.rubros.muebles?detalle.muebles_lineas.map(line=>({precio:line.precioPorPt,piezas:line.piezas.map(p=>[p.cantidad,p.espesor,p.ancho,p.largo])})):[],
+    acabado:detalle.rubros.muebles?detalle.costoAcabadoSoles ?? 0:0,manoObra:detalle.rubros.muebles?detalle.costoManoObra ?? 0:0,
+    aserradero:detalle.rubros.aserradero && detalle.aserradero?(detalle.aserradero.modo==="hora"?{modo:"hora",precio:detalle.aserradero.precioHora,horas:detalle.aserradero.horas}:{modo:"total",fijo:detalle.aserradero.montoTotalFijo}):null,
+    alquiler:detalle.rubros.alquiler && detalle.alquiler?{tarifa:detalle.alquiler.tarifa,unidades:detalle.alquiler.unidades_tiempo,garantia:detalle.alquiler.incluye_garantia_danios,monto:detalle.alquiler.incluye_garantia_danios?detalle.alquiler.monto_garantia:0}:null});
+}
+export function conservaImporteCotizacion(detalle:CotizacionDetalleV1,anterior?:{detalle:CotizacionDetalleV1;total:number}|null) {
+  return !!anterior && baseEconomica(detalle)===baseEconomica(anterior.detalle);
+}
+export function calcularCotizacionParaGuardar(detalle:CotizacionDetalleV1,margen:number,anterior?:{detalle:CotizacionDetalleV1;total:number}|null):ContratoCalculoCotizacion {
+  if(anterior && conservaImporteCotizacion(detalle,anterior)) {
+    const original=resolverCalculoDocumentoCotizacion(anterior.detalle,anterior.total);
+    if(original.margenPctAplicado!==null && original.margenMonto!==null) return {subtotalBase:original.subtotalBase,margenPctAplicado:original.margenPctAplicado,margenMonto:original.margenMonto,precioSugerido:original.totalFinal,totalFinal:original.totalFinal};
+  }
+  return calcularContratoCotizacion(detalle,margen);
+}
+
 export function resolverCalculoDocumentoCotizacion(
   detalle: CotizacionDetalleV1,
   totalPersistido: number,
@@ -181,13 +228,15 @@ export function resolverCalculoDocumentoCotizacion(
   if (!Number.isFinite(totalPersistido) || totalPersistido < 0) {
     throw new RangeError('El total persistido debe ser un importe finito.');
   }
-  const totalFinal = roundMoney(totalPersistido);
-  const subtotalBase = totalGeneralDetalle(detalle);
+  const totalFinal = roundLegacyMoney(totalPersistido);
+  const precisionVersion=detalle.resumenCalculo?.precisionVersion ?? 1;
+  const rubros=precisionVersion===1 ? computeTotalesDetalleLegacy(detalle) : computeTotalesDetalle(detalle);
+  const subtotalBase=precisionVersion===1 ? roundLegacyMoney(rubros.muebles+rubros.aserradero+rubros.alquiler) : sumMoney([rubros.muebles,rubros.aserradero,rubros.alquiler]);
   const instantanea = detalle.resumenCalculo;
 
   if (instantanea) {
     try {
-      const recalculado = calcularContratoCotizacion(detalle, instantanea.margenPctAplicado);
+      const recalculado = precisionVersion===1 ? calcularContratoLegacy(detalle,instantanea.margenPctAplicado) : calcularContratoCotizacion(detalle,instantanea.margenPctAplicado);
       const instantaneaConsistente =
         totalClienteCoincideConServidor(instantanea.subtotalBase, recalculado.subtotalBase) &&
         totalClienteCoincideConServidor(instantanea.margenMonto, recalculado.margenMonto) &&
@@ -207,8 +256,8 @@ export function resolverCalculoDocumentoCotizacion(
   }
 
   if (subtotalBase > 0 && totalFinal >= subtotalBase) {
-    const margenMonto = roundMoney(totalFinal - subtotalBase);
-    const margenPctAplicado = roundMoney((margenMonto / subtotalBase) * 100);
+    const margenMonto = roundLegacyMoney(totalFinal - subtotalBase);
+    const margenPctAplicado = roundLegacyMoney((margenMonto / subtotalBase) * 100);
     return {
       subtotalBase,
       margenPctAplicado,

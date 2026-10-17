@@ -25,37 +25,37 @@ async function pendingRows<T>(loadPage: (from: number, to: number, signal: Abort
   return all;
 }
 
-export async function getVentasBorradorRows() {
-  if (!hasSupabaseEnv()) return demoVentasRows().filter((row) => row.estado === "borrador" && visible(row));
+export async function getVentasBorradorRows(organizationId = DEFAULT_ORG_ID) {
+  if (!hasSupabaseEnv()) return demoVentasRows().filter((row) => row.organization_id === organizationId && row.estado === "borrador" && visible(row));
   const client = getSupabaseServerClient();
   return pendingRows<Tables["ventas_madera"]["Row"]>((from, to, signal) => client.from("ventas_madera")
-    .select("*", { count: "exact" }).eq("organization_id", DEFAULT_ORG_ID)
+    .select("*", { count: "exact" }).eq("organization_id", organizationId)
     .eq("estado", "borrador").is("deleted_at", null)
     .order("fecha", { ascending: false }).order("id").range(from, to).abortSignal(signal));
 }
 
-export async function getAlquileresConPenalidadRows() {
-  if (!hasSupabaseEnv()) return demoAlquilerRows().filter((row) => row.penalidad > 0 && row.estado !== "cerrado" && visible(row));
+export async function getAlquileresConPenalidadRows(organizationId = DEFAULT_ORG_ID) {
+  if (!hasSupabaseEnv()) return demoAlquilerRows().filter((row) => row.organization_id === organizationId && row.penalidad > 0 && row.estado !== "cerrado" && visible(row));
   const client = getSupabaseServerClient();
   return pendingRows<Tables["alquileres"]["Row"]>((from, to, signal) => client.from("alquileres")
-    .select("*", { count: "exact" }).eq("organization_id", DEFAULT_ORG_ID)
+    .select("*", { count: "exact" }).eq("organization_id", organizationId)
     .gt("penalidad", 0).neq("estado", "cerrado").is("deleted_at", null)
     .order("fecha_inicio", { ascending: false }).order("id").range(from, to).abortSignal(signal));
 }
 
-export async function getAdelantosPendientesRows() {
-  if (!hasSupabaseEnv()) return demoPersonalRows().adelantos.filter((row) => row.estado === "pendiente");
+export async function getAdelantosPendientesRows(organizationId = DEFAULT_ORG_ID) {
+  if (!hasSupabaseEnv()) return demoPersonalRows().adelantos.filter((row) => row.organization_id === organizationId && row.estado === "pendiente");
   const client = getSupabaseServerClient();
   return pendingRows<Tables["adelantos"]["Row"]>((from, to, signal) => client.from("adelantos")
-    .select("*", { count: "exact" }).eq("organization_id", DEFAULT_ORG_ID).eq("estado", "pendiente")
+    .select("*", { count: "exact" }).eq("organization_id", organizationId).eq("estado", "pendiente")
     .order("fecha", { ascending: false }).order("id").range(from, to).abortSignal(signal));
 }
 
-export async function getAlertasCriticasRows() {
-  if (!hasSupabaseEnv()) return demoAlertasCriticasRows();
+export async function getAlertasCriticasRows(organizationId = DEFAULT_ORG_ID) {
+  if (!hasSupabaseEnv()) return demoAlertasCriticasRows().filter(row => row.organization_id === organizationId);
   const client = getSupabaseServerClient();
   return pendingRows<Tables["alertas_operativas"]["Row"]>((from, to, signal) => client.from("alertas_operativas")
-    .select("*", { count: "exact" }).eq("organization_id", DEFAULT_ORG_ID)
+    .select("*", { count: "exact" }).eq("organization_id", organizationId)
     .eq("prioridad", "alta").neq("estado", "resuelta")
     .order("created_at", { ascending: false }).order("id").range(from, to).abortSignal(signal));
 }

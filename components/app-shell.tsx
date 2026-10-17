@@ -36,7 +36,6 @@ import { cn } from "@/lib/utils";
 import { AppShellAccessGuard } from "@/components/app-shell-access-guard";
 import { AppFooter } from "@/components/app-footer";
 import { GlobalSearch } from "@/components/ui/global-search";
-import { NotificationBell, type Notification } from "@/components/ui/notification-bell";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const icons = {
@@ -71,9 +70,9 @@ type AppShellProps = {
   /** Si se pasa, solo esos `href` aparecen en el menú lateral. */
   navAllowlist: Set<string>;
   globalSearchItems?: React.ComponentProps<typeof GlobalSearch>["items"];
+  globalSearchUnavailableSources?: string[];
   navBadges?: Record<string, number>;
   companyName?: string | null;
-  notifications?: Notification[];
   showUpdatePresentation?: boolean;
 };
 
@@ -151,9 +150,9 @@ export function AppShell({
   uiRole,
   navAllowlist,
   globalSearchItems = [],
+  globalSearchUnavailableSources = [],
   navBadges = {},
   companyName,
-  notifications = [],
   showUpdatePresentation = false,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -466,9 +465,8 @@ export function AppShell({
             </button>
             <h1 className="truncate text-base font-semibold text-[var(--katia-text-primary)]">{pageTitle}</h1>
           </div>
-          <GlobalSearch items={globalSearchItems} />
+          <GlobalSearch items={globalSearchItems} allowedRoutes={navAllowlist} unavailableSources={globalSearchUnavailableSources} />
           <div className="flex shrink-0 items-center gap-2">
-            <NotificationBell notifications={notifications} />
             <span data-update-tour="appearance" className="inline-flex"><ThemeToggle /></span>
             {profileMarkup(true)}
           </div>

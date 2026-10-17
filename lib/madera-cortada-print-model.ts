@@ -1,4 +1,5 @@
-import { formatPen, roundMoney } from "@/lib/utils";
+import { formatPen } from "@/lib/utils";
+import { roundLegacyMoney as roundMoney } from "@/lib/money";
 import { calculateMaderaCortadaRealPtPricing } from "@/lib/madera-cortada-pricing";
 
 export type TipoComprobanteVenta = "boleta" | "factura" | "ninguno";

@@ -1,7 +1,8 @@
+import { roundLegacyMoney } from "@/lib/money";
 import {
-  calcularPrecioConMargen,
-  computeTotalesDetalle,
-  round2,
+  calcularPrecioConMargen as calcularPrecioActual,
+  computeTotalesCotizacion,
+  round2 as roundCurrent,
 } from "@/lib/cotizacion-calculos";
 import type { CotizacionDetalleV1 } from "@/lib/cotizacion-unificada-payload";
 
@@ -17,21 +18,21 @@ function reconciliarLineasConTotal(lineas: LineaFormal[], totalFinal: number | u
   if (totalFinal === undefined || !Number.isFinite(totalFinal) || totalFinal < 0 || lineas.length === 0) {
     return lineas;
   }
-  const totalObjetivo = round2(totalFinal);
-  const sumaLineas = round2(lineas.reduce((acumulado, linea) => acumulado + linea.precioTotal, 0));
-  const ajuste = round2(totalObjetivo - sumaLineas);
+  const totalObjetivo = roundCurrent(totalFinal);
+  const sumaLineas = roundCurrent(lineas.reduce((acumulado, linea) => acumulado + linea.precioTotal, 0));
+  const ajuste = roundCurrent(totalObjetivo - sumaLineas);
   if (ajuste === 0) return lineas;
 
   const ultimoIndice = lineas.length - 1;
   const ultimaLinea = lineas[ultimoIndice];
-  const precioTotalAjustado = round2(ultimaLinea.precioTotal + ajuste);
+  const precioTotalAjustado = roundCurrent(ultimaLinea.precioTotal + ajuste);
   if (precioTotalAjustado < 0) return lineas;
 
   return lineas.map((linea, indice) =>
     indice === ultimoIndice
       ? {
           ...linea,
-          precioUnit: round2(precioTotalAjustado / Math.max(1, linea.cantidad)),
+          precioUnit: roundCurrent(precioTotalAjustado / Math.max(1, linea.cantidad)),
           precioTotal: precioTotalAjustado,
         }
       : linea,
@@ -43,7 +44,10 @@ export function buildLineasResumen(
   detalle: CotizacionDetalleV1,
   margenGananciaPct = 0,
   totalFinal?: number,
+  precisionVersion:1|2=2,
 ): LineaFormal[] {
+  const round2=precisionVersion===1?roundLegacyMoney:roundCurrent;
+  const calcularPrecioConMargen=precisionVersion===1?(costo:number,margen:number)=>{const base=roundLegacyMoney(Math.max(0,costo));return roundLegacyMoney(base+roundLegacyMoney(base*Math.max(0,margen)/100));}:calcularPrecioActual;
   const lineas: LineaFormal[] = [];
   const descripcionPersonalizada = getDescripcionPersonalizada(detalle);
   const bulletsPersonalizados = descripcionPersonalizada === null
@@ -129,7 +133,7 @@ export function buildLineasResumen(
     }
   }
 
-  const totRubros = computeTotalesDetalle(detalle);
+  const totRubros = computeTotalesCotizacion(detalle,precisionVersion);
 
   if (detalle.rubros.aserradero && detalle.aserradero) {
     const a = detalle.aserradero;

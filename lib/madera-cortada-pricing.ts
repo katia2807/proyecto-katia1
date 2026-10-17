@@ -1,4 +1,4 @@
-import { roundMoney } from "@/lib/utils";
+import { productMoney, roundLegacyMoney } from "@/lib/money";
 
 export type MaderaCortadaRealPtPricingInput = {
   cantidad: number;
@@ -18,6 +18,7 @@ function nonNegativeFinite(value: number) {
  */
 export function calculateMaderaCortadaRealPtPricing(
   input: MaderaCortadaRealPtPricingInput,
+  precision: "current" | "legacy" = "current",
 ) {
   const cantidad = nonNegativeFinite(input.cantidad);
   const espesor = nonNegativeFinite(input.espesor);
@@ -28,7 +29,7 @@ export function calculateMaderaCortadaRealPtPricing(
   const ptUnitarioReal = (espesor * ancho * largo) / 12;
   const ptTotalReal = ptUnitarioReal * cantidad;
   const precioUnitarioComercial = ptUnitarioReal * precioPorPt;
-  const subtotalComercial = roundMoney(ptTotalReal * precioPorPt);
+  const subtotalComercial = precision==="legacy" ? roundLegacyMoney(ptTotalReal*precioPorPt) : productMoney([cantidad,espesor,ancho,largo,precioPorPt],12);
 
   return {
     ptUnitarioReal,

@@ -11,19 +11,24 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const context = await requireAuthContext();
   const displayName = context.fullName?.trim() || "Usuario";
   const navAllowlist = buildNavHrefAllowlist(context.role, context.uiRole);
-  const [clientes, cotizaciones, productos, mandoSources, empresa] = await Promise.all([
-    canAccessPath(context.role,context.uiRole,"/ventas/clientes") ? readCompleteTable("clientes",context.organizationId).catch(() => []) : Promise.resolve([]),
-    canAccessPath(context.role,context.uiRole,"/cotizacion") ? readCompleteTable("cotizaciones_unificadas",context.organizationId).catch(() => []) : Promise.resolve([]),
-    canAccessPath(context.role,context.uiRole,"/inventario") ? readCompleteTable("inventario_productos",context.organizationId).catch(() => []) : Promise.resolve([]),
+  const [clientesResult, cotizacionesResult, productosResult, mandoSources, empresa] = await Promise.all([
+    canAccessPath(context.role,context.uiRole,"/ventas/clientes") ? readCompleteTable("clientes",context.organizationId).catch(() => null) : Promise.resolve([]),
+    canAccessPath(context.role,context.uiRole,"/cotizacion") ? readCompleteTable("cotizaciones_unificadas",context.organizationId).catch(() => null) : Promise.resolve([]),
+    canAccessPath(context.role,context.uiRole,"/inventario") ? readCompleteTable("inventario_productos",context.organizationId).catch(() => null) : Promise.resolve([]),
     canAccessPath(context.role,context.uiRole,"/gerencial") ? getGerencialSources("hoy",context.organizationId) : Promise.resolve(null),
     getEmpresaConfig(context.organizationId).catch(() => null),
   ]);
+  const clientes = clientesResult ?? [];
+  const cotizaciones = cotizacionesResult ?? [];
+  const productos = productosResult ?? [];
+  const globalSearchUnavailableSources = [clientesResult === null ? "Clientes" : null, productosResult === null ? "Productos" : null, cotizacionesResult === null ? "Cotizaciones" : null].filter((label): label is string => label !== null);
+  const clientNames = new Map(clientes.map(cliente => [cliente.id, cliente.nombre]));
   const mando = mandoSources ? buildGerencialModel(mandoSources) : null;
   const recent = <T extends {created_at:string}>(rows:T[]) => [...rows].sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,200);
   const globalSearchItems = [
     ...recent(clientes).map((cliente) => ({
       label: cliente.nombre,
-      detail: [cliente.documento, cliente.telefono].filter(Boolean).join(" · ") || "Cliente",
+      detail: [...new Set([cliente.documento, cliente.ruc, cliente.telefono].filter(Boolean))].join(" · ") || "Cliente",
       href: `/ventas/clientes/${cliente.id}`,
       type: "Cliente" as const,
     })),
@@ -35,7 +40,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     })),
     ...recent(cotizaciones).map((cotizacion) => ({
       label: cotizacion.correlativo ?? cotizacion.id.slice(0, 8),
-      detail: `${cotizacion.fecha} · ${cotizacion.estado_flujo}`,
+      detail: [cotizacion.cliente_id ? clientNames.get(cotizacion.cliente_id) : null, cotizacion.fecha, cotizacion.estado_flujo].filter(Boolean).join(" · "),
       href: `/cotizacion?cotizacion=${cotizacion.id}`,
       type: "Cotizacion" as const,
     })),
@@ -51,6 +56,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         userRole={context.role}
         userName={displayName}
         globalSearchItems={globalSearchItems}
+        globalSearchUnavailableSources={globalSearchUnavailableSources}
         companyName={empresa?.nombre ?? null}
         navBadges={{
           // Centro de Mando muestra el total de alertas críticas del negocio

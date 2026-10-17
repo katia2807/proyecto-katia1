@@ -18,7 +18,8 @@
     "db:login": "supabase login",
     "db:link": "supabase link",
     "db:push": "supabase db push",
-    "db:status": "supabase migration list"
+    "db:status": "supabase migration list",
+    "preview:mantenimiento": "node scripts/mantenimiento-local.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.53.1",
@@ -27,6 +28,7 @@
     "@tabler/icons-react": "^3.44.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "decimal.js": "10.6.0",
     "exceljs": "^4.4.0",
     "lucide-react": "^1.14.0",
     "next": "16.2.4",

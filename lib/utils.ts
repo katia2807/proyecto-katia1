@@ -1,13 +1,12 @@
 import { clsx, type ClassValue } from "clsx";
 import { z } from "zod";
+import { roundMoney } from "@/lib/money";
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
 }
 
-export const roundMoney = (value: number): number => {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-};
+export { roundMoney } from "@/lib/money";
 
 export const safeDivide = (a: number, b: number): number => {
   if (b === 0) return 0;

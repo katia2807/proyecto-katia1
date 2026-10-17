@@ -169,6 +169,10 @@ export type Database = {
           pies_cubicos: number;
           costo_cubicaje: number;
           precio_cobrado: number;
+          metodo_pago?: string | null;
+          modalidad_pago?: string | null;
+          fecha_pago_credito?: string | null;
+          adelanto?: number | null;
           utilidad: number;
           lineas_json: Json;
           correlativo: string | null;

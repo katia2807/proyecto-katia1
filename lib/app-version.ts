@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.90";
-export const APP_LAST_UPDATE = "14/10/2026";
+export const APP_VERSION = "1.1.91";
+export const APP_LAST_UPDATE = "17/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Las invitaciones conservan las cuentas existentes y los cambios de usuarios protegen la última dueña activa. Las ventas nuevas de muebles aparecen en Kardex, con una sola salida de stock y sin alterar el historial.";
+  "Inicio reúne prioridades, cobros y alquileres en un resumen visual. La búsqueda facilita encontrar registros y los cálculos nuevos mejoran la precisión de centavos, conservando los importes históricos.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {

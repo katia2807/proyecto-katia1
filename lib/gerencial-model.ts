@@ -75,21 +75,23 @@ export function buildGerencialModel(input: GerencialSources, now = new Date()) {
   const actions: GerencialItem[] = [];
   const upcoming: GerencialItem[] = [];
   const undated: GerencialItem[] = [];
+  const credits: GerencialItem[] = [];
   const payments = new Map<string, number>();
-  const aliases: Record<string, string> = { ventas_madera: "venta-madera", ventas_pdf: "venta-madera", ventas_madera_cortada: "madera", ventas_muebles_terminados: "mueble", ventas_alquiler: "alquiler", alquiler: "alquiler", cotizacion_unificada: "cotizacion" };
+  const aliases: Record<string, string> = { ventas_madera: "venta-madera", ventas_pdf: "venta-madera", ventas_madera_cortada: "madera", ventas_muebles_terminados: "mueble", ventas_alquiler: "alquiler", alquiler: "alquiler", cotizacion_unificada: "cotizacion", ventas_aserradero: "aserradero", aserradero: "aserradero" };
   if (caja) for (const m of caja) {
     const type = m.modulo_origen ? aliases[m.modulo_origen] : null;
     if (m.tipo === "ingreso" && type && m.referencia_id && m.fecha <= periods.today && m.categoria !== "penalidad_alquiler") {
       const key = `${type}:${m.referencia_id}`; payments.set(key, roundMoney((payments.get(key) ?? 0) + Number(m.monto)));
     }
   }
-  function credit(r: { id: string; cliente_id: string; fecha_pago_credito?: string | null; modalidad_pago?: string | null }, type: string, label: string, amount: unknown) {
+  function credit(r: { id: string; cliente_id: string | null; fecha_pago_credito?: string | null; modalidad_pago?: string | null }, type: string, label: string, amount: unknown) {
     if (r.modalidad_pago !== "credito") return;
     const total = gerencialAmount(amount);
     const remaining = total !== null && caja !== null ? roundMoney(Math.max(0, total - (payments.get(`${type}:${r.id}`) ?? 0))) : null;
     if (remaining === 0) return;
     const date = calendarDate(r.fecha_pago_credito) ? r.fecha_pago_credito : null;
     const item: GerencialItem = { id: `credito:${type}:${r.id}`, title: date && date < periods.today ? "Revisar crédito vencido" : "Revisar crédito", subject: `${label} · ${client(r.cliente_id)}`, reason: remaining === null ? "Falta un importe o no se pudo consultar Caja para comprobar el saldo." : "Descontados los ingresos vinculados en Caja. Comprueba pagos sin referencia o fuera de Caja.", date, amount: remaining, amountLabel: "Saldo según Caja vinculada", href: detail(type, r.id), action: "Revisar operación", priority: date && date <= periods.today ? "alta" : "media" };
+    credits.push(item);
     if (date === null) undated.push(item);
     else if (date <= periods.today) actions.push(item);
     else if (date <= periods.nextEnd) upcoming.push(item);
@@ -113,6 +115,7 @@ export function buildGerencialModel(input: GerencialSources, now = new Date()) {
     const item: GerencialItem = { id: `orden:${o.id}`, title: o.estado === "terminado" ? "Coordinar entrega de pedido terminado" : "Revisar pedido en producción", subject: `${o.correlativo ?? "Pedido"} · ${client(o.cliente_id)}`, reason: "No hay una fecha de entrega pactada disponible. Comprueba el avance con el cliente.", date: null, amount: null, amountLabel: "", href, action: "Revisar pedido", priority: o.estado === "terminado" ? "media" : "baja" };
     undated.push(item); actions.push(item);
   }
+  for (const service of sources.servicios_aserradero ?? []) credit(service, "aserradero", "Servicio de aserradero", service.precio_cobrado);
   const opportunities = (sources.cotizaciones_unificadas ?? []).filter(c => c.estado_flujo !== "cobrada" && String(c.estado_flujo) !== "inactivo").map(c => ({ id: c.id, subject: client(c.cliente_id), date: c.fecha, amount: gerencialAmount(c.total), state: String(c.estado_flujo), href: `/cotizacion?editar=${encodeURIComponent(c.id)}#cotizacion-wizard` }));
   for (const c of opportunities.filter(c => c.state === "deudor")) actions.push({ id: `mora:${c.id}`, title: "Revisar cotización marcada en mora", subject: c.subject, reason: "El estado registrado es Deudor (Mora); comprueba la situación antes de considerar un cobro.", date: null, amount: c.amount, amountLabel: "Importe de la cotización", href: c.href, action: "Revisar cotización", priority: "alta" });
   const orderItems = (items: GerencialItem[]) => items.sort((a, b) => ({ alta: 0, media: 1, baja: 2 }[a.priority] - { alta: 0, media: 1, baja: 2 }[b.priority]) || (a.date ?? "9999").localeCompare(b.date ?? "9999"));
@@ -149,6 +152,6 @@ export function buildGerencialModel(input: GerencialSources, now = new Date()) {
     const date = addCalendarDays(periods.recentStart, i);
     return { fecha: date.slice(5), saldo: moneySum(caja.filter(r => r.fecha <= date).map(r => r.tipo === "ingreso" ? Number(r.monto) : r.tipo === "egreso" ? -Number(r.monto) : 0)) };
   });
-  return { periods, sources, cash, stockLow, stockValues, inventory, actions, upcoming, undated, opportunities, operationsReady, operationsAmount, unknownOperations, operationsCount: currentOperations.length, previousOperationsAmount: operationsReady ? moneySum(previousOperations.filter(o => o.amount !== null).map(o => o.amount!)) : null, topClients: [...topMap.values()].sort((a, b) => b.amount - a.amount || a.id.localeCompare(b.id)).slice(0, 5), expenseCategories, productGroups, cashPoints };
+  return { periods, sources, cash, stockLow, stockValues, inventory, actions, upcoming, undated, credits, opportunities, operationsReady, operationsAmount, unknownOperations, operationsCount: currentOperations.length, previousOperationsAmount: operationsReady ? moneySum(previousOperations.filter(o => o.amount !== null).map(o => o.amount!)) : null, topClients: [...topMap.values()].sort((a, b) => b.amount - a.amount || a.id.localeCompare(b.id)).slice(0, 5), expenseCategories, productGroups, cashPoints };
 }
 export type GerencialModel = ReturnType<typeof buildGerencialModel>;

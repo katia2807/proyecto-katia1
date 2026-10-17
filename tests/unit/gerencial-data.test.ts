@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 const mocks = vi.hoisted(() => ({ hasSupabaseEnv: vi.fn(), getSupabaseServerClient: vi.fn() }));
 vi.mock("@/lib/runtime", () => ({ hasSupabaseEnv: mocks.hasSupabaseEnv }));
 vi.mock("@/lib/supabase/server", () => ({ getSupabaseServerClient: mocks.getSupabaseServerClient }));
+import { buildGerencialModel } from "@/lib/gerencial-model";
 import { getGerencialSources, readGerencialTable, normalizeGerencialTab } from "@/lib/gerencial-data";
 let rows: Record<string, Record<string, unknown>[]>;
 let requests: { url: URL; method: string }[];
@@ -42,8 +43,12 @@ describe("Lectura completa de Centro de Mando", () => {
     rows.movimientos_caja = Array.from({ length: 601 }, (_, i) => ({ id: String(i).padStart(5, "0"), organization_id: org })); mode = "failure";
     const s = await getGerencialSources("hoy"); expect(s.movimientos_caja).toBeNull(); expect(s.ventas_madera).toEqual([]);
   });
-  test("Futuro no carga inventario ni servicios innecesarios", async () => {
-    await getGerencialSources("futuro"); expect(requests.some(r => r.url.pathname.includes("inventario") || r.url.pathname.includes("servicios_aserradero"))).toBe(false);
+  test("Futuro consulta los créditos de Aserradero sin cargar inventario", async () => {
+    rows.servicios_aserradero=[{id:"servicio-credito",organization_id:org,cliente_id:"cliente",fecha:"2026-10-15",modalidad_pago:"credito",fecha_pago_credito:"2026-10-20",precio_cobrado:80}];
+    const sources=await getGerencialSources("futuro");
+    expect(requests.some(r=>r.url.pathname.includes("inventario"))).toBe(false);
+    expect(requests.some(r=>r.url.pathname.includes("servicios_aserradero"))).toBe(true);
+    expect(buildGerencialModel(sources,new Date("2026-10-16T16:00:00Z")).upcoming.find(item=>item.id==="credito:aserradero:servicio-credito")).toMatchObject({date:"2026-10-20",amount:80});
   });
   test("los enlaces antiguos siguen funcionando y un tab inválido vuelve a Hoy", () => {
     expect(normalizeGerencialTab("pasado")).toBe("pasado"); expect(normalizeGerencialTab("incorrecto")).toBe("hoy"); expect(normalizeGerencialTab("futuro", "criticas")).toBe("hoy");

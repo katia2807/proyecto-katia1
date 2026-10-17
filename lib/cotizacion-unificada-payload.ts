@@ -27,6 +27,7 @@ export type MuebleLineaMadera = {
 };
 
 export type CotizacionResumenCalculo = {
+  precisionVersion?: 1 | 2;
   margenPctAplicado: number;
   subtotalBase: number;
   margenMonto: number;
@@ -137,6 +138,7 @@ const alquilerSchema = z
   .nullable();
 
 const resumenCalculoSchema = z.object({
+  precisionVersion: z.union([z.literal(1), z.literal(2)]).optional(),
   margenPctAplicado: z.number().finite().nonnegative(),
   subtotalBase: z.number().finite().nonnegative(),
   margenMonto: z.number().finite().nonnegative(),

@@ -86,7 +86,8 @@ import { validarCondicionesPagoCotizacion } from "@/lib/cotizacion-pago";
 
 import { getEmpresaConfig } from "@/lib/company-config";
 import {
-  calcularContratoCotizacion,
+  calcularCotizacionParaGuardar,
+  conservaImporteCotizacion,
   crearInstantaneaCalculoCotizacion,
   resolverCalculoDocumentoCotizacion,
   totalClienteCoincideConServidor,
@@ -1027,7 +1028,8 @@ export async function saveCotizacionUnificada(input: {
       }
       margenPctAutorizado = calculoAnterior.margenPctAplicado;
     }
-    const calculo = calcularContratoCotizacion(det, margenPctAutorizado);
+    const anteriorParaCalculo=cotizacionAnterior ? {detalle:parseCotizacionDetalle(cotizacionAnterior.detalle),total:cotizacionAnterior.total} : null;
+    const calculo = calcularCotizacionParaGuardar(det, margenPctAutorizado, anteriorParaCalculo);
     if (!totalClienteCoincideConServidor(input.total, calculo.totalFinal)) {
       return { ok: false, error: "El total no coincide con el detalle. Revisa los importes." };
     }
@@ -1035,7 +1037,7 @@ export async function saveCotizacionUnificada(input: {
     if (errorPago) return { ok: false, error: errorPago };
     const detalleConResumen = {
       ...det,
-      resumenCalculo: crearInstantaneaCalculoCotizacion(calculo),
+      resumenCalculo: crearInstantaneaCalculoCotizacion(calculo, conservaImporteCotizacion(det,anteriorParaCalculo) ? anteriorParaCalculo?.detalle.resumenCalculo?.precisionVersion ?? 1 : 2),
     };
     const detalleRecord = JSON.parse(JSON.stringify(detalleConResumen)) as Record<string, unknown>;
     // Guardar cambios no devuelve a pendiente una propuesta ya aceptada o en producción.

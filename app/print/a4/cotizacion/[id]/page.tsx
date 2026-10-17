@@ -27,6 +27,7 @@ export default async function A4CotizacionPage({ params }: PdfPageProps) {
     detalle,
     calculoDocumento.margenPctAplicado ?? 0,
     calculoDocumento.margenPctAplicado == null ? undefined : calculoDocumento.totalFinal,
+    detalle.resumenCalculo?.precisionVersion ?? 1,
   );
   const total = calculoDocumento.totalFinal;
 

@@ -4,6 +4,6 @@
     "types": ["vitest/globals"],
     "noEmit": true
   },
-  "include": ["./**/*.ts"],
+  "include": ["../../next-env.d.ts", "./**/*.ts"],
   "exclude": ["node_modules"]
 }

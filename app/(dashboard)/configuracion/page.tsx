@@ -119,7 +119,7 @@ export default async function ConfiguracionPage({ searchParams }: ConfiguracionP
           <Card>
             <CardTitle>Notificaciones</CardTitle>
             <CardDescription>
-              Revisa stock y créditos en Centro de Mando e Inventario. La campana todavía no recibe avisos automáticos; su contador no indica que no existan pendientes.
+              Consulta los pendientes de stock y créditos en Centro de Mando e Inventario. Los avisos automáticos todavía no están habilitados.
             </CardDescription>
           </Card>
 

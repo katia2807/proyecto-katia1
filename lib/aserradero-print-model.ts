@@ -1,4 +1,4 @@
-import { roundMoney } from "@/lib/utils";
+import { roundMoney, roundLegacyMoney, productMoney } from "@/lib/money";
 
 export type AserraderoDocumentType = "boleta" | "factura";
 
@@ -84,7 +84,7 @@ type ParsedLines = {
 };
 
 export function calculateAserraderoCutSubtotal(totalPTComercial: number, tarifaPorPT: number) {
-  return roundMoney(totalPTComercial * tarifaPorPT);
+  return productMoney([totalPTComercial,tarifaPorPT]);
 }
 
 export function calculateAserraderoTotal(
@@ -223,7 +223,7 @@ function buildAdditionalService(
   const cantidad = positiveNumber(line.cantidad) ?? 1;
   const tarifa = nonNegativeNumber(line.tarifa) ?? 0;
   const storedSubtotal = nonNegativeNumber(line.subtotal);
-  const subtotal = roundMoney(storedSubtotal ?? cantidad * tarifa);
+  const subtotal = roundLegacyMoney(storedSubtotal ?? cantidad * tarifa);
   if (subtotal <= 0) return null;
 
   return { nombre, cantidad, tarifa, subtotal };
@@ -302,14 +302,14 @@ export function buildAserraderoPrintModel({
       : null;
   const totalPTComercial = storedTotalPT ?? blockTotalPT;
   const tarifaPorPT = summary ? positiveNumber(summary.precioPorPT) : null;
-  const subtotalCorte = roundMoney(nonNegativeNumber(service.costo_cubicaje) ?? 0);
-  const subtotalAdicionales = roundMoney(
+  const subtotalCorte = roundLegacyMoney(nonNegativeNumber(service.costo_cubicaje) ?? 0);
+  const subtotalAdicionales = roundLegacyMoney(
     additionalServices.reduce((total, item) => total + item.subtotal, 0),
   );
-  const totalCobrado = roundMoney(nonNegativeNumber(service.precio_cobrado) ?? 0);
-  const totalCalculado = roundMoney(subtotalCorte + subtotalAdicionales);
-  const ajusteAlTotal = roundMoney(totalCobrado - totalCalculado);
-  const adelanto = roundMoney(nonNegativeNumber(service.adelanto) ?? 0);
+  const totalCobrado = roundLegacyMoney(nonNegativeNumber(service.precio_cobrado) ?? 0);
+  const totalCalculado = roundLegacyMoney(subtotalCorte + subtotalAdicionales);
+  const ajusteAlTotal = roundLegacyMoney(totalCobrado - totalCalculado);
+  const adelanto = roundLegacyMoney(nonNegativeNumber(service.adelanto) ?? 0);
   const modalidad = nonEmptyString(service.modalidad_pago) ?? "contado";
 
   if (!summary) {
@@ -342,7 +342,7 @@ export function buildAserraderoPrintModel({
       modalidad,
       metodo: nonEmptyString(service.metodo_pago) ?? "efectivo",
       adelanto,
-      saldo: roundMoney(Math.max(0, totalCobrado - adelanto)),
+      saldo: roundLegacyMoney(Math.max(0, totalCobrado - adelanto)),
       fechaCredito:
         modalidad === "credito" ? nonEmptyString(service.fecha_pago_credito) : null,
     },

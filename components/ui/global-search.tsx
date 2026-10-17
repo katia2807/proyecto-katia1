@@ -1,121 +1,116 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
-import { IconSearch, IconX } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { IconArrowUpRight, IconBox, IconFileText, IconLayoutGrid, IconSearch, IconUser, IconX } from "@tabler/icons-react";
+import { buildGlobalSearchSections, getGlobalSearchContinuations, getGlobalSearchResults, GLOBAL_SEARCH_LABELS, GLOBAL_SEARCH_TYPES, nextGlobalSearchIndex, normalizeGlobalSearch, type GlobalSearchItem, type GlobalSearchType } from "@/lib/global-search";
+import styles from "./global-search.module.css";
 
-type SearchItem = {
-  label: string;
-  detail: string;
-  href: string;
-  type: "Cliente" | "Producto" | "Cotizacion";
-};
+const icons = { Apartado: IconLayoutGrid, Cliente: IconUser, Producto: IconBox, Cotizacion: IconFileText };
 
-const typeColors: Record<SearchItem["type"], string> = {
-  Cliente:    "text-[var(--katia-accent-cyan)]",
-  Producto:   "text-[var(--katia-primary)]",
-  Cotizacion: "text-[var(--katia-secondary)]",
-};
+type Props = { items: GlobalSearchItem[]; allowedRoutes: ReadonlySet<string>; unavailableSources?: string[] };
 
-export function GlobalSearch({ items }: { items: SearchItem[] }) {
+export function GlobalSearch({ items, allowedRoutes, unavailableSources = [] }: Props) {
   const [query, setQuery] = useState("");
-  const [focused, setFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const id = useId();
+  const listId = id + "-results";
+  const pathname = usePathname();
+  const router = useRouter();
+  const sections = useMemo(() => buildGlobalSearchSections(allowedRoutes), [allowedRoutes]);
+  const results = useMemo(() => getGlobalSearchResults(items, sections, query), [items, sections, query]);
+  const continuations = useMemo(() => getGlobalSearchContinuations(query, allowedRoutes), [query, allowedRoutes]);
+  const searchable = items.length > 0 || sections.some(item => item.href !== "/");
+  const selectedIndex = results.length ? Math.min(Math.max(0, activeIndex), results.length - 1) : -1;
+  const activeId = selectedIndex >= 0 ? id + "-result-" + selectedIndex : undefined;
+  const hasQuery = normalizeGlobalSearch(query).length >= 2;
 
-  const results = useMemo((): Record<SearchItem["type"], SearchItem[]> => {
-    const q = query.trim().toLowerCase();
-    const empty: Record<SearchItem["type"], SearchItem[]> = { Cliente: [], Producto: [], Cotizacion: [] };
-    if (q.length < 2) return empty;
-    const filtered = items.filter((item) =>
-      `${item.label} ${item.detail} ${item.type}`.toLowerCase().includes(q),
-    );
-    const grouped: Record<SearchItem["type"], SearchItem[]> = { Cliente: [], Producto: [], Cotizacion: [] };
-    for (const item of filtered.slice(0, 12)) {
-      grouped[item.type].push(item);
+  const openSearch = useCallback(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    setIsOpen(true);
+    inputRef.current?.focus();
+  }, []);
+
+  function closeSearch() { dialogRef.current?.close(); }
+
+  useEffect(() => {
+    if (!searchable) return;
+    function shortcut(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "k") {
+        const currentDialog = document.querySelector("dialog[open]");
+        if (currentDialog && currentDialog !== dialogRef.current) return;
+        event.preventDefault();
+        openSearch();
+      }
     }
-    return grouped;
-  }, [items, query]);
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  }, [openSearch, searchable]);
 
-  const hasResults = Object.values(results).some((arr) => arr && arr.length > 0);
-  const showDropdown = focused && query.trim().length >= 2;
+  useEffect(() => { dialogRef.current?.close(); }, [pathname]);
+  useEffect(() => {
+    if (dialogRef.current?.open && activeId) document.getElementById(activeId)?.scrollIntoView({ block: "nearest" });
+  }, [activeId, query]);
+
+  function inputKeys(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.nativeEvent.isComposing) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSearch();
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex(nextGlobalSearchIndex(selectedIndex, results.length, event.key === "ArrowDown" ? 1 : -1));
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const selected = results[selectedIndex];
+      if (selected) { closeSearch(); router.push(selected.href); }
+    }
+  }
+
+  if (!searchable) return null;
 
   return (
-    <div className="relative hidden min-w-[16rem] max-w-sm flex-1 md:block">
-      <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--katia-text-tertiary)]" />
-      <input
-        ref={inputRef}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setTimeout(() => setFocused(false), 150)}
-        placeholder="Buscar en registros recientes…"
-        aria-label="Búsqueda global"
-        className={cn(
-          "h-10 w-full rounded-[var(--katia-radius-md)] border pl-9 pr-8 text-sm transition-all duration-150",
-          "bg-[var(--katia-glass-bg)] text-[var(--katia-text-primary)]",
-          "placeholder:text-[var(--katia-text-disabled)]",
-          focused
-            ? "border-[var(--katia-border-emphasis)] shadow-[var(--katia-shadow-focus)]"
-            : "border-[var(--katia-border-default)]",
-        )}
-      />
-      {query ? (
-        <button
-          type="button"
-          aria-label="Limpiar búsqueda"
-          onClick={() => { setQuery(""); inputRef.current?.focus(); }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--katia-text-tertiary)] hover:text-[var(--katia-text-primary)]"
-        >
-          <IconX className="size-3.5" />
-        </button>
-      ) : null}
-
-      {showDropdown ? (
-        <div
-          className={cn(
-            "absolute left-0 right-0 top-12 z-[75] overflow-hidden",
-            "rounded-[var(--katia-radius-xl)] border border-[var(--katia-glass-border)]",
-            "bg-[var(--katia-bg-overlay)] backdrop-blur-[20px]",
-            "shadow-[var(--katia-shadow-modal)]",
-          )}
-        >
-          <p className="border-b border-[var(--katia-border-subtle)] px-4 py-2 text-xs text-[var(--katia-text-tertiary)]">Hasta 200 registros recientes por categoría permitida.</p>
-          {!hasResults ? (
-            <p className="px-4 py-3 text-sm text-[var(--katia-text-tertiary)]">
-              Sin coincidencias recientes para &ldquo;{query}&rdquo;. Busca en el apartado correspondiente para consultar todo el historial.
-            </p>
-          ) : (
-            (["Cliente", "Producto", "Cotizacion"] as const).map((type) => {
-              const group = results[type];
-              if (!group?.length) return null;
-              return (
-                <div key={type}>
-                  <p className="border-b border-[var(--katia-border-subtle)] px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--katia-text-disabled)]">
-                    {type === "Cotizacion" ? "Cotizaciones" : `${type}s`}
-                  </p>
-                  {group.map((item) => (
-                    <Link
-                      key={`${type}-${item.href}-${item.label}`}
-                      href={item.href}
-                      onClick={() => setQuery("")}
-                      className="flex items-center gap-3 border-b border-[var(--katia-border-subtle)] px-4 py-2 last:border-0 transition-colors duration-100 hover:bg-[var(--katia-primary-soft)]"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-[var(--katia-text-primary)]">{item.label}</p>
-                        <p className="truncate text-xs text-[var(--katia-text-tertiary)]">{item.detail}</p>
-                      </div>
-                      <span className={cn("shrink-0 text-[10px] font-semibold", typeColors[type])}>
-                        {type}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              );
-            })
-          )}
+    <div className={styles.root}>
+      <button type="button" className={styles.trigger} onClick={openSearch} aria-label="Buscar en el programa" aria-haspopup="dialog" aria-expanded={isOpen}>
+        <IconSearch size={17} aria-hidden="true" /><span>Buscar en el programa…</span><kbd>Ctrl K</kbd>
+      </button>
+      <dialog ref={dialogRef} className={styles.dialog} aria-labelledby={id + "-title"} onClose={() => { setIsOpen(false); setQuery(""); setActiveIndex(0); }} onClick={event => { if (event.target === event.currentTarget) closeSearch(); }}>
+        <div className={styles.heading}><h2 id={id + "-title"}>Buscar en el programa</h2><button type="button" className={styles.close} aria-label="Cerrar búsqueda" onClick={closeSearch}><IconX size={19} aria-hidden="true" /></button></div>
+        <div className={styles.inputLine}>
+          <IconSearch size={20} aria-hidden="true" />
+          <label className={styles.srOnly} htmlFor={id + "-input"}>Nombre, documento, código o apartado</label>
+          <input ref={inputRef} id={id + "-input"} type="search" role="combobox" value={query} maxLength={120} autoComplete="off" spellCheck={false} aria-autocomplete="list" aria-controls={listId} aria-expanded={isOpen} aria-activedescendant={activeId} aria-describedby={id + "-hint"} placeholder="Nombre, documento, código o apartado…" onChange={event => { setQuery(event.target.value); setActiveIndex(0); }} onKeyDown={inputKeys} />
         </div>
-      ) : null}
+        <p className={styles.hint} id={id + "-hint"}>{hasQuery ? "Apartados y coincidencias entre tus registros recientes." : query ? "Escribe al menos 2 caracteres para buscar registros." : "Ve a un apartado o busca clientes, productos y cotizaciones."}</p>
+        {unavailableSources.length > 0 ? <p className={styles.warning} role="status">No se pudo cargar: {unavailableSources.join(", ")}. Puedes abrir sus apartados.</p> : null}
+        <div className={styles.results} id={listId} role="listbox" aria-label={hasQuery ? "Resultados de búsqueda" : "Accesos rápidos"}>
+          {results.length === 0 ? <div className={styles.empty}><IconSearch size={24} aria-hidden="true" /><strong>Sin coincidencias directas</strong><p>{continuations.length > 0 ? "Puedes buscar en el historial completo desde los enlaces de abajo." : "Prueba otro nombre de apartado."}</p></div> : GLOBAL_SEARCH_TYPES.map((type: GlobalSearchType) => {
+            const group = results.filter(item => item.type === type);
+            if (!group.length) return null;
+            const Icon = icons[type];
+            return <div key={type} role="group" aria-label={GLOBAL_SEARCH_LABELS[type]}>
+              <p className={styles.groupLabel}>{type === "Apartado" && !hasQuery ? "Ir a un apartado" : GLOBAL_SEARCH_LABELS[type]}</p>
+              {group.map(item => {
+                const index = results.indexOf(item);
+                return <Link key={item.type + item.href + item.label} id={id + "-result-" + index} role="option" aria-selected={index === selectedIndex} tabIndex={-1} href={item.href} className={styles.result} data-type={item.type} onPointerEnter={event => { if (event.pointerType !== "touch") setActiveIndex(index); }} onClick={closeSearch}>
+                  <span className={styles.resultIcon}><Icon size={20} stroke={1.7} aria-hidden="true" /></span><span className={styles.resultCopy}><strong>{item.label}</strong><span>{item.detail}</span></span><IconArrowUpRight className={styles.resultArrow} size={16} aria-hidden="true" />
+                </Link>;
+              })}
+            </div>;
+          })}
+        </div>
+        {hasQuery && continuations.length > 0 ? <div className={styles.continuations}><p>Para consultar todo el historial</p>{continuations.map(link => <Link key={link.href} href={link.href} onClick={closeSearch}>{link.label}<IconArrowUpRight size={13} aria-hidden="true" /></Link>)}</div> : null}
+        <div className={styles.footer}><span className={styles.keyboardHint}>↑ ↓ elegir <span>·</span> Enter abrir <span>·</span> Esc cerrar</span><span>{results.length} {hasQuery ? "coincidencias mostradas" : "accesos"}</span></div>
+        <p className={styles.srOnly} role="status" aria-live="polite">{results.length} {hasQuery ? "coincidencias mostradas" : "accesos disponibles"}</p>
+      </dialog>
     </div>
   );
 }

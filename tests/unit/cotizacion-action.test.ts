@@ -92,6 +92,7 @@ describe('saveCotizacionUnificada', () => {
         total: 312,
         detalle: expect.objectContaining({
           resumenCalculo: {
+            precisionVersion: 2,
             margenPctAplicado: 30,
             subtotalBase: 240,
             margenMonto: 72,
@@ -115,6 +116,7 @@ describe('saveCotizacionUnificada', () => {
         total: 312,
         detalle: expect.objectContaining({
           resumenCalculo: {
+            precisionVersion: 2,
             margenPctAplicado: 30,
             subtotalBase: 240,
             margenMonto: 72,
@@ -214,5 +216,38 @@ describe('saveCotizacionUnificada', () => {
     input.detalle.condiciones_pago = { metodo: 'yape', modalidad: 'adelanto', adelanto, plazo: 15, plazoUnidad: 'dias' };
     expect(await saveCotizacionUnificada(input)).toMatchObject({ ok: false });
     expect(mocks.demoCreateCotizacionUnificada).not.toHaveBeenCalled();
+  });
+
+  test("guarda el céntimo corregido y la versión decimal en una cotización nueva",async()=>{
+    mocks.hasSupabaseEnv.mockReturnValue(false);mocks.getEmpresaConfig.mockResolvedValue({margen_ganancia_default_pct:50});
+    const input=inputCotizacion(30.23);input.detalle.aserradero!.precioHora=20.15;input.detalle.aserradero!.horas=1;
+    expect(await saveCotizacionUnificada(input)).toMatchObject({ok:true});
+    expect(mocks.demoCreateCotizacionUnificada).toHaveBeenCalledWith(expect.objectContaining({total:30.23,detalle:expect.objectContaining({resumenCalculo:expect.objectContaining({precisionVersion:2,margenMonto:10.08})})}));
+  });
+  test("guardar una nota no recalcula el precio de una cotización antigua",async()=>{
+    mocks.hasSupabaseEnv.mockReturnValue(false);
+    const input=inputCotizacion(30.22);input.detalle.aserradero!.precioHora=20.15;input.detalle.aserradero!.horas=1;
+    input.detalle.resumenCalculo={subtotalBase:20.15,margenPctAplicado:50,margenMonto:10.07,totalFinal:30.22};
+    mocks.demoGetCotizacionUnificada.mockReturnValue({estado_flujo:"pendiente",total:30.22,detalle:structuredClone(input.detalle)});
+    input.detalle.notas_generales="Confirmar una medida por teléfono";
+    expect(await saveCotizacionUnificada({...input,id:"44444444-4444-4444-8444-444444444444"})).toMatchObject({ok:true});
+    expect(mocks.demoUpdateCotizacionUnificada).toHaveBeenCalledWith("44444444-4444-4444-8444-444444444444",expect.objectContaining({total:30.22,detalle:expect.objectContaining({resumenCalculo:expect.objectContaining({precisionVersion:1,margenMonto:10.07})})}));
+  });
+  test("rechaza subir un céntimo un precio antiguo sin cambiar su base económica",async()=>{
+    mocks.hasSupabaseEnv.mockReturnValue(false);
+    const input=inputCotizacion(30.23);input.detalle.aserradero!.precioHora=20.15;input.detalle.aserradero!.horas=1;
+    input.detalle.resumenCalculo={subtotalBase:20.15,margenPctAplicado:50,margenMonto:10.07,totalFinal:30.22};
+    mocks.demoGetCotizacionUnificada.mockReturnValue({estado_flujo:"pendiente",total:30.22,detalle:structuredClone(input.detalle)});
+    expect(await saveCotizacionUnificada({...input,id:"44444444-4444-4444-8444-444444444444"})).toMatchObject({ok:false});
+    expect(mocks.demoUpdateCotizacionUnificada).not.toHaveBeenCalled();
+  });
+  test("cambiar el precio de la base recalcula de forma verificable y guarda precisión nueva",async()=>{
+    mocks.hasSupabaseEnv.mockReturnValue(false);
+    const input=inputCotizacion(30.24);input.detalle.aserradero!.precioHora=20.15;input.detalle.aserradero!.horas=1;
+    input.detalle.resumenCalculo={subtotalBase:20.15,margenPctAplicado:50,margenMonto:10.07,totalFinal:30.22};
+    mocks.demoGetCotizacionUnificada.mockReturnValue({estado_flujo:"pendiente",total:30.22,detalle:structuredClone(input.detalle)});
+    input.detalle.aserradero!.precioHora=20.16;
+    expect(await saveCotizacionUnificada({...input,id:"44444444-4444-4444-8444-444444444444"})).toMatchObject({ok:true});
+    expect(mocks.demoUpdateCotizacionUnificada).toHaveBeenCalledWith("44444444-4444-4444-8444-444444444444",expect.objectContaining({total:30.24,detalle:expect.objectContaining({resumenCalculo:expect.objectContaining({precisionVersion:2,margenMonto:10.08})})}));
   });
 });

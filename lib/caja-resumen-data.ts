@@ -49,6 +49,18 @@ function finalizar(acumulador: Acumulador): CajaResumen {
   return { ...acumulador, ingresos: acumulador.ingresos / 100, gastos: acumulador.gastos / 100, saldo: (acumulador.ingresos - acumulador.gastos) / 100 };
 }
 
+/** Reutiliza el acumulador de Caja para Inicio, sin limitar el historial. */
+export function resumirCajaEmpresa(rows:readonly CajaRow[]):CajaResumen {
+  const empresa=crearAcumulador(),ids=new Set<string>();
+  for(const row of rows) {
+    if(row.deleted_at || row.voided_at) continue;
+    if(ids.has(row.id)) throw new Error("Historial duplicado.");
+    ids.add(row.id);
+    if(!row.es_personal) agregar(empresa,row);
+  }
+  return finalizar(empresa);
+}
+
 /** El resumen recorre el historial completo; únicamente las filas enviadas a la tabla se limitan. */
 export async function getCajaPanelData(vista: CajaVista = "todos", organizationId = DEFAULT_ORG_ID, filtros: CajaFiltros = normalizeCajaFiltros()): Promise<CajaPanelData> {
   const empresa = crearAcumulador();

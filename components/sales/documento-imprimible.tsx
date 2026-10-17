@@ -60,7 +60,7 @@ export function DocumentoImprimible({
           <button
             type="button"
             onClick={() => window.print()}
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-[var(--color-primary)] px-4 text-sm font-semibold text-white"
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-neutral-900 px-4 text-sm font-semibold text-white hover:bg-neutral-800"
           >
             🖨️ Imprimir / guardar como PDF
           </button>

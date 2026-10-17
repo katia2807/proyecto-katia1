@@ -59,8 +59,8 @@ export function PrintSelector({ id, currentFormat, docType, tipoSale }: PrintSel
           onClick={() => handleSwitch("default")}
           className={`px-3 py-1 rounded-lg transition-all ${
             currentFormat === "default"
-              ? "bg-[var(--color-primary,#3b82f6)] text-white shadow"
-              : "text-[var(--color-text-secondary,#94a3b8)] hover:text-white"
+              ? "bg-[var(--color-primary,#202125)] text-[var(--color-on-accent,#ffffff)] shadow"
+              : "text-[var(--color-text-secondary,#94a3b8)] hover:text-[var(--color-text-primary,#f4f4f5)]"
           }`}
         >
           Vista Interactiva
@@ -73,8 +73,8 @@ export function PrintSelector({ id, currentFormat, docType, tipoSale }: PrintSel
         onClick={() => handleSwitch("a4")}
         className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 ${
           currentFormat === "a4"
-            ? "bg-[var(--color-primary,#3b82f6)] text-white shadow"
-            : "text-[var(--color-text-secondary,#94a3b8)] hover:text-white"
+            ? "bg-[var(--color-primary,#202125)] text-[var(--color-on-accent,#ffffff)] shadow"
+            : "text-[var(--color-text-secondary,#94a3b8)] hover:text-[var(--color-text-primary,#f4f4f5)]"
         }`}
       >
         📄 A4 (EPSON L5190)
@@ -87,8 +87,8 @@ export function PrintSelector({ id, currentFormat, docType, tipoSale }: PrintSel
           onClick={() => handleSwitch("ticket")}
           className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 ${
             currentFormat === "ticket"
-              ? "bg-[var(--color-primary,#3b82f6)] text-white shadow"
-              : "text-[var(--color-text-secondary,#94a3b8)] hover:text-white"
+              ? "bg-[var(--color-primary,#202125)] text-[var(--color-on-accent,#ffffff)] shadow"
+              : "text-[var(--color-text-secondary,#94a3b8)] hover:text-[var(--color-text-primary,#f4f4f5)]"
           }`}
         >
           🎫 Ticket Térmico 80mm
@@ -100,7 +100,7 @@ export function PrintSelector({ id, currentFormat, docType, tipoSale }: PrintSel
         <button
           type="button"
           onClick={() => handleSwitch("cotizacion")}
-          className="px-3 py-1 rounded-lg text-[var(--color-text-secondary,#94a3b8)] hover:text-white"
+          className="px-3 py-1 rounded-lg text-[var(--color-text-secondary,#94a3b8)] hover:text-[var(--color-text-primary,#f4f4f5)]"
         >
           Vista Cotización
         </button>
@@ -111,7 +111,7 @@ export function PrintSelector({ id, currentFormat, docType, tipoSale }: PrintSel
         <button
           type="button"
           onClick={() => handleSwitch("contrato")}
-          className="px-3 py-1 rounded-lg text-[var(--color-text-secondary,#94a3b8)] hover:text-white"
+          className="px-3 py-1 rounded-lg text-[var(--color-text-secondary,#94a3b8)] hover:text-[var(--color-text-primary,#f4f4f5)]"
         >
           Vista Contrato
         </button>

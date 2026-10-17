@@ -1,16 +1,15 @@
+import { cache } from "react";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { hasSupabaseEnv } from "@/lib/runtime";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
 type Tables = Database["public"]["Tables"];
-export const GERENCIAL_TABLES = ["movimientos_caja", "clientes", "ventas_madera", "ventas_madera_cortada", "ventas_mueble_terminado", "cotizaciones_unificadas", "alquileres", "servicios_aserradero", "ordenes_produccion", "inventario_productos", "inventario_movimientos"] as const;
-export type GerencialTable = typeof GERENCIAL_TABLES[number];
+import { GERENCIAL_TABLES, GERENCIAL_LABELS, type GerencialTable } from "@/lib/gerencial-tables";
+export { GERENCIAL_TABLES, GERENCIAL_LABELS } from "@/lib/gerencial-tables";
+export type { GerencialTable } from "@/lib/gerencial-tables";
 export type GerencialSources = { [T in GerencialTable]: Tables[T]["Row"][] | null };
 export type GerencialTab = "hoy" | "pasado" | "futuro";
-export const GERENCIAL_LABELS: Record<GerencialTable, string> = {
-  movimientos_caja: "Caja", clientes: "Clientes", ventas_madera: "Ventas de madera", ventas_madera_cortada: "Madera cortada", ventas_mueble_terminado: "Muebles terminados", cotizaciones_unificadas: "Cotizaciones", alquileres: "Alquileres", servicios_aserradero: "Aserradero", ordenes_produccion: "Producción", inventario_productos: "Productos", inventario_movimientos: "Movimientos de inventario",
-};
 const deletedTables = new Set<GerencialTable>(GERENCIAL_TABLES.filter(t => t !== "servicios_aserradero" && t !== "inventario_movimientos"));
 
 export function normalizeGerencialTab(tab: string, alertas = "") {
@@ -55,13 +54,13 @@ export async function readGerencialTable<T extends GerencialTable>(table: T, org
 }
 
 export function gerencialRequiredTables(tab: GerencialTab) {
-  return GERENCIAL_TABLES.filter(t => tab === "hoy" || (tab === "futuro" ? !["inventario_productos", "inventario_movimientos", "servicios_aserradero"].includes(t) : t !== "ordenes_produccion"));
+  return GERENCIAL_TABLES.filter(t => tab === "hoy" || (tab === "futuro" ? !["inventario_productos", "inventario_movimientos"].includes(t) : t !== "ordenes_produccion"));
 }
-export async function getGerencialSources(tab: GerencialTab, organizationId = DEFAULT_ORG_ID): Promise<GerencialSources> {
+export const getGerencialSources = cache(async function getGerencialSources(tab: GerencialTab, organizationId = DEFAULT_ORG_ID): Promise<GerencialSources> {
   const required = gerencialRequiredTables(tab);
   const entries = await Promise.all(required.map(async table => {
     try { return [table, await readGerencialTable(table, organizationId)] as const; }
     catch { return [table, null] as const; }
   }));
   return Object.fromEntries(GERENCIAL_TABLES.map(table => [table, entries.find(e => e[0] === table)?.[1] ?? null])) as GerencialSources;
-}
+});

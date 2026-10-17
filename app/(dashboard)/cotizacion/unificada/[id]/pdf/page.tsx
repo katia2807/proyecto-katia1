@@ -28,6 +28,7 @@ export default async function CotizacionUnificadaPdfPage({ params }: PdfPageProp
     detalle,
     calculoDocumento.margenPctAplicado ?? 0,
     calculoDocumento.margenPctAplicado == null ? undefined : calculoDocumento.totalFinal,
+    detalle.resumenCalculo?.precisionVersion ?? 1,
   );
   const total = calculoDocumento.totalFinal;
 

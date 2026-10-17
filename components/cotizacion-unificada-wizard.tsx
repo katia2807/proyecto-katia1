@@ -11,8 +11,9 @@ import {
   cambiarEstadoCotizacionUnificada,
 } from "@/app/actions";
 import {
-  calcularContratoCotizacion,
-  computeTotalesDetalle,
+  calcularCotizacionParaGuardar,
+  computeTotalesCotizacion,
+  conservaImporteCotizacion,
   economiaLineaMueble,
   resolverCalculoDocumentoCotizacion,
   round2,
@@ -695,10 +696,11 @@ export function CotizacionUnificadaWizard({
   );
   const margenGananciaPct =
     calculoDocumentoGuardado?.margenPctAplicado ?? empresa.margen_ganancia_default_pct;
-  const totales = useMemo(() => computeTotalesDetalle(detalle), [detalle]);
+  const precisionCotizacion:1|2=cotizacionGuardadaParaCalculo && conservaImporteCotizacion(detalle,{detalle:parseCotizacionDetalle(cotizacionGuardadaParaCalculo.detalle),total:cotizacionGuardadaParaCalculo.total}) ? parseCotizacionDetalle(cotizacionGuardadaParaCalculo.detalle).resumenCalculo?.precisionVersion ?? 1 : 2;
+  const totales = useMemo(() => computeTotalesCotizacion(detalle,precisionCotizacion), [detalle,precisionCotizacion]);
   const calculoCotizacionActual = useMemo(
-    () => calcularContratoCotizacion(detalle, margenGananciaPct),
-    [detalle, margenGananciaPct],
+    () => calcularCotizacionParaGuardar(detalle, margenGananciaPct, cotizacionGuardadaParaCalculo ? {detalle:parseCotizacionDetalle(cotizacionGuardadaParaCalculo.detalle),total:cotizacionGuardadaParaCalculo.total} : null),
+    [detalle, margenGananciaPct, cotizacionGuardadaParaCalculo],
   );
   const resumenCotizacion = calculoDocumentoGuardado?.margenPctAplicado === null
     ? calculoDocumentoGuardado
@@ -1342,8 +1344,9 @@ export function CotizacionUnificadaWizard({
         detalleParaLineas,
         margenGananciaPct,
         calculoDocumentoGuardado?.margenPctAplicado === null ? undefined : totalGral,
+        precisionCotizacion,
       ),
-    [calculoDocumentoGuardado?.margenPctAplicado, detalleParaLineas, margenGananciaPct, totalGral],
+    [calculoDocumentoGuardado?.margenPctAplicado, detalleParaLineas, margenGananciaPct, totalGral,precisionCotizacion],
   );
   const lineasFormalSafe = useMemo(
     () =>

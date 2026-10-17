@@ -3,7 +3,7 @@ import {
   parseStoredMaderaCortadaVoucherLines,
   type MaderaCortadaVoucherLine,
 } from "@/lib/madera-cortada-print-model";
-import { roundMoney } from "@/lib/utils";
+import { roundLegacyMoney as roundMoney } from "@/lib/money";
 
 export type MaderaCortadaHistoricalReviewStatus =
   | "correcta"
@@ -143,7 +143,7 @@ export function reviewMaderaCortadaHistoricalSale(
       ancho: line.ancho,
       largo: line.largo,
       precioPorPt,
-    });
+    }, "legacy");
     calculatedTotalPt += pricing.ptTotalReal;
     calculatedQuantity += line.cantidad;
     calculatedSubtotal = roundMoney(calculatedSubtotal + pricing.subtotalComercial);

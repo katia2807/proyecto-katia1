@@ -123,6 +123,7 @@ describe('instantánea e históricos de cotización', () => {
 
     const normalizado = cotizacionDetalleV1Schema.parse(detalle);
     expect(normalizado.resumenCalculo).toEqual({
+      precisionVersion: 2,
       margenPctAplicado: 30,
       subtotalBase: 240,
       margenMonto: 72,
