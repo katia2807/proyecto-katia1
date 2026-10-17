@@ -1,6 +1,8 @@
+import { Suspense } from "react";
+import { PageLoading } from "@/components/ui/page-loading";
 import { AppShell } from "@/components/app-shell";
 import { DatabaseModeBanner } from "@/components/database-mode-banner";
-import { requireAuthContext } from "@/lib/auth";
+import { requireAuthContext, type AuthContext } from "@/lib/auth";
 import { readCompleteTable } from "@/lib/complete-data";
 import { getGerencialSources } from "@/lib/gerencial-data";
 import { buildGerencialModel } from "@/lib/gerencial-model";
@@ -9,6 +11,10 @@ import { getEmpresaConfig } from "@/lib/company-config";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const context = await requireAuthContext();
+  return <Suspense fallback={<PageLoading />}><AuthenticatedDashboard context={context}>{children}</AuthenticatedDashboard></Suspense>;
+}
+
+async function AuthenticatedDashboard({ context, children }: { context: AuthContext; children: React.ReactNode }) {
   const displayName = context.fullName?.trim() || "Usuario";
   const navAllowlist = buildNavHrefAllowlist(context.role, context.uiRole);
   const [clientesResult, cotizacionesResult, productosResult, mandoSources, empresa] = await Promise.all([

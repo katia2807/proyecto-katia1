@@ -1,0 +1,50 @@
+.page {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  padding: 40px 20px;
+  background: var(--katia-bg-base);
+  color: var(--katia-text-primary);
+}
+.card {
+  width: 100%;
+  max-width: 420px;
+  padding: 30px 34px;
+  border: 1px solid var(--katia-border-default);
+  border-radius: 20px;
+  background: var(--katia-bg-elevated);
+  box-shadow: var(--katia-shadow-card);
+}
+.brandRow { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 34px; }
+.brand { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; letter-spacing: -.02em; }
+.intro h1 { margin: 0; font-size: 28px; font-weight: 650; line-height: 1.2; letter-spacing: -.04em; }
+.intro > p { margin: 10px 0 0; color: var(--katia-text-secondary); font-size: 14px; line-height: 1.6; }
+.card input { height: 44px; border-color: var(--katia-border-default); background: var(--katia-bg-base); color: var(--katia-text-primary); box-shadow: none; }
+.card input:focus-visible { border-color: var(--katia-primary); outline: 2px solid var(--katia-primary); outline-offset: 2px; box-shadow: none; }
+.card button[type="submit"] { min-height: 44px; background: var(--katia-primary); color: var(--color-on-accent); box-shadow: none; }
+.card button[type="submit"]:hover { background: var(--katia-primary-hover); filter: none; }
+.recovery { margin: 16px 0 0; text-align: right; color: var(--katia-text-secondary); font-size: 12px; }
+.recovery a:hover { color: var(--katia-text-primary); text-decoration: underline; }
+.footer { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--katia-text-tertiary); font-size: 12px; }
+.footer a:hover { color: var(--katia-text-primary); text-decoration: underline; }
+.page a:focus-visible, .demo summary:focus-visible { outline: 2px solid var(--katia-primary); outline-offset: 4px; border-radius: 4px; }
+.notice { margin-top: 20px; border: 1px solid var(--katia-border-default); border-radius: 10px; padding: 12px; font-size: 13px; line-height: 1.5; }
+.notice strong { display: block; font-weight: 600; }
+.notice p { margin: 4px 0 0; color: var(--katia-text-secondary); font-size: 12px; }
+.warning { border-left: 3px solid var(--katia-warning); }
+.success { border-left: 3px solid var(--katia-success); }
+.danger { border-left: 3px solid var(--katia-danger); }
+.demo { margin-top: 24px; border-top: 1px solid var(--katia-border-subtle); padding-top: 8px; color: var(--katia-text-secondary); font-size: 12px; }
+.demo summary { min-height: 36px; align-content: center; cursor: pointer; }
+.demo p { margin: 4px 0 12px; line-height: 1.6; }
+.credentials { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--katia-border-subtle); border-radius: 8px; background: var(--katia-bg-base); overflow-wrap: anywhere; }
+.credentials code { color: var(--katia-text-primary); font-size: 12px; }
+@media (max-width: 440px) {
+  .page { padding: 24px 16px; gap: 20px; }
+  .card { padding: 24px; border-radius: 16px; }
+  .brandRow { margin-bottom: 28px; }
+  .intro h1 { font-size: 26px; }
+}

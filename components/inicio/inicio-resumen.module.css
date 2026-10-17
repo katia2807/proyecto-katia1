@@ -171,3 +171,14 @@
 @media (prefers-reduced-motion: reduce) {
   .pendingLink { transition: none; }
 }
+
+.saludoCopy { min-height: 70px; }
+.saludoCopy > p { margin: 10px 0 0; font-size: 13px; line-height: 1.5; color: var(--katia-text-secondary); }
+.saludoPlaceholder { padding-top: 3px; }
+.saludoPlaceholder > span { display: block; width: min(80%, 390px); height: 30px; border-radius: 7px; background: var(--katia-primary-soft); }
+.saludoPlaceholder > span + span { width: min(90%, 420px); height: 12px; margin-top: 14px; opacity: .65; }
+@media (max-width: 540px) {
+  .saludoCopy { min-height: 112px; }
+  .saludoPlaceholder > span { height: 54px; }
+  .saludoPlaceholder > span + span { height: 28px; }
+}

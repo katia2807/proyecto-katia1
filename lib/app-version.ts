@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.91";
+export const APP_VERSION = "1.1.92";
 export const APP_LAST_UPDATE = "17/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Inicio reúne prioridades, cobros y alquileres en un resumen visual. La búsqueda facilita encontrar registros y los cálculos nuevos mejoran la precisión de centavos, conservando los importes históricos.";
+  "Renovamos el acceso y el icono de Katia Suite. La carga muestra una vista limpia mientras esperas e Inicio te recibe con mensajes diarios variados, conservando tu forma de trabajo y los datos del negocio.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {

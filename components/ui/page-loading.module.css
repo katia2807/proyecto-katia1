@@ -1,0 +1,33 @@
+.screen,
+:global(.dashboard-content) > .screen {
+  transform: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--katia-bg-base);
+  color: var(--katia-text-primary);
+  visibility: hidden;
+  animation: reveal 140ms ease 250ms both;
+}
+/* Evita que la animación de entrada limite el indicador a un contenedor. */
+:global(.dashboard-content) > :has(.screen) { animation: none; transform: none; }
+/* Oculta también los controles al teclado; el indicador recupera su visibilidad
+   explícitamente. Al desmontarse el fallback, estas reglas dejan de aplicarse. */
+:global(body):has(.screen) { overflow: hidden; }
+:global(body):has(.screen) > :not(.screen) { animation: conceal 1ms step-end 250ms forwards; }
+.content { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.content > strong { margin-top: 18px; font-size: 16px; font-weight: 600; }
+.content > p { margin: 7px 0 0; color: var(--katia-text-secondary); font-size: 12px; line-height: 1.6; }
+.track { width: 132px; height: 3px; margin-top: 22px; overflow: hidden; border-radius: 3px; background: var(--katia-border-subtle); }
+.track > span { display: block; height: 100%; width: 45%; border-radius: inherit; background: var(--katia-text-primary); animation: progress 1.4s ease-in-out infinite; }
+@keyframes conceal { to { visibility: hidden; } }
+@keyframes reveal { from { opacity: 0; visibility: hidden; } to { opacity: 1; visibility: visible; } }
+@keyframes progress { from { transform: translateX(-110%); } to { transform: translateX(330%); } }
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  :global(.dashboard-content) > .screen { animation: reveal 1ms linear 250ms both; }
+  .track > span { animation: none; margin: 0 auto; }
+}

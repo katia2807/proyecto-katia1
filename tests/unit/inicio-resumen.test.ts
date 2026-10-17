@@ -164,3 +164,22 @@ describe("Inicio: permisos, organización y recuperación",()=>{
    expect(markup).toContain("No tienes acceso a esta sección");expect(markup).toContain("data-inicio-resumen");
  });
 });
+
+describe("Vista de la carga aislada de producción",()=>{
+ test("la muestra solo se abre en el servidor de pruebas autorizado",async()=>{
+   vi.stubEnv("NODE_ENV","development");vi.stubEnv("KATIA_USE_DEMO_DB","1");vi.stubEnv("KATIA_INICIO_PREVIEW","1");
+   try {
+     const markup=renderToStaticMarkup(await DashboardPage({searchParams:Promise.resolve({vista:"carga"})}));
+     expect(markup).toContain('data-local-loading-preview="true"');expect(markup).toContain("Abriendo el apartado");
+     expect(mocks.sources).not.toHaveBeenCalled();
+   } finally {vi.unstubAllEnvs();}
+ });
+ test("pedir la muestra en producción mantiene Inicio y sus controles de acceso",async()=>{
+   vi.stubEnv("NODE_ENV","production");vi.stubEnv("KATIA_USE_DEMO_DB","1");vi.stubEnv("KATIA_INICIO_PREVIEW","1");
+   try {
+     const markup=renderToStaticMarkup(await DashboardPage({searchParams:Promise.resolve({vista:"carga"})}));
+     expect(markup).not.toContain('data-local-loading-preview="true"');expect(markup).toContain("data-inicio-resumen");
+     expect(mocks.sources).toHaveBeenCalled();
+   } finally {vi.unstubAllEnvs();}
+ });
+});

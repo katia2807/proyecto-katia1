@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { AuthSplitLayout } from "@/components/auth/auth-split-layout";
+import { LoginLayout } from "@/components/auth/login-layout";
+import styles from "@/components/auth/login-layout.module.css";
 import { LoginForm } from "@/components/auth/login-form";
 import { getAuthContext } from "@/lib/auth";
 import { isDemoDatabaseMode } from "@/lib/demo-mode";
@@ -36,65 +37,38 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     isDemoDatabaseMode() || (process.env.NODE_ENV === "development" && !hasSupabaseEnv());
 
   return (
-    <AuthSplitLayout
-      title="Ingreso privado"
-      subtitle={
-        showLocalDemoHint
-          ? "Modo prueba local: los datos vienen del almacén demo (no Supabase)."
-          : "Acceso seguro al panel de gestión del taller."
-      }
-    >
+    <LoginLayout>
       {passwordUpdated ? (
-        <div className="mt-4 rounded-[var(--border-radius-input)] border border-emerald-500/50 bg-emerald-900/40 p-3 text-sm text-white">
-          Contraseña actualizada.
+        <div role="status" className={[styles.notice, styles.success].join(" ")}>
+          <strong>Contraseña actualizada.</strong>
         </div>
       ) : null}
-
-      {showLocalDemoHint ? (
-        <div className="mt-4 rounded-[var(--border-radius-input)] border border-[var(--border-color)] bg-[var(--bg-card)] p-3 text-sm text-[var(--text-primary)]">
-          <p className="font-semibold">Credenciales de prueba</p>
-          <p className="mt-1 font-mono text-xs">
-            Correo: test@test.com
-            <br />
-            Contraseña: test1234
-          </p>
-          {isDemoDatabaseMode() ? (
-            <p className="mt-2 text-xs text-[var(--text-secondary)]">
-              Activo por <code className="rounded bg-[var(--bg-primary)] px-1">KATIA_USE_DEMO_DB=1</code>.
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
       {avisoPanel ? (
-        <div className="mt-4 rounded-[var(--border-radius-input)] border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-100">
-          <p className="font-semibold text-amber-800 dark:text-amber-300">Sesión expirada</p>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
-            Tu sesión cerró automáticamente por inactividad. Vuelve a ingresar con tus datos.
-          </p>
+        <div role="status" className={[styles.notice, styles.warning].join(" ")}>
+          <strong>Sesión expirada</strong>
+          <p>Vuelve a ingresar con tus datos para continuar.</p>
         </div>
       ) : null}
-
       {showSupabasePublicKeysMissing ? (
-        <div className="mt-4 rounded-[var(--border-radius-input)] border border-[var(--accent-danger)]/55 bg-[var(--bg-card)] p-3 text-sm">
-          <p className="font-semibold text-[var(--accent-danger)]">Supabase no configurado</p>
-          <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">
-            Define credenciales públicas/servidor y redeploy.
-          </p>
+        <div role="alert" className={[styles.notice, styles.danger].join(" ")}>
+          <strong>Supabase no configurado</strong>
+          <p>Define credenciales públicas/servidor y redeploy.</p>
         </div>
       ) : null}
-
       <LoginForm />
-      <p className="mt-3 text-right text-xs text-[var(--text-secondary)]/90">
-        <Link href="/forgot-password" className="hover:text-[var(--text-primary)] hover:underline">
-          Olvidé mi contraseña
-        </Link>
+      <p className={styles.recovery}>
+        <Link href="/forgot-password">Olvidé mi contraseña</Link>
       </p>
-      <p className="mt-4 text-xs text-[var(--text-secondary)]">
-        {showLocalDemoHint
-          ? "En producción desactiva modo demo y configura Supabase real."
-          : "El usuario debe tener perfil válido en la organización."}
-      </p>
-    </AuthSplitLayout>
+      {showLocalDemoHint ? (
+        <details className={styles.demo}>
+          <summary>Acceso de prueba local</summary>
+          <p>Este entorno utiliza datos ficticios.</p>
+          <div className={styles.credentials}>
+            <span>Correo: <code>test@test.com</code></span>
+            <span>Contraseña: <code>test1234</code></span>
+          </div>
+        </details>
+      ) : null}
+    </LoginLayout>
   );
 }
