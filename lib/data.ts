@@ -335,12 +335,10 @@ export async function getVentasMaderaCortadaRows() {
   return data ?? [];
 }
 
-export async function getClientesRows() {
-  if (!hasSupabaseEnv()) {
-    return demoClientesRows().filter(row => row.organization_id === DEFAULT_ORG_ID);
-  }
-  const rows = await readClientesTable("clientes", true);
-  return rows.sort((a, b) => a.nombre.localeCompare(b.nombre));
+export async function getClientesRows(includeAdditional = false) {
+  const rows = !hasSupabaseEnv() ? demoClientesRows().filter(row => row.organization_id === DEFAULT_ORG_ID) : await readClientesTable("clientes", true);
+  const result = includeAdditional ? rows : rows.map(row => { const basic = { ...row }; delete basic.datos_adicionales; return basic; });
+  return result.sort((a, b) => a.nombre.localeCompare(b.nombre));
 }
 
 export async function getProveedoresRows() {

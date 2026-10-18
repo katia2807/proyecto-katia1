@@ -51,3 +51,6 @@ next-env.d.ts
 temp/
 
 .vercel
+
+# Recursos del lector generados desde dependencias fijadas
+/public/pdf-reader-assets/

@@ -8,7 +8,11 @@ import { fileURLToPath } from "node:url";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const mode = process.argv.includes("--build") ? "build" : process.argv.includes("--production") ? "start" : "dev";
 if (process.argv.includes("--inicio") && mode !== "dev") throw new Error("La propuesta de Inicio solo se habilita en desarrollo local.");
-const dataDir = join(root, "temp", "mantenimiento-local", "data");
+const dataName = process.argv.find(arg => arg.startsWith("--datos="))?.slice(8) ?? "mantenimiento-local";
+if (!/^[a-z0-9-]{1,64}$/.test(dataName)) throw new Error("Nombre de almacén local inválido.");
+const dataDir = join(root, "temp", dataName, "data");
+const { preparePdfReaderAssets } = await import("./prepare-pdf-reader-assets.mjs");
+await preparePdfReaderAssets();
 await mkdir(dataDir, { recursive: true });
 const env = {
   ...process.env,

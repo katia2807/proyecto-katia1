@@ -145,3 +145,22 @@ describe("completar el cliente recién registrado en Cotizaciones", () => {
     expect(mocks.getSupabaseServerClient).not.toHaveBeenCalled();
   });
 });
+
+describe("Contacto PDF del alta rápida",()=>{
+ beforeEach(()=>{vi.clearAllMocks();mocks.requireAuthContext.mockResolvedValue({role:"owner_admin",uiRole:"owner_admin"});mocks.hasSupabaseEnv.mockReturnValue(false);});
+
+test("el alta de Cotizaciones conserva contacto PDF y una edición básica no lo borra", async () => {
+  const contacto = { email: "pdf@ejemplo.invalid", cuentas_bancarias: [{ banco: "BCP", moneda: "PEN", numero: "001234567890", cci: "00212300012345678903", titular: "" }] };
+  const creado = await createClienteCotizacionRapida({ ...datos, datosAdicionales: JSON.stringify(contacto) });
+  if (!creado.ok) throw new Error(creado.error);
+  expect(demoClientesRows().find(c => c.id === creado.id)?.datos_adicionales).toEqual(contacto);
+  await updateClienteCotizacionRapida(creado.id, { ...datos, direccion: "Nueva dirección ficticia" });
+  expect(demoClientesRows().find(c => c.id === creado.id)?.datos_adicionales).toEqual(contacto);
+});
+test("contacto PDF inválido no crea un cliente parcial en Cotizaciones", async () => {
+  const antes = demoClientesRows().length;
+  expect((await createClienteCotizacionRapida({ ...datos, datosAdicionales: '{"email":"incorrecto"}' })).ok).toBe(false);
+  expect(demoClientesRows()).toHaveLength(antes);
+});
+
+});

@@ -53,6 +53,7 @@ export type Database = {
           deleted_at?: string | null;
           organization_id: string;
           nombre: string;
+          datos_adicionales?: Json;
           documento: string | null;
           telefono: string | null;
           ruc: string | null;
@@ -66,6 +67,7 @@ export type Database = {
           deleted_at?: string | null;
           organization_id: string;
           nombre: string;
+          datos_adicionales?: Json;
           documento?: string | null;
           telefono?: string | null;
           ruc?: string | null;
@@ -77,6 +79,7 @@ export type Database = {
         Update: {
           deleted_at?: string | null;
           nombre?: string;
+          datos_adicionales?: Json;
           documento?: string | null;
           telefono?: string | null;
           ruc?: string | null;

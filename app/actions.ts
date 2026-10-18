@@ -1,4 +1,5 @@
 "use server";
+import { parseContactoCliente, clienteFichaSnapshotSchema } from "@/lib/cliente-contacto";
 import { documentoClienteError, telefonoClienteError } from "@/lib/cotizacion-cliente-validacion";
 
 import { revalidatePath } from "next/cache";
@@ -22,6 +23,7 @@ import {
   demoUpdateChofer,
   demoCreateCliente,
   demoUpdateClienteDatos,
+  demoUpdateClienteFicha,
   demoCreateCorte,
   demoCreateEmpleado,
   demoDeleteInventarioMovimiento,
@@ -696,6 +698,7 @@ export async function createCliente(formData: FormData) {
       ? "El nombre debe tener al menos 3 caracteres, sin contar espacios."
       : "Datos de cliente inválidos.");
   }
+  const datosAdicionales = formData.has("datos_adicionales") ? parseContactoCliente(formData.get("datos_adicionales")) : undefined;
   const tipoPersona =
     parsed.data.tipoPersona === "natural" || parsed.data.tipoPersona === "empresa"
       ? parsed.data.tipoPersona
@@ -704,6 +707,7 @@ export async function createCliente(formData: FormData) {
     const newId = demoCreateCliente({
       organization_id: DEFAULT_ORG_ID,
       nombre: parsed.data.nombre,
+      ...(datosAdicionales ? { datos_adicionales: datosAdicionales } : {}),
       documento: parsed.data.documento || parsed.data.ruc || null,
       telefono: parsed.data.telefono || null,
       ruc: parsed.data.ruc || null,
@@ -725,6 +729,7 @@ export async function createCliente(formData: FormData) {
       .insert({
         organization_id: DEFAULT_ORG_ID,
         nombre: parsed.data.nombre,
+      ...(datosAdicionales ? { datos_adicionales: datosAdicionales } : {}),
         documento: parsed.data.documento || parsed.data.ruc || null,
         telefono: parsed.data.telefono || null,
         ruc: parsed.data.ruc || null,
@@ -743,6 +748,52 @@ export async function createCliente(formData: FormData) {
     if (skipRedirect) return { id: newCliente.id, nombre: parsed.data.nombre };
     maybeRedirectToQuickStep(formData);
     return { id: newCliente.id, nombre: parsed.data.nombre };
+  }
+}
+
+
+/** Guarda únicamente la ficha; nunca crea movimientos financieros. */
+export async function submitUpdateClienteFicha(_prev: MutationFormState, formData: FormData): Promise<MutationFormState> {
+  try {
+    const actor = await requireMutationAccess(writerRoles);
+    const parsedId = z.uuid().safeParse(formData.get("cliente_id"));
+    if (!parsedId.success) throw new Error("El cliente no es válido. Recarga la ficha.");
+    const id = parsedId.data;
+    const rawPrevious = formData.get("ficha_anterior");
+    if (typeof rawPrevious !== "string" || rawPrevious.length > 18000) throw new Error("Recarga la ficha antes de guardarla.");
+    let rawSnapshot: unknown;
+    try { rawSnapshot = JSON.parse(rawPrevious); } catch { throw new Error("Recarga la ficha antes de guardarla."); }
+    const snapshot = clienteFichaSnapshotSchema.safeParse(rawSnapshot);
+    if (!snapshot.success) throw new Error("Recarga la ficha antes de guardarla.");
+    const previous = snapshot.data;
+    const parsed = clienteSchema.safeParse({
+      nombre: formData.get("nombre"), documento: formData.get("documento") ?? "", telefono: formData.get("telefono") ?? "",
+      ruc: formData.get("ruc") ?? "", direccion: formData.get("direccion") ?? "", tipoPersona: formData.get("tipo_persona") ?? "",
+    });
+    if (!parsed.success) throw new Error("Revisa el nombre y los datos del cliente.");
+    const contacto = parseContactoCliente(formData.get("datos_adicionales"));
+    const patch = { nombre: parsed.data.nombre, documento: parsed.data.documento || parsed.data.ruc || null,
+      ruc: parsed.data.ruc || null, telefono: parsed.data.telefono || null, direccion: parsed.data.direccion || null,
+      tipo_persona: parsed.data.tipoPersona === "natural" || parsed.data.tipoPersona === "empresa" ? parsed.data.tipoPersona : null,
+      datos_adicionales: contacto as Json };
+    let updated = false;
+    if (!hasSupabaseEnv()) {
+      updated = demoUpdateClienteFicha(id, actor.organizationId, patch, previous);
+    } else {
+      let query = getSupabaseServerClient().from("clientes").update(patch)
+        .eq("id", id).eq("organization_id", actor.organizationId).is("deleted_at", null);
+      for (const key of ["nombre", "documento", "ruc", "telefono", "direccion", "tipo_persona"] as const) {
+        query = previous[key] === null ? query.is(key, null) : query.eq(key, previous[key]!);
+      }
+      const { data, error } = await query.eq("datos_adicionales", JSON.stringify(previous.datos_adicionales)).select("id").maybeSingle();
+      if (error) throw new Error(error.message);
+      updated = !!data;
+    }
+    if (!updated) throw new Error("La ficha cambió o ya no está disponible. Recarga antes de guardar para conservar los cambios de otras personas.");
+    for (const path of ["/ventas/clientes", "/ventas/clientes/" + id, "/ventas", "/cotizacion", "/gerencial"]) revalidatePath(path);
+    return { success: true, error: null, message: "Datos del cliente actualizados." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "No se pudieron guardar los datos del cliente.", message: null };
   }
 }
 
@@ -784,6 +835,7 @@ export async function createClienteCotizacionRapida(input: {
   telefono: string;
   direccion: string;
   tipoPersona: "natural" | "empresa";
+  datosAdicionales?: string;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   try {
     await requireMutationAccess(ventasRoles);
@@ -793,10 +845,12 @@ export async function createClienteCotizacionRapida(input: {
     if (!["natural", "empresa"].includes(input.tipoPersona)) return { ok: false, error: "Selecciona persona natural o empresa." };
     const errorCliente = documentoClienteError(input.tipoPersona, input.documento, false) || telefonoClienteError(input.telefono);
     if (errorCliente) return { ok: false, error: errorCliente };
+    const contacto = input.datosAdicionales === undefined ? undefined : parseContactoCliente(input.datosAdicionales);
     if (!hasSupabaseEnv()) {
       const id = demoCreateCliente({
         organization_id: DEFAULT_ORG_ID,
         nombre: input.nombre.trim(),
+        ...(contacto ? { datos_adicionales: contacto } : {}),
         documento: input.documento.trim() || null,
         telefono: input.telefono.trim() || null,
         ruc: input.tipoPersona === "empresa" ? (input.documento.trim() || null) : null,
@@ -813,6 +867,7 @@ export async function createClienteCotizacionRapida(input: {
       .insert({
         organization_id: DEFAULT_ORG_ID,
         nombre: input.nombre.trim(),
+        ...(contacto ? { datos_adicionales: contacto } : {}),
         documento: input.documento.trim() || null,
         telefono: input.telefono.trim() || null,
         direccion: input.direccion.trim() || null,

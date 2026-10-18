@@ -1,3 +1,4 @@
+import { clienteFichaSnapshot, type ClienteFichaSnapshot } from "@/lib/cliente-contacto";
 import { createHash, randomUUID } from "node:crypto";
 import { readStoreFromDisk, writeStoreToDisk } from "@/lib/store-persistence";
 import { isDemoDatabaseMode } from "@/lib/demo-mode";
@@ -56,6 +57,7 @@ type ClienteRow = {
   deleted_at?: string | null;
   organization_id: string;
   nombre: string;
+  datos_adicionales?: import("@/lib/supabase/types").Json;
   documento: string | null;
   telefono: string | null;
   ruc: string | null;
@@ -1589,6 +1591,7 @@ function normalizeCliente(raw: unknown): ClienteRow {
     id: String(r.id),
     organization_id: String(r.organization_id),
     nombre: String(r.nombre),
+    ...(r.datos_adicionales !== undefined ? { datos_adicionales: r.datos_adicionales as import("@/lib/supabase/types").Json } : {}),
     documento: r.documento != null ? String(r.documento) : null,
     telefono: r.telefono != null ? String(r.telefono) : null,
     created_at: String(r.created_at ?? nowIso()),
@@ -2338,6 +2341,12 @@ export function demoUpdateClienteDatos(
   Object.assign(cliente, datos);
   persistStore();
   return true;
+}
+
+export function demoUpdateClienteFicha(id: string, organizationId: string, datos: Pick<ClienteRow, "nombre" | "documento" | "ruc" | "telefono" | "direccion" | "tipo_persona" | "datos_adicionales">, previous: ClienteFichaSnapshot): boolean {
+  const row = store.clientes.find(c => c.id === id && c.organization_id === organizationId && !c.deleted_at);
+  if (!row || JSON.stringify(clienteFichaSnapshot(row)) !== JSON.stringify(previous)) return false;
+  Object.assign(row, datos); persistStore(); return true;
 }
 
 export function demoCreateProveedor(

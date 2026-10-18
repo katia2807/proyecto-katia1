@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { submitCreateClienteForm } from "@/app/actions";
 import { mutationFormInitialState } from "@/lib/mutation-form-state";
-import { Field, SelectField } from "@/components/ui/field";
+import { ClienteFormFields } from "@/components/sales/cliente-form-fields";
 import { Button } from "@/components/ui/button";
 
 export function NuevoClienteInline() {
@@ -57,22 +57,7 @@ export function NuevoClienteInline() {
         }}
         className="mt-4 grid gap-3 sm:grid-cols-2"
       >
-        <Field
-          name="nombre"
-          label="Nombre *"
-          placeholder="Nombre completo o razón social"
-          required
-          className="sm:col-span-2"
-        />
-        <Field name="documento" label="DNI / Documento" placeholder="12345678" />
-        <Field name="telefono" label="Teléfono" placeholder="999 000 000" />
-        <Field name="ruc" label="RUC (opcional)" placeholder="20123456789" />
-        <Field name="direccion" label="Dirección (opcional)" placeholder="Av. / Jr. / Referencia" />
-        <SelectField name="tipo_persona" label="Tipo" defaultValue="">
-          <option value="">Sin especificar</option>
-          <option value="natural">Persona natural</option>
-          <option value="empresa">Empresa</option>
-        </SelectField>
+        <div className="sm:col-span-2"><ClienteFormFields defaultTipoPersona="" showBothDocuments /></div>
 
         {error ? (
           <p role="alert" className="sm:col-span-2 text-xs text-[var(--katia-danger)]">{error}</p>

@@ -29,6 +29,7 @@ import {
 import { CotizacionResumenFormal } from "@/components/sales/cotizacion-resumen-formal";
 import { CobroCotizacionDialog } from "@/components/sales/cobro-cotizacion-dialog";
 import { notasDocumentoCotizacion, validarCondicionesPagoCotizacion } from "@/lib/cotizacion-pago";
+import { ClienteFormFields } from "@/components/sales/cliente-form-fields";
 import { ClienteCombobox } from "@/components/ui/cliente-combobox";
 import { Combobox } from "@/components/ui/Combobox";
 import {
@@ -378,117 +379,52 @@ function loadDraftFromStorage(): CotizacionDraft | null {
 
 // ─── Componente auxiliar: nuevo cliente rápido dentro del wizard ─────────────
 function NuevoClienteRapidoInline({
-  tipoCliente,
-  onCreated,
-}: {
-  tipoCliente: "natural" | "empresa";
-  onCreated: (cliente: ClienteRow) => void;
-}) {
+  tipoCliente, onCreated,
+}: { tipoCliente: "natural" | "empresa"; onCreated: (cliente: ClienteRow) => void }) {
   const [open, setOpen] = useState(false);
-  const [nombre, setNombre] = useState("");
-  const [documento, setDocumento] = useState("");
-  const [telefono, setTelefono] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--color-accent)] transition hover:bg-[var(--color-accent)] hover:text-[var(--color-on-accent)]"
-      >
-        + Nuevo cliente rápido
-      </button>
-    );
-  }
+  const fieldsRef = useRef<HTMLDivElement>(null);
+  if (!open) return <button type="button" onClick={() => setOpen(true)}
+    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--color-accent)] transition hover:bg-[var(--color-accent)] hover:text-[var(--color-on-accent)]">+ Nuevo cliente rápido</button>;
 
   async function handleSave() {
-    if (!nombre.trim()) { setErr("El nombre es obligatorio."); return; }
-    const validationError = documentoClienteError(tipoCliente, documento, false) || telefonoClienteError(telefono);
+    if (!fieldsRef.current || loading) return;
+    const fields = new FormData();
+    fieldsRef.current.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input[name],select[name]").forEach(input => fields.set(input.name, input.value));
+    const tipo = fields.get("tipo_persona");
+    if (tipo !== "natural" && tipo !== "empresa") { setErr("Selecciona persona natural o empresa."); return; }
+    const datos: ClienteCotizacionDatos = {
+      nombre: String(fields.get("nombre") ?? "").trim(),
+      documento: String((tipo === "empresa" ? fields.get("ruc") || fields.get("documento") : fields.get("documento")) ?? "").trim(),
+      telefono: String(fields.get("telefono") ?? "").trim(),
+      direccion: String(fields.get("direccion") ?? "").trim(),
+      tipoPersona: tipo,
+      datosAdicionales: String(fields.get("datos_adicionales") ?? "{}"),
+    };
+    if (!datos.nombre) { setErr("El nombre es obligatorio."); return; }
+    const validationError = documentoClienteError(tipo, datos.documento, false) || telefonoClienteError(datos.telefono);
     if (validationError) { setErr(validationError); return; }
-    setLoading(true);
-    setErr("");
+    setLoading(true); setErr("");
     try {
-      const datos: ClienteCotizacionDatos = {
-        nombre: nombre.trim(),
-        documento: documento.trim(),
-        telefono: telefono.trim(),
-        direccion: "",
-        tipoPersona: tipoCliente,
-      };
       const res = await createClienteCotizacionRapida(datos);
       if (!res.ok) { setErr(res.error); return; }
       onCreated(clienteCreadoRow(res.id, datos));
-      setNombre(""); setDocumento(""); setTelefono("");
       setOpen(false);
-    } catch {
-      setErr("Error al crear el cliente.");
-    } finally {
-      setLoading(false);
-    }
+    } catch { setErr("Error al crear el cliente."); }
+    finally { setLoading(false); }
   }
-
-  return (
-    <div className="w-full rounded-2xl border border-[var(--color-accent)]/40 bg-[var(--color-primary-soft)]/30 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-semibold text-[var(--color-text-primary)]">Agregar nuevo cliente</p>
-        <button
-          type="button"
-          onClick={() => { setOpen(false); setErr(""); }}
-          className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-        >
-          Cancelar
-        </button>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-3">
-        <label className="space-y-1 sm:col-span-3">
-          <span className="text-xs font-medium text-[var(--color-text-secondary)]">Nombre *</span>
-          <input
-            className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej: María Quispe"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-[var(--color-text-secondary)]">{tipoCliente === "empresa" ? "RUC / Documento" : "DNI / Documento"}</span>
-          <input
-            className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
-            value={documento}
-            onChange={(e) => setDocumento(e.target.value.replace(/\D/g, "").slice(0, tipoCliente === "empresa" ? 11 : 8))}
-            placeholder={tipoCliente === "empresa" ? "RUC" : "DNI"}
-            inputMode="numeric"
-            maxLength={tipoCliente === "empresa" ? 11 : 8}
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-medium text-[var(--color-text-secondary)]">Teléfono</span>
-          <input
-            className="h-10 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
-            value={telefono}
-            onChange={(e) => setTelefono(e.target.value)}
-            placeholder="999 999 999"
-            type="tel"
-            inputMode="tel"
-            maxLength={30}
-          />
-        </label>
-        <div className="flex items-end">
-          <button
-            type="button"
-            disabled={loading}
-            onClick={handleSave}
-            className="h-10 w-full rounded-xl bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-on-accent)] transition hover:brightness-110 disabled:opacity-50"
-          >
-            {loading ? "Guardando…" : "Guardar cliente"}
-          </button>
-        </div>
-      </div>
-      {err ? <p className="mt-2 text-xs text-[var(--color-danger)]">{err}</p> : null}
-      <p className="mt-2 text-[11px] text-[var(--color-text-secondary)]">El cliente se registra en la base de datos. Puedes completar más datos luego en la sección Clientes.</p>
+  return <div className="w-full rounded-2xl border border-[var(--color-accent)]/40 bg-[var(--color-primary-soft)]/30 p-4">
+    <div className="mb-3 flex items-center justify-between">
+      <p className="text-sm font-semibold text-[var(--color-text-primary)]">Agregar nuevo cliente</p>
+      <button type="button" disabled={loading} onClick={() => { setOpen(false); setErr(""); }} className="text-xs text-[var(--color-text-secondary)]">Cancelar</button>
     </div>
-  );
+    <div ref={fieldsRef}><ClienteFormFields defaultTipoPersona={tipoCliente} /></div>
+    {err ? <p role="alert" className="mt-2 text-xs text-[var(--color-danger)]">{err}</p> : null}
+    <button type="button" disabled={loading} onClick={handleSave}
+      className="mt-3 h-10 rounded-xl bg-[var(--color-accent)] px-4 text-sm font-semibold text-[var(--color-on-accent)] disabled:opacity-50">{loading ? "Guardando…" : "Guardar cliente"}</button>
+    <p className="mt-2 text-[11px] text-[var(--color-text-secondary)]">El cliente se registra al guardar. Los datos leídos del PDF se pueden corregir antes de confirmarlos.</p>
+  </div>;
 }
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -1,3 +1,7 @@
+import { requirePageAccess } from "@/lib/auth";
+import { canMutateClientes } from "@/lib/permissions";
+import { leerContactoCliente, clienteFichaSnapshot } from "@/lib/cliente-contacto";
+import { ClienteFichaEditor } from "@/components/ventas/cliente-ficha-editor";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -18,15 +22,18 @@ type Params = Promise<{ id: string }>;
 
 export default async function ClienteDetallePage({ params, searchParams }: { params: Params; searchParams?: Promise<{ volver?: string | string[] }> }) {
   const { id } = await params;
+  const actor = await requirePageAccess("/ventas/clientes");
+  const canEdit = canMutateClientes(actor.role, actor.uiRole);
   const volver = safeClientesReturn((await searchParams)?.volver);
   const [clientes, historial, catalogo] = await Promise.all([
-    getClientesRows(),
+    getClientesRows(canEdit),
     getClienteHistorial(id),
     getMueblesCatalogoRows(),
   ]);
 
   const cliente = clientes.find((c) => c.id === id);
   if (!cliente) notFound();
+  const contacto = leerContactoCliente(cliente.datos_adicionales);
 
   const { cotizaciones: cotizCliente, ventasMuebles: vMuebles, ventasMadera: vMadera, contratos: cContratos, servicios: sServicios } = historial;
   const muebleById = new Map(catalogo.map((m) => [m.id, m]));
@@ -55,6 +62,7 @@ export default async function ClienteDetallePage({ params, searchParams }: { par
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
+          {canEdit ? <ClienteFichaEditor cliente={{ id: cliente.id, ...clienteFichaSnapshot(cliente) }} /> : null}
           <Link href={volver} className="text-sm font-semibold underline">
             ← Listado
           </Link>
@@ -98,6 +106,15 @@ export default async function ClienteDetallePage({ params, searchParams }: { par
           </div>
         </div>
       </Card>
+
+      {contacto.email || contacto.cuentas_bancarias.length ? <Card>
+        <CardTitle>Contacto y cuentas bancarias</CardTitle>
+        {contacto.email ? <p className="mt-3 text-sm">Correo: {contacto.email}</p> : null}
+        {contacto.cuentas_bancarias.length ? <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold">Ver cuentas ({contacto.cuentas_bancarias.length})</summary><div className="mt-3 grid gap-3 sm:grid-cols-2">{contacto.cuentas_bancarias.map((cuenta, index) => <div key={index} className="space-y-1 rounded-xl border border-[var(--katia-border-subtle)] p-3 text-sm break-all">
+          <p className="font-semibold">{cuenta.banco}{cuenta.moneda ? " · " + cuenta.moneda : ""}</p>
+          {cuenta.numero ? <p>Cuenta: {cuenta.numero}</p> : null}{cuenta.cci ? <p>CCI: {cuenta.cci}</p> : null}{cuenta.titular ? <p>Titular: {cuenta.titular}</p> : null}
+        </div>)}</div></details> : null}
+      </Card> : null}
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard

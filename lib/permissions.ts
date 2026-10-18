@@ -156,3 +156,8 @@ export function canAccessPath(role: AppRole, uiRole: string | null, pathname: st
   }
   return false;
 }
+
+/** Misma autorización que el alta y edición de fichas de clientes. */
+export function canMutateClientes(role: AppRole | null | undefined, uiRole?: string | null) {
+  return !!role && uiRole !== "readonly" && ["owner_admin", "gerencia", "almacen", "ventas"].includes(resolveRole(role, uiRole));
+}

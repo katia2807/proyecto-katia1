@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.92";
-export const APP_LAST_UPDATE = "17/10/2026";
+export const APP_VERSION = "1.1.93";
+export const APP_LAST_UPDATE = "18/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Renovamos el acceso y el icono de Katia Suite. La carga muestra una vista limpia mientras esperas e Inicio te recibe con mensajes diarios variados, conservando tu forma de trabajo y los datos del negocio.";
+  "Ahora puedes leer datos de clientes desde un PDF, revisarlos y completar correo y cuentas antes de guardar. La herramienta está disponible en Clientes, Ventas y Cotizaciones, con mejoras de seguridad.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {
