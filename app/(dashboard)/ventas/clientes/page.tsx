@@ -77,7 +77,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="mr-auto min-w-0">
           <h2 className="text-2xl font-semibold tracking-tight text-[var(--katia-text-primary)]">
             Clientes y Base de datos
           </h2>
@@ -85,11 +85,11 @@ export default async function ClientesPage({ searchParams }: PageProps) {
             Compradores, choferes contratados y proveedores de la empresa.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {tab === "compradores" && <NuevoClienteInline />}
+        <div className="contents">
           <Link href="/ventas">
             <Button type="button" variant="ghost" size="sm">← Ventas</Button>
           </Link>
+          {tab === "compradores" && <NuevoClienteInline />}
         </div>
       </div>
 

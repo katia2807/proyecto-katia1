@@ -38,7 +38,7 @@ export function NuevoClienteInline() {
   }
 
   return (
-    <div className="w-full rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] p-4">
+    <div className="order-last min-w-0 basis-full w-full rounded-[var(--katia-radius-lg)] border border-[var(--katia-border-subtle)] bg-[var(--katia-surface-raised)] p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-[var(--katia-text-primary)]">Agregar cliente</p>
         <button

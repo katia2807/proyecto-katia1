@@ -13,6 +13,8 @@ export function ClientePdfAutofill({ current, currentAccounts, onApply }: Props)
   const id = useId();
   const [result, setResult] = useState<ResultadoPdfCliente | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [fileName, setFileName] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<PdfReaderProgress | null>(null);
   const [error, setError] = useState("");
@@ -82,8 +84,21 @@ export function ClientePdfAutofill({ current, currentAccounts, onApply }: Props)
       <div className="mt-3 space-y-3">
         <p className="text-xs text-[var(--katia-text-secondary)]">El archivo se lee en este navegador. Revisa los datos antes de guardarlos.</p>
         <label className="block text-sm font-medium" htmlFor={id}>Archivo PDF de cliente</label>
-        <input id={id} type="file" accept=".pdf,application/pdf" disabled={loading} className="block w-full max-w-full text-xs file:mr-3 file:rounded-md file:border file:border-[var(--katia-border-default)] file:bg-[var(--katia-bg-elevated)] file:px-3 file:py-2 file:text-[var(--katia-text-primary)]"
-          onChange={event => { const chosen = event.target.files?.[0]; setPassword(""); setFile(chosen ?? null); if (chosen) void read(chosen); event.target.value = ""; }} />
+        <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-lg border border-[var(--katia-border-default)] bg-[var(--katia-bg-elevated)] p-2">
+          <Button type="button" variant="secondary" size="sm" disabled={loading} onClick={() => fileInput.current?.click()} aria-controls={id}>
+            {fileName ? "Cambiar PDF" : "Elegir PDF"}
+          </Button>
+          <span id={id + "-name"} aria-live="polite" className="min-w-0 flex-1 break-all text-xs text-[var(--katia-text-secondary)]" title={fileName || undefined}>
+            {fileName || "Ningún PDF seleccionado"}
+          </span>
+        </div>
+        <input ref={fileInput} id={id} type="file" accept=".pdf,application/pdf" disabled={loading} className="sr-only" tabIndex={-1} aria-describedby={id + "-name"}
+          onChange={event => {
+            const chosen = event.target.files?.[0];
+            event.target.value = ""; // Permite volver a elegir el mismo PDF; su nombre se muestra aparte.
+            if (!chosen) return;
+            setPassword(""); setFile(chosen); setFileName(chosen.name); void read(chosen);
+          }} />
         {loading ? <div role="status" className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <span>{progressText}</span><Button type="button" size="sm" variant="secondary" onClick={() => controller.current?.abort()}>Cancelar lectura</Button>
         </div> : null}
@@ -119,7 +134,7 @@ export function ClientePdfAutofill({ current, currentAccounts, onApply }: Props)
           </label>)}</div> : null}
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={apply}>Usar estos datos</Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => { setResult(null); setFile(null); setPassword(""); setError(""); }}>Descartar lectura</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => { setResult(null); setFile(null); setFileName(""); setPassword(""); setError(""); }}>Descartar lectura</Button>
             {file && !result.cuentas.some(c => c.origen === "ocr") ? <Button type="button" variant="secondary" size="sm" onClick={() => void read(file, true, password)}>Leer también como escaneo</Button> : null}
           </div>
         </div> : null}
