@@ -5,7 +5,6 @@ import Link from "next/link";
 import { IconSearch, IconExternalLink, IconTrash, IconUser } from "@tabler/icons-react";
 import { Table, TD, TH, THead, TRow } from "@/components/ui/table";
 import { formatPen } from "@/lib/utils";
-import { deleteCliente } from "@/app/actions";
 import { CLIENTE_ESTADOS, etiquetaEstadoCliente } from "@/lib/clientes-model";
 
 type ClienteRow = {
@@ -23,7 +22,7 @@ type ClienteRow = {
 
 type Props = {
   clientes: ClienteRow[];
-  isOwner: boolean;
+  canManage: boolean;
 };
 
 const ESTADO_COLORS: Record<string, string> = {
@@ -35,10 +34,9 @@ const ESTADO_COLORS: Record<string, string> = {
   potencial: "bg-[var(--katia-warning)]/15 text-[var(--katia-warning)]",
 };
 
-export function ClientesMasivoTable({ clientes, isOwner }: Props) {
+export function ClientesMasivoTable({ clientes, canManage }: Props) {
   const [query, setQuery] = useState("");
   const [filterEstado, setFilterEstado] = useState<string>("todos");
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -187,35 +185,12 @@ export function ClientesMasivoTable({ clientes, isOwner }: Props) {
                       >
                         Estado
                       </Link>
-                      {isOwner && c.estado !== "activo" ? (
-                        confirmDelete === c.id ? (
-                          <form action={deleteCliente} className="flex items-center gap-1">
-                            <input type="hidden" name="id" value={c.id} />
-                            <input type="hidden" name="confirmacion" value="ELIMINAR CLIENTE" />
-                            <button
-                              type="submit"
-                              className="rounded-md bg-[var(--katia-danger)] px-2 py-1 text-xs font-bold text-white hover:opacity-90 transition-opacity"
-                            >
-                              Confirmar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDelete(null)}
-                              className="rounded-md px-2 py-1 text-xs text-[var(--katia-text-secondary)] hover:bg-[var(--katia-surface-raised)] transition-colors"
-                            >
-                              Cancelar
-                            </button>
-                          </form>
-                        ) : (
-                          <button
-                            type="button"
-                            title="Eliminar cliente"
-                            onClick={() => setConfirmDelete(c.id)}
-                            className="inline-flex items-center rounded-md p-1 text-[var(--katia-danger)]/60 hover:bg-[var(--katia-danger)]/10 hover:text-[var(--katia-danger)] transition-colors"
-                          >
-                            <IconTrash className="size-3.5" />
-                          </button>
-                        )
+                      {canManage ? (
+                        <Link href={"/gerencial?tab=clientes360&cliente=" + encodeURIComponent(c.id) + "#eliminar-cliente"}
+                          aria-label={"Revisar eliminación de " + c.nombre}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[var(--katia-text-secondary)] hover:bg-[var(--katia-surface-raised)]">
+                          <IconTrash aria-hidden="true" className="size-3.5" /> Eliminar
+                        </Link>
                       ) : null}
                     </div>
                   </TD>

@@ -1,3 +1,5 @@
+import { getClienteEliminacion, type ClienteEliminacion } from "@/lib/cliente-eliminacion";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -6,7 +8,7 @@ import { Field } from "@/components/ui/field";
 import { getDashboardSession } from "@/lib/current-user-role";
 import { getAuthContext } from "@/lib/auth";
 import { getClientesRows } from "@/lib/data";
-import { canAccessGerencial } from "@/lib/permissions";
+import { canAccessGerencial, canMutateVentas } from "@/lib/permissions";
 import { deleteCliente, forzarEliminarClienteCompleto } from "@/app/actions";
 import { formatDate, formatPen } from "@/lib/utils";
 import { GerencialClienteSearchSelect } from "@/components/gerencial/cliente-search-select";
@@ -22,7 +24,7 @@ import { buildGerencialModel } from "@/lib/gerencial-model";
 
 export const dynamic = "force-dynamic";
 type GerencialPageProps = {
-  searchParams?: Promise<{ cliente?: string | string[]; mensaje?: string | string[]; tab?: string | string[]; alertas?: string | string[] }>;
+  searchParams?: Promise<{ cliente?: string | string[]; mensaje?: string | string[]; resultado?: string | string[]; tab?: string | string[]; alertas?: string | string[] }>;
 };
 
 function firstParam(value: string | string[] | undefined) {
@@ -68,30 +70,26 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
   });
 
   const message = firstParam(params?.mensaje).trim();
+  const resultado = firstParam(params?.resultado);
   const selectedClienteId = firstParam(params?.cliente).trim();
   const selectedCliente = selectedClienteId ? clientes.find((c) => c.id === selectedClienteId) ?? null : null;
   const porCliente = <T extends { cliente_id: string | null }>(rows: T[]) => selectedCliente ? rows.filter(c => c.cliente_id === selectedCliente.id) : [];
-  const clienteCotizacionesUnificadas = porCliente(historialClientes?.cotizaciones.filter(c => c.actual) ?? []);
-  const clienteCotizacionesMueble = porCliente(historialClientes?.cotizaciones.filter(c => !c.actual) ?? []);
-  const clienteVentasMuebles = porCliente(historialClientes?.ventasMuebles ?? []);
-  const clienteVentasMadera = porCliente(historialClientes?.ventasMadera ?? []);
-  const clienteContratos = porCliente(historialClientes?.contratos ?? []);
-  const clienteServicios = porCliente(historialClientes?.servicios ?? []);
   const clienteCobrosVencidos = porCliente(historialClientes ? cobrosClientes(historialClientes) : []);
   const resumenCliente = selectedCliente ? resumenPorCliente.get(selectedCliente.id) : null;
   const totalFacturadoCliente = resumenCliente?.total ?? 0;
   const totalOperacionesCliente = resumenCliente?.operaciones ?? 0;
-  const relatedDependencies = [
-    { label: "Cotizaciones de muebles", count: clienteCotizacionesMueble.length, href: "/ventas/muebles-personalizados" },
-    { label: "Cotizaciones unificadas", count: clienteCotizacionesUnificadas.length, href: "/cotizacion" },
-    { label: "Ventas de muebles terminados", count: clienteVentasMuebles.length, href: "/ventas/muebles-terminados" },
-    { label: "Ventas de madera", count: clienteVentasMadera.length, href: "/ventas?categoria=madera#historial-ventas" },
-    { label: "Contratos de alquiler", count: clienteContratos.length, href: "/ventas/alquiler-mixer" },
-    { label: "Servicios de aserradero", count: clienteServicios.length, href: "/ventas/aserradero-servicios" },
-    { label: "Avisos de vencimiento (muebles y alquileres)", count: clienteCobrosVencidos.length, href: "/reportes#cobros-vencidos" },
-    { label: "Órdenes de producción", count: porCliente(historialClientes?.ordenes ?? []).length, href: "/ventas/muebles-personalizados" },
-  ];
-  const hasRelatedDependencies = relatedDependencies.some((dependency) => dependency.count > 0);
+  const canManage = canMutateVentas(session?.role, session?.uiRole);
+  let eliminacion: ClienteEliminacion | null = null;
+  let eliminacionError = "";
+  if (selectedCliente) {
+    try {
+      eliminacion = await getClienteEliminacion(selectedCliente.id, context?.organizationId);
+      if (!eliminacion) eliminacionError = "El cliente ya no está disponible. Actualiza la página.";
+    } catch {
+      eliminacionError = "No pudimos comprobar los registros vinculados. Actualiza la página para volver a intentarlo.";
+    }
+  }
+  const hasRelatedDependencies = (eliminacion?.dependencias.length ?? 0) > 0;
   const pedidosActivosCliente = resumenCliente?.pedidosActivos ?? 0;
   const pagosPendientesCliente = selectedCliente ? clienteCobrosVencidos.length : 0;
 
@@ -108,8 +106,12 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
       </div>
 
       {message ? (
-        <div className="rounded-[var(--katia-radius-md)] border border-[var(--katia-success)]/40 bg-[var(--katia-success)]/10 px-4 py-3 text-sm font-medium text-[var(--katia-success)]">
-          ✓ {message}
+        <div role={resultado === "error" ? "alert" : "status"} className={"rounded-[var(--katia-radius-md)] border px-4 py-3 text-sm font-medium " + (
+          resultado === "error" ? "border-[var(--katia-danger)]/40 bg-[var(--katia-danger)]/10 text-[var(--katia-danger)]" :
+          resultado === "exito" ? "border-[var(--katia-success)]/40 bg-[var(--katia-success)]/10 text-[var(--katia-success)]" :
+          "border-[var(--katia-border-default)] bg-[var(--katia-bg-overlay)] text-[var(--katia-text-primary)]"
+        )}>
+          {resultado === "exito" ? "✓ " : ""}{message}
         </div>
       ) : null}
 
@@ -140,7 +142,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
             <div className="mt-4">
               <ClientesMasivoTable
                 clientes={clientesMasivo}
-                isOwner={session?.role === "owner_admin"}
+                canManage={canManage}
               />
             </div>
           </Card>
@@ -217,7 +219,7 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <Card>
+                  <Card id="estado-cliente">
                     <CardTitle>Actualizar estado</CardTitle>
                     <CardDescription>Cambia el estado del cliente.</CardDescription>
                     <ClienteEstadoForm
@@ -229,48 +231,55 @@ export default async function GerencialPage({ searchParams }: GerencialPageProps
                 </div>
               </div>
 
-              {selectedCliente.estado !== "activo" ? (
-                <div className="mt-6 rounded-[var(--katia-radius-md)] border border-[var(--katia-danger)]/30 bg-[var(--katia-danger)]/5 p-4">
-                  <p className="text-sm font-semibold text-[var(--katia-danger)]">Eliminar cliente</p>
+              <div id="eliminar-cliente" className="mt-6 scroll-mt-24 rounded-[var(--katia-radius-md)] border border-[var(--katia-border-default)] bg-[var(--katia-bg-overlay)] p-4">
+                <h4 className="text-sm font-semibold">Eliminar cliente</h4>
+                <p className="mt-2 text-sm text-[var(--katia-text-secondary)]">
+                  Solo se elimina la ficha cuando no tiene registros vinculados. Para conservar su historial, puedes usar el estado Inactivo.
+                </p>
+                <div id="motivo-eliminacion" className="mt-3 space-y-2 text-sm">
+                  {eliminacionError ? <p role="alert" className="text-[var(--katia-danger)]">{eliminacionError}</p> : null}
+                  {!canManage ? <p>Tu cuenta no tiene permiso para eliminar clientes. Solicita la revisión de la dueña o de gerencia.</p> : null}
+                  {eliminacion?.estado === "activo" ? (
+                    <p>El cliente está <strong>Activo</strong>. Primero elige <strong>Inactivo</strong> en «Actualizar estado» y pulsa «Guardar estado».</p>
+                  ) : null}
                   {hasRelatedDependencies ? (
-                    <p className="mt-2 text-xs text-[var(--katia-text-secondary)]">
-                      Este cliente tiene {relatedDependencies.filter((d) => d.count > 0).map((d) => `${d.count} ${d.label.toLowerCase()}`).join(", ")}. Limpia los registros relacionados antes de eliminar, o usa la opción de eliminación forzada (solo owner).
-                    </p>
-                  ) : (
-                    <form action={deleteCliente} className="mt-4 grid gap-3">
-                      <input type="hidden" name="id" value={selectedCliente.id} />
-                      <Field
-                        label="Escribe ELIMINAR CLIENTE para confirmar"
-                        name="confirmacion"
-                        placeholder="ELIMINAR CLIENTE"
-                        required
-                      />
-                      <Button type="submit" variant="danger" size="sm">
-                        Eliminar cliente
-                      </Button>
-                    </form>
-                  )}
-                  {session?.role === "owner_admin" && hasRelatedDependencies ? (
-                    <details className="mt-3">
-                      <summary className="cursor-pointer text-xs font-semibold text-[var(--katia-danger)]">
-                        Eliminar cliente y todos sus registros (owner_admin)
-                      </summary>
-                      <form action={forzarEliminarClienteCompleto} className="mt-3 grid gap-3">
-                        <input type="hidden" name="id" value={selectedCliente.id} />
-                        <Field
-                          label="Escribe ELIMINAR TODO para confirmar"
-                          name="confirmacion"
-                          placeholder="ELIMINAR TODO"
-                          required
-                        />
-                        <Button type="submit" variant="danger" size="sm">
-                          Eliminar cliente y todos sus registros
-                        </Button>
-                      </form>
-                    </details>
+                    <>
+                      <p className="font-medium">No se puede eliminar porque tiene registros vinculados:</p>
+                      <ul className="list-inside list-disc space-y-1">
+                        {eliminacion?.dependencias.map(dep => <li key={dep.label}>
+                          <Link href={dep.href} className="underline">{dep.label}: {dep.count}</Link>
+                        </li>)}
+                      </ul>
+                      <p>Marcarlo como Inactivo conserva estos registros. No necesitas borrar ventas o cobros para dejar de usar su ficha.</p>
+                    </>
                   ) : null}
                 </div>
-              ) : null}
+                {canManage && eliminacion?.puedeEliminar && !eliminacionError ? (
+                  <form action={deleteCliente} className="mt-4 grid max-w-lg gap-3">
+                    <p className="text-sm">Se eliminará únicamente la ficha de <strong>{selectedCliente.nombre}</strong>. Esta acción no se puede deshacer desde el programa.</p>
+                    <input type="hidden" name="id" value={selectedCliente.id} />
+                    <Field label="Escribe ELIMINAR CLIENTE para confirmar" name="confirmacion" placeholder="ELIMINAR CLIENTE" autoComplete="off" required />
+                    <PendingSubmitButton idleText="Eliminar cliente" pendingText="Eliminando..." variant="danger" />
+                  </form>
+                ) : (
+                  <Button type="button" variant="secondary" size="sm" disabled aria-describedby="motivo-eliminacion" className="mt-4">Eliminar cliente</Button>
+                )}
+                {canManage && session?.role === "owner_admin" && selectedCliente.estado !== "activo" && hasRelatedDependencies ? (
+                  <details className="mt-5 border-t border-[var(--katia-border-subtle)] pt-3">
+                    <summary className="cursor-pointer text-xs font-semibold text-[var(--katia-danger)]">
+                      Eliminación completa de ficha e historial · solo dueña
+                    </summary>
+                    <p className="mt-3 text-sm text-[var(--katia-danger)]">
+                      Esta opción elimina también las operaciones del cliente y puede anular cobros y devolver existencias. Si vas a conservar las operaciones, mantén la ficha como Inactivo.
+                    </p>
+                    <form action={forzarEliminarClienteCompleto} className="mt-3 grid max-w-lg gap-3">
+                      <input type="hidden" name="id" value={selectedCliente.id} />
+                      <Field label="Escribe ELIMINAR TODO para confirmar" name="confirmacion" placeholder="ELIMINAR TODO" autoComplete="off" required />
+                      <PendingSubmitButton idleText="Eliminar cliente y todos sus registros" pendingText="Eliminando registros..." variant="danger" />
+                    </form>
+                  </details>
+                ) : null}
+              </div>
             </Card>
           ) : null}
         </div>

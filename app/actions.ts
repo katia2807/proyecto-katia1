@@ -1,4 +1,5 @@
 "use server";
+import { getClienteEliminacion } from "@/lib/cliente-eliminacion";
 import { parseContactoCliente, clienteFichaSnapshotSchema } from "@/lib/cliente-contacto";
 import { documentoClienteError, telefonoClienteError } from "@/lib/cotizacion-cliente-validacion";
 
@@ -3155,85 +3156,61 @@ export async function updateClienteEstado(formData: FormData) {
   }
   revalidatePath("/ventas/clientes");
   revalidatePath(`/ventas/clientes/${id}`);
+  revalidatePath("/gerencial");
 }
 
 export async function deleteCliente(formData: FormData) {
-  await requireMutationAccess(ventasRoles);
-  const id = String(formData.get("id") ?? "");
-  const confirmacion = String(formData.get("confirmacion") ?? "").trim();
-  const redirectWithMessage = (message: string) => {
-    const baseUrl = id ? `/gerencial?cliente=${encodeURIComponent(id)}` : "/gerencial";
-    const separator = id ? "&" : "?";
-    redirect(`${baseUrl}${separator}mensaje=${encodeURIComponent(message)}`);
+  const actor = await requireMutationAccess(ventasRoles);
+  const id = String(formData.get("id") ?? "").trim();
+  const redirectWithMessage = (message: string, success = false) => {
+    const params = new URLSearchParams({ tab: "clientes360", resultado: success ? "exito" : "error", mensaje: message });
+    if (!success && z.uuid().safeParse(id).success) params.set("cliente", id);
+    redirect("/gerencial?" + params.toString() + (!success && params.has("cliente") ? "#eliminar-cliente" : ""));
   };
-  if (!id) {
-    redirectWithMessage("Identificador inválido para eliminar el cliente.");
+  if (!z.uuid().safeParse(id).success) return redirectWithMessage("No se pudo identificar al cliente. Vuelve a seleccionarlo.");
+  if (String(formData.get("confirmacion") ?? "").trim() !== "ELIMINAR CLIENTE") {
+    return redirectWithMessage('Escribe "ELIMINAR CLIENTE" para confirmar. Aún no se eliminó nada.');
   }
-  if (confirmacion !== "ELIMINAR CLIENTE") {
-    redirectWithMessage('Escribe "ELIMINAR CLIENTE" en el campo de confirmación.');
+  let status;
+  try {
+    status = await getClienteEliminacion(id, actor.organizationId);
+  } catch {
+    return redirectWithMessage("No pudimos comprobar los registros vinculados. Actualiza la página e inténtalo de nuevo. No se eliminó el cliente.");
   }
-  if (!hasSupabaseEnv()) {
-    demoDeleteCliente(id);
-  } else {
-    const supabase = getSupabaseServerClient();
-    const { data: cliente, error: clienteError } = await supabase
-      .from("clientes")
-      .select("estado")
-      .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .maybeSingle();
-    if (clienteError) {
-      redirectWithMessage(clienteError.message || "No se pudo verificar el estado del cliente.");
-    }
-    if (!cliente) {
-      redirectWithMessage("Cliente no encontrado.");
-      return;
-    }
-    if (cliente.estado === "activo") {
-      redirectWithMessage("El cliente está activo. Cambia su estado a inactivo antes de eliminar.");
-    }
-
-    const dependentTables = [
-      { table: "cotizaciones_mueble", label: "cotizaciones de muebles" },
-      { table: "cotizaciones_unificadas", label: "cotizaciones unificadas" },
-      { table: "ventas_madera", label: "ventas de madera" },
-      { table: "ventas_mueble_terminado", label: "ventas de muebles terminados" },
-      { table: "servicios_aserradero", label: "servicios de aserradero" },
-      { table: "alquileres", label: "contratos de alquiler" },
-      { table: "ordenes_produccion", label: "órdenes de producción" },
-    ];
-
-    const blocked = [] as string[];
-    for (const entry of dependentTables) {
-      const { count, error } = await supabase
-        .from(entry.table)
-        .select("id", { count: "exact", head: true })
-        .eq("cliente_id", id)
-        .eq("organization_id", DEFAULT_ORG_ID);
+  if (!status) return redirectWithMessage("Cliente no encontrado. Puede haberse eliminado desde otra sesión.");
+  if (status.estado === "activo") {
+    return redirectWithMessage("El cliente está activo. Primero marca Inactivo en Actualizar estado y guarda el cambio.");
+  }
+  if (status.dependencias.length > 0) {
+    return redirectWithMessage("No se puede eliminar: tiene registros vinculados (" + status.dependencias.map(d => d.label + ": " + d.count).join(", ") + "). Puedes marcarlo como Inactivo para conservar su historial.");
+  }
+  let failure = "";
+  try {
+    if (!hasSupabaseEnv()) {
+      demoDeleteCliente(id, actor.organizationId);
+    } else {
+      const supabase = getSupabaseServerClient();
+      let query = supabase.from("clientes").delete().eq("id", id).eq("organization_id", actor.organizationId).is("deleted_at", null);
+      // Evita borrar con un estado distinto al que acabamos de comprobar.
+      query = status.estado === null ? query.is("estado", null) : query.eq("estado", status.estado);
+      const { data, error } = await query.select("id");
       if (error) {
-        redirectWithMessage(error.message || "Error al verificar los datos relacionados del cliente.");
+        failure = error.code === "23503"
+          ? "El cliente tiene registros vinculados. Actualiza la página para revisarlos; puedes mantenerlo como Inactivo."
+          : "No pudimos confirmar la eliminación. Actualiza la página para comprobar el estado del cliente antes de reintentar.";
+      } else if (!data?.length) {
+        failure = "El cliente cambió desde otra sesión o ya no está disponible. Actualiza la página antes de intentarlo de nuevo.";
       }
-      if ((count ?? 0) > 0) {
-        blocked.push(entry.label);
-      }
     }
-    if (blocked.length > 0) {
-      redirectWithMessage(
-        `El cliente tiene registros relacionados en: ${blocked.join(", ")}. Elimina o desvincula esos registros antes de borrar el cliente.`,
-      );
-    }
-
-    const { error } = await supabase
-      .from("clientes")
-      .delete()
-      .eq("id", id)
-      .eq("organization_id", DEFAULT_ORG_ID);
-    if (error) {
-      redirectWithMessage(error.message || "No se pudo eliminar el cliente.");
-    }
+  } catch {
+    failure = "No se pudo eliminar el cliente. Actualiza la página para comprobar su estado antes de reintentar.";
   }
+  if (failure) return redirectWithMessage(failure);
   revalidatePath("/ventas/clientes");
+  revalidatePath("/ventas/clientes/" + id);
   revalidatePath("/gerencial");
+  revalidatePath("/");
+  return redirectWithMessage("Cliente eliminado. No se modificaron ventas, cobros ni existencias.", true);
 }
 
 /**
@@ -3247,7 +3224,7 @@ export async function deleteCliente(formData: FormData) {
 export async function forzarEliminarClienteCompleto(formData: FormData) {
     const actor = await requireMutationAccess(['owner_admin']);
     const id = String(formData.get('id') ?? '').trim();
-    const base = '/gerencial?cliente=' + encodeURIComponent(id);
+    const base = '/gerencial?tab=clientes360&resultado=error&cliente=' + encodeURIComponent(id);
     if (!z.uuid().safeParse(id).success || formData.get('confirmacion') !== 'ELIMINAR TODO')
         return redirect(base + '&mensaje=' + encodeURIComponent('Escribe ELIMINAR TODO para confirmar un cliente válido.'));
     try {
@@ -3270,7 +3247,7 @@ export async function forzarEliminarClienteCompleto(formData: FormData) {
     revalidatePath('/caja');
     revalidatePath('/inventario');
     revalidatePath('/');
-    redirect('/gerencial?mensaje=' + encodeURIComponent('Cliente y todos sus registros eliminados correctamente.'));
+    redirect('/gerencial?tab=clientes360&resultado=exito&mensaje=' + encodeURIComponent('Cliente y todos sus registros eliminados correctamente.'));
 }
 
 export async function submitCreateClienteForm(

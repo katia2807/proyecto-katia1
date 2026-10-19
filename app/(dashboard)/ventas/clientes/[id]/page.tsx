@@ -1,5 +1,5 @@
 import { requirePageAccess } from "@/lib/auth";
-import { canMutateClientes } from "@/lib/permissions";
+import { canMutateClientes, canAccessGerencial } from "@/lib/permissions";
 import { leerContactoCliente, clienteFichaSnapshot } from "@/lib/cliente-contacto";
 import { ClienteFichaEditor } from "@/components/ventas/cliente-ficha-editor";
 import Link from "next/link";
@@ -24,6 +24,7 @@ export default async function ClienteDetallePage({ params, searchParams }: { par
   const { id } = await params;
   const actor = await requirePageAccess("/ventas/clientes");
   const canEdit = canMutateClientes(actor.role, actor.uiRole);
+  const canManage = canAccessGerencial(actor.role, actor.uiRole);
   const volver = safeClientesReturn((await searchParams)?.volver);
   const [clientes, historial, catalogo] = await Promise.all([
     getClientesRows(canEdit),
@@ -66,15 +67,15 @@ export default async function ClienteDetallePage({ params, searchParams }: { par
           <Link href={volver} className="text-sm font-semibold underline">
             ← Listado
           </Link>
-          <Link href={`/gerencial?tab=clientes360&cliente=${cliente.id}`}>
-            <Button variant="secondary">Gestionar en Panel Gerencial</Button>
-          </Link>
+          {canManage ? <Link href={"/gerencial?tab=clientes360&cliente=" + encodeURIComponent(cliente.id) + "#eliminar-cliente"}>
+            <Button type="button" variant="secondary">Estado y eliminación</Button>
+          </Link> : null}
         </div>
       </div>
 
       <Card>
         <CardTitle>Ficha de cliente</CardTitle>
-        <CardDescription>Visualización de datos e historial. El estado y la eliminación se gestionan desde el Panel Gerencial.</CardDescription>
+        <CardDescription>Datos e historial del cliente. {canManage ? "En Estado y eliminación puedes revisar si su ficha se puede borrar y por qué." : "Tu cuenta permite consultar esta ficha; la eliminación se gestiona con la dueña o gerencia."}</CardDescription>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
             <p className="text-xs uppercase tracking-wide text-[var(--color-text-secondary)]">Registrado desde</p>

@@ -27,6 +27,7 @@ export function CentroMandoTabs({ activeTab }: CentroMandoTabsProps) {
     params.set("tab", tab);
     params.delete("alertas");
     params.delete("mensaje");
+    params.delete("resultado");
     // Limpiar cliente al cambiar de tab
     if (tab !== "clientes360") params.delete("cliente");
     router.push(`${pathname}?${params.toString()}`);

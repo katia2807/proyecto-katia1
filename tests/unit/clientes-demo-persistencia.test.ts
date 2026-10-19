@@ -30,3 +30,35 @@ describe("Persistencia local de clientes", () => {
     expect(mocks.write).not.toHaveBeenCalled();
   });
 });
+
+describe("Eliminación local con las mismas restricciones", () => {
+  const clearRuntime = () => { delete (globalThis as Record<symbol, unknown>)[Symbol.for("katia.demo-store.runtime")]; };
+  beforeEach(() => { clearRuntime(); vi.resetModules(); vi.clearAllMocks(); mocks.write.mockReset(); });
+  afterEach(clearRuntime);
+  test("el borrado directo rechaza clientes activos y no escribe", async () => {
+    mocks.read.mockReturnValue({ clientes: [cliente("prueba", { estado: "activo" })] });
+    const store = await import("@/lib/demo-store");
+    expect(() => store.demoDeleteCliente("prueba", org)).toThrow("Inactivo");
+    expect(store.demoClientesRows()).toHaveLength(1); expect(mocks.write).not.toHaveBeenCalled();
+  });
+  test("incluye cotizaciones archivadas al proteger el historial", async () => {
+    mocks.read.mockReturnValue({ clientes: [cliente("prueba", { estado: "inactivo" })],
+      cotizaciones: [{ id: "cot", organization_id: org, cliente_id: "prueba", deleted_at: "2026-10-01" }] });
+    const store = await import("@/lib/demo-store");
+    expect(store.demoClienteDependencias("prueba", org).cotizaciones_mueble).toBe(1);
+    expect(() => store.demoDeleteCliente("prueba", org)).toThrow("vinculados"); expect(mocks.write).not.toHaveBeenCalled();
+  });
+  test("elimina una ficha vacía sin tocar otra organización", async () => {
+    mocks.read.mockReturnValue({ clientes: [cliente("prueba", { estado: "inactivo" }), cliente("ajeno", { organization_id: "otra", estado: "inactivo" })] });
+    const store = await import("@/lib/demo-store"); store.demoDeleteCliente("prueba", org);
+    expect(store.demoClientesRows().map(c => c.id)).toEqual(["ajeno"]); expect(mocks.write).toHaveBeenCalledTimes(1);
+    expect(() => store.demoDeleteCliente("ajeno", org)).toThrow("no encontrado");
+  });
+  test("si falla el guardado local restaura la ficha en memoria", async () => {
+    mocks.read.mockReturnValue({ clientes: [cliente("prueba", { estado: "inactivo" })] });
+    mocks.write.mockImplementation(() => { throw new Error("Disco ficticio"); });
+    const store = await import("@/lib/demo-store");
+    expect(() => store.demoDeleteCliente("prueba", org)).toThrow("Disco ficticio");
+    expect(store.demoClientesRows().map(c => c.id)).toEqual(["prueba"]);
+  });
+});

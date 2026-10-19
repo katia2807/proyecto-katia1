@@ -3398,10 +3398,29 @@ export function demoUpdateClienteEstado(id: string, estado: "activo" | "inactivo
   }
 }
 
-export function demoDeleteCliente(id: string) {
-  const idx = store.clientes.findIndex((c) => c.id === id);
-  if (idx !== -1) {
+export function demoClienteDependencias(id: string, organizationId: string) {
+  const count = (rows: readonly { organization_id: string; cliente_id?: string | null }[]) =>
+    rows.filter(r => r.organization_id === organizationId && r.cliente_id === id).length;
+  return {
+    cotizaciones_mueble: count(store.cotizaciones),
+    cotizaciones_unificadas: count(store.cotizacionesUnificadas),
+    ventas_madera: count(store.ventas.filter(v => !v.tipo_corte)),
+    ventas_madera_cortada: count(store.ventas.filter(v => Boolean(v.tipo_corte))),
+    ventas_mueble_terminado: count(store.ventasMuebleTerminado),
+    servicios_aserradero: count(store.serviciosAserradero),
+    alquileres: count(store.alquileres),
+    ordenes_produccion: count(store.ordenesProduccion),
+  };
+}
+
+export function demoDeleteCliente(id: string, organizationId = DEFAULT_ORG_ID) {
+  return demoOperacionAtomica(() => {
+    const idx = store.clientes.findIndex(c => c.id === id && c.organization_id === organizationId && !c.deleted_at);
+    if (idx === -1) throw new Error("Cliente no encontrado.");
+    if (store.clientes[idx].estado === "activo") throw new Error("Primero marca al cliente como Inactivo.");
+    if (Object.values(demoClienteDependencias(id, organizationId)).some(count => count > 0)) {
+      throw new Error("El cliente tiene registros vinculados. Puedes conservarlo como Inactivo.");
+    }
     store.clientes.splice(idx, 1);
-    persistStore();
-  }
+  });
 }

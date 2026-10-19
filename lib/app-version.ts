@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.94";
-export const APP_LAST_UPDATE = "18/10/2026";
+export const APP_VERSION = "1.1.95";
+export const APP_LAST_UPDATE = "19/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Al leer un PDF, su nombre permanece visible para que sepas qué archivo usaste. El formulario de clientes aprovecha mejor el espacio en computadora y celular, con una distribución más cómoda para revisar los datos.";
+  "Ahora la eliminación de clientes muestra si está disponible y explica los bloqueos por estado o historial. Las confirmaciones y los avisos son más claros, conservando los registros vinculados y tus datos.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {
