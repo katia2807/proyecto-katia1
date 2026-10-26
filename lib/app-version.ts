@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.97";
+export const APP_VERSION = "1.1.98";
 export const APP_LAST_UPDATE = "26/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Las vistas de impresión comprueban tu sesión y los permisos antes de cargar documentos. Boletas, facturas, contratos y cotizaciones mantienen su formato y sus importes, con un acceso más seguro.";
+  "Los comprobantes verifican la sesión antes de consultar datos, también en la vista normal. Se refuerza la privacidad al abrir o imprimir documentos, conservando sus descripciones, medidas e importes.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {

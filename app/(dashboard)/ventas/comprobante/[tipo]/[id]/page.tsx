@@ -1,3 +1,4 @@
+import { requirePageAccess } from "@/lib/auth";
 import { clienteParaComprobante, entregaParaComprobante } from "@/lib/comprobante-presentacion";
 import { ComprobanteItemDescription } from "@/components/sales/comprobante-item-description";
 import { ComprobanteReviewNotice } from "@/components/sales/comprobante-review-notice";
@@ -326,6 +327,7 @@ export default async function ComprobantePage({
   params: Promise<Params>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  await requirePageAccess("/ventas");
   const { tipo, id } = await params;
   const sParams = await searchParams;
   const historialHref = sParams.volver == null ? "/ventas" : safeHistorialHref(sParams.volver);
