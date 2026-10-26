@@ -1,3 +1,4 @@
+import { requirePageAccess } from "@/lib/auth";
 import { clienteParaComprobante, entregaParaComprobante } from "@/lib/comprobante-presentacion";
 import { ComprobanteItemDescription } from "@/components/sales/comprobante-item-description";
 import { ComprobanteReviewNotice } from "@/components/sales/comprobante-review-notice";
@@ -94,6 +95,7 @@ function DecorativeQr({ className = "" }: { className?: string }) {
   );
 }
 export async function PrintA4Voucher({ id, docType, searchTipo, volver }: PrintA4VoucherProps) {
+  await requirePageAccess("/ventas");
   const historialHref = volver == null ? "/ventas" : safeHistorialHref(volver);
   const { tipo, data: saleRecord } = await resolveSaleDocument(id, searchTipo);
   if (!saleRecord) {

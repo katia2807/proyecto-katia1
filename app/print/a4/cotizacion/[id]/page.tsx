@@ -1,3 +1,4 @@
+import { requirePageAccess } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { CotizacionResumenFormal } from "@/components/sales/cotizacion-resumen-formal";
 import { DocumentoImprimible } from "@/components/sales/documento-imprimible";
@@ -10,6 +11,7 @@ import { getCotizacionUnificadaById, getClientesRows } from "@/lib/data";
 type PdfPageProps = { params: Promise<{ id: string }> };
 
 export default async function A4CotizacionPage({ params }: PdfPageProps) {
+  await requirePageAccess("/cotizacion");
   const { id } = await params;
   const [cot, clientes, empresa] = await Promise.all([
     getCotizacionUnificadaById(id),

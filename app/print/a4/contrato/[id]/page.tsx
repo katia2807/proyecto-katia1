@@ -1,3 +1,4 @@
+import { requirePageAccess } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { DocumentoHeader, DocumentoImprimible } from "@/components/sales/documento-imprimible";
 import { getEmpresaConfig } from "@/lib/company-config";
@@ -7,6 +8,7 @@ import { formatDate, formatPen } from "@/lib/utils";
 type PageProps = { params: Promise<{ id: string }> };
 
 export default async function A4ContratoPage({ params }: PageProps) {
+  await requirePageAccess("/ventas");
   const { id } = await params;
   const [alquilerResult, clientes, empresa] = await Promise.all([
     getAlquilerRows(),
