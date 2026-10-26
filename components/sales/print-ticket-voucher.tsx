@@ -1,3 +1,6 @@
+import { clienteParaComprobante, entregaParaComprobante } from "@/lib/comprobante-presentacion";
+import { ComprobanteItemDescription } from "@/components/sales/comprobante-item-description";
+import { ComprobanteReviewNotice } from "@/components/sales/comprobante-review-notice";
 import { notFound } from "next/navigation";
 import { getEmpresaConfig } from "@/lib/company-config";
 import { getClientesRows } from "@/lib/data";
@@ -87,7 +90,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo, volver }: Pr
   let fechaVenta  = "—";
   let clienteNombre = "—";
   let clienteDoc    = "—";
-  let items: Array<{ desc: string; qty: string; unitario: string; total: string; kind?: "producto" | "ajuste" }> = [];
+  let items: Array<{ desc: string; medidas?: string; advertenciaMedidas?: string; qty: string; unitario: string; total: string; kind?: "producto" | "ajuste" }> = [];
   let totalSoles    = 0;
   let modalidad     = "—";
   let metodo        = "—";
@@ -108,8 +111,9 @@ export async function PrintTicketVoucher({ id, docType, searchTipo, volver }: Pr
     entrega     = "recojo";
 
     const cli     = clienteMap.get(aserraderoServicio.cliente_id);
-    clienteNombre = cli?.nombre ?? "—";
-    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
+    const clienteImpreso = clienteParaComprobante(cli);
+    clienteNombre = clienteImpreso.nombre;
+    clienteDoc = clienteImpreso.documento ?? "—";
 
     if (aserraderoServicio.lineas_json) {
       try {
@@ -133,8 +137,9 @@ export async function PrintTicketVoucher({ id, docType, searchTipo, volver }: Pr
     entrega     = "entrega local";
 
     const cli     = clienteMap.get(ventaMadera.cliente_id);
-    clienteNombre = cli?.nombre ?? "—";
-    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
+    const clienteImpreso = clienteParaComprobante(cli);
+    clienteNombre = clienteImpreso.nombre;
+    clienteDoc = clienteImpreso.documento ?? "—";
 
     for (const linea of ventaMadera.lineas) {
       let desc = "Venta de madera";
@@ -166,8 +171,9 @@ export async function PrintTicketVoucher({ id, docType, searchTipo, volver }: Pr
     entrega        = venta.tipo_entrega ?? "—";
 
     const cli      = clienteMap.get(venta.cliente_id);
-    clienteNombre  = cli?.nombre ?? "—";
-    clienteDoc     = cli?.ruc ?? cli?.documento ?? "—";
+    const clienteImpreso = clienteParaComprobante(cli);
+    clienteNombre = clienteImpreso.nombre;
+    clienteDoc = clienteImpreso.documento ?? "—";
 
     items = getMaderaCortadaCustomerItems(printModel.items, printModel.totalSoles);
     if (venta.tipo_entrega && venta.direccion_entrega) {
@@ -183,8 +189,9 @@ export async function PrintTicketVoucher({ id, docType, searchTipo, volver }: Pr
     entrega       = venta.tipo_entrega ?? "—";
 
     const cli     = clienteMap.get(venta.cliente_id);
-    clienteNombre = cli?.nombre ?? "—";
-    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
+    const clienteImpreso = clienteParaComprobante(cli);
+    clienteNombre = clienteImpreso.nombre;
+    clienteDoc = clienteImpreso.documento ?? "—";
 
     const muebleNombre = venta.mueble_catalogo_id
       ? ((await getMuebleNombre(venta.mueble_catalogo_id)) ?? "Mueble")
@@ -355,6 +362,8 @@ export async function PrintTicketVoucher({ id, docType, searchTipo, volver }: Pr
         </div>
       </div>
 
+      <ComprobanteReviewNotice items={items} />
+
       {/* 80mm Thermal Ticket Design */}
       <div className="ticket-container">
         
@@ -426,7 +435,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo, volver }: Pr
               {["madera", "mueble"].includes(tipo || "") && items.map((item, idx) => (
                 <tr key={idx} className="border-b border-dashed border-gray-200">
                   <td className="py-1 font-semibold text-left">
-                    {item.kind === "ajuste" ? item.desc : `${item.qty} × ${item.desc}`}
+                    <ComprobanteItemDescription item={item} prefix={item.kind === "ajuste" ? "" : item.qty + " × "} compact />
                   </td>
                   <td className="text-right">{item.unitario}</td>
                   <td className="text-right">{item.total}</td>
@@ -463,7 +472,7 @@ export async function PrintTicketVoucher({ id, docType, searchTipo, volver }: Pr
         <div className="text-[10px] space-y-0.5">
           <p><strong>MODALIDAD:</strong> {modalidad}</p>
           <p><strong>METODO PAGO:</strong> {metodo}</p>
-          <p><strong>ENTREGA:</strong> {entrega}</p>
+          <p><strong>ENTREGA:</strong> {entregaParaComprobante(entrega)}</p>
         </div>
         <div className="ticket-dashed-line"></div>
 

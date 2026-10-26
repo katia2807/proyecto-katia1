@@ -1,3 +1,4 @@
+import { clienteParaComprobante } from "@/lib/comprobante-presentacion";
 import { roundMoney, roundLegacyMoney, productMoney } from "@/lib/money";
 
 export type AserraderoDocumentType = "boleta" | "factura";
@@ -245,23 +246,7 @@ function resolveDocumentType(
 }
 
 function resolveCustomer(customer: AserraderoCustomerSource | null | undefined) {
-  const ruc = nonEmptyString(customer?.ruc);
-  const documento = nonEmptyString(customer?.documento);
-  const selectedDocument = ruc ?? documento;
-  const tipoDocumento =
-    ruc !== null
-      ? "RUC"
-      : documento?.length === 8
-        ? "DNI"
-        : documento
-          ? "Documento"
-          : null;
-
-  return {
-    nombre: nonEmptyString(customer?.nombre) ?? "Cliente no registrado",
-    documento: selectedDocument,
-    tipoDocumento,
-  } satisfies AserraderoPrintModel["customer"];
+  return clienteParaComprobante(customer, "Cliente no registrado");
 }
 
 export function buildAserraderoPrintModel({

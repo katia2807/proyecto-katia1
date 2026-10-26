@@ -1,3 +1,6 @@
+import { clienteParaComprobante, entregaParaComprobante } from "@/lib/comprobante-presentacion";
+import { ComprobanteItemDescription } from "@/components/sales/comprobante-item-description";
+import { ComprobanteReviewNotice } from "@/components/sales/comprobante-review-notice";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { getEmpresaConfig } from "@/lib/company-config";
@@ -127,7 +130,7 @@ export async function PrintA4Voucher({ id, docType, searchTipo, volver }: PrintA
   let fechaVenta  = "—";
   let clienteNombre = "—";
   let clienteDoc    = "—";
-  let items: Array<{ desc: string; qty: string; unitario: string; total: string; kind?: "producto" | "ajuste" }> = [];
+  let items: Array<{ desc: string; medidas?: string; advertenciaMedidas?: string; qty: string; unitario: string; total: string; kind?: "producto" | "ajuste" }> = [];
   let totalSoles    = 0;
   let modalidad     = "—";
   let metodo        = "—";
@@ -149,8 +152,9 @@ export async function PrintA4Voucher({ id, docType, searchTipo, volver }: PrintA
     entrega     = "recojo";
 
     const cli     = clienteMap.get(aserraderoServicio.cliente_id);
-    clienteNombre = cli?.nombre ?? "—";
-    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
+    const clienteImpreso = clienteParaComprobante(cli);
+    clienteNombre = clienteImpreso.nombre;
+    clienteDoc = clienteImpreso.documento ?? "—";
 
     if (aserraderoServicio.lineas_json) {
       try {
@@ -177,8 +181,9 @@ export async function PrintA4Voucher({ id, docType, searchTipo, volver }: PrintA
     entrega     = "entrega local";
 
     const cli     = clienteMap.get(ventaMadera.cliente_id);
-    clienteNombre = cli?.nombre ?? "—";
-    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
+    const clienteImpreso = clienteParaComprobante(cli);
+    clienteNombre = clienteImpreso.nombre;
+    clienteDoc = clienteImpreso.documento ?? "—";
 
     for (const linea of ventaMadera.lineas) {
       let desc = "Venta de madera";
@@ -210,8 +215,9 @@ export async function PrintA4Voucher({ id, docType, searchTipo, volver }: PrintA
     entrega        = venta.tipo_entrega ?? "—";
 
     const cli      = clienteMap.get(venta.cliente_id);
-    clienteNombre  = cli?.nombre ?? "—";
-    clienteDoc     = cli?.ruc ?? cli?.documento ?? "—";
+    const clienteImpreso = clienteParaComprobante(cli);
+    clienteNombre = clienteImpreso.nombre;
+    clienteDoc = clienteImpreso.documento ?? "—";
 
     items = getMaderaCortadaCustomerItems(printModel.items, printModel.totalSoles);
     if (venta.tipo_entrega && venta.tipo_entrega !== "recojo" && venta.direccion_entrega) {
@@ -227,8 +233,9 @@ export async function PrintA4Voucher({ id, docType, searchTipo, volver }: PrintA
     entrega       = venta.tipo_entrega ?? "—";
 
     const cli     = clienteMap.get(venta.cliente_id);
-    clienteNombre = cli?.nombre ?? "—";
-    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
+    const clienteImpreso = clienteParaComprobante(cli);
+    clienteNombre = clienteImpreso.nombre;
+    clienteDoc = clienteImpreso.documento ?? "—";
 
     const muebleNombre = venta.mueble_catalogo_id
       ? ((await getMuebleNombre(venta.mueble_catalogo_id)) ?? "Mueble")
@@ -299,6 +306,8 @@ export async function PrintA4Voucher({ id, docType, searchTipo, volver }: PrintA
           <PrintButton />
         </div>
       </div>
+
+      <ComprobanteReviewNotice items={items} />
 
       {/* Document page layout A4 */}
       <div
@@ -569,7 +578,7 @@ export async function PrintA4Voucher({ id, docType, searchTipo, volver }: PrintA
                       {tipo === "mueble" ? `${item.qty} UND.` : item.qty}
                     </td>
                     <td className="min-w-0 whitespace-normal break-words px-2 py-2.5 text-sm leading-snug">
-                      <p className="font-semibold">{item.desc}</p>
+                      <ComprobanteItemDescription item={item} />
                     </td>
                     <td className="px-2 py-2.5 text-right text-sm whitespace-nowrap">{item.unitario}</td>
                     <td className="py-2.5 pl-2 pr-3 text-right text-sm font-bold whitespace-nowrap">{item.total}</td>
@@ -614,7 +623,7 @@ export async function PrintA4Voucher({ id, docType, searchTipo, volver }: PrintA
           </div>
           <div>
             <span className="text-[10px] font-bold text-gray-500 uppercase">Tipo de Entrega</span>
-            <p className="text-sm font-semibold mt-1 capitalize">{entrega}</p>
+            <p className="text-sm font-semibold mt-1 capitalize">{entregaParaComprobante(entrega)}</p>
           </div>
         </div>
 

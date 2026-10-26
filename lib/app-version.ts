@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.95";
-export const APP_LAST_UPDATE = "19/10/2026";
+export const APP_VERSION = "1.1.96";
+export const APP_LAST_UPDATE = "26/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Ahora la eliminación de clientes muestra si está disponible y explica los bloqueos por estado o historial. Las confirmaciones y los avisos son más claros, conservando los registros vinculados y tus datos.";
+  "Los comprobantes muestran descripciones más claras, medidas separadas y entregas legibles. Si falta DNI o RUC, aparece una raya. Las diferencias de unidades se señalan para revisar, sin cambiar importes.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {

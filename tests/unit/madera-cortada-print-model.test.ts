@@ -48,7 +48,7 @@ describe("buildMaderaCortadaPrintModel", () => {
     expect(model.totalSoles).toBe(93.33);
     expect(model.items).toHaveLength(1);
     expect(model.items[0]?.desc).toContain("Tabla de roble selecto");
-    expect(model.items[0]?.desc).toContain(`1\" × 8\" × 10'`);
+    expect(model.items[0]?.medidas).toBe("1 pulg × 8 pulg × 10 pies");
     expect(model.items[0]?.qty).toMatch(/4\s*pzs/i);
     expect(model.items[0]?.unitario).toContain("23.33");
     expect(model.items[0]?.total).toContain("93.33");

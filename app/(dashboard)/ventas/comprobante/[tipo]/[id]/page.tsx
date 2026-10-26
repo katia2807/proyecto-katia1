@@ -1,3 +1,6 @@
+import { clienteParaComprobante, entregaParaComprobante } from "@/lib/comprobante-presentacion";
+import { ComprobanteItemDescription } from "@/components/sales/comprobante-item-description";
+import { ComprobanteReviewNotice } from "@/components/sales/comprobante-review-notice";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { getEmpresaConfig } from "@/lib/company-config";
@@ -342,7 +345,7 @@ export default async function ComprobantePage({
   let fechaVenta  = "—";
   let clienteNombre = "—";
   let clienteDoc    = "—";
-  let items: Array<{ desc: string; qty: string; unitario: string; total: string; kind?: "producto" | "ajuste" }> = [];
+  let items: Array<{ desc: string; medidas?: string; advertenciaMedidas?: string; qty: string; unitario: string; total: string; kind?: "producto" | "ajuste" }> = [];
   let totalSoles    = 0;
   let modalidad     = "—";
   let metodo        = "—";
@@ -373,8 +376,9 @@ export default async function ComprobantePage({
     entrega     = "recojo";
 
     const cli     = clienteMap.get(aserraderoServicio.cliente_id);
-    clienteNombre = cli?.nombre ?? "—";
-    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
+    const clienteImpreso = clienteParaComprobante(cli);
+    clienteNombre = clienteImpreso.nombre;
+    clienteDoc = clienteImpreso.documento ?? "—";
 
     if (aserraderoServicio.lineas_json) {
       try {
@@ -403,8 +407,9 @@ export default async function ComprobantePage({
     entrega     = "entrega local";
 
     const cli     = clienteMap.get(ventaMadera.cliente_id);
-    clienteNombre = cli?.nombre ?? "—";
-    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
+    const clienteImpreso = clienteParaComprobante(cli);
+    clienteNombre = clienteImpreso.nombre;
+    clienteDoc = clienteImpreso.documento ?? "—";
 
     for (const linea of ventaMadera.lineas) {
       let desc = "Venta de madera";
@@ -438,8 +443,9 @@ export default async function ComprobantePage({
     entrega        = venta.tipo_entrega ?? "—";
 
     const cli      = clienteMap.get(venta.cliente_id);
-    clienteNombre  = cli?.nombre ?? "—";
-    clienteDoc     = cli?.ruc ?? cli?.documento ?? "—";
+    const clienteImpreso = clienteParaComprobante(cli);
+    clienteNombre = clienteImpreso.nombre;
+    clienteDoc = clienteImpreso.documento ?? "—";
 
     items = getMaderaCortadaCustomerItems(printModel.items, printModel.totalSoles);
     if (venta.tipo_entrega && venta.tipo_entrega !== "recojo" && venta.direccion_entrega) {
@@ -457,8 +463,9 @@ export default async function ComprobantePage({
     entrega       = venta.tipo_entrega ?? "—";
 
     const cli     = clienteMap.get(venta.cliente_id);
-    clienteNombre = cli?.nombre ?? "—";
-    clienteDoc    = cli?.ruc ?? cli?.documento ?? "—";
+    const clienteImpreso = clienteParaComprobante(cli);
+    clienteNombre = clienteImpreso.nombre;
+    clienteDoc = clienteImpreso.documento ?? "—";
 
     const muebleNombre = venta.mueble_catalogo_id
       ? ((await getMuebleNombre(venta.mueble_catalogo_id)) ?? "Mueble")
@@ -562,6 +569,8 @@ export default async function ComprobantePage({
         </div>
       </div>
 
+
+      <ComprobanteReviewNotice items={items} />
 
       {/* Voucher */}
       <div
@@ -839,7 +848,7 @@ export default async function ComprobantePage({
                         <td className="voucher-td whitespace-normal py-2 pl-2 pr-2 text-left text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">
                           {tipo === "mueble" ? `${item.qty} UND.` : item.qty}
                         </td>
-                        <td className="voucher-td min-w-0 whitespace-normal break-words px-2 py-2 text-sm leading-snug text-[var(--color-text-primary,#1e293b)]">{item.desc}</td>
+                        <td className="voucher-td min-w-0 whitespace-normal break-words px-2 py-2 text-sm leading-snug text-[var(--color-text-primary,#1e293b)]"><ComprobanteItemDescription item={item} /></td>
                         <td className="voucher-td whitespace-nowrap px-2 py-2 text-right text-sm text-[var(--color-text-primary,#1e293b)]">{item.unitario}</td>
                         <td className="voucher-td whitespace-nowrap py-2 pl-2 pr-2 text-right text-sm font-semibold text-[var(--color-text-primary,#1e293b)]">{item.total}</td>
                       </tr>
@@ -884,7 +893,7 @@ export default async function ComprobantePage({
             </div>
             <div>
               <p className="voucher-label text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-secondary,#94a3b8)]">Entrega</p>
-              <p className="voucher-value mt-0.5 text-sm font-medium text-[var(--color-text-primary,#1e293b)] capitalize">{entrega}</p>
+              <p className="voucher-value mt-0.5 text-sm font-medium text-[var(--color-text-primary,#1e293b)] capitalize">{entregaParaComprobante(entrega)}</p>
             </div>
           </div>
           <div className="mt-4 flex flex-col items-center gap-2 text-center">

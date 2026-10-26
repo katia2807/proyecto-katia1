@@ -41,6 +41,8 @@ export type MaderaCortadaPrintSource = {
 
 export type MaderaCortadaPrintItem = {
   desc: string;
+  medidas?: string;
+  advertenciaMedidas?: string;
   qty: string;
   unitario: string;
   total: string;
@@ -275,18 +277,22 @@ function tipoCorteLabel(tipoCorte: string | null | undefined) {
 }
 
 function detailedDescription(linea: MaderaCortadaVoucherLine, tipoCorte: string | null | undefined) {
-  const corte = tipoCorteLabel(tipoCorte);
-  const descripcion = compactText(linea.descripcion);
-  const descContainsCut = descripcion
-    ? normalizedComparisonText(descripcion).includes(normalizedComparisonText(corte))
-    : false;
-  const base = descripcion
-    ? (descContainsCut ? descripcion : `${corte} — ${descripcion}`)
-    : `${corte} de madera cortada`;
-  const hasDimensions = linea.espesor > 0 && linea.ancho > 0 && linea.largo > 0;
+  return compactText(linea.descripcion) || (tipoCorteLabel(tipoCorte) + " de madera cortada");
+}
 
-  if (!hasDimensions) return base;
-  return `${base} · ${formatCompactNumber(linea.espesor, 2)}\" × ${formatCompactNumber(linea.ancho, 2)}\" × ${formatCompactNumber(linea.largo, 2)}'`;
+function detailedDimensions(linea: MaderaCortadaVoucherLine) {
+  if (!(linea.espesor > 0 && linea.ancho > 0 && linea.largo > 0)) return undefined;
+  return formatCompactNumber(linea.espesor, 2) + " pulg × " + formatCompactNumber(linea.ancho, 2) + " pulg × " + formatCompactNumber(linea.largo, 2) + " pies";
+}
+
+/** Señala unidades de largo distintas; no convierte medidas ni recalcula la venta. */
+function descriptionMeasureWarning(linea: MaderaCortadaVoucherLine) {
+  if (!(linea.largo > 0)) return undefined;
+  const description = compactText(linea.descripcion);
+  const metric = description.match(/(?:\d+(?:[.,]\d+)?\s*(?:["″]|pulg(?:adas)?|cent[ií]metros?|mil[ií]metros?|metros?|cm|mm|m)?\s*[x×]\s*){2}(\d+(?:[.,]\d+)?)\s*(cent[ií]metros?|mil[ií]metros?|metros?|cm|mm|m)\b/i)
+    ?? description.match(/\blargo\s*(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(cent[ií]metros?|mil[ií]metros?|metros?|cm|mm|m)\b/i);
+  if (!metric) return undefined;
+  return "La descripción indica un largo de " + metric[1] + " " + metric[2] + "; el largo registrado es " + formatCompactNumber(linea.largo, 2) + " pies. Confirma que correspondan.";
 }
 
 function validStoredDocumentType(value: unknown): Exclude<TipoComprobanteVenta, "ninguno"> | null {
@@ -325,6 +331,8 @@ export function buildMaderaCortadaPrintModel(
     const subtotalLineas = roundMoney(storedLines.reduce((sum, linea) => sum + linea.subtotal, 0));
     const items: MaderaCortadaPrintItem[] = storedLines.map((linea) => ({
       desc: detailedDescription(linea, source.tipo_corte),
+      medidas: detailedDimensions(linea),
+      advertenciaMedidas: descriptionMeasureWarning(linea),
       qty: `${formatCompactNumber(linea.cantidad)} ${linea.unidad}`,
       unitario: formatPen(linea.precio_unitario),
       total: formatPen(linea.subtotal),
