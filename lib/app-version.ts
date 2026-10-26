@@ -1,7 +1,7 @@
-export const APP_VERSION = "1.1.98";
+export const APP_VERSION = "1.1.99";
 export const APP_LAST_UPDATE = "26/10/2026";
 export const APP_UPDATE_SUMMARY =
-  "Los comprobantes verifican la sesión antes de consultar datos, también en la vista normal. Se refuerza la privacidad al abrir o imprimir documentos, conservando sus descripciones, medidas e importes.";
+  "En Clientes 360, el enlace ahora dice «Revisar eliminación» para aclarar que abre la revisión de la ficha. Puedes ver los requisitos y motivos de bloqueo antes de confirmar el borrado cuando esté permitido.";
 
 /** Presentación de esta renovación; las siguientes notas no la reutilizan. */
 export const APP_UPDATE_PRESENTATION = {

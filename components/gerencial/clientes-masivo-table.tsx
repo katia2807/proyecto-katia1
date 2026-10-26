@@ -189,7 +189,7 @@ export function ClientesMasivoTable({ clientes, canManage }: Props) {
                         <Link href={"/gerencial?tab=clientes360&cliente=" + encodeURIComponent(c.id) + "#eliminar-cliente"}
                           aria-label={"Revisar eliminación de " + c.nombre}
                           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[var(--katia-text-secondary)] hover:bg-[var(--katia-surface-raised)]">
-                          <IconTrash aria-hidden="true" className="size-3.5" /> Eliminar
+                          <IconTrash aria-hidden="true" className="size-3.5" /> Revisar eliminación
                         </Link>
                       ) : null}
                     </div>
